@@ -263,6 +263,12 @@ export async function handleS3Request(
       "expect",
       "transfer-encoding",
       "content-length",
+      "x-forwarded-for",
+      "x-forwarded-host",
+      "x-forwarded-proto",
+      "x-forwarded-port",
+      "x-forwarded-server",
+      "x-real-ip",
     ];
 
     req.headers.forEach((value, key) => {
