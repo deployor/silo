@@ -148,7 +148,7 @@ export async function handleS3Request(
         `?${cleanUrl.searchParams.toString()}`,
         {
           method: "GET",
-          headers: req.headers,
+          headers: filterUpstreamHeaders(req.headers),
         },
       );
 
@@ -185,7 +185,7 @@ export async function handleS3Request(
         `?${cleanUrl.searchParams.toString()}`,
         {
           method: "GET",
-          headers: req.headers,
+          headers: filterUpstreamHeaders(req.headers),
         },
       );
 
@@ -208,7 +208,7 @@ export async function handleS3Request(
 
       const response = await s3Client.fetch(pathWithQuery, {
         method: "GET",
-        headers: req.headers,
+        headers: filterUpstreamHeaders(req.headers),
       });
 
       if (url.searchParams.has("uploadId")) {

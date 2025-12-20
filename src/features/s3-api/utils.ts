@@ -59,7 +59,8 @@ export async function rewriteCopySourceHeader(
     return null;
   }
 
-  const internalPath = `users/${sourceBucket.userId}/${sourceBucket.name}/${key}`;
+  const sanitizedUserId = sourceBucket.userId.replace(/[^a-zA-Z0-9-]/g, "_");
+  const internalPath = `users/${sanitizedUserId}/${sourceBucket.name}/${key}`;
 
   return `/${config.s3.bucket}/${internalPath}`;
 }
@@ -101,27 +102,25 @@ export function stripAuthQueryParams(url: URL): URL {
 
 export function filterUpstreamHeaders(reqHeaders: Headers): Headers {
   const upstreamHeaders = new Headers();
-  const forbiddenHeaders = [
-    "authorization",
-    "host",
-    "connection",
-    "date",
-    "x-amz-date",
-    "x-amz-security-token",
-    "x-amz-content-sha256",
-    "expect",
-    "transfer-encoding",
+  const allowedHeaders = [
+    "content-type",
     "content-length",
-    "x-forwarded-for",
-    "x-forwarded-host",
-    "x-forwarded-proto",
-    "x-forwarded-port",
-    "x-forwarded-server",
-    "x-real-ip",
+    "content-md5",
+    "cache-control",
+    "content-disposition",
+    "content-encoding",
+    "content-language",
+    "expires",
+    "range",
+    "if-match",
+    "if-none-match",
+    "if-modified-since",
+    "if-unmodified-since",
   ];
 
   reqHeaders.forEach((value, key) => {
-    if (!forbiddenHeaders.includes(key.toLowerCase())) {
+    const lowerKey = key.toLowerCase();
+    if (allowedHeaders.includes(lowerKey)) {
       upstreamHeaders.set(key, value);
     }
   });
