@@ -340,9 +340,18 @@ export async function handleS3Request(
         status: response.status,
         headers: response.headers,
       });
-    } catch (e) {
+    } catch (e: any) {
       console.error("PUT Error:", e);
-      return new Response("Internal Error", { status: 500 });
+      return new Response(
+        `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+    <Code>InternalError</Code>
+    <Message>${e.message}</Message>
+    <Resource>/</Resource>
+    <RequestId>0000000000000000</RequestId>
+</Error>`,
+        { status: 500, headers: { "Content-Type": "application/xml" } },
+      );
     }
   }
 

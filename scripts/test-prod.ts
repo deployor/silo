@@ -1,43 +1,48 @@
-import { AwsClient } from "aws4fetch";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 
 async function runTest() {
-  console.log("🧪 Starting Integration Test...");
+  console.log("🧪 Starting Integration Test (AWS SDK v3)...");
 
   const testBucketName = "testtest";
   const accessKey = "CKD4DCC2B3BB4F9AEDC305";
   const secretKey = "4495a68af0cb0c56778f5b363ea22a4e33588eaa";
   const endpoint = "https://cargo.deployor.dev";
 
-  const s3 = new AwsClient({
-    accessKeyId: accessKey,
-    secretAccessKey: secretKey,
-    service: "s3",
+  const s3 = new S3Client({
     region: "auto",
+    endpoint: endpoint,
+    credentials: {
+      accessKeyId: accessKey,
+      secretAccessKey: secretKey,
+    },
+    forcePathStyle: true, // Use path-style URLs
   });
 
   try {
     console.log("\nTesting PUT Object...");
-    const putRes = await s3.fetch(`${endpoint}/${testBucketName}/hello.txt`, {
-      method: "PUT",
-      body: "Hello World!",
-    });
-
-    if (putRes.status !== 200) {
-      throw new Error(
-        `PUT failed with status ${putRes.status}: ${await putRes.text()}`,
-      );
-    }
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: testBucketName,
+        Key: "hello.txt",
+        Body: "Hello World!",
+      }),
+    );
     console.log("✅ PUT Object success");
 
     console.log("\nTesting GET Object...");
-    const getRes = await s3.fetch(`${endpoint}/${testBucketName}/hello.txt`);
-
-    if (getRes.status !== 200) {
-      throw new Error(
-        `GET failed with status ${getRes.status}: ${await getRes.text()}`,
-      );
-    }
-    const content = await getRes.text();
+    const getRes = await s3.send(
+      new GetObjectCommand({
+        Bucket: testBucketName,
+        Key: "hello.txt",
+      }),
+    );
+    const content = await getRes.Body?.transformToString();
     if (content !== "Hello World!") {
       throw new Error(
         `GET content mismatch. Expected 'Hello World!', got '${content}'`,
@@ -46,31 +51,24 @@ async function runTest() {
     console.log("✅ GET Object success");
 
     console.log("\nTesting List Objects...");
-    const listRes = await s3.fetch(
-      `${endpoint}/${testBucketName}/?list-type=2`,
+    const listRes = await s3.send(
+      new ListObjectsV2Command({
+        Bucket: testBucketName,
+      }),
     );
-
-    if (listRes.status !== 200) {
-      throw new Error(
-        `LIST failed with status ${listRes.status}: ${await listRes.text()}`,
-      );
-    }
-    const xml = await listRes.text();
-    if (!xml.includes("hello.txt")) {
+    const found = listRes.Contents?.some((obj) => obj.Key === "hello.txt");
+    if (!found) {
       throw new Error("LIST response missing hello.txt");
     }
     console.log("✅ List Objects success");
 
     console.log("\nTesting DELETE Object...");
-    const delRes = await s3.fetch(`${endpoint}/${testBucketName}/hello.txt`, {
-      method: "DELETE",
-    });
-
-    if (delRes.status !== 204 && delRes.status !== 200) {
-      throw new Error(
-        `DELETE failed with status ${delRes.status}: ${await delRes.text()}`,
-      );
-    }
+    await s3.send(
+      new DeleteObjectCommand({
+        Bucket: testBucketName,
+        Key: "hello.txt",
+      }),
+    );
     console.log("✅ DELETE Object success");
 
     console.log("\n🎉 All tests passed!");
