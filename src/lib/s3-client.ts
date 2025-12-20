@@ -50,6 +50,24 @@ export class HetznerS3Client {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
 
+        console.log(`[S3Client] Fetching: ${baseUrl.toString()}`);
+        
+        const headersObj: Record<string, string> = {};
+        if (init?.headers) {
+            if (init.headers instanceof Headers) {
+                init.headers.forEach((v, k) => {
+                    headersObj[k] = v;
+                });
+            } else if (Array.isArray(init.headers)) {
+                init.headers.forEach(([k, v]) => {
+                    headersObj[k] = v;
+                });
+            } else {
+                Object.assign(headersObj, init.headers);
+            }
+        }
+        console.log(`[S3Client] Headers:`, JSON.stringify(headersObj));
+
         const res = await this.client.fetch(baseUrl.toString(), {
           ...init,
           signal: controller.signal,

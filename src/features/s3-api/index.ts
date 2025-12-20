@@ -271,6 +271,10 @@ export async function handleS3Request(
       }
     });
 
+    if (contentLength > 0) {
+      upstreamHeaders.set("Content-Length", contentLength.toString());
+    }
+
     upstreamHeaders.set("x-amz-content-sha256", "UNSIGNED-PAYLOAD");
 
     const copySource = req.headers.get("x-amz-copy-source");
@@ -303,7 +307,7 @@ export async function handleS3Request(
           body: req.body,
           duplex: "half",
         } as any,
-        0,
+        1,
       );
 
       if (response.ok && contentLength > 0 && !copySource) {
