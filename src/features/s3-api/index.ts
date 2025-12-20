@@ -291,9 +291,6 @@ export async function handleS3Request(
       const endpoint = s3Client.getEndpoint();
       const baseUrl = new URL(`https://${bucketName}.${endpoint}`);
 
-      // Explicitly set Host header to match what aws4fetch expects and what we want to send
-      upstreamHeaders.set("Host", `${bucketName}.${endpoint}`);
-
       const relative = internalPath.startsWith("/")
         ? internalPath.slice(1)
         : internalPath;
@@ -306,14 +303,22 @@ export async function handleS3Request(
 
       const fullUrl = baseUrl.toString();
 
+      // Explicitly set Host header to match what aws4fetch expects and what we want to send
+      upstreamHeaders.set("Host", `${bucketName}.${endpoint}`);
+
       const signedReq = await s3Client.sign(fullUrl, {
         method: "PUT",
         headers: upstreamHeaders,
       });
 
+      // Remove Host header from fetch options as it's handled by the URL
+      // but keep it in the signature
+      const fetchHeaders = new Headers(signedReq.headers);
+      fetchHeaders.delete("Host");
+
       const response = await fetch(fullUrl, {
         method: "PUT",
-        headers: signedReq.headers,
+        headers: fetchHeaders,
         body: req.body,
         duplex: "half",
       } as any);
