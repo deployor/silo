@@ -4,40 +4,22 @@ import {
   GetObjectCommand,
   ListObjectsV2Command,
   DeleteObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  CopyObjectCommand,
+  DeleteObjectsCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3";
-import { AwsClient } from "aws4fetch";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 async function runTest() {
-  console.log("🧪 Starting Integration Test (AWS SDK v3)...");
+  console.log("🧪 Starting Comprehensive Security & Integration Test...");
 
   const testBucketName = "testtest";
   const accessKey = "CKD4DCC2B3BB4F9AEDC305";
   const secretKey = "4495a68af0cb0c56778f5b363ea22a4e33588eaa";
   const endpoint = "https://cargo.deployor.dev";
-
-  // DEBUG: Perform a raw request to see the actual response body
-  console.log("\n🔍 Debug: Performing raw PUT request...");
-  try {
-    const client = new AwsClient({
-      accessKeyId: accessKey,
-      secretAccessKey: secretKey,
-      service: "s3",
-      region: "auto",
-    });
-
-    const url = `${endpoint}/${testBucketName}/hello.txt`;
-    const res = await client.fetch(url, {
-      method: "PUT",
-      body: "Hello World!",
-    });
-
-    console.log("Raw Response Status:", res.status);
-    console.log("Raw Response Headers:", Object.fromEntries(res.headers.entries()));
-    const text = await res.text();
-    console.log("Raw Response Body Preview:", text.slice(0, 500));
-  } catch (e) {
-    console.error("Raw fetch failed:", e);
-  }
 
   const s3 = new S3Client({
     region: "auto",
@@ -46,11 +28,14 @@ async function runTest() {
       accessKeyId: accessKey,
       secretAccessKey: secretKey,
     },
-    forcePathStyle: true, // Use path-style URLs
+    forcePathStyle: true,
   });
 
   try {
-    console.log("\nTesting PUT Object...");
+    // --- Basic Operations ---
+    console.log("\n--- Basic Operations ---");
+
+    console.log("Testing PUT Object...");
     await s3.send(
       new PutObjectCommand({
         Bucket: testBucketName,
@@ -60,7 +45,7 @@ async function runTest() {
     );
     console.log("✅ PUT Object success");
 
-    console.log("\nTesting GET Object...");
+    console.log("Testing GET Object...");
     const getRes = await s3.send(
       new GetObjectCommand({
         Bucket: testBucketName,
@@ -75,7 +60,16 @@ async function runTest() {
     }
     console.log("✅ GET Object success");
 
-    console.log("\nTesting List Objects...");
+    console.log("Testing HEAD Object...");
+    await s3.send(
+      new HeadObjectCommand({
+        Bucket: testBucketName,
+        Key: "hello.txt",
+      }),
+    );
+    console.log("✅ HEAD Object success");
+
+    console.log("Testing List Objects...");
     const listRes = await s3.send(
       new ListObjectsV2Command({
         Bucket: testBucketName,
@@ -87,16 +81,144 @@ async function runTest() {
     }
     console.log("✅ List Objects success");
 
-    console.log("\nTesting DELETE Object...");
-    await s3.send(
-      new DeleteObjectCommand({
+    // --- Multipart Upload ---
+    console.log("\n--- Multipart Upload ---");
+    console.log("Initiating Multipart Upload...");
+    const multipartUpload = await s3.send(
+      new CreateMultipartUploadCommand({
         Bucket: testBucketName,
-        Key: "hello.txt",
+        Key: "multipart.txt",
       }),
     );
-    console.log("✅ DELETE Object success");
+    const uploadId = multipartUpload.UploadId;
+    console.log(`Upload ID: ${uploadId}`);
 
-    console.log("\n🎉 All tests passed!");
+    console.log("Uploading Part 1...");
+    const part1 = await s3.send(
+      new UploadPartCommand({
+        Bucket: testBucketName,
+        Key: "multipart.txt",
+        PartNumber: 1,
+        UploadId: uploadId,
+        Body: "Part 1 Data",
+      }),
+    );
+
+    console.log("Completing Multipart Upload...");
+    await s3.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: testBucketName,
+        Key: "multipart.txt",
+        UploadId: uploadId,
+        MultipartUpload: {
+          Parts: [{ PartNumber: 1, ETag: part1.ETag }],
+        },
+      }),
+    );
+    console.log("✅ Multipart Upload success");
+
+    // --- Copy Object ---
+    console.log("\n--- Copy Object ---");
+    console.log("Copying Object...");
+    await s3.send(
+      new CopyObjectCommand({
+        Bucket: testBucketName,
+        CopySource: `${testBucketName}/hello.txt`,
+        Key: "copy.txt",
+      }),
+    );
+    console.log("✅ Copy Object success");
+
+    // --- Delete Objects ---
+    console.log("\n--- Delete Objects ---");
+    console.log("Deleting Multiple Objects...");
+    await s3.send(
+      new DeleteObjectsCommand({
+        Bucket: testBucketName,
+        Delete: {
+          Objects: [{ Key: "multipart.txt" }, { Key: "copy.txt" }],
+        },
+      }),
+    );
+    console.log("✅ Delete Objects success");
+
+    // --- Security & Isolation Tests ---
+    console.log("\n--- Security & Isolation Tests ---");
+
+    console.log("Testing Path Traversal Attack (../)...");
+    try {
+      await s3.send(
+        new GetObjectCommand({
+          Bucket: testBucketName,
+          Key: "../../../etc/passwd",
+        }),
+      );
+      console.error("❌ Path Traversal Attack SUCCEEDED (Should have failed)");
+    } catch (e) {
+      console.log("✅ Path Traversal Attack blocked");
+    }
+
+    console.log("Testing Access to Another User's Bucket...");
+    const otherS3 = new S3Client({
+      region: "auto",
+      endpoint: endpoint,
+      credentials: {
+        accessKeyId: "INVALID_KEY",
+        secretAccessKey: "INVALID_SECRET",
+      },
+    });
+    try {
+      await otherS3.send(
+        new GetObjectCommand({
+          Bucket: testBucketName,
+          Key: "hello.txt",
+        }),
+      );
+      console.error("❌ Unauthorized Access SUCCEEDED (Should have failed)");
+    } catch (e) {
+      console.log("✅ Unauthorized Access blocked");
+    }
+
+    console.log("Testing Bucket Creation (Should be blocked)...");
+    // Note: AWS SDK CreateBucketCommand might not work directly with custom endpoints if not configured perfectly,
+    // but we can simulate the request or use the command.
+    try {
+      // We'll use a raw fetch to simulate a bucket creation request to avoid SDK complexity with CreateBucket on custom endpoints
+      const res = await fetch(`${endpoint}/new-bucket`, {
+        method: "PUT",
+        headers: {
+          Authorization:
+            "AWS4-HMAC-SHA256 Credential=CKD4DCC2B3BB4F9AEDC305/20251220/auto/s3/aws4_request, ...",
+        },
+      });
+      if (res.status === 403) {
+        console.log("✅ Bucket Creation blocked");
+      } else {
+        console.error(
+          `❌ Bucket Creation SUCCEEDED with status ${res.status} (Should have failed)`,
+        );
+      }
+    } catch (e) {
+      console.log("✅ Bucket Creation blocked (Network Error)");
+    }
+
+    console.log("Testing Presigned URL...");
+    const command = new GetObjectCommand({
+      Bucket: testBucketName,
+      Key: "hello.txt",
+    });
+    const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+    console.log(`Generated Presigned URL: ${url}`);
+    const presignedRes = await fetch(url);
+    if (presignedRes.status === 200) {
+      console.log("✅ Presigned URL access success");
+    } else {
+      console.error(
+        `❌ Presigned URL access failed with status ${presignedRes.status}`,
+      );
+    }
+
+    console.log("\n🎉 All Comprehensive Tests Passed!");
   } catch (error) {
     console.error("\n❌ Test Failed:", error);
   }

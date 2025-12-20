@@ -258,7 +258,11 @@ export async function handleS3Request(
       upstreamHeaders.set("Content-Length", contentLength.toString());
     }
 
-    upstreamHeaders.set("x-amz-content-sha256", "UNSIGNED-PAYLOAD");
+    // If the client provided a SHA256 checksum, pass it through.
+    // Otherwise, default to UNSIGNED-PAYLOAD.
+    if (!upstreamHeaders.has("x-amz-content-sha256")) {
+      upstreamHeaders.set("x-amz-content-sha256", "UNSIGNED-PAYLOAD");
+    }
 
     const copySource = req.headers.get("x-amz-copy-source");
 
