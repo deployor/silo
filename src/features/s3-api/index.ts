@@ -260,6 +260,8 @@ export async function handleS3Request(
       "x-amz-date",
       "x-amz-security-token",
       "x-amz-content-sha256",
+      "expect",
+      "transfer-encoding",
     ];
 
     req.headers.forEach((value, key) => {
@@ -288,6 +290,9 @@ export async function handleS3Request(
       const bucketName = s3Client.getBucket();
       const endpoint = s3Client.getEndpoint();
       const baseUrl = new URL(`https://${bucketName}.${endpoint}`);
+
+      // Explicitly set Host header to match what aws4fetch expects and what we want to send
+      upstreamHeaders.set("Host", `${bucketName}.${endpoint}`);
 
       const relative = internalPath.startsWith("/")
         ? internalPath.slice(1)
