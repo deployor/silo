@@ -21,6 +21,15 @@ export function getKeyFromRequest(req: Request, bucketName: string): string {
     return path.slice(prefix.length);
   }
 
+  // If we are in path-style mode but the path doesn't start with the bucket name,
+  // it might be because we are already stripping it somewhere else or it's implicit.
+  // However, for safety, if we are NOT in virtual-host mode, we should expect the bucket name.
+  // But our logic in auth.ts handles the bucket extraction.
+  // Here we just want the key.
+
+  // If the path is just "/" or "/bucketName", the key is empty.
+  if (path === "/" || path === `/${bucketName}`) return "";
+
   return path.startsWith("/") ? path.slice(1) : path;
 }
 
