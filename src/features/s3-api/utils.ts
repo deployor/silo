@@ -70,7 +70,9 @@ export function getInternalPath(
   bucket: typeof buckets.$inferSelect,
 ): string {
   const cleanKey = key.startsWith("/") ? key.slice(1) : key;
-  return `users/${user.id}/${bucket.name}/${cleanKey}`;
+  // Sanitize user ID to remove special characters that might break S3 paths
+  const sanitizedUserId = user.id.replace(/[^a-zA-Z0-9-]/g, "_");
+  return `users/${sanitizedUserId}/${bucket.name}/${cleanKey}`;
 }
 
 export function stripAuthQueryParams(url: URL): URL {
