@@ -9,6 +9,7 @@ import {
   getInternalPath,
   rewriteCopySourceHeader,
   stripAuthQueryParams,
+  filterUpstreamHeaders,
 } from "./utils";
 import { db } from "../../db";
 import { users, buckets } from "../../db/schema";
@@ -251,31 +252,7 @@ export async function handleS3Request(
       }
     }
 
-    const upstreamHeaders = new Headers();
-    const forbiddenHeaders = [
-      "authorization",
-      "host",
-      "connection",
-      "date",
-      "x-amz-date",
-      "x-amz-security-token",
-      "x-amz-content-sha256",
-      "expect",
-      "transfer-encoding",
-      "content-length",
-      "x-forwarded-for",
-      "x-forwarded-host",
-      "x-forwarded-proto",
-      "x-forwarded-port",
-      "x-forwarded-server",
-      "x-real-ip",
-    ];
-
-    req.headers.forEach((value, key) => {
-      if (!forbiddenHeaders.includes(key.toLowerCase())) {
-        upstreamHeaders.set(key, value);
-      }
-    });
+    const upstreamHeaders = filterUpstreamHeaders(req.headers);
 
     if (contentLength > 0) {
       upstreamHeaders.set("Content-Length", contentLength.toString());

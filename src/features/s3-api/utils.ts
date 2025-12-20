@@ -99,6 +99,36 @@ export function stripAuthQueryParams(url: URL): URL {
   return newUrl;
 }
 
+export function filterUpstreamHeaders(reqHeaders: Headers): Headers {
+  const upstreamHeaders = new Headers();
+  const forbiddenHeaders = [
+    "authorization",
+    "host",
+    "connection",
+    "date",
+    "x-amz-date",
+    "x-amz-security-token",
+    "x-amz-content-sha256",
+    "expect",
+    "transfer-encoding",
+    "content-length",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-proto",
+    "x-forwarded-port",
+    "x-forwarded-server",
+    "x-real-ip",
+  ];
+
+  reqHeaders.forEach((value, key) => {
+    if (!forbiddenHeaders.includes(key.toLowerCase())) {
+      upstreamHeaders.set(key, value);
+    }
+  });
+
+  return upstreamHeaders;
+}
+
 export async function updateStats(
   user: typeof users.$inferSelect,
   bucket: typeof buckets.$inferSelect,
