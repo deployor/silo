@@ -179,6 +179,75 @@ async function runTest() {
       console.log("✅ Unauthorized Access blocked");
     }
 
+    console.log("Testing Cross-Tenant Access (User A -> Bucket B)...");
+    try {
+      await s3.send(
+        new GetObjectCommand({
+          Bucket: "other-users-bucket", // A bucket that definitely doesn't belong to this user
+          Key: "secret.txt",
+        }),
+      );
+      console.error("❌ Cross-Tenant Access SUCCEEDED (Should have failed)");
+    } catch (e: any) {
+      if (
+        e.$metadata?.httpStatusCode === 403 ||
+        e.$metadata?.httpStatusCode === 404
+      ) {
+        console.log("✅ Cross-Tenant Access blocked");
+      } else {
+        console.log(
+          `⚠️ Cross-Tenant Access failed with unexpected status: ${e.$metadata?.httpStatusCode}`,
+        );
+      }
+    }
+
+    console.log("Testing Cross-Tenant Copy Source...");
+    try {
+      await s3.send(
+        new CopyObjectCommand({
+          Bucket: testBucketName,
+          CopySource: "other-users-bucket/secret.txt", // Source is outside
+          Key: "stolen-secret.txt",
+        }),
+      );
+      console.error("❌ Cross-Tenant Copy SUCCEEDED (Should have failed)");
+    } catch (e: any) {
+      if (e.$metadata?.httpStatusCode === 403) {
+        console.log("✅ Cross-Tenant Copy blocked");
+      } else {
+        console.log(
+          `⚠️ Cross-Tenant Copy failed with unexpected status: ${e.$metadata?.httpStatusCode}`,
+        );
+      }
+    }
+
+    console.log("Testing URL Encoded Path Traversal...");
+    try {
+      await s3.send(
+        new GetObjectCommand({
+          Bucket: testBucketName,
+          Key: "..%2f..%2fetc/passwd",
+        }),
+      );
+      console.error("❌ Encoded Traversal SUCCEEDED");
+    } catch (e) {
+      console.log("✅ Encoded Traversal blocked");
+    }
+
+    console.log("Testing Unsupported HTTP Method (PATCH)...");
+    try {
+      const res = await fetch(`${endpoint}/${testBucketName}/hello.txt`, {
+        method: "PATCH",
+      });
+      if (res.status === 405 || res.status === 501 || res.status === 403) {
+        console.log("✅ Unsupported Method blocked");
+      } else {
+        console.error(`❌ Unsupported Method allowed: ${res.status}`);
+      }
+    } catch (e) {
+      console.log("✅ Unsupported Method blocked (Network Error)");
+    }
+
     console.log("Testing Bucket Creation (Should be blocked)...");
     // Note: AWS SDK CreateBucketCommand might not work directly with custom endpoints if not configured perfectly,
     // but we can simulate the request or use the command.

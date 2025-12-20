@@ -71,12 +71,28 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 
   if (!credential) {
     if (req.method !== "GET" && req.method !== "HEAD") {
-      return new Response("Access Denied", { status: 403 });
+      return new Response(
+        `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+    <Code>AccessDenied</Code>
+    <Message>Access Denied</Message>
+    <RequestId>0000000000000000</RequestId>
+</Error>`,
+        { status: 403, headers: { "Content-Type": "application/xml" } },
+      );
     }
 
     const requestedBucket = getBucketFromRequest(req);
     if (!requestedBucket) {
-      return new Response("Access Denied", { status: 403 });
+      return new Response(
+        `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+    <Code>AccessDenied</Code>
+    <Message>Access Denied</Message>
+    <RequestId>0000000000000000</RequestId>
+</Error>`,
+        { status: 403, headers: { "Content-Type": "application/xml" } },
+      );
     }
 
     const bucketResult = await db
@@ -90,13 +106,29 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
       .limit(1);
 
     if (bucketResult.length === 0) {
-      return new Response("Access Denied", { status: 403 });
+      return new Response(
+        `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+    <Code>AccessDenied</Code>
+    <Message>Access Denied</Message>
+    <RequestId>0000000000000000</RequestId>
+</Error>`,
+        { status: 403, headers: { "Content-Type": "application/xml" } },
+      );
     }
 
     const { bucket, user } = bucketResult[0];
 
     if (!bucket.isPublic) {
-      return new Response("Access Denied", { status: 403 });
+      return new Response(
+        `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+    <Code>AccessDenied</Code>
+    <Message>Access Denied</Message>
+    <RequestId>0000000000000000</RequestId>
+</Error>`,
+        { status: 403, headers: { "Content-Type": "application/xml" } },
+      );
     }
 
     return { user, bucket };
@@ -106,7 +138,15 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
     credential.split("/");
 
   if (service !== "s3") {
-    return new Response("Invalid Service", { status: 400 });
+    return new Response(
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+    <Code>InvalidRequest</Code>
+    <Message>Invalid Service</Message>
+    <RequestId>0000000000000000</RequestId>
+</Error>`,
+      { status: 400, headers: { "Content-Type": "application/xml" } },
+    );
   }
 
   const bucketResult = await db
@@ -120,7 +160,15 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
     .limit(1);
 
   if (bucketResult.length === 0) {
-    return new Response("Invalid Access Key Id", { status: 403 });
+    return new Response(
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+    <Code>InvalidAccessKeyId</Code>
+    <Message>The AWS Access Key Id you provided does not exist in our records.</Message>
+    <RequestId>0000000000000000</RequestId>
+</Error>`,
+      { status: 403, headers: { "Content-Type": "application/xml" } },
+    );
   }
 
   const { bucket, user } = bucketResult[0];
@@ -130,11 +178,28 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
   // If requestedBucket is present (Path-Style or Virtual-Host), it MUST match the key's bucket.
   // If it is NOT present (Implicit Mode), we allow it and assume the key's bucket.
   if (requestedBucket && requestedBucket !== bucket.name) {
-    return new Response("Access Denied", { status: 403 });
+    return new Response(
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+    <Code>AccessDenied</Code>
+    <Message>Access Denied</Message>
+    <RequestId>0000000000000000</RequestId>
+</Error>`,
+      { status: 403, headers: { "Content-Type": "application/xml" } },
+    );
   }
 
   const amzDate = getDate(req);
-  if (!amzDate) return new Response("Missing Date", { status: 403 });
+  if (!amzDate)
+    return new Response(
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+    <Code>AccessDenied</Code>
+    <Message>Missing Date Header</Message>
+    <RequestId>0000000000000000</RequestId>
+</Error>`,
+      { status: 403, headers: { "Content-Type": "application/xml" } },
+    );
 
   return { user, bucket };
 };
