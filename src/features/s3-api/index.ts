@@ -339,7 +339,7 @@ export async function handleS3Request(
 
       const response = await s3Client.fetch(pathWithQuery, {
         method: "DELETE",
-        headers: req.headers,
+        headers: filterUpstreamHeaders(req.headers),
       });
 
       return new Response(response.body, {
@@ -365,7 +365,7 @@ export async function handleS3Request(
 
       const response = await s3Client.fetch(pathWithQuery, {
         method: "HEAD",
-        headers: req.headers,
+        headers: filterUpstreamHeaders(req.headers),
       });
 
       return new Response(null, {
@@ -417,7 +417,7 @@ export async function handleS3Request(
     if (query.has("uploads")) {
       const response = await s3Client.fetch(`${internalPath}?uploads`, {
         method: "POST",
-        headers: req.headers,
+        headers: filterUpstreamHeaders(req.headers),
       });
       const resText = await response.text();
       const rootPrefix = getInternalPath("", user, bucket);
@@ -435,7 +435,7 @@ export async function handleS3Request(
         `${internalPath}?uploadId=${uploadId}`,
         {
           method: "POST",
-          headers: req.headers,
+          headers: filterUpstreamHeaders(req.headers),
           body: req.body,
         },
       );
