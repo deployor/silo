@@ -1,15 +1,23 @@
 {
-  "name": "s3-thing",
-  "version": "1.0.50",
+  "name": "cargo-s3-gateway",
+  "version": "1.0.0",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run --watch src/index.ts"
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "db:generate": "drizzle-kit generate:pg",
+    "db:push": "drizzle-kit push:pg",
+    "db:studio": "drizzle-kit studio",
+    "test": "bun run scripts/test.ts"
   },
   "dependencies": {
-    "elysia": "latest"
+    "aws4fetch": "^1.0.20",
+    "drizzle-orm": "^0.30.10",
+    "fast-xml-parser": "^4.5.3",
+    "postgres": "^3.4.7"
   },
   "devDependencies": {
-    "bun-types": "latest"
-  },
-  "module": "src/index.js"
+    "bun-types": "latest",
+    "drizzle-kit": "^0.20.18",
+    "@types/node": "^20.19.27"
+  }
 }
