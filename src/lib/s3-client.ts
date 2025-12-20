@@ -1,9 +1,22 @@
-import { AwsClient } from "aws4fetch";
+import {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  CopyObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
+  DeleteObjectsCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { config } from "../config";
 
 export class HetznerS3Client {
-  private client: AwsClient;
-  private endpoint: string;
+  private client: S3Client;
   private bucket: string;
 
   constructor() {
@@ -14,81 +27,161 @@ export class HetznerS3Client {
       throw new Error("Missing S3 configuration environment variables");
     }
 
-    this.endpoint = endpoint.replace(/^https?:\/\//, "").replace(/\/$/, "");
     this.bucket = bucket;
 
-    this.client = new AwsClient({
-      accessKeyId,
-      secretAccessKey,
-      service: "s3",
-      region,
+    // Ensure endpoint has protocol
+    const endpointUrl = endpoint.startsWith("http")
+      ? endpoint
+      : `https://${endpoint}`;
+
+    this.client = new S3Client({
+      region: region || "auto",
+      endpoint: endpointUrl,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+      forcePathStyle: true, // Hetzner/Impossible Cloud often works better with path style internally
     });
   }
 
-  async fetch(
-    pathAndQuery: string,
-    init?: RequestInit,
-    retries = 3,
-  ): Promise<Response> {
-    const baseUrl = new URL(`https://${this.bucket}.${this.endpoint}`);
-
-    if (pathAndQuery.startsWith("?")) {
-      baseUrl.search = pathAndQuery;
-    } else {
-      const relative = pathAndQuery.startsWith("/")
-        ? pathAndQuery.slice(1)
-        : pathAndQuery;
-      const tempUrl = new URL(relative, baseUrl.toString());
-
-      baseUrl.pathname = tempUrl.pathname;
-      baseUrl.search = tempUrl.search;
-    }
-
-    let lastError: unknown;
-    for (let i = 0; i < retries; i++) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-        const res = await this.client.fetch(baseUrl.toString(), {
-          ...init,
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (res.status >= 500) {
-          throw new Error(`Server error: ${res.status}`);
-        }
-
-        if (res.status === 403 || res.status === 404) {
-          return res;
-        }
-
-        return res;
-      } catch (e: any) {
-        lastError = e;
-        if (e.name === "AbortError") {
-          console.error("Upstream S3 request timed out");
-        }
-
-        if (i < retries - 1) {
-          await new Promise((r) => setTimeout(r, Math.pow(2, i) * 100));
-        }
-      }
-    }
-    throw lastError;
+  async getObject(key: string) {
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    });
+    return this.client.send(command);
   }
 
-  async sign(url: string, init?: RequestInit): Promise<Request> {
-    return this.client.sign(url, init);
+  async putObject(
+    key: string,
+    body: any,
+    contentType?: string,
+    contentLength?: number,
+  ) {
+    const command = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      ContentLength: contentLength,
+    });
+    return this.client.send(command);
   }
 
-  getEndpoint(): string {
-    return this.endpoint;
+  async deleteObject(key: string) {
+    const command = new DeleteObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    });
+    return this.client.send(command);
   }
 
-  getBucket(): string {
+  async headObject(key: string) {
+    const command = new HeadObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    });
+    return this.client.send(command);
+  }
+
+  async listObjectsV2(
+    prefix: string,
+    delimiter?: string,
+    continuationToken?: string,
+    maxKeys?: number,
+    startAfter?: string,
+  ) {
+    const command = new ListObjectsV2Command({
+      Bucket: this.bucket,
+      Prefix: prefix,
+      Delimiter: delimiter,
+      ContinuationToken: continuationToken,
+      MaxKeys: maxKeys,
+      StartAfter: startAfter,
+    });
+    return this.client.send(command);
+  }
+
+  async copyObject(sourceKey: string, destinationKey: string) {
+    const command = new CopyObjectCommand({
+      Bucket: this.bucket,
+      CopySource: `${this.bucket}/${sourceKey}`,
+      Key: destinationKey,
+    });
+    return this.client.send(command);
+  }
+
+  async createMultipartUpload(key: string, contentType?: string) {
+    const command = new CreateMultipartUploadCommand({
+      Bucket: this.bucket,
+      Key: key,
+      ContentType: contentType,
+    });
+    return this.client.send(command);
+  }
+
+  async uploadPart(
+    key: string,
+    uploadId: string,
+    partNumber: number,
+    body: any,
+  ) {
+    const command = new UploadPartCommand({
+      Bucket: this.bucket,
+      Key: key,
+      UploadId: uploadId,
+      PartNumber: partNumber,
+      Body: body,
+    });
+    return this.client.send(command);
+  }
+
+  async completeMultipartUpload(
+    key: string,
+    uploadId: string,
+    parts: { ETag?: string; PartNumber: number }[],
+  ) {
+    const command = new CompleteMultipartUploadCommand({
+      Bucket: this.bucket,
+      Key: key,
+      UploadId: uploadId,
+      MultipartUpload: {
+        Parts: parts,
+      },
+    });
+    return this.client.send(command);
+  }
+
+  async abortMultipartUpload(key: string, uploadId: string) {
+    const command = new AbortMultipartUploadCommand({
+      Bucket: this.bucket,
+      Key: key,
+      UploadId: uploadId,
+    });
+    return this.client.send(command);
+  }
+
+  async deleteObjects(keys: string[]) {
+    const command = new DeleteObjectsCommand({
+      Bucket: this.bucket,
+      Delete: {
+        Objects: keys.map((Key) => ({ Key })),
+      },
+    });
+    return this.client.send(command);
+  }
+
+  // Helper to get a signed URL for direct upload/download if needed
+  async getSignedUrl(key: string, operation: "getObject" | "putObject") {
+    const command =
+      operation === "getObject"
+        ? new GetObjectCommand({ Bucket: this.bucket, Key: key })
+        : new PutObjectCommand({ Bucket: this.bucket, Key: key });
+    return getSignedUrl(this.client, command, { expiresIn: 3600 });
+  }
+
+  getBucketName() {
     return this.bucket;
   }
 }
