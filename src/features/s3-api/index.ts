@@ -399,7 +399,7 @@ export async function handleS3Request(
         .update(rewrittenBody)
         .digest("base64");
 
-      const headers = new Headers(req.headers);
+      const headers = filterUpstreamHeaders(req.headers);
       headers.set("Content-MD5", md5);
       headers.delete("Content-Length");
 
