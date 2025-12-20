@@ -7,7 +7,7 @@ import { config } from "./config";
 const S3_DOMAIN = config.s3Domain;
 
 Bun.serve({
-  port: 3000,
+  port: process.env.PORT || 3000,
   async fetch(req) {
     const url = new URL(req.url);
     const host = req.headers.get("host") || "";
@@ -72,4 +72,4 @@ Bun.serve({
   },
 });
 
-console.log(`Cargo S3 Gateway running on port 3000`);
+console.log(`Cargo S3 Gateway running on port ${process.env.PORT || 3000}`);
