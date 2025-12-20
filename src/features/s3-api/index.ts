@@ -260,8 +260,6 @@ export async function handleS3Request(
       "x-amz-date",
       "x-amz-security-token",
       "x-amz-content-sha256",
-      "expect",
-      "transfer-encoding",
     ];
 
     req.headers.forEach((value, key) => {
@@ -303,22 +301,14 @@ export async function handleS3Request(
 
       const fullUrl = baseUrl.toString();
 
-      // Explicitly set Host header to match what aws4fetch expects and what we want to send
-      upstreamHeaders.set("Host", `${bucketName}.${endpoint}`);
-
       const signedReq = await s3Client.sign(fullUrl, {
         method: "PUT",
         headers: upstreamHeaders,
       });
 
-      // Remove Host header from fetch options as it's handled by the URL
-      // but keep it in the signature
-      const fetchHeaders = new Headers(signedReq.headers);
-      fetchHeaders.delete("Host");
-
       const response = await fetch(fullUrl, {
         method: "PUT",
-        headers: fetchHeaders,
+        headers: signedReq.headers,
         body: req.body,
         duplex: "half",
       } as any);
