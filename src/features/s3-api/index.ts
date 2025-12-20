@@ -262,6 +262,7 @@ export async function handleS3Request(
       "x-amz-content-sha256",
       "expect",
       "transfer-encoding",
+      "content-length",
     ];
 
     req.headers.forEach((value, key) => {
