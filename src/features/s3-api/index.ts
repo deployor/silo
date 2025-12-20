@@ -288,36 +288,23 @@ export async function handleS3Request(
     }
 
     try {
-      const bucketName = s3Client.getBucket();
-      const endpoint = s3Client.getEndpoint();
-      const baseUrl = new URL(`https://${bucketName}.${endpoint}`);
-
-      // Explicitly set Host header to match what aws4fetch expects and what we want to send
-      upstreamHeaders.set("Host", `${bucketName}.${endpoint}`);
-
-      const relative = internalPath.startsWith("/")
-        ? internalPath.slice(1)
-        : internalPath;
-      baseUrl.pathname = relative;
-
       const cleanUrl = stripAuthQueryParams(url);
-      cleanUrl.searchParams.forEach((value, key) => {
-        baseUrl.searchParams.append(key, value);
-      });
+      const queryStr = cleanUrl.searchParams.toString();
+      const pathWithQuery = queryStr
+        ? `${internalPath}?${queryStr}`
+        : internalPath;
 
-      const fullUrl = baseUrl.toString();
-
-      const signedReq = await s3Client.sign(fullUrl, {
-        method: "PUT",
-        headers: upstreamHeaders,
-      });
-
-      const response = await fetch(fullUrl, {
-        method: "PUT",
-        headers: signedReq.headers,
-        body: req.body,
-        duplex: "half",
-      } as any);
+      // Use 0 retries for PUT to avoid consuming the streaming body
+      const response = await s3Client.fetch(
+        pathWithQuery,
+        {
+          method: "PUT",
+          headers: upstreamHeaders,
+          body: req.body,
+          duplex: "half",
+        } as any,
+        0,
+      );
 
       if (response.ok && contentLength > 0 && !copySource) {
         await db

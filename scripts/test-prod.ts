@@ -5,6 +5,7 @@ import {
   ListObjectsV2Command,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
+import { AwsClient } from "aws4fetch";
 
 async function runTest() {
   console.log("🧪 Starting Integration Test (AWS SDK v3)...");
@@ -13,6 +14,30 @@ async function runTest() {
   const accessKey = "CKD4DCC2B3BB4F9AEDC305";
   const secretKey = "4495a68af0cb0c56778f5b363ea22a4e33588eaa";
   const endpoint = "https://cargo.deployor.dev";
+
+  // DEBUG: Perform a raw request to see the actual response body
+  console.log("\n🔍 Debug: Performing raw PUT request...");
+  try {
+    const client = new AwsClient({
+      accessKeyId: accessKey,
+      secretAccessKey: secretKey,
+      service: "s3",
+      region: "auto",
+    });
+
+    const url = `${endpoint}/${testBucketName}/hello.txt`;
+    const res = await client.fetch(url, {
+      method: "PUT",
+      body: "Hello World!",
+    });
+
+    console.log("Raw Response Status:", res.status);
+    console.log("Raw Response Headers:", Object.fromEntries(res.headers.entries()));
+    const text = await res.text();
+    console.log("Raw Response Body Preview:", text.slice(0, 500));
+  } catch (e) {
+    console.error("Raw fetch failed:", e);
+  }
 
   const s3 = new S3Client({
     region: "auto",
