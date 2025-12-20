@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cargo Docs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Space Grotesk", "sans-serif"],
+              mono: ["JetBrains Mono", "monospace"],
+            },
+            colors: {
+              "hc-red": "#ec3750",
+              "hc-dark": "#17171d",
+              "hc-darker": "#131316",
+              "hc-blue": "#338eda",
+              "sidebar-bg": "#1c1c21",
+              "text-main": "#e0e6ed",
+              "text-muted": "#94a3b8",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body {
+        background-color: #131316;
+        color: #e0e6ed;
+      }
+      .section-content {
+        display: none;
+      }
+      .section-content.active {
+        display: block;
+      }
+      .nav-link.active {
+        color: #ec3750;
+        font-weight: bold;
+        background-color: rgba(236, 55, 80, 0.1);
+      }
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+    </style>
+  </head>
+  <body
+    class="min-h-screen selection:bg-hc-red selection:text-white flex flex-col"
+  >
+    <nav
+      class="w-full bg-hc-darker border-b border-white/10 px-6 py-4 sticky top-0 z-50 flex justify-between items-center"
+    >
+      <div class="flex items-center gap-4">
+        <a
+          href="/"
+          class="font-bold text-2xl tracking-tighter italic text-white hover:text-hc-red transition-colors"
+          >CARGO</a
+        >
+        <span
+          class="bg-hc-red/20 text-hc-red px-2 py-0.5 rounded text-sm font-mono border border-hc-red/30"
+          >DOCS</span
+        >
+      </div>
+      <div class="hidden md:flex gap-6 font-bold text-sm text-text-muted">
+        <a href="/dashboard" class="hover:text-white transition-colors"
+          >Dashboard</a
+        >
+        <a
+          href="https://hackclub.com"
+          target="_blank"
+          class="hover:text-white transition-colors"
+          >Hack Club</a
+        >
+      </div>
+    </nav>
+
+    <div class="flex flex-1 max-w-7xl mx-auto w-full">
+      <!-- Sidebar -->
+      <aside
+        class="w-64 hidden md:block h-[calc(100vh-65px)] sticky top-[65px] border-r border-white/10 bg-hc-dark p-6 overflow-y-auto"
+      >
+        <div class="space-y-8">
+          <div>
+            <h5
+              class="font-bold text-text-muted text-xs uppercase tracking-wider mb-3 pl-3"
+            >
+              Basics
+            </h5>
+            <ul class="space-y-1 text-sm font-medium">
+              <li>
+                <button
+                  onclick="showSection('intro')"
+                  class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
+                  id="nav-intro"
+                >
+                  What is this?
+                </button>
+              </li>
+              <li>
+                <button
+                  onclick="showSection('auth')"
+                  class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
+                  id="nav-auth"
+                >
+                  Get Access
+                </button>
+              </li>
+              <li>
+                <button
+                  onclick="showSection('structure')"
+                  class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
+                  id="nav-structure"
+                >
+                  Projects & Keys
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h5
+              class="font-bold text-text-muted text-xs uppercase tracking-wider mb-3 pl-3"
+            >
+              How To Use
+            </h5>
+            <ul class="space-y-1 text-sm font-medium">
+              <li>
+                <button
+                  onclick="showSection('aws-cli')"
+                  class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
+                  id="nav-aws-cli"
+                >
+                  AWS CLI
+                </button>
+              </li>
+              <li>
+                <button
+                  onclick="showSection('js')"
+                  class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
+                  id="nav-js"
+                >
+                  JavaScript / Bun
+                </button>
+              </li>
+              <li>
+                <button
+                  onclick="showSection('rclone')"
+                  class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
+                  id="nav-rclone"
+                >
+                  rclone
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h5
+              class="font-bold text-text-muted text-xs uppercase tracking-wider mb-3 pl-3"
+            >
+              Reference
+            </h5>
+            <ul class="space-y-1 text-sm font-medium">
+              <li>
+                <button
+                  onclick="showSection('endpoints')"
+                  class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
+                  id="nav-endpoints"
+                >
+                  Endpoints & Regions
+                </button>
+              </li>
+              <li>
+                <button
+                  onclick="showSection('limits')"
+                  class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
+                  id="nav-limits"
+                >
+                  Limits & Quotas
+                </button>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="flex-1 p-6 md:p-12 max-w-3xl">
+        <!-- Intro -->
+        <div id="intro" class="section-content active">
+          <h1 class="text-4xl font-bold mb-6 text-white">Introduction</h1>
+          <p class="text-lg mb-6 text-text-muted leading-relaxed">
+            Cargo is a high-performance, isolated S3 storage gateway built exclusively for Hack Club's Ship-to-Earn program. It provides you with S3-compatible object storage that works with all your favorite tools.
+          </p>
+          <p class="text-lg mb-6 text-text-muted leading-relaxed">
+            Under the hood, Cargo virtualizes a massive private storage cluster into thousands of isolated environments. You get your own buckets, your own credentials, and your own slice of the cloud—all served with blazing fast speeds.
+          </p>
+        </div>
+
+        <!-- Auth -->
+        <div id="auth" class="section-content">
+          <h1 class="text-4xl font-bold mb-6 text-white">Authentication</h1>
+          <p class="text-lg mb-6 text-text-muted">
+            Cargo uses standard AWS Signature V4 authentication. This means it works out of the box with the AWS CLI, SDKs, rclone, and almost any other S3-compatible tool.
+          </p>
+          <div class="bg-black/30 rounded-xl p-6 border border-white/10 mb-6">
+            <h3 class="text-white font-bold mb-2">Getting Credentials</h3>
+            <ol class="list-decimal list-inside text-text-muted space-y-2">
+              <li>Log in to the <a href="/dashboard" class="text-hc-red hover:underline">Dashboard</a> using your Hack Club account.</li>
+              <li>Click <strong>+ New Bucket</strong> to create a storage container.</li>
+              <li>Copy your <strong>Access Key ID</strong> and <strong>Secret Access Key</strong> immediately. We only show the secret key once!</li>
+            </ol>
+          </div>
+        </div>
+
+        <!-- Structure -->
+        <div id="structure" class="section-content">
+          <h1 class="text-4xl font-bold mb-6 text-white">How it Works</h1>
+          <p class="text-lg mb-6 text-text-muted">
+            Cargo implements a "Secret Proxy" architecture. To you, it looks like you have a dedicated S3 account. In reality, we transparently rewrite your requests to isolated paths on our backend.
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="bg-black/30 p-6 rounded-xl border border-white/10">
+              <h4 class="text-white font-bold mb-2">Your View</h4>
+              <code class="text-emerald-400 font-mono text-sm">my-bucket/cool-image.png</code>
+            </div>
+            <div class="bg-black/30 p-6 rounded-xl border border-white/10">
+              <h4 class="text-white font-bold mb-2">Internal Storage</h4>
+              <code class="text-hc-red font-mono text-sm">users/user_123/my-bucket/cool-image.png</code>
+            </div>
+          </div>
+          <p class="text-text-muted">
+            This isolation is enforced at the gateway level. You can only access buckets that belong to your account, and you can never see or touch another user's data.
+          </p>
+        </div>
+
+        <!-- AWS CLI -->
+        <div id="aws-cli" class="section-content">
+          <h1 class="text-4xl font-bold mb-6 text-white">AWS CLI</h1>
+          <p class="mb-6 text-text-muted">
+            Configure a profile for Cargo in your <code class="text-white bg-white/10 px-1 rounded">~/.aws/credentials</code> file or use environment variables.
+          </p>
+          <pre class="rounded-xl mb-6"><code class="language-bash"># Configure a new profile
+aws configure --profile cargo
+
+# AWS Access Key ID: [Your Access Key]
+# AWS Secret Access Key: [Your Secret Key]
+# Default region name: auto
+# Default output format: json
+
+# Set the endpoint URL (Critical!)
+aws configure set plugins.endpoint awscli_plugin_endpoint --profile cargo
+aws configure set endpoint_url https://cargo.deployor.dev --profile cargo</code></pre>
+          
+          <h3 class="text-xl font-bold text-white mb-4">Usage Examples</h3>
+          <pre class="rounded-xl"><code class="language-bash"># List your buckets
+aws s3 ls --profile cargo --endpoint-url https://cargo.deployor.dev
+
+# Upload a file
+aws s3 cp hello.txt s3://my-bucket/ --profile cargo --endpoint-url https://cargo.deployor.dev
+
+# List files
+aws s3 ls s3://my-bucket/ --profile cargo --endpoint-url https://cargo.deployor.dev</code></pre>
+        </div>
+
+        <!-- JS -->
+        <div id="js" class="section-content">
+          <h1 class="text-4xl font-bold mb-6 text-white">JavaScript / TypeScript</h1>
+          <p class="mb-6 text-text-muted">
+            You can use the official AWS SDK v3 or lightweight clients like <code class="text-white bg-white/10 px-1 rounded">aws4fetch</code>.
+          </p>
+          
+          <h3 class="text-xl font-bold text-white mb-4">AWS SDK v3</h3>
+          <pre class="rounded-xl mb-8"><code class="language-javascript">import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+
+const s3 = new S3Client({
+  region: "auto",
+  endpoint: "https://cargo.deployor.dev",
+  credentials: {
+    accessKeyId: "YOUR_ACCESS_KEY",
+    secretAccessKey: "YOUR_SECRET_KEY",
+  },
+});
+
+await s3.send(new PutObjectCommand({
+  Bucket: "my-bucket",
+  Key: "hello.txt",
+  Body: "Hello from Cargo!",
+}));</code></pre>
+        </div>
+
+        <!-- rclone -->
+        <div id="rclone" class="section-content">
+          <h1 class="text-4xl font-bold mb-6 text-white">rclone</h1>
+          <p class="mb-6 text-text-muted">
+            Add the following to your <code class="text-white bg-white/10 px-1 rounded">rclone.conf</code>:
+          </p>
+          <pre class="rounded-xl"><code class="language-bash">[cargo]
+type = s3
+provider = Other
+env_auth = false
+access_key_id = YOUR_ACCESS_KEY
+secret_access_key = YOUR_SECRET_KEY
+endpoint = https://cargo.deployor.dev
+acl = private</code></pre>
+        </div>
+
+        <!-- Endpoints -->
+        <div id="endpoints" class="section-content">
+          <h1 class="text-4xl font-bold mb-6 text-white">Endpoints & Regions</h1>
+          
+          <div class="space-y-6">
+            <div>
+              <h3 class="text-xl font-bold text-white mb-2">API Endpoint</h3>
+              <code class="block bg-black/30 p-4 rounded-xl border border-white/10 text-hc-blue font-mono">https://cargo.deployor.dev</code>
+            </div>
+
+            <div>
+              <h3 class="text-xl font-bold text-white mb-2">Virtual-Hosted Style</h3>
+              <p class="text-text-muted mb-2">We support accessing buckets via subdomains:</p>
+              <code class="block bg-black/30 p-4 rounded-xl border border-white/10 text-hc-blue font-mono">https://my-bucket.cargo.deployor.dev/file.txt</code>
+            </div>
+
+            <div>
+              <h3 class="text-xl font-bold text-white mb-2">Region</h3>
+              <p class="text-text-muted">
+                You can use <code class="text-white bg-white/10 px-1 rounded">auto</code>, <code class="text-white bg-white/10 px-1 rounded">us-east-1</code>, or <code class="text-white bg-white/10 px-1 rounded">eu-central-1</code>. We ignore the region parameter, but some clients require it.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Limits -->
+        <div id="limits" class="section-content">
+          <h1 class="text-4xl font-bold mb-6 text-white">Limits & Quotas</h1>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-hc-dark p-6 rounded-xl border border-white/10">
+              <h3 class="text-white font-bold mb-2">Storage Quota</h3>
+              <p class="text-text-muted">
+                Default limit is <strong>1 GB</strong> per user.
+                <br>Need more? Ship a project and ask in Slack!
+              </p>
+            </div>
+            
+            <div class="bg-hc-dark p-6 rounded-xl border border-white/10">
+              <h3 class="text-white font-bold mb-2">Bucket Limit</h3>
+              <p class="text-text-muted">
+                Maximum <strong>50 buckets</strong> per user.
+              </p>
+            </div>
+
+            <div class="bg-hc-dark p-6 rounded-xl border border-white/10 md:col-span-2">
+              <h3 class="text-white font-bold mb-2">Supported Operations</h3>
+              <div class="flex flex-wrap gap-2">
+                <span class="bg-white/5 px-2 py-1 rounded text-xs font-mono text-emerald-400">PutObject</span>
+                <span class="bg-white/5 px-2 py-1 rounded text-xs font-mono text-emerald-400">GetObject</span>
+                <span class="bg-white/5 px-2 py-1 rounded text-xs font-mono text-emerald-400">HeadObject</span>
+                <span class="bg-white/5 px-2 py-1 rounded text-xs font-mono text-emerald-400">DeleteObject</span>
+                <span class="bg-white/5 px-2 py-1 rounded text-xs font-mono text-emerald-400">CopyObject</span>
+                <span class="bg-white/5 px-2 py-1 rounded text-xs font-mono text-emerald-400">ListBuckets</span>
+                <span class="bg-white/5 px-2 py-1 rounded text-xs font-mono text-emerald-400">ListObjectsV2</span>
+                <span class="bg-white/5 px-2 py-1 rounded text-xs font-mono text-emerald-400">MultipartUpload</span>
+              </div>
+              <p class="text-xs text-hc-red mt-3">
+                Note: Bucket creation and deletion must be done via the Dashboard.
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      function showSection(id) {
+        document.querySelectorAll(".section-content").forEach((el) => {
+          el.classList.remove("active");
+        });
+        document.getElementById(id).classList.add("active");
+
+        document.querySelectorAll(".nav-link").forEach((el) => {
+          el.classList.remove("active");
+        });
+        document.getElementById("nav-" + id).classList.add("active");
+      }
+
+      if (window.location.hash) {
+        const hash = window.location.hash.substring(1);
+        if (document.getElementById(hash)) {
+          showSection(hash);
+        }
+      }
+    </script>
+  </body>
+</html>
