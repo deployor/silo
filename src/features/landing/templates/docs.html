@@ -283,21 +283,17 @@
 
     <script>
       function showSection(id) {
-        // Hide all sections
         document.querySelectorAll(".section-content").forEach((el) => {
           el.classList.remove("active");
         });
-        // Show selected section
         document.getElementById(id).classList.add("active");
 
-        // Update nav state
         document.querySelectorAll(".nav-link").forEach((el) => {
           el.classList.remove("active");
         });
         document.getElementById("nav-" + id).classList.add("active");
       }
 
-      // Handle hash navigation
       if (window.location.hash) {
         const hash = window.location.hash.substring(1);
         if (document.getElementById(hash)) {
