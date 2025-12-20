@@ -44,7 +44,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
   if (path === "/docs" || path === "/docs/") {
     const finalDocs = docsTemplate.replace(
-      /https:\/\/cargo\.hackclub\.com/g,
+      /https:\/\/cargo\.deployor\.dev/g,
       `https://${config.s3Domain}`,
     );
     return new Response(finalDocs, {
@@ -251,7 +251,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
   }
 
   const finalDashboard = dashboardTemplate.replace(
-    "https://cargo.deployor.dev",
+    /https:\/\/cargo\.deployor\.dev/g,
     `https://${config.s3Domain}`,
   );
   return new Response(finalDashboard, {
