@@ -44,6 +44,9 @@ Bun.serve({
           isDashboard = false;
         }
       }
+    } else if (host.startsWith("dashboard.")) {
+      // Explicit dashboard subdomain support
+      isDashboard = true;
     } else {
       isDashboard = false;
     }
@@ -91,9 +94,14 @@ Bun.serve({
       }
 
       const { user, bucket, mode } = authResult;
+      const start = performance.now();
       const response = await handleS3Request(req, user, bucket, mode);
+      const duration = Math.round(performance.now() - start);
 
-      updateStats(user, bucket, req, response);
+      // Fire and forget stats update to not block response
+      updateStats(user, bucket, req, response, mode, duration).catch((err) => {
+        console.error("Error updating stats:", err);
+      });
 
       return response;
     } catch (e) {

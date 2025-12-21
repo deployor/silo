@@ -71,3 +71,31 @@ export const bucketKeys = pgTable(
     };
   },
 );
+
+export const requestLogs = pgTable(
+  "request_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    bucketId: uuid("bucket_id").references(() => buckets.id),
+    // The owner of the bucket (for billing/quota)
+    ownerId: text("owner_id").references(() => users.id),
+    // The user who performed the action (might be null for public)
+    requesterId: text("requester_id").references(() => users.id),
+    method: text("method").notNull(), // GET, PUT, DELETE, HEAD
+    path: text("path").notNull(), // The object key or path
+    statusCode: bigint("status_code", { mode: "number" }).notNull(),
+    ingressBytes: bigint("ingress_bytes", { mode: "number" }).default(0),
+    egressBytes: bigint("egress_bytes", { mode: "number" }).default(0),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    latencyMs: bigint("latency_ms", { mode: "number" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => {
+    return {
+      ownerIdx: index("log_owner_idx").on(table.ownerId),
+      bucketIdx: index("log_bucket_idx").on(table.bucketId),
+      createdAtIdx: index("log_created_at_idx").on(table.createdAt),
+    };
+  },
+);
