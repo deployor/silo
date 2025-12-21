@@ -27,6 +27,37 @@ export async function handleS3Request(
   const host = req.headers.get("host") || "";
   const key = getKeyFromRequest(req, bucket.name);
 
+  // Check for forbidden parameters globally for ALL methods
+  const forbiddenParams = [
+    "policy",
+    "acl",
+    "cors",
+    "lifecycle",
+    "replication",
+    "tagging",
+    "encryption",
+    "website",
+    "logging",
+    "accelerate",
+    "payment",
+    "object-lock",
+    "versioning",
+    "versions",
+  ];
+  for (const param of forbiddenParams) {
+    if (url.searchParams.has(param)) {
+      return new Response(
+        `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+    <Code>NotImplemented</Code>
+    <Message>A header you provided implies functionality that is not implemented</Message>
+    <RequestId>0000000000000000</RequestId>
+</Error>`,
+        { status: 501, headers: { "Content-Type": "application/xml" } },
+      );
+    }
+  }
+
   // Handle ListBuckets on root domain OR on bucket domain if the path is empty
   // Some clients (like AWS SDK) might call ListBuckets on the bucket endpoint if configured that way,
   // though standard S3 behavior is usually on the root.
@@ -52,6 +83,21 @@ export async function handleS3Request(
 
     if (host === S3_DOMAIN) {
       if (method === "GET") {
+        const userBuckets = await db
+          .select()
+          .from(buckets)
+          .where(eq(buckets.userId, user.id));
+
+        const bucketsXml = userBuckets
+          .map(
+            (b) => `
+    <Bucket>
+      <Name>${b.name}</Name>
+      <CreationDate>${b.createdAt ? new Date(b.createdAt).toISOString() : new Date().toISOString()}</CreationDate>
+    </Bucket>`,
+          )
+          .join("");
+
         return new Response(
           `
 <?xml version="1.0" encoding="UTF-8"?>
@@ -60,11 +106,7 @@ export async function handleS3Request(
     <ID>${user.id}</ID>
     <DisplayName>${user.id}</DisplayName>
   </Owner>
-  <Buckets>
-    <Bucket>
-      <Name>${bucket.name}</Name>
-      <CreationDate>${bucket.createdAt ? new Date(bucket.createdAt).toISOString() : new Date().toISOString()}</CreationDate>
-    </Bucket>
+  <Buckets>${bucketsXml}
   </Buckets>
 </ListAllMyBucketsResult>`.trim(),
           {
@@ -117,36 +159,6 @@ export async function handleS3Request(
       );
     }
 
-    // Check for forbidden parameters on ALL GET requests, not just root
-    const forbiddenParams = [
-      "policy",
-      "acl",
-      "cors",
-      "lifecycle",
-      "replication",
-      "tagging",
-      "encryption",
-      "website",
-      "logging",
-      "accelerate",
-      "payment",
-      "object-lock",
-      "versioning",
-      "versions",
-    ];
-    for (const param of forbiddenParams) {
-      if (url.searchParams.has(param)) {
-        return new Response(
-          `<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-    <Code>NotImplemented</Code>
-    <Message>A header you provided implies functionality that is not implemented</Message>
-    <RequestId>0000000000000000</RequestId>
-</Error>`,
-          { status: 501, headers: { "Content-Type": "application/xml" } },
-        );
-      }
-    }
 
     const listType = url.searchParams.get("list-type");
     const isListObjects =
