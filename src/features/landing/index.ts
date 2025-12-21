@@ -243,7 +243,11 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
       }
     }
 
-    if (path.startsWith("/api/dashboard/buckets/") && req.method === "DELETE") {
+    // Delete bucket
+    if (
+      path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+$/) &&
+      req.method === "DELETE"
+    ) {
       const bucketName = path.split("/").pop();
       if (!bucketName)
         return new Response("Invalid bucket name", { status: 400 });
@@ -263,7 +267,11 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
       return new Response("Deleted", { status: 200 });
     }
 
-    if (path.startsWith("/api/dashboard/buckets/") && req.method === "PATCH") {
+    // Update bucket (public/private)
+    if (
+      path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+$/) &&
+      req.method === "PATCH"
+    ) {
       const bucketName = path.split("/")[4]; // /api/dashboard/buckets/:name
       if (!bucketName)
         return new Response("Invalid bucket name", { status: 400 });
@@ -345,18 +353,14 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
       const bucketName = parts[4];
       const keyId = parts[6];
 
-      console.log(`Attempting to delete key. Bucket: ${bucketName}, Key: ${keyId}`);
-
       const bucket = await db
         .select()
         .from(buckets)
         .where(eq(buckets.name, bucketName))
         .limit(1);
 
-      if (bucket.length === 0) {
-        console.log(`Bucket not found: ${bucketName}`);
+      if (bucket.length === 0)
         return new Response("Bucket not found", { status: 404 });
-      }
       if (bucket[0].userId !== user.id)
         return new Response("Unauthorized", { status: 403 });
 
