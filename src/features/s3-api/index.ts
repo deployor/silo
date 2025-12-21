@@ -27,37 +27,6 @@ export async function handleS3Request(
   const host = req.headers.get("host") || "";
   const key = getKeyFromRequest(req, bucket.name);
 
-  // Check for forbidden parameters globally for ALL methods
-  const forbiddenParams = [
-    "policy",
-    "acl",
-    "cors",
-    "lifecycle",
-    "replication",
-    "tagging",
-    "encryption",
-    "website",
-    "logging",
-    "accelerate",
-    "payment",
-    "object-lock",
-    "versioning",
-    "versions",
-  ];
-  for (const param of forbiddenParams) {
-    if (url.searchParams.has(param)) {
-      return new Response(
-        `<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-    <Code>NotImplemented</Code>
-    <Message>A header you provided implies functionality that is not implemented</Message>
-    <RequestId>0000000000000000</RequestId>
-</Error>`,
-        { status: 501, headers: { "Content-Type": "application/xml" } },
-      );
-    }
-  }
-
   // Handle ListBuckets on root domain OR on bucket domain if the path is empty
   // Some clients (like AWS SDK) might call ListBuckets on the bucket endpoint if configured that way,
   // though standard S3 behavior is usually on the root.
