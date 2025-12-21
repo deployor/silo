@@ -170,7 +170,6 @@
         </div>
         <div class="mt-4 text-center">
             <p id="preview-filename" class="text-white font-bold text-lg"></p>
-            <a id="preview-download" href="#" target="_blank" class="text-hc-blue hover:underline text-sm mt-1 inline-block">Open Original</a>
         </div>
       </div>
     </div>
@@ -418,40 +417,52 @@
         modal.classList.remove('hidden');
         modal.classList.add('flex');
 
-        // Use proxy URL for preview to handle private buckets
-        const proxyUrl = `/api/dashboard/buckets/${bucketName}/files/preview?key=${encodeURIComponent(key)}`;
-
-        // Determine file type
-        const ext = key.split('.').pop().toLowerCase();
-        const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
-        const videoExts = ['mp4', 'webm', 'ogg'];
-        const audioExts = ['mp3', 'wav'];
-        const textExts = ['txt', 'md', 'json', 'js', 'css', 'html', 'xml', 'csv', 'ts', 'sql'];
-        
-        if (imageExts.includes(ext)) {
-            content.innerHTML = `<img src="${proxyUrl}" class="max-w-full max-h-full object-contain" />`;
-        } else if (videoExts.includes(ext)) {
-            content.innerHTML = `<video src="${proxyUrl}" controls class="max-w-full max-h-full"></video>`;
-        } else if (audioExts.includes(ext)) {
-            content.innerHTML = `<audio src="${proxyUrl}" controls></audio>`;
-        } else if (textExts.includes(ext)) {
-            fetch(proxyUrl).then(r => {
-                if (!r.ok) throw new Error("Failed to load");
-                return r.text();
-            }).then(text => {
-                content.innerHTML = `<pre class="p-4 text-sm font-mono text-white whitespace-pre-wrap overflow-auto w-full h-full">${text.replace(/</g, '<')}</pre>`;
-            }).catch(() => {
-                content.innerHTML = '<div class="text-hc-red">Failed to load text content</div>';
+        // Get signed URL for preview
+        try {
+            const res = await fetch(`/api/dashboard/buckets/${bucketName}/files/sign`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ key })
             });
-        } else {
-            content.innerHTML = `
-                <div class="text-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-text-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <p class="text-text-muted">Preview not available for this file type.</p>
-                </div>
-            `;
+            
+            if (!res.ok) throw new Error("Failed to sign URL");
+            const data = await res.json();
+            const proxyUrl = data.url;
+
+            // Determine file type
+            const ext = key.split('.').pop().toLowerCase();
+            const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
+            const videoExts = ['mp4', 'webm', 'ogg'];
+            const audioExts = ['mp3', 'wav'];
+            const textExts = ['txt', 'md', 'json', 'js', 'css', 'html', 'xml', 'csv', 'ts', 'sql'];
+            
+            if (imageExts.includes(ext)) {
+                content.innerHTML = `<img src="${proxyUrl}" class="max-w-full max-h-full object-contain" />`;
+            } else if (videoExts.includes(ext)) {
+                content.innerHTML = `<video src="${proxyUrl}" controls class="max-w-full max-h-full"></video>`;
+            } else if (audioExts.includes(ext)) {
+                content.innerHTML = `<audio src="${proxyUrl}" controls></audio>`;
+            } else if (textExts.includes(ext)) {
+                fetch(proxyUrl).then(r => {
+                    if (!r.ok) throw new Error("Failed to load");
+                    return r.text();
+                }).then(text => {
+                    content.innerHTML = `<pre class="p-4 text-sm font-mono text-white whitespace-pre-wrap overflow-auto w-full h-full">${text.replace(/</g, '<')}</pre>`;
+                }).catch(() => {
+                    content.innerHTML = '<div class="text-hc-red">Failed to load text content</div>';
+                });
+            } else {
+                content.innerHTML = `
+                    <div class="text-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-text-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p class="text-text-muted">Preview not available for this file type.</p>
+                    </div>
+                `;
+            }
+        } catch (e) {
+            content.innerHTML = '<div class="text-hc-red">Failed to load preview</div>';
         }
       }
 
