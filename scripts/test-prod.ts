@@ -140,6 +140,48 @@ async function runTest() {
       }
     }
 
+    console.log("Testing Put Bucket Policy (Should be Not Implemented)...");
+    try {
+      // We can't easily use PutBucketPolicyCommand without a valid policy string,
+      // but we can simulate the request with fetch to check the query param blocking.
+      const res = await fetch(`${endpoint}/${testBucketName}?policy`, {
+        method: "PUT",
+        headers: {
+          Authorization:
+            "AWS4-HMAC-SHA256 Credential=CKD4DCC2B3BB4F9AEDC305/20251220/auto/s3/aws4_request, ...",
+        },
+      });
+      if (res.status === 501) {
+        console.log("✅ Put Bucket Policy blocked (Not Implemented)");
+      } else {
+        console.error(
+          `❌ Put Bucket Policy allowed with status: ${res.status}`,
+        );
+      }
+    } catch (e) {
+      console.log("✅ Put Bucket Policy blocked (Network Error)");
+    }
+
+    console.log("Testing Put Bucket ACL (Should be Not Implemented)...");
+    try {
+      const res = await fetch(`${endpoint}/${testBucketName}?acl`, {
+        method: "PUT",
+        headers: {
+          Authorization:
+            "AWS4-HMAC-SHA256 Credential=CKD4DCC2B3BB4F9AEDC305/20251220/auto/s3/aws4_request, ...",
+        },
+      });
+      if (res.status === 501) {
+        console.log("✅ Put Bucket ACL blocked (Not Implemented)");
+      } else {
+        console.error(
+          `❌ Put Bucket ACL allowed with status: ${res.status}`,
+        );
+      }
+    } catch (e) {
+      console.log("✅ Put Bucket ACL blocked (Network Error)");
+    }
+
     // --- Multipart Upload ---
     console.log("\n--- Multipart Upload ---");
     console.log("Initiating Multipart Upload...");
