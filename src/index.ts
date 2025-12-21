@@ -33,6 +33,7 @@ Bun.serve({
           path === "/" ||
           path.startsWith("/auth/") ||
           path.startsWith("/api/dashboard/") ||
+          path.startsWith("/dashboard/") ||
           path.startsWith("/docs")
         ) {
           isDashboard = true;
