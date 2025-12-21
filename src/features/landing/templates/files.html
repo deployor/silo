@@ -165,7 +165,7 @@
             </svg>
         </button>
         
-        <div id="preview-content" class="w-full h-full flex items-center justify-center overflow-auto rounded-lg border border-white/10 bg-hc-dark">
+        <div id="preview-content" class="w-full max-h-[75vh] overflow-auto rounded-lg border border-white/10 bg-hc-dark">
             <!-- Preview content injected here -->
         </div>
         <div class="mt-4 text-center flex flex-col gap-2">
@@ -452,7 +452,7 @@
                     if (!r.ok) throw new Error("Failed to load");
                     return r.text();
                 }).then(text => {
-                    content.innerHTML = `<pre class="p-4 text-sm font-mono text-white whitespace-pre-wrap overflow-auto w-full h-full">${text.replace(/</g, '<')}</pre>`;
+                    content.innerHTML = `<pre class="p-4 text-sm font-mono text-white whitespace-pre-wrap break-words">${text.replace(/</g, '<')}</pre>`;
                 }).catch(() => {
                     content.innerHTML = '<div class="text-hc-red">Failed to load text content</div>';
                 });
