@@ -650,6 +650,7 @@
                             </div>
                         </td>
                         <td class="px-6 py-4">
+                            <a href="/dashboard/buckets/${bucket.name}" class="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider transition-colors mr-4">Files</a>
                           <label class="inline-flex items-center cursor-pointer">
                             <input type="checkbox" class="sr-only peer" onchange="togglePublic('${bucket.name}', this.checked)" ${bucket.isPublic ? "checked" : ""}>
                             <div class="relative w-9 h-5 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-blue rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-hc-blue"></div>

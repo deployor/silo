@@ -2,12 +2,18 @@ import { db } from "../../db";
 import { users, buckets, bucketKeys } from "../../db/schema";
 import { eq, sql } from "drizzle-orm";
 import { config } from "../../config";
+import { s3Client } from "../../lib/s3-client";
+import { getInternalPath } from "../s3-api/utils";
+import { XMLParser } from "fast-xml-parser";
 
 const landingTemplate = await Bun.file(
   "src/features/landing/templates/landing.html",
 ).text();
 const dashboardTemplate = await Bun.file(
   "src/features/landing/templates/dashboard.html",
+).text();
+const filesTemplate = await Bun.file(
+  "src/features/landing/templates/files.html",
 ).text();
 const docsTemplate = await Bun.file(
   "src/features/landing/templates/docs.html",
@@ -382,12 +388,162 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
       return new Response("Deleted", { status: 200 });
     }
+
+    // List Files (Proxy to S3 ListObjectsV2)
+    const listFilesMatch = path.match(
+      /^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/files$/,
+    );
+    if (listFilesMatch && req.method === "GET") {
+      const bucketName = listFilesMatch[1];
+      const prefix = url.searchParams.get("prefix") || "";
+      const continuationToken = url.searchParams.get("continuation-token");
+
+      const bucket = await db
+        .select()
+        .from(buckets)
+        .where(eq(buckets.name, bucketName))
+        .limit(1);
+
+      if (bucket.length === 0)
+        return new Response("Bucket not found", { status: 404 });
+      if (bucket[0].userId !== user.id)
+        return new Response("Unauthorized", { status: 403 });
+
+      // Construct internal prefix
+      const internalPrefix = getInternalPath(prefix, user, bucket[0]);
+      
+      // We need to list objects from S3
+      // We'll use the s3Client directly
+      const query = new URLSearchParams();
+      query.set("list-type", "2");
+      query.set("prefix", internalPrefix);
+      query.set("delimiter", "/"); // Important for folder view
+      if (continuationToken) {
+        query.set("continuation-token", continuationToken);
+      }
+
+      try {
+        const s3Res = await s3Client.fetch(`?${query.toString()}`, {
+            method: "GET",
+        });
+
+        if (!s3Res.ok) {
+            throw new Error(`S3 Error: ${s3Res.status}`);
+        }
+
+        const xml = await s3Res.text();
+        const parser = new XMLParser();
+        const result = parser.parse(xml).ListBucketResult;
+
+        // Process Contents (Files)
+        let files = [];
+        if (result.Contents) {
+            const contents = Array.isArray(result.Contents) ? result.Contents : [result.Contents];
+            files = contents.map((item: any) => {
+                // Strip internal prefix to get relative path
+                const key = item.Key;
+                // We want to show the name relative to the current prefix for display?
+                // Or just the full key? The UI handles display.
+                // But we must strip the user/bucket prefix part.
+                const rootPrefix = getInternalPath("", user, bucket[0]);
+                const relativeKey = key.startsWith(rootPrefix) ? key.slice(rootPrefix.length) : key;
+                
+                return {
+                    key: relativeKey,
+                    name: relativeKey.split('/').pop(),
+                    size: item.Size,
+                    lastModified: item.LastModified,
+                    url: `https://${config.s3Domain}/${relativeKey}`
+                };
+            }).filter((f: any) => f.key !== prefix); // Exclude the folder itself if it appears
+        }
+
+        // Process CommonPrefixes (Folders)
+        let folders = [];
+        if (result.CommonPrefixes) {
+            const prefixes = Array.isArray(result.CommonPrefixes) ? result.CommonPrefixes : [result.CommonPrefixes];
+            folders = prefixes.map((item: any) => {
+                const p = item.Prefix;
+                const rootPrefix = getInternalPath("", user, bucket[0]);
+                const relativePrefix = p.startsWith(rootPrefix) ? p.slice(rootPrefix.length) : p;
+                
+                return {
+                    prefix: relativePrefix,
+                    name: relativePrefix.split('/').filter(Boolean).pop() + '/'
+                };
+            });
+        }
+
+        return new Response(JSON.stringify({
+            files,
+            folders,
+            nextContinuationToken: result.NextContinuationToken,
+            userId: user.id
+        }), {
+            headers: { "Content-Type": "application/json" }
+        });
+
+      } catch (e) {
+        console.error("List Files Error:", e);
+        return new Response("Failed to list files", { status: 500 });
+      }
+    }
+
+    // Delete File
+    if (listFilesMatch && req.method === "DELETE") {
+        const bucketName = listFilesMatch[1];
+        const key = url.searchParams.get("key");
+
+        if (!key) return new Response("Missing key", { status: 400 });
+
+        const bucket = await db
+            .select()
+            .from(buckets)
+            .where(eq(buckets.name, bucketName))
+            .limit(1);
+
+        if (bucket.length === 0)
+            return new Response("Bucket not found", { status: 404 });
+        if (bucket[0].userId !== user.id)
+            return new Response("Unauthorized", { status: 403 });
+
+        const internalKey = getInternalPath(key, user, bucket[0]);
+
+        try {
+            const s3Res = await s3Client.fetch(internalKey, {
+                method: "DELETE"
+            });
+
+            if (!s3Res.ok) {
+                throw new Error(`S3 Delete Error: ${s3Res.status}`);
+            }
+
+            return new Response("Deleted", { status: 200 });
+        } catch (e) {
+            console.error("Delete File Error:", e);
+            return new Response("Failed to delete file", { status: 500 });
+        }
+    }
   }
 
   const user = await getCurrentUser(req);
   if (!user) {
     return new Response(landingTemplate, {
       headers: { "Content-Type": "text/html" },
+    });
+  }
+
+  // Serve File Explorer Page
+  const fileExplorerMatch = path.match(/^\/dashboard\/buckets\/([a-z0-9-]+)$/);
+  if (fileExplorerMatch) {
+    const bucketName = fileExplorerMatch[1];
+    // Verify bucket exists and belongs to user (optional, but good for UX to 404 early)
+    // But we can just let the API calls handle auth.
+    // However, we need to inject the bucket name or just let the client side handle it from URL.
+    // The template uses window.location to get bucket name.
+    
+    return new Response(filesTemplate, {
+        headers: { "Content-Type": "text/html" },
     });
   }
 
