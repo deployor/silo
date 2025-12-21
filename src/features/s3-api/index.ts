@@ -134,6 +134,24 @@ export async function handleS3Request(
   }
 
   if (method === "GET") {
+    // Egress Limit Check
+    // We allow 3x the storage limit as egress
+    const egressLimit =
+      user.storageLimitBytes !== null ? BigInt(user.storageLimitBytes) * 3n : null;
+
+    if (egressLimit !== null && BigInt(user.egressBytes) > egressLimit) {
+      return new Response(
+        `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+    <Code>QuotaExceeded</Code>
+    <Message>You have exceeded your egress quota.</Message>
+    <Resource>${key}</Resource>
+    <RequestId>0000000000000000</RequestId>
+</Error>`,
+        { status: 403, headers: { "Content-Type": "application/xml" } },
+      );
+    }
+
     if (key === "" && url.searchParams.has("location")) {
       return new Response(
         `<?xml version="1.0" encoding="UTF-8"?>
