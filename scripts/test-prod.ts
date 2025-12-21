@@ -24,8 +24,8 @@ async function runTest() {
   console.log("🧪 Starting Comprehensive Security & Integration Test...");
 
   const testBucketName = "testtest";
-  const accessKey = "CKD4DCC2B3BB4F9AEDC305";
-  const secretKey = "4495a68af0cb0c56778f5b363ea22a4e33588eaa";
+  const accessKey = "CK879AF852B314B4D652E7";
+  const secretKey = "344efd09e342553e9578cd8b92b448d70c7c2f75";
   const endpoint = "https://cargo.deployor.dev";
 
   const s3 = new S3Client({

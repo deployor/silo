@@ -303,11 +303,11 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
     }
 
     // Generate new key for bucket
-    if (
-      path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+\/keys$/) &&
-      req.method === "POST"
-    ) {
-      const bucketName = path.split("/")[4];
+    const generateKeyMatch = path.match(
+      /^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/keys$/,
+    );
+    if (generateKeyMatch && req.method === "POST") {
+      const bucketName = generateKeyMatch[1];
       const bucket = await db
         .select()
         .from(buckets)
@@ -343,15 +343,14 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
     }
 
     // Delete key
-    if (
-      path.match(
-        /^\/api\/dashboard\/buckets\/[a-z0-9-]+\/keys\/[^/]+$/,
-      ) &&
-      req.method === "DELETE"
-    ) {
-      const parts = path.split("/");
-      const bucketName = parts[4];
-      const keyId = parts[6];
+    const deleteKeyMatch = path.match(
+      /^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/keys\/([^/]+)$/,
+    );
+    if (deleteKeyMatch && req.method === "DELETE") {
+      const bucketName = deleteKeyMatch[1];
+      const keyId = deleteKeyMatch[2];
+
+      console.log(`[DELETE KEY] Bucket: "${bucketName}", KeyID: "${keyId}"`);
 
       const bucket = await db
         .select()
@@ -359,8 +358,10 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
         .where(eq(buckets.name, bucketName))
         .limit(1);
 
-      if (bucket.length === 0)
-        return new Response("Bucket not found", { status: 404 });
+      if (bucket.length === 0) {
+        console.log(`[DELETE KEY] Bucket not found in DB: "${bucketName}"`);
+        return new Response(`Bucket not found: "${bucketName}"`, { status: 404 });
+      }
       if (bucket[0].userId !== user.id)
         return new Response("Unauthorized", { status: 403 });
 

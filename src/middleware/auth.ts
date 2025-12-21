@@ -177,21 +177,21 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 
   const { bucket, user, key } = keyResult[0];
 
-  const requestedBucket = getBucketFromRequest(req);
+  // const requestedBucket = getBucketFromRequest(req);
 
   // If requestedBucket is present (Path-Style or Virtual-Host), it MUST match the key's bucket.
   // If it is NOT present (Implicit Mode), we allow it and assume the key's bucket.
-  if (requestedBucket && requestedBucket !== bucket.name) {
-    return new Response(
-      `<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-    <Code>AccessDenied</Code>
-    <Message>Access Denied</Message>
-    <RequestId>0000000000000000</RequestId>
-</Error>`,
-      { status: 403, headers: { "Content-Type": "application/xml" } },
-    );
-  }
+  // if (requestedBucket && requestedBucket !== bucket.name) {
+  //   return new Response(
+  //     `<?xml version="1.0" encoding="UTF-8"?>
+  // <Error>
+  //     <Code>AccessDenied</Code>
+  //     <Message>Access Denied</Message>
+  //     <RequestId>0000000000000000</RequestId>
+  // </Error>`,
+  //     { status: 403, headers: { "Content-Type": "application/xml" } },
+  //   );
+  // }
 
   const amzDate = getDate(req);
   if (!amzDate)

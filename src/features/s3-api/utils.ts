@@ -1,7 +1,6 @@
 import { db } from "../../db";
-import { buckets } from "../../db/schema";
+import { buckets, users, requestLogs } from "../../db/schema";
 import { eq, sql } from "drizzle-orm";
-import { users } from "../../db/schema";
 
 import { config } from "../../config";
 
@@ -128,32 +127,119 @@ export function filterUpstreamHeaders(reqHeaders: Headers): Headers {
   return upstreamHeaders;
 }
 
+// Batching configuration
+const BATCH_SIZE = 100;
+const FLUSH_INTERVAL_MS = 5000;
+
+interface LogEntry {
+  bucketId: string;
+  ownerId: string;
+  requesterId: string | null;
+  method: string;
+  path: string;
+  statusCode: number;
+  ingressBytes: number;
+  egressBytes: number;
+  ipAddress: string;
+  userAgent: string | null;
+  latencyMs: number;
+}
+
+let logQueue: LogEntry[] = [];
+let flushTimer: Timer | null = null;
+
+async function flushLogs() {
+  if (logQueue.length === 0) return;
+
+  const batch = [...logQueue];
+  logQueue = [];
+
+  try {
+    await db.insert(requestLogs).values(batch);
+  } catch (e) {
+    console.error("Failed to flush log batch:", e);
+    // Optionally re-queue failed logs or log to a fallback file
+  }
+}
+
+function scheduleFlush() {
+  if (!flushTimer) {
+    flushTimer = setTimeout(() => {
+      flushTimer = null;
+      flushLogs();
+    }, FLUSH_INTERVAL_MS);
+  }
+}
+
 export async function updateStats(
   user: typeof users.$inferSelect,
   bucket: typeof buckets.$inferSelect,
   req: Request,
   res: Response,
+  mode: "authenticated" | "public",
+  durationMs: number,
 ) {
   const ingress = parseInt(req.headers.get("content-length") || "0");
   const egress = parseInt(res.headers.get("content-length") || "0");
+  const method = req.method;
+  const url = new URL(req.url);
+  const path = url.pathname;
+  const statusCode = res.status;
+  const ip =
+    req.headers.get("x-forwarded-for") ||
+    req.headers.get("cf-connecting-ip") ||
+    "unknown";
+  const userAgent = req.headers.get("user-agent");
 
+  // 1. Update aggregates immediately (critical for quotas/billing accuracy)
+  // We do this individually to ensure consistency, but could also batch if needed.
+  // For now, keeping it direct is safer for "live" limits.
   try {
-    await db
-      .update(users)
-      .set({
-        ingressBytes: sql`${users.ingressBytes} + ${ingress}`,
-        egressBytes: sql`${users.egressBytes} + ${egress}`,
-        totalRequests: sql`${users.totalRequests} + 1`,
-      })
-      .where(eq(users.id, user.id));
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({
+          ingressBytes: sql`${users.ingressBytes} + ${ingress}`,
+          egressBytes: sql`${users.egressBytes} + ${egress}`,
+          totalRequests: sql`${users.totalRequests} + 1`,
+        })
+        .where(eq(users.id, user.id));
 
-    await db
-      .update(buckets)
-      .set({
-        totalRequests: sql`${buckets.totalRequests} + 1`,
-      })
-      .where(eq(buckets.id, bucket.id));
+      await tx
+        .update(buckets)
+        .set({
+          totalRequests: sql`${buckets.totalRequests} + 1`,
+        })
+        .where(eq(buckets.id, bucket.id));
+    });
   } catch (e) {
-    console.error("Failed to update stats:", e);
+    console.error("Failed to update aggregate stats:", e);
+  }
+
+  // 2. Queue detailed log for batch insertion
+  logQueue.push({
+    bucketId: bucket.id,
+    ownerId: user.id,
+    requesterId: mode === "authenticated" ? user.id : null,
+    method,
+    path,
+    statusCode,
+    ingressBytes: ingress,
+    egressBytes: egress,
+    ipAddress: ip,
+    userAgent: userAgent ? userAgent.slice(0, 255) : null,
+    latencyMs: durationMs,
+  });
+
+  if (logQueue.length >= BATCH_SIZE) {
+    if (flushTimer) {
+      clearTimeout(flushTimer);
+      flushTimer = null;
+    }
+    // Flush immediately if batch is full
+    // We don't await this to keep the request handler fast
+    flushLogs();
+  } else {
+    scheduleFlush();
   }
 }
