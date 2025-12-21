@@ -25,7 +25,9 @@ export async function handleS3Request(
   const url = new URL(req.url);
   const S3_DOMAIN = config.s3Domain;
   const host = req.headers.get("host") || "";
+  const key = getKeyFromRequest(req, bucket.name);
 
+  // Handle ListBuckets on root domain
   if (host === S3_DOMAIN && url.pathname === "/") {
     if (method === "GET") {
       return new Response(
@@ -50,8 +52,6 @@ export async function handleS3Request(
     }
     return new Response("Method Not Allowed", { status: 405 });
   }
-
-  const key = getKeyFromRequest(req, bucket.name);
   const internalPath = getInternalPath(key, user, bucket);
 
   if (key === "") {

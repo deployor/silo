@@ -19,29 +19,29 @@ Bun.serve({
       (S3_DOMAIN === "localhost:3000" && host.startsWith("localhost"))
     ) {
       const path = url.pathname;
-      if (
-        path === "/" ||
-        path.startsWith("/auth/") ||
-        path.startsWith("/api/dashboard/") ||
-        path.startsWith("/docs")
-      ) {
-        isDashboard = true;
-      } else {
-        const hasAuthHeader = req.headers.has("authorization");
-        const hasAmzParams =
-          url.searchParams.has("X-Amz-Algorithm") ||
-          url.searchParams.has("x-amz-algorithm");
+      const hasAuthHeader = req.headers.has("authorization");
+      const hasAmzParams =
+        url.searchParams.has("X-Amz-Algorithm") ||
+        url.searchParams.has("x-amz-algorithm");
 
-        if (hasAuthHeader || hasAmzParams) {
-          isDashboard = false;
+      // If it looks like an S3 request (Auth header or params), treat as S3
+      if (hasAuthHeader || hasAmzParams) {
+        isDashboard = false;
+      } else {
+        // Otherwise, check if it matches dashboard paths
+        if (
+          path === "/" ||
+          path.startsWith("/auth/") ||
+          path.startsWith("/api/dashboard/") ||
+          path.startsWith("/docs")
+        ) {
+          isDashboard = true;
         } else {
-          if (
-            path === "/" ||
-            path.startsWith("/auth/") ||
-            path.startsWith("/api/dashboard/")
-          ) {
-            isDashboard = true;
-          }
+          // If it's not a known dashboard path and has no auth,
+          // it might be an unauthenticated S3 request (which will fail auth)
+          // OR a static asset for dashboard (if we had any).
+          // For now, default to S3 to let auth middleware handle the denial.
+          isDashboard = false;
         }
       }
     } else {
