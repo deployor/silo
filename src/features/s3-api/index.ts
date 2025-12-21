@@ -24,6 +24,9 @@ export async function handleS3Request(
 ): Promise<Response> {
   const method = req.method;
 
+  // console.log(`[S3] ${method} ${req.url}`);
+  // console.log("[S3] Headers:", JSON.stringify(Object.fromEntries(req.headers.entries())));
+
   if (mode === "public" && method !== "GET" && method !== "HEAD") {
     return new Response(
       `<?xml version="1.0" encoding="UTF-8"?>
