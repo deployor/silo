@@ -158,7 +158,11 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
             .where(eq(bucketKeys.bucketId, b.id));
           return {
             ...b,
-            keys: keys.map((k) => ({ id: k.id, accessKey: k.accessKey })),
+            keys: keys.map((k) => ({
+                id: k.id,
+                accessKey: k.accessKey,
+                secretKey: k.secretKey
+            })),
           };
         }),
       );
@@ -387,6 +391,54 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
       await db.delete(bucketKeys).where(eq(bucketKeys.id, keyId));
 
       return new Response("Deleted", { status: 200 });
+    }
+
+    // Preview File (Proxy)
+    const previewFileMatch = path.match(
+      /^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/files\/preview$/,
+    );
+    if (previewFileMatch && req.method === "GET") {
+        const bucketName = previewFileMatch[1];
+        const key = url.searchParams.get("key");
+
+        if (!key) return new Response("Missing key", { status: 400 });
+
+        const bucket = await db
+            .select()
+            .from(buckets)
+            .where(eq(buckets.name, bucketName))
+            .limit(1);
+
+        if (bucket.length === 0)
+            return new Response("Bucket not found", { status: 404 });
+        if (bucket[0].userId !== user.id)
+            return new Response("Unauthorized", { status: 403 });
+
+        const internalKey = getInternalPath(key, user, bucket[0]);
+
+        try {
+            const s3Res = await s3Client.fetch(internalKey, {
+                method: "GET"
+            });
+
+            if (!s3Res.ok) {
+                if (s3Res.status === 404) return new Response("File not found", { status: 404 });
+                return new Response(s3Res.body, { status: s3Res.status });
+            }
+
+            const headers = new Headers(s3Res.headers);
+            headers.set("Content-Disposition", "inline");
+            headers.delete("x-amz-request-id");
+            headers.delete("x-amz-id-2");
+
+            return new Response(s3Res.body, {
+                status: s3Res.status,
+                headers
+            });
+        } catch (e) {
+            console.error("Preview File Error:", e);
+            return new Response("Failed to preview file", { status: 500 });
+        }
     }
 
     // List Files (Proxy to S3 ListObjectsV2)
