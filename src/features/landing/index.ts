@@ -345,14 +345,18 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
       const bucketName = parts[4];
       const keyId = parts[6];
 
+      console.log(`Attempting to delete key. Bucket: ${bucketName}, Key: ${keyId}`);
+
       const bucket = await db
         .select()
         .from(buckets)
         .where(eq(buckets.name, bucketName))
         .limit(1);
 
-      if (bucket.length === 0)
+      if (bucket.length === 0) {
+        console.log(`Bucket not found: ${bucketName}`);
         return new Response("Bucket not found", { status: 404 });
+      }
       if (bucket[0].userId !== user.id)
         return new Response("Unauthorized", { status: 403 });
 
