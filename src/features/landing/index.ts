@@ -198,6 +198,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
           return new Response("Bucket limit reached", { status: 403 });
         }
 
+        // Check if bucket name exists globally
         const existing = await db
           .select()
           .from(buckets)
