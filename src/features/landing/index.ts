@@ -337,7 +337,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
     // Delete key
     if (
       path.match(
-        /^\/api\/dashboard\/buckets\/[a-z0-9-]+\/keys\/[a-f0-9-]+$/,
+        /^\/api\/dashboard\/buckets\/[a-z0-9-]+\/keys\/[^/]+$/,
       ) &&
       req.method === "DELETE"
     ) {
