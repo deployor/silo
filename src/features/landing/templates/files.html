@@ -418,21 +418,27 @@
         modal.classList.remove('hidden');
         modal.classList.add('flex');
 
+        // Use proxy URL for preview to handle private buckets
+        const proxyUrl = `/api/dashboard/buckets/${bucketName}/files/preview?key=${encodeURIComponent(key)}`;
+
         // Determine file type
         const ext = key.split('.').pop().toLowerCase();
         const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
         const videoExts = ['mp4', 'webm', 'ogg'];
         const audioExts = ['mp3', 'wav'];
-        const textExts = ['txt', 'md', 'json', 'js', 'css', 'html', 'xml', 'csv'];
+        const textExts = ['txt', 'md', 'json', 'js', 'css', 'html', 'xml', 'csv', 'ts', 'sql'];
         
         if (imageExts.includes(ext)) {
-            content.innerHTML = `<img src="${url}" class="max-w-full max-h-full object-contain" />`;
+            content.innerHTML = `<img src="${proxyUrl}" class="max-w-full max-h-full object-contain" />`;
         } else if (videoExts.includes(ext)) {
-            content.innerHTML = `<video src="${url}" controls class="max-w-full max-h-full"></video>`;
+            content.innerHTML = `<video src="${proxyUrl}" controls class="max-w-full max-h-full"></video>`;
         } else if (audioExts.includes(ext)) {
-            content.innerHTML = `<audio src="${url}" controls></audio>`;
+            content.innerHTML = `<audio src="${proxyUrl}" controls></audio>`;
         } else if (textExts.includes(ext)) {
-            fetch(url).then(r => r.text()).then(text => {
+            fetch(proxyUrl).then(r => {
+                if (!r.ok) throw new Error("Failed to load");
+                return r.text();
+            }).then(text => {
                 content.innerHTML = `<pre class="p-4 text-sm font-mono text-white whitespace-pre-wrap overflow-auto w-full h-full">${text.replace(/</g, '<')}</pre>`;
             }).catch(() => {
                 content.innerHTML = '<div class="text-hc-red">Failed to load text content</div>';
