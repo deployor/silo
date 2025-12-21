@@ -234,9 +234,16 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
           secretKey,
         });
 
-        return new Response(JSON.stringify({ accessKey, secretKey }), {
-          headers: { "Content-Type": "application/json" },
-        });
+        // Construct public URL example
+        // Since we don't use subdomains per bucket, it's just the root domain + bucket name
+        const publicUrl = `https://${config.s3Domain}/${name}/file.png`;
+
+        return new Response(
+          JSON.stringify({ accessKey, secretKey, publicUrl }),
+          {
+            headers: { "Content-Type": "application/json" },
+          },
+        );
       } catch (e) {
         console.error(e);
         return new Response("Internal Error", { status: 500 });
@@ -337,9 +344,14 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
         secretKey,
       });
 
-      return new Response(JSON.stringify({ accessKey, secretKey }), {
-        headers: { "Content-Type": "application/json" },
-      });
+      const publicUrl = `https://${config.s3Domain}/${bucketName}/file.png`;
+
+      return new Response(
+        JSON.stringify({ accessKey, secretKey, publicUrl }),
+        {
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     // Delete key
