@@ -133,7 +133,17 @@
             </div>
             <div class="flex justify-between text-sm">
               <span class="text-hc-red">Egress (Out)</span>
-              <span id="egress-bytes" class="text-white">0 GB</span>
+              <div class="text-right">
+                <span id="egress-bytes" class="text-white">0 GB</span>
+                <span class="text-text-muted text-xs block" id="egress-limit">/ 0 GB</span>
+              </div>
+            </div>
+            <div class="w-full bg-white/5 rounded-full h-1.5 mt-1 overflow-hidden">
+                <div
+                  class="bg-hc-red h-1.5 rounded-full transition-all duration-500"
+                  id="egress-bar"
+                  style="width: 0%"
+                ></div>
             </div>
             <div
               class="mt-1 pt-2 border-t border-white/10 flex justify-between font-bold"
@@ -561,6 +571,17 @@
           document.getElementById("egress-bytes").textContent = formatBytes(
             data.user.egressBytes,
           );
+          
+          // Egress Limit Logic
+          const egressLimitBytes = data.user.storageLimit * 3;
+          document.getElementById("egress-limit").textContent = `/ ${formatBytes(egressLimitBytes)}`;
+          
+          const egressPercent = Math.min(
+            (data.user.egressBytes / egressLimitBytes) * 100,
+            100
+          );
+          document.getElementById("egress-bar").style.width = `${egressPercent}%`;
+          
           document.getElementById("total-bytes").textContent = formatBytes(
             data.user.totalBytes,
           );
