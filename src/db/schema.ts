@@ -36,8 +36,6 @@ export const buckets = pgTable(
     userId: text("user_id")
       .references(() => users.id)
       .notNull(),
-    accessKey: text("access_key").notNull().unique(),
-    secretKey: text("secret_key").notNull(),
     region: text("region").default("auto"),
     isPublic: boolean("is_public").default(false).notNull(),
     totalBytes: bigint("total_bytes", { mode: "number" }).notNull().default(0),
@@ -50,8 +48,26 @@ export const buckets = pgTable(
   (table) => {
     return {
       nameIdx: index("name_idx").on(table.name),
-      accessKeyIdx: index("access_key_idx").on(table.accessKey),
       userIdIdx: index("user_id_idx").on(table.userId),
+    };
+  },
+);
+
+export const bucketKeys = pgTable(
+  "bucket_keys",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    bucketId: uuid("bucket_id")
+      .references(() => buckets.id, { onDelete: "cascade" })
+      .notNull(),
+    accessKey: text("access_key").notNull().unique(),
+    secretKey: text("secret_key").notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => {
+    return {
+      bucketIdIdx: index("bucket_id_idx").on(table.bucketId),
+      accessKeyIdx: index("access_key_idx").on(table.accessKey),
     };
   },
 );

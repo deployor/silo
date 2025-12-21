@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { buckets, users } from "../db/schema";
+import { buckets, users, bucketKeys } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { createHmac } from "node:crypto";
 import { config } from "../config";
@@ -151,17 +151,19 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
     );
   }
 
-  const bucketResult = await db
+  const keyResult = await db
     .select({
       bucket: buckets,
       user: users,
+      key: bucketKeys,
     })
-    .from(buckets)
+    .from(bucketKeys)
+    .innerJoin(buckets, eq(bucketKeys.bucketId, buckets.id))
     .innerJoin(users, eq(buckets.userId, users.id))
-    .where(eq(buckets.accessKey, accessKeyId))
+    .where(eq(bucketKeys.accessKey, accessKeyId))
     .limit(1);
 
-  if (bucketResult.length === 0) {
+  if (keyResult.length === 0) {
     return new Response(
       `<?xml version="1.0" encoding="UTF-8"?>
 <Error>
@@ -173,7 +175,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
     );
   }
 
-  const { bucket, user } = bucketResult[0];
+  const { bucket, user, key } = keyResult[0];
 
   const requestedBucket = getBucketFromRequest(req);
 
@@ -204,7 +206,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
     );
 
   // Verify Signature
-  const isValid = await verifyAwsV4Signature(req, bucket.secretKey);
+  const isValid = await verifyAwsV4Signature(req, key.secretKey);
   if (!isValid) {
     return new Response(
       `<?xml version="1.0" encoding="UTF-8"?>
