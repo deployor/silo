@@ -593,6 +593,16 @@
       }
 
       async function togglePublic(name, isPublic) {
+        const action = isPublic ? "make public" : "make private";
+        if (
+          !confirm(
+            `Are you sure you want to ${action} bucket "${name}"? This will affect who can access files in this bucket.`,
+          )
+        ) {
+          loadDashboard(); // Revert checkbox
+          return;
+        }
+
         try {
           const res = await fetch(`/api/dashboard/buckets/${name}`, {
             method: "PATCH",
@@ -607,6 +617,9 @@
             loadDashboard();
             return;
           }
+          
+          // Reload to confirm state
+          loadDashboard();
         } catch (error) {
           alert("Failed to update bucket");
           loadDashboard();
