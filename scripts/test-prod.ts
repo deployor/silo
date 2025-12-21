@@ -10,6 +10,13 @@ import {
   CopyObjectCommand,
   DeleteObjectsCommand,
   HeadObjectCommand,
+  ListBucketsCommand,
+  HeadBucketCommand,
+  GetBucketLocationCommand,
+  GetBucketPolicyCommand,
+  AbortMultipartUploadCommand,
+  ListMultipartUploadsCommand,
+  ListPartsCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -81,6 +88,58 @@ async function runTest() {
     }
     console.log("✅ List Objects success");
 
+    console.log("Testing List Buckets (Should return only user's bucket)...");
+    // Note: ListBuckets is usually on the root, but our client is configured with a bucket.
+    // We need a client without a bucket in the endpoint or path to test ListBuckets properly if we were doing it the standard way.
+    // However, our implementation handles ListBuckets on the root domain.
+    // Let's try to list buckets using a new client pointing to the root.
+    const rootS3 = new S3Client({
+      region: "auto",
+      endpoint: endpoint,
+      credentials: {
+        accessKeyId: accessKey,
+        secretAccessKey: secretKey,
+      },
+      forcePathStyle: true,
+    });
+    const listBucketsRes = await rootS3.send(new ListBucketsCommand({}));
+    const bucketFound = listBucketsRes.Buckets?.some(
+      (b) => b.Name === testBucketName,
+    );
+    if (!bucketFound) {
+      throw new Error("ListBuckets did not return the test bucket");
+    }
+    console.log("✅ List Buckets success");
+
+    console.log("Testing Head Bucket...");
+    await s3.send(new HeadBucketCommand({ Bucket: testBucketName }));
+    console.log("✅ Head Bucket success");
+
+    console.log("Testing Get Bucket Location...");
+    const locationRes = await s3.send(
+      new GetBucketLocationCommand({ Bucket: testBucketName }),
+    );
+    if (locationRes.LocationConstraint !== "eu-central-1") {
+      console.warn(
+        `⚠️ Unexpected LocationConstraint: ${locationRes.LocationConstraint}`,
+      );
+    }
+    console.log("✅ Get Bucket Location success");
+
+    console.log("Testing Get Bucket Policy (Should be Not Implemented)...");
+    try {
+      await s3.send(new GetBucketPolicyCommand({ Bucket: testBucketName }));
+      console.error("❌ Get Bucket Policy SUCCEEDED (Should have failed)");
+    } catch (e: any) {
+      if (e.$metadata?.httpStatusCode === 501) {
+        console.log("✅ Get Bucket Policy blocked (Not Implemented)");
+      } else {
+        console.log(
+          `⚠️ Get Bucket Policy failed with status: ${e.$metadata?.httpStatusCode}`,
+        );
+      }
+    }
+
     // --- Multipart Upload ---
     console.log("\n--- Multipart Upload ---");
     console.log("Initiating Multipart Upload...");
@@ -93,6 +152,18 @@ async function runTest() {
     const uploadId = multipartUpload.UploadId;
     console.log(`Upload ID: ${uploadId}`);
 
+    console.log("Testing List Multipart Uploads...");
+    const listMultipartRes = await s3.send(
+      new ListMultipartUploadsCommand({ Bucket: testBucketName }),
+    );
+    const uploadFound = listMultipartRes.Uploads?.some(
+      (u) => u.UploadId === uploadId && u.Key === "multipart.txt",
+    );
+    if (!uploadFound) {
+      throw new Error("ListMultipartUploads did not find the active upload");
+    }
+    console.log("✅ List Multipart Uploads success");
+
     console.log("Uploading Part 1...");
     const part1 = await s3.send(
       new UploadPartCommand({
@@ -103,6 +174,20 @@ async function runTest() {
         Body: "Part 1 Data",
       }),
     );
+
+    console.log("Testing List Parts...");
+    const listPartsRes = await s3.send(
+      new ListPartsCommand({
+        Bucket: testBucketName,
+        Key: "multipart.txt",
+        UploadId: uploadId,
+      }),
+    );
+    const partFound = listPartsRes.Parts?.some((p) => p.PartNumber === 1);
+    if (!partFound) {
+      throw new Error("ListParts did not find Part 1");
+    }
+    console.log("✅ List Parts success");
 
     console.log("Completing Multipart Upload...");
     await s3.send(
@@ -116,6 +201,32 @@ async function runTest() {
       }),
     );
     console.log("✅ Multipart Upload success");
+
+    console.log("Testing Abort Multipart Upload...");
+    const abortUpload = await s3.send(
+      new CreateMultipartUploadCommand({
+        Bucket: testBucketName,
+        Key: "abort-me.txt",
+      }),
+    );
+    await s3.send(
+      new AbortMultipartUploadCommand({
+        Bucket: testBucketName,
+        Key: "abort-me.txt",
+        UploadId: abortUpload.UploadId,
+      }),
+    );
+    // Verify it's gone
+    const listMultipartResAfterAbort = await s3.send(
+      new ListMultipartUploadsCommand({ Bucket: testBucketName }),
+    );
+    const abortedFound = listMultipartResAfterAbort.Uploads?.some(
+      (u) => u.UploadId === abortUpload.UploadId,
+    );
+    if (abortedFound) {
+      throw new Error("AbortMultipartUpload failed (upload still exists)");
+    }
+    console.log("✅ Abort Multipart Upload success");
 
     // --- Copy Object ---
     console.log("\n--- Copy Object ---");
