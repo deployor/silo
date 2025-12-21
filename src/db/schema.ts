@@ -76,7 +76,9 @@ export const requestLogs = pgTable(
   "request_logs",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    bucketId: uuid("bucket_id").references(() => buckets.id),
+    bucketId: uuid("bucket_id").references(() => buckets.id, {
+      onDelete: "set null",
+    }),
     // The owner of the bucket (for billing/quota)
     ownerId: text("owner_id").references(() => users.id),
     // The user who performed the action (might be null for public)
