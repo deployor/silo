@@ -276,15 +276,8 @@ export async function handleS3Request(
   }
 
   if (method === "PUT") {
-    const contentLength = parseInt(req.headers.get("content-length") || "0");
     const limit = user.storageLimitBytes;
-
-
     const upstreamHeaders = filterUpstreamHeaders(req.headers);
-
-    if (contentLength > 0) {
-      upstreamHeaders.set("Content-Length", contentLength.toString());
-    }
 
     // If the client provided a SHA256 checksum, pass it through.
     // Otherwise, default to UNSIGNED-PAYLOAD.
@@ -313,30 +306,34 @@ export async function handleS3Request(
         ? `${internalPath}?${queryStr}`
         : internalPath;
 
-      let requestBody = req.body;
+      let requestBody: any = req.body;
       let actualSize = 0;
 
-      if (requestBody && !copySource) {
-        const remainingQuota =
-          limit !== null
-            ? BigInt(limit) - BigInt(user.storageUsageBytes)
-            : null;
+      if (!copySource) {
+        // Buffer the entire body to compute Content-Length and check quota
+        const arrayBuffer = await req.arrayBuffer();
+        actualSize = arrayBuffer.byteLength;
+        requestBody = arrayBuffer;
 
-        const transform = new TransformStream({
-          transform(chunk, controller) {
-            actualSize += chunk.length;
-            if (
-              remainingQuota !== null &&
-              BigInt(actualSize) > remainingQuota
-            ) {
-              controller.error(new Error("QuotaExceeded"));
-              return;
-            }
-            controller.enqueue(chunk);
-          },
-        });
+        if (limit !== null) {
+          if (
+            BigInt(user.storageUsageBytes) + BigInt(actualSize) >
+            BigInt(limit)
+          ) {
+            return new Response(
+              `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+    <Code>QuotaExceeded</Code>
+    <Message>You have exceeded your storage quota.</Message>
+    <Resource>${key}</Resource>
+    <RequestId>0000000000000000</RequestId>
+</Error>`.trim(),
+              { status: 403, headers: { "Content-Type": "application/xml" } },
+            );
+          }
+        }
 
-        requestBody = requestBody.pipeThrough(transform);
+        upstreamHeaders.set("Content-Length", actualSize.toString());
       }
 
       // Use 0 retries for PUT to avoid consuming the streaming body
@@ -352,7 +349,6 @@ export async function handleS3Request(
       );
 
       if (response.ok && !copySource) {
-        // Update with actual size, even if it's 0 or different from Content-Length
         if (actualSize > 0) {
           await db
             .update(users)
