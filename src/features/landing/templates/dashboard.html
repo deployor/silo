@@ -270,7 +270,7 @@
       class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50"
     >
       <div
-        class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-2xl card-shadow transform transition-all"
+        class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-4xl card-shadow transform transition-all"
       >
         <div class="flex justify-between items-center mb-6">
             <div>
@@ -292,6 +292,7 @@
                 <thead class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
                     <tr>
                         <th class="px-4 py-3">Access Key ID</th>
+                        <th class="px-4 py-3">Secret Key</th>
                         <th class="px-4 py-3 text-right">Actions</th>
                     </tr>
                 </thead>
@@ -312,201 +313,10 @@
       </div>
     </div>
 
-    <!-- Secret Key Modal -->
-    <div
-      id="key-modal"
-      class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50"
-    >
-      <div
-        class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-md card-shadow"
-      >
-        <div class="flex items-center gap-3 mb-2">
-          <div class="bg-emerald-500/20 p-2 rounded-full text-emerald-400">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-          </div>
-          <h3 class="text-2xl font-bold text-white">Bucket Created!</h3>
-        </div>
-        <p class="text-text-muted text-sm mb-6 ml-11">
-          Save these credentials now. You won't be able to see the Secret Key
-          again.
-        </p>
-
-        <div
-          class="space-y-4 bg-black/30 p-6 rounded-xl border border-white/10 mb-8"
-        >
-          <div>
-            <label
-              class="text-xs text-text-muted font-bold uppercase tracking-wider block mb-1"
-              >Access Key ID</label
-            >
-            <div
-              class="flex items-center gap-2 bg-black/20 rounded-lg p-2 border border-white/5 hover:border-white/10 transition-colors"
-            >
-              <div
-                class="font-mono text-sm select-all text-white overflow-x-auto whitespace-nowrap scrollbar-thin flex-1"
-                id="new-access-key"
-              ></div>
-              <button
-                id="btn-new-access-key"
-                onclick="copyToClipboard('new-access-key')"
-                class="text-text-muted hover:text-white transition-colors p-1"
-                title="Copy"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div>
-            <label
-              class="text-xs text-text-muted font-bold uppercase tracking-wider block mb-1"
-              >Secret Access Key</label
-            >
-            <div
-              class="flex items-center gap-2 bg-black/20 rounded-lg p-2 border border-white/5 hover:border-white/10 transition-colors"
-            >
-              <div
-                class="font-mono text-sm select-all text-emerald-400 overflow-x-auto whitespace-nowrap scrollbar-thin flex-1"
-                id="new-secret-key"
-              ></div>
-              <button
-                id="btn-new-secret-key"
-                onclick="copyToClipboard('new-secret-key')"
-                class="text-text-muted hover:text-white transition-colors p-1"
-                title="Copy"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div>
-            <label
-              class="text-xs text-text-muted font-bold uppercase tracking-wider block mb-1"
-              >Endpoint</label
-            >
-            <div
-              class="flex items-center gap-2 bg-black/20 rounded-lg p-2 border border-white/5 hover:border-white/10 transition-colors"
-            >
-              <div
-                class="font-mono text-sm select-all text-hc-red overflow-x-auto whitespace-nowrap scrollbar-thin flex-1"
-                id="new-endpoint"
-              >
-                https://cargo.deployor.dev
-              </div>
-              <button
-                id="btn-new-endpoint"
-                onclick="copyToClipboard('new-endpoint')"
-                class="text-text-muted hover:text-white transition-colors p-1"
-                title="Copy"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label
-              class="text-xs text-text-muted font-bold uppercase tracking-wider block mb-1"
-              >Public URL Example</label
-            >
-            <div
-              class="flex items-center gap-2 bg-black/20 rounded-lg p-2 border border-white/5 hover:border-white/10 transition-colors"
-            >
-              <div
-                class="font-mono text-sm select-all text-hc-blue overflow-x-auto whitespace-nowrap scrollbar-thin flex-1"
-                id="new-public-url"
-              >
-                ...
-              </div>
-              <button
-                id="btn-new-public-url"
-                onclick="copyToClipboard('new-public-url')"
-                class="text-text-muted hover:text-white transition-colors p-1"
-                title="Copy"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <button
-          onclick="closeKeyModal()"
-          class="w-full bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors border border-white/5 hover:border-white/20"
-        >
-          I have saved my keys
-        </button>
-      </div>
-    </div>
-
     <!-- Confirmation Modal -->
     <div
       id="confirm-modal"
-      class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-[60]"
     >
       <div
         class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-md card-shadow transform transition-all"
@@ -683,15 +493,6 @@
         document.getElementById("create-modal").classList.remove("flex");
       }
 
-      async function closeKeyModal() {
-        document.getElementById("key-modal").classList.add("hidden");
-        document.getElementById("key-modal").classList.remove("flex");
-        await loadDashboard(); // Reload to show new bucket
-        if (currentManagedBucket) {
-            openManageKeysModal(currentManagedBucket);
-        }
-      }
-
       async function createBucket(e) {
         e.preventDefault();
         const form = e.target;
@@ -710,21 +511,11 @@
             return;
           }
 
-          const data = await res.json();
-
-          // Show keys
-          document.getElementById("new-access-key").textContent =
-            data.accessKey;
-          document.getElementById("new-secret-key").textContent =
-            data.secretKey;
-          document.getElementById("new-public-url").textContent =
-            data.publicUrl;
-
           closeCreateModal();
           form.reset();
-
-          document.getElementById("key-modal").classList.remove("hidden");
-          document.getElementById("key-modal").classList.add("flex");
+          
+          await loadDashboard();
+          openManageKeysModal(name);
         } catch (error) {
           alert("Failed to create bucket");
         }
@@ -776,16 +567,8 @@
                     throw new Error(err);
                 }
 
-                const data = await res.json();
-                
-                // Show keys
-                document.getElementById("new-access-key").textContent = data.accessKey;
-                document.getElementById("new-secret-key").textContent = data.secretKey;
-                document.getElementById("new-public-url").textContent = data.publicUrl;
-                document.getElementById("new-endpoint").textContent = `https://${window.location.host.replace('dashboard.', '')}`;
-
-                document.getElementById("key-modal").classList.remove("hidden");
-                document.getElementById("key-modal").classList.add("flex");
+                await loadDashboard();
+                openManageKeysModal(bucketName);
             }
         );
       }
@@ -833,12 +616,18 @@
       function renderManageKeysTable(bucket) {
         const tbody = document.getElementById('manage-keys-table');
         if (bucket.keys.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="2" class="px-4 py-8 text-center text-text-muted italic">No keys found for this bucket.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-8 text-center text-text-muted italic">No keys found for this bucket.</td></tr>';
             return;
         }
         tbody.innerHTML = bucket.keys.map(k => `
             <tr class="hover:bg-white/5 transition-colors">
                 <td class="px-4 py-3 font-mono text-white">${k.accessKey}</td>
+                <td class="px-4 py-3 font-mono text-text-muted text-xs break-all">
+                    <div class="group/key relative cursor-pointer" onclick="navigator.clipboard.writeText('${k.secretKey}'); alert('Secret key copied!')">
+                        <span class="blur-sm group-hover/key:blur-none transition-all">${k.secretKey}</span>
+                        <span class="absolute top-0 right-0 text-xs text-white opacity-0 group-hover/key:opacity-100 bg-black/50 px-1 rounded">Copy</span>
+                    </div>
+                </td>
                 <td class="px-4 py-3 text-right">
                     <button onclick="deleteKey('${bucket.name}', '${k.id}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider transition-colors">Delete</button>
                 </td>
