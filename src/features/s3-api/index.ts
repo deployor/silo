@@ -20,8 +20,21 @@ export async function handleS3Request(
   req: Request,
   user: typeof users.$inferSelect,
   bucket: typeof buckets.$inferSelect,
+  mode: "authenticated" | "public",
 ): Promise<Response> {
   const method = req.method;
+
+  if (mode === "public" && method !== "GET" && method !== "HEAD") {
+    return new Response(
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+    <Code>AccessDenied</Code>
+    <Message>Access Denied</Message>
+    <RequestId>0000000000000000</RequestId>
+</Error>`,
+      { status: 403, headers: { "Content-Type": "application/xml" } },
+    );
+  }
   const url = new URL(req.url);
   const S3_DOMAIN = config.s3Domain;
   const host = req.headers.get("host") || "";

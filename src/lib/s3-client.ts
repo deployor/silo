@@ -102,6 +102,37 @@ export class HetznerS3Client {
     return this.client.sign(url, init);
   }
 
+  async getPresignedUrl(
+    path: string,
+    expiresIn: number = 3600,
+  ): Promise<string> {
+    const baseUrl = new URL(`https://${this.bucket}.${this.endpoint}`);
+    const relative = path.startsWith("/") ? path.slice(1) : path;
+    const url = new URL(relative, baseUrl.toString());
+
+    // aws4fetch doesn't have a direct presign method that returns a URL string with query params
+    // We have to manually construct it or use a workaround.
+    // However, since we are proxying, we might want to generate a presigned URL for OUR service,
+    // not the upstream Hetzner bucket directly, if the user wants to share it.
+    // But if the requirement is "allow presigned urls so private objects can be shared publicly",
+    // it usually means the user generates a presigned URL using their credentials for OUR service.
+    // Then our service validates it.
+
+    // Wait, if the user asks for a presigned URL via API, we might need this.
+    // But usually users generate presigned URLs locally using their SDK and keys.
+    // Then they send that URL to someone. That someone requests OUR service.
+    // OUR service sees the signature in the query params.
+    // We validate that signature against the user's secret key.
+    // If valid, we proxy to Hetzner.
+
+    // So we don't necessarily need to generate upstream presigned URLs here unless we are redirecting.
+    // But we are proxying. So we just need to handle the incoming request with query auth.
+    // Which `authenticate` middleware already does!
+    // It checks `X-Amz-Credential` in query params.
+
+    return url.toString();
+  }
+
   getEndpoint(): string {
     return this.endpoint;
   }

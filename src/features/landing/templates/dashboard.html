@@ -469,7 +469,16 @@
             .map(
               (bucket) => `
                     <tr class="hover:bg-white/5 transition-colors group">
-                        <td class="px-6 py-4 font-medium text-white font-mono">${bucket.name}</td>
+                        <td class="px-6 py-4 font-medium text-white font-mono">
+                          ${bucket.name}
+                          <div class="mt-1">
+                            <label class="inline-flex items-center cursor-pointer">
+                              <input type="checkbox" class="sr-only peer" onchange="togglePublic('${bucket.name}', this.checked)" ${bucket.isPublic ? "checked" : ""}>
+                              <div class="relative w-9 h-5 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-blue rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-hc-blue"></div>
+                              <span class="ms-2 text-xs font-medium text-text-muted peer-checked:text-white">Public</span>
+                            </label>
+                          </div>
+                        </td>
                         <td class="px-6 py-4 font-mono text-xs text-text-muted group-hover:text-white transition-colors">${bucket.accessKey}</td>
                         <td class="px-6 py-4 text-text-main">
                             <div class="text-xs font-mono">
@@ -580,6 +589,27 @@
           loadDashboard();
         } catch (error) {
           alert("Failed to delete bucket");
+        }
+      }
+
+      async function togglePublic(name, isPublic) {
+        try {
+          const res = await fetch(`/api/dashboard/buckets/${name}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isPublic }),
+          });
+
+          if (!res.ok) {
+            const err = await res.text();
+            alert(err);
+            // Revert checkbox if failed
+            loadDashboard();
+            return;
+          }
+        } catch (error) {
+          alert("Failed to update bucket");
+          loadDashboard();
         }
       }
 

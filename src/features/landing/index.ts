@@ -161,6 +161,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
             createdAt: b.createdAt,
             totalBytes: b.totalBytes,
             totalRequests: b.totalRequests,
+            isPublic: b.isPublic,
           })),
         }),
         { headers: { "Content-Type": "application/json" } },
@@ -240,6 +241,36 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
       await db.delete(buckets).where(eq(buckets.name, bucketName));
 
       return new Response("Deleted", { status: 200 });
+    }
+
+    if (path.startsWith("/api/dashboard/buckets/") && req.method === "PATCH") {
+      const bucketName = path.split("/")[4]; // /api/dashboard/buckets/:name
+      if (!bucketName)
+        return new Response("Invalid bucket name", { status: 400 });
+
+      const bucket = await db
+        .select()
+        .from(buckets)
+        .where(eq(buckets.name, bucketName))
+        .limit(1);
+      if (bucket.length === 0)
+        return new Response("Bucket not found", { status: 404 });
+      if (bucket[0].userId !== user.id)
+        return new Response("Unauthorized", { status: 403 });
+
+      try {
+        const body = await req.json();
+        if (typeof body.isPublic === "boolean") {
+          await db
+            .update(buckets)
+            .set({ isPublic: body.isPublic })
+            .where(eq(buckets.name, bucketName));
+          return new Response("Updated", { status: 200 });
+        }
+        return new Response("Invalid body", { status: 400 });
+      } catch (e) {
+        return new Response("Internal Error", { status: 500 });
+      }
     }
   }
 
