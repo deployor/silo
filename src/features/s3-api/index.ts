@@ -278,24 +278,7 @@ export async function handleS3Request(
   if (method === "PUT") {
     const contentLength = parseInt(req.headers.get("content-length") || "0");
     const limit = user.storageLimitBytes;
-    if (contentLength > 0 && limit !== null) {
-      if (
-        BigInt(user.storageUsageBytes) + BigInt(contentLength) >
-        BigInt(limit)
-      ) {
-        return new Response(
-          `
-<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-    <Code>QuotaExceeded</Code>
-    <Message>You have exceeded your storage quota.</Message>
-    <Resource>${key}</Resource>
-    <RequestId>0000000000000000</RequestId>
-</Error>`.trim(),
-          { status: 403, headers: { "Content-Type": "application/xml" } },
-        );
-      }
-    }
+
 
     const upstreamHeaders = filterUpstreamHeaders(req.headers);
 
