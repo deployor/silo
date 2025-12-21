@@ -65,17 +65,8 @@ export async function verifyAwsV4Signature(
   // URL Encode - S3 requires specific encoding
   // But usually url.pathname is already decoded. We need to encode it back, but keep slashes.
   // AWS expects each path segment to be URI-encoded.
-  // canonicalUri = canonicalUri.split('/').map(encodeURIComponent).join('/');
-  // if (canonicalUri.startsWith("//")) canonicalUri = canonicalUri.slice(1); // Fix double slash from split/join if leading slash
-  
-  // NOTE: Bun's req.url might already be decoded or encoded. 
-  // For now, let's try using the pathname as is, or minimal encoding if needed.
-  // S3 signing is very sensitive to this.
-  // A safer bet for a proxy is often to use the raw path if available, but Request object gives parsed URL.
-  // Let's try standard URI encoding for now.
-  
-  // Actually, let's look at how aws4fetch or others do it.
-  // They usually encode.
+  canonicalUri = canonicalUri.split('/').map(encodeURIComponent).join('/');
+  if (canonicalUri.startsWith("//")) canonicalUri = canonicalUri.slice(1); // Fix double slash from split/join if leading slash
   
   // CanonicalQueryString
   const searchParams = new URLSearchParams(url.search);
