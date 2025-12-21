@@ -27,11 +27,33 @@ export async function handleS3Request(
   const host = req.headers.get("host") || "";
   const key = getKeyFromRequest(req, bucket.name);
 
-  // Handle ListBuckets on root domain
-  if (host === S3_DOMAIN && url.pathname === "/") {
-    if (method === "GET") {
-      return new Response(
-        `
+  // Handle ListBuckets on root domain OR on bucket domain if the path is empty
+  // Some clients (like AWS SDK) might call ListBuckets on the bucket endpoint if configured that way,
+  // though standard S3 behavior is usually on the root.
+  // We'll support it if the key is empty and it looks like a service-level request,
+  // BUT for virtual-host style, the bucket is in the host, so it's technically a bucket-level request.
+  // However, if the user asks for "ListBuckets", they expect a list of buckets.
+  // Since we only have one bucket per user, we can return that.
+  if (
+    (host === S3_DOMAIN && url.pathname === "/") ||
+    (key === "" &&
+      method === "GET" &&
+      !url.searchParams.has("list-type") &&
+      !url.searchParams.has("uploads") &&
+      !url.searchParams.has("location"))
+  ) {
+    // If it's a bucket-specific request (virtual host), standard S3 treats GET / as ListObjects.
+    // But if the client explicitly sends a ListBuckets style request (which is just GET / on the service),
+    // it's ambiguous when using virtual hosts.
+    // However, our logic below handles ListObjects if list-type is 2 OR if key is empty and no other params.
+    // Let's refine:
+    // If host is S3_DOMAIN (path style root), it's definitely ListBuckets.
+    // If host is bucket.s3.domain, GET / is ListObjects.
+
+    if (host === S3_DOMAIN) {
+      if (method === "GET") {
+        return new Response(
+          `
 <?xml version="1.0" encoding="UTF-8"?>
 <ListAllMyBucketsResult>
   <Owner>
@@ -45,12 +67,13 @@ export async function handleS3Request(
     </Bucket>
   </Buckets>
 </ListAllMyBucketsResult>`.trim(),
-        {
-          headers: { "Content-Type": "application/xml" },
-        },
-      );
+          {
+            headers: { "Content-Type": "application/xml" },
+          },
+        );
+      }
+      return new Response("Method Not Allowed", { status: 405 });
     }
-    return new Response("Method Not Allowed", { status: 405 });
   }
   const internalPath = getInternalPath(key, user, bucket);
 
