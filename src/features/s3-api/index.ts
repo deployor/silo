@@ -312,25 +312,54 @@ export async function handleS3Request(
         ? `${internalPath}?${queryStr}`
         : internalPath;
 
+      let requestBody = req.body;
+      let actualSize = 0;
+
+      if (requestBody && !copySource) {
+        const remainingQuota =
+          limit !== null
+            ? BigInt(limit) - BigInt(user.storageUsageBytes)
+            : null;
+
+        const transform = new TransformStream({
+          transform(chunk, controller) {
+            actualSize += chunk.length;
+            if (
+              remainingQuota !== null &&
+              BigInt(actualSize) > remainingQuota
+            ) {
+              controller.error(new Error("QuotaExceeded"));
+              return;
+            }
+            controller.enqueue(chunk);
+          },
+        });
+
+        requestBody = requestBody.pipeThrough(transform);
+      }
+
       // Use 0 retries for PUT to avoid consuming the streaming body
       const response = await s3Client.fetch(
         pathWithQuery,
         {
           method: "PUT",
           headers: upstreamHeaders,
-          body: req.body,
+          body: requestBody,
           duplex: "half",
         } as any,
         1,
       );
 
-      if (response.ok && contentLength > 0 && !copySource) {
-        await db
-          .update(users)
-          .set({
-            storageUsageBytes: sql`${users.storageUsageBytes} + ${contentLength}`,
-          })
-          .where(eq(users.id, user.id));
+      if (response.ok && !copySource) {
+        // Update with actual size, even if it's 0 or different from Content-Length
+        if (actualSize > 0) {
+          await db
+            .update(users)
+            .set({
+              storageUsageBytes: sql`${users.storageUsageBytes} + ${actualSize}`,
+            })
+            .where(eq(users.id, user.id));
+        }
       }
 
       if (copySource && response.ok) {
@@ -347,6 +376,23 @@ export async function handleS3Request(
       });
     } catch (e: any) {
       console.error("PUT Error:", e);
+
+      if (
+        e.message === "QuotaExceeded" ||
+        e.toString().includes("QuotaExceeded")
+      ) {
+        return new Response(
+          `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+    <Code>QuotaExceeded</Code>
+    <Message>You have exceeded your storage quota.</Message>
+    <Resource>${key}</Resource>
+    <RequestId>0000000000000000</RequestId>
+</Error>`.trim(),
+          { status: 403, headers: { "Content-Type": "application/xml" } },
+        );
+      }
+
       return new Response(
         `<?xml version="1.0" encoding="UTF-8"?>
 <Error>

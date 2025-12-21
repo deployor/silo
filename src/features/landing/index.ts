@@ -1,5 +1,5 @@
 import { db } from "../../db";
-import { users, buckets } from "../../db/schema";
+import { users, buckets, bucketKeys } from "../../db/schema";
 import { eq, sql } from "drizzle-orm";
 import { config } from "../../config";
 
@@ -144,6 +144,19 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
         .from(buckets)
         .where(eq(buckets.userId, user.id));
 
+      const bucketsWithKeys = await Promise.all(
+        userBuckets.map(async (b) => {
+          const keys = await db
+            .select()
+            .from(bucketKeys)
+            .where(eq(bucketKeys.bucketId, b.id));
+          return {
+            ...b,
+            keys: keys.map((k) => ({ id: k.id, accessKey: k.accessKey })),
+          };
+        }),
+      );
+
       return new Response(
         JSON.stringify({
           user: {
@@ -155,9 +168,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
             totalBytes: user.ingressBytes + user.egressBytes,
             totalRequests: user.totalRequests,
           },
-          buckets: userBuckets.map((b) => ({
+          buckets: bucketsWithKeys.map((b) => ({
             name: b.name,
-            accessKey: b.accessKey,
+            keys: b.keys,
             createdAt: b.createdAt,
             totalBytes: b.totalBytes,
             totalRequests: b.totalRequests,
@@ -194,6 +207,15 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
           return new Response("Bucket name already taken", { status: 409 });
         }
 
+        const newBucket = await db
+          .insert(buckets)
+          .values({
+            name,
+            userId: user.id,
+            isPublic: false,
+          })
+          .returning();
+
         const accessKey =
           "CK" +
           Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) =>
@@ -206,12 +228,10 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
           (b) => b.toString(16).padStart(2, "0"),
         ).join("");
 
-        await db.insert(buckets).values({
-          name,
-          userId: user.id,
+        await db.insert(bucketKeys).values({
+          bucketId: newBucket[0].id,
           accessKey,
           secretKey,
-          isPublic: false,
         });
 
         return new Response(JSON.stringify({ accessKey, secretKey }), {
@@ -260,6 +280,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
       try {
         const body = await req.json();
+
         if (typeof body.isPublic === "boolean") {
           await db
             .update(buckets)
@@ -271,6 +292,73 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
       } catch (e) {
         return new Response("Internal Error", { status: 500 });
       }
+    }
+
+    // Generate new key for bucket
+    if (
+      path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+\/keys$/) &&
+      req.method === "POST"
+    ) {
+      const bucketName = path.split("/")[4];
+      const bucket = await db
+        .select()
+        .from(buckets)
+        .where(eq(buckets.name, bucketName))
+        .limit(1);
+
+      if (bucket.length === 0)
+        return new Response("Bucket not found", { status: 404 });
+      if (bucket[0].userId !== user.id)
+        return new Response("Unauthorized", { status: 403 });
+
+      const accessKey =
+        "CK" +
+        Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) =>
+          b.toString(16).padStart(2, "0"),
+        )
+          .join("")
+          .toUpperCase();
+      const secretKey = Array.from(
+        crypto.getRandomValues(new Uint8Array(20)),
+        (b) => b.toString(16).padStart(2, "0"),
+      ).join("");
+
+      await db.insert(bucketKeys).values({
+        bucketId: bucket[0].id,
+        accessKey,
+        secretKey,
+      });
+
+      return new Response(JSON.stringify({ accessKey, secretKey }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Delete key
+    if (
+      path.match(
+        /^\/api\/dashboard\/buckets\/[a-z0-9-]+\/keys\/[a-f0-9-]+$/,
+      ) &&
+      req.method === "DELETE"
+    ) {
+      const parts = path.split("/");
+      const bucketName = parts[4];
+      const keyId = parts[6];
+
+      const bucket = await db
+        .select()
+        .from(buckets)
+        .where(eq(buckets.name, bucketName))
+        .limit(1);
+
+      if (bucket.length === 0)
+        return new Response("Bucket not found", { status: 404 });
+      if (bucket[0].userId !== user.id)
+        return new Response("Unauthorized", { status: 403 });
+
+      await db.delete(bucketKeys).where(eq(bucketKeys.id, keyId));
+
+      return new Response("Deleted", { status: 200 });
     }
   }
 

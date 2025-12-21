@@ -11,6 +11,8 @@ async function main() {
 
   // 1. Setup: Get a user and bucket
   const testBucketName = "testtest";
+  // These keys must match what's in your DB for the user who owns 'testtest'
+  // If you are running this locally, ensure these credentials are valid for your local DB
   const accessKey = "CKD4DCC2B3BB4F9AEDC305";
   const secretKey = "4495a68af0cb0c56778f5b363ea22a4e33588eaa";
 
@@ -33,8 +35,8 @@ async function main() {
   }
 
   console.log(`User: ${user.id}`);
-  console.log(`Current Usage: ${(user.storageUsageBytes / 1024 / 1024).toFixed(2)} MB`);
-  console.log(`Limit: ${(user.storageLimitBytes / 1024 / 1024).toFixed(2)} MB`);
+  console.log(`Current Usage: ${(Number(user.storageUsageBytes) / 1024 / 1024).toFixed(2)} MB`);
+  console.log(`Limit: ${(Number(user.storageLimitBytes) / 1024 / 1024).toFixed(2)} MB`);
 
   const aws = new AwsClient({
     accessKeyId: accessKey,
@@ -43,14 +45,16 @@ async function main() {
     region: "auto",
   });
 
-  // 2. Simulate filling up to 900MB (by updating DB directly to save time/bandwidth)
-  console.log("\n1. Simulating 900MB usage...");
+  // --- Test 1: Standard Quota Enforcement ---
+  console.log("\n--- Test 1: Standard Quota Enforcement ---");
+  
+  // Set usage to 900MB (Limit is 1GB = 1024MB)
   const usage900MB = 900 * 1024 * 1024;
   await db.update(users).set({ storageUsageBytes: usage900MB }).where(eq(users.id, user.id));
   console.log("✅ DB updated to 900MB usage.");
 
-  // 3. Try to upload a small file (Should Succeed)
-  console.log("\n2. Uploading small file (1MB) - Should SUCCEED...");
+  // Upload 1MB file (Should Succeed)
+  console.log("1.1 Uploading small file (1MB) - Should SUCCEED...");
   const smallFile = new Uint8Array(1024 * 1024).fill(65); // 1MB of 'A'
   const res1 = await aws.fetch(`${S3_ENDPOINT}/${bucket.name}/small.bin`, {
     method: "PUT",
@@ -67,27 +71,16 @@ async function main() {
     console.log(await res1.text());
   }
 
-  // 4. Try to upload a large file that exceeds quota (300MB) - Should Fail
-  // 900MB + 1MB + 300MB = 1201MB > 1024MB (1GB)
-  console.log("\n3. Uploading large file (300MB) - Should FAIL (Quota Exceeded)...");
-  
-  // We don't want to actually send 300MB over the network for this test if we can avoid it,
-  // but the server checks Content-Length header before reading body.
-  // So we can send a request with Content-Length: 300MB but a small body,
-  // and expect the server to reject it immediately based on header.
-  
+  // Upload 300MB file (Should Fail)
+  console.log("1.2 Uploading large file (300MB) - Should FAIL (Quota Exceeded)...");
   const largeSize = 300 * 1024 * 1024;
-  
   try {
-      // Note: We are faking the body size here.
-      // If the server reads the body before checking quota, this might hang or fail differently.
-      // But our implementation checks Content-Length header first.
       const res2 = await aws.fetch(`${S3_ENDPOINT}/${bucket.name}/large.bin`, {
         method: "PUT",
         headers: {
             "Content-Length": largeSize.toString()
         },
-        body: "fake-body" // This won't match content-length, but server should reject before reading
+        body: "fake-body" // Server checks header first
       });
 
       if (res2.status === 403) {
@@ -105,10 +98,135 @@ async function main() {
       console.log("Network error (expected if connection closed early):", e.message);
   }
 
-  // 5. Reset Usage
-  // console.log("\n4. Resetting usage...");
-  // await db.update(users).set({ storageUsageBytes: 0 }).where(eq(users.id, user.id));
-  // console.log("✅ Usage reset.");
+  // --- Test 2: Multipart Upload Quota ---
+  console.log("\n--- Test 2: Multipart Upload Quota ---");
+  
+  // Reset usage to Limit - 5MB
+  const limit = Number(user.storageLimitBytes);
+  const usageNearLimit = limit - (5 * 1024 * 1024);
+  await db.update(users).set({ storageUsageBytes: usageNearLimit }).where(eq(users.id, user.id));
+  console.log(`✅ DB updated to ${(usageNearLimit / 1024 / 1024).toFixed(2)} MB (5MB remaining).`);
+
+  // Initiate Multipart Upload
+  console.log("2.1 Initiating Multipart Upload...");
+  const initRes = await aws.fetch(`${S3_ENDPOINT}/${bucket.name}/multipart.bin?uploads`, {
+      method: "POST"
+  });
+  
+  if (!initRes.ok) {
+      console.error("❌ Failed to initiate multipart upload");
+      console.log(await initRes.text());
+      process.exit(1);
+  }
+  
+  const initXml = await initRes.text();
+  const uploadIdMatch = initXml.match(/<UploadId>(.*?)<\/UploadId>/);
+  const uploadId = uploadIdMatch ? uploadIdMatch[1] : null;
+  
+  if (!uploadId) {
+      console.error("❌ Could not parse UploadId");
+      process.exit(1);
+  }
+  console.log(`✅ UploadId: ${uploadId}`);
+
+  // Upload Part 1 (3MB) - Should Succeed (Remaining: 5MB -> 2MB)
+  console.log("2.2 Uploading Part 1 (3MB) - Should SUCCEED...");
+  const part1 = new Uint8Array(3 * 1024 * 1024).fill(66); // 3MB
+  const part1Res = await aws.fetch(`${S3_ENDPOINT}/${bucket.name}/multipart.bin?partNumber=1&uploadId=${uploadId}`, {
+      method: "PUT",
+      headers: { "Content-Length": part1.length.toString() },
+      body: part1
+  });
+
+  if (part1Res.ok) {
+      console.log("✅ Part 1 uploaded.");
+  } else {
+      console.error(`❌ Part 1 failed: ${part1Res.status}`);
+      console.log(await part1Res.text());
+  }
+
+  // Upload Part 2 (3MB) - Should Fail (Remaining: 2MB < 3MB)
+  console.log("2.3 Uploading Part 2 (3MB) - Should FAIL (Quota Exceeded)...");
+  const part2 = new Uint8Array(3 * 1024 * 1024).fill(67); // 3MB
+  const part2Res = await aws.fetch(`${S3_ENDPOINT}/${bucket.name}/multipart.bin?partNumber=2&uploadId=${uploadId}`, {
+      method: "PUT",
+      headers: { "Content-Length": part2.length.toString() },
+      body: part2
+  });
+
+  if (part2Res.status === 403) {
+      console.log("✅ Part 2 blocked with 403.");
+  } else {
+      console.error(`❌ Part 2 unexpected status: ${part2Res.status}`);
+      console.log(await part2Res.text());
+  }
+
+  // Abort multipart (cleanup)
+  console.log("2.4 Aborting Multipart Upload...");
+  await aws.fetch(`${S3_ENDPOINT}/${bucket.name}/multipart.bin?uploadId=${uploadId}`, {
+      method: "DELETE"
+  });
+
+
+  // --- Test 3: Content-Length Spoofing (Lying) ---
+  console.log("\n--- Test 3: Content-Length Spoofing ---");
+  
+  // Reset usage to 0
+  await db.update(users).set({ storageUsageBytes: 0 }).where(eq(users.id, user.id));
+  console.log("✅ Usage reset to 0.");
+
+  // Attempt to upload 1MB body with Content-Length: 100
+  console.log("3.1 Uploading 1MB body with Content-Length: 100...");
+  
+  // We need to manually construct this request to ensure aws4fetch doesn't correct the header
+  // Actually, aws4fetch calculates signature based on headers. If we sign with CL=100, we must send CL=100.
+  // If we send a body larger than CL, the server (or upstream) should truncate or error.
+  
+  const spoofBody = new Uint8Array(1024 * 1024).fill(68); // 1MB
+  
+  // We use a custom fetch call here to ensure we control the body and headers exactly
+  // But we need a valid signature. 
+  // We can use aws.sign to get headers, then use global fetch.
+  
+  const spoofUrl = `${S3_ENDPOINT}/${bucket.name}/spoof.bin`;
+  const signed = await aws.sign(spoofUrl, {
+      method: "PUT",
+      headers: { "Content-Length": "100" },
+      // We sign as if the body is empty or we don't provide it to sign?
+      // AWS SigV4 includes payload hash. 
+      // If we sign with "UNSIGNED-PAYLOAD" (which our server defaults to if not provided), it's easier.
+      // Our server sets x-amz-content-sha256 to UNSIGNED-PAYLOAD if missing.
+      // So let's try to sign with that.
+  });
+  
+  // Extract headers from signed request
+  const headers = new Headers(signed.headers);
+  headers.set("Content-Length", "100"); // Ensure it's 100
+  
+  // Now perform the actual fetch with the large body
+  const spoofRes = await fetch(spoofUrl, {
+      method: "PUT",
+      headers: headers,
+      body: spoofBody
+  });
+
+  console.log(`Response Status: ${spoofRes.status}`);
+  
+  // Check usage
+  const userAfterSpoof = await db.query.users.findFirst({
+      where: eq(users.id, user.id)
+  });
+  
+  const usage = Number(userAfterSpoof?.storageUsageBytes || 0);
+  console.log(`Usage after spoof: ${usage} bytes`);
+  
+  if (usage === 100) {
+      console.log("✅ Usage increased by Content-Length (100), not body size. This implies truncation or correct handling.");
+  } else if (usage > 100) {
+      console.error("❌ Usage increased by more than Content-Length! The server read the full body despite the header.");
+  } else {
+      console.log("ℹ️ Usage did not increase (upload failed or 0 bytes stored).");
+  }
 
   process.exit(0);
 }
