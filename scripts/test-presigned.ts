@@ -1,7 +1,7 @@
 
 import { AwsClient } from "aws4fetch";
 import { db } from "../src/db";
-import { buckets, users } from "../src/db/schema";
+import { buckets, users, bucketKeys } from "../src/db/schema";
 import { eq } from "drizzle-orm";
 
 const S3_ENDPOINT = "https://cargo.deployor.dev";
@@ -11,21 +11,33 @@ async function main() {
 
   // 1. Setup: Get a user and bucket
   const testBucketName = "testtest";
-  const accessKey = "CKD4DCC2B3BB4F9AEDC305";
-  const secretKey = "4495a68af0cb0c56778f5b363ea22a4e33588eaa";
 
   let bucket = await db.query.buckets.findFirst({
     where: eq(buckets.name, testBucketName),
   });
 
   if (!bucket) {
-    console.error("❌ Test bucket not found in DB. Please run test-prod.ts first or ensure seed data.");
+    console.error(
+      "❌ Test bucket not found in DB. Please run test-prod.ts first or ensure seed data.",
+    );
     process.exit(1);
   }
 
+  const key = await db.query.bucketKeys.findFirst({
+    where: eq(bucketKeys.bucketId, bucket.id),
+  });
+
+  if (!key) {
+    console.error("❌ No keys found for test bucket.");
+    process.exit(1);
+  }
+
+  const accessKey = key.accessKey;
+  const secretKey = key.secretKey;
+
   console.log(`Using bucket: ${bucket.name}`);
-  console.log(`Access Key: ${bucket.accessKey}`);
-  console.log(`Secret Key: ${bucket.secretKey}`);
+  console.log(`Access Key: ${accessKey}`);
+  console.log(`Secret Key: ${secretKey}`);
 
   // 2. Upload a private file using standard Auth (Header)
   const filename = "secret.txt";

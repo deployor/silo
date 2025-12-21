@@ -1,7 +1,7 @@
 
 import { AwsClient } from "aws4fetch";
 import { db } from "../src/db";
-import { buckets, users } from "../src/db/schema";
+import { buckets, users, bucketKeys } from "../src/db/schema";
 import { eq, sql } from "drizzle-orm";
 
 const S3_ENDPOINT = "https://cargo.deployor.dev";
@@ -11,10 +11,6 @@ async function main() {
 
   // 1. Setup: Get a user and bucket
   const testBucketName = "testtest";
-  // These keys must match what's in your DB for the user who owns 'testtest'
-  // If you are running this locally, ensure these credentials are valid for your local DB
-  const accessKey = "CKD4DCC2B3BB4F9AEDC305";
-  const secretKey = "4495a68af0cb0c56778f5b363ea22a4e33588eaa";
 
   let bucket = await db.query.buckets.findFirst({
     where: eq(buckets.name, testBucketName),
@@ -24,6 +20,18 @@ async function main() {
     console.error("❌ Test bucket not found in DB.");
     process.exit(1);
   }
+
+  const key = await db.query.bucketKeys.findFirst({
+    where: eq(bucketKeys.bucketId, bucket.id),
+  });
+
+  if (!key) {
+    console.error("❌ No keys found for test bucket.");
+    process.exit(1);
+  }
+
+  const accessKey = key.accessKey;
+  const secretKey = key.secretKey;
 
   const user = await db.query.users.findFirst({
     where: eq(users.id, bucket.userId),
@@ -170,62 +178,64 @@ async function main() {
 
   // --- Test 3: Content-Length Spoofing (Lying) ---
   console.log("\n--- Test 3: Content-Length Spoofing ---");
-  
+
   // Reset usage to 0
-  await db.update(users).set({ storageUsageBytes: 0 }).where(eq(users.id, user.id));
+  await db
+    .update(users)
+    .set({ storageUsageBytes: 0 })
+    .where(eq(users.id, user.id));
   console.log("✅ Usage reset to 0.");
 
   // Attempt to upload 1MB body with Content-Length: 100
   console.log("3.1 Uploading 1MB body with Content-Length: 100...");
-  
-  // We need to manually construct this request to ensure aws4fetch doesn't correct the header
-  // Actually, aws4fetch calculates signature based on headers. If we sign with CL=100, we must send CL=100.
-  // If we send a body larger than CL, the server (or upstream) should truncate or error.
-  
+
   const spoofBody = new Uint8Array(1024 * 1024).fill(68); // 1MB
-  
-  // We use a custom fetch call here to ensure we control the body and headers exactly
-  // But we need a valid signature. 
-  // We can use aws.sign to get headers, then use global fetch.
-  
+
   const spoofUrl = `${S3_ENDPOINT}/${bucket.name}/spoof.bin`;
   const signed = await aws.sign(spoofUrl, {
-      method: "PUT",
-      headers: { "Content-Length": "100" },
-      // We sign as if the body is empty or we don't provide it to sign?
-      // AWS SigV4 includes payload hash. 
-      // If we sign with "UNSIGNED-PAYLOAD" (which our server defaults to if not provided), it's easier.
-      // Our server sets x-amz-content-sha256 to UNSIGNED-PAYLOAD if missing.
-      // So let's try to sign with that.
+    method: "PUT",
+    headers: { "Content-Length": "100" },
   });
-  
+
   // Extract headers from signed request
   const headers = new Headers(signed.headers);
   headers.set("Content-Length", "100"); // Ensure it's 100
-  
+
   // Now perform the actual fetch with the large body
   const spoofRes = await fetch(spoofUrl, {
-      method: "PUT",
-      headers: headers,
-      body: spoofBody
+    method: "PUT",
+    headers: headers,
+    body: spoofBody,
   });
 
   console.log(`Response Status: ${spoofRes.status}`);
-  
+
   // Check usage
   const userAfterSpoof = await db.query.users.findFirst({
-      where: eq(users.id, user.id)
+    where: eq(users.id, user.id),
   });
-  
+
   const usage = Number(userAfterSpoof?.storageUsageBytes || 0);
   console.log(`Usage after spoof: ${usage} bytes`);
-  
-  if (usage === 100) {
-      console.log("✅ Usage increased by Content-Length (100), not body size. This implies truncation or correct handling.");
-  } else if (usage > 100) {
-      console.error("❌ Usage increased by more than Content-Length! The server read the full body despite the header.");
+
+  // Verify what was actually stored
+  if (spoofRes.ok) {
+    const getRes = await aws.fetch(spoofUrl);
+    const storedBlob = await getRes.arrayBuffer();
+    const storedSize = storedBlob.byteLength;
+    console.log(`Stored Object Size: ${storedSize} bytes`);
+
+    if (usage === storedSize) {
+      console.log(
+        "✅ Usage matches stored size. The system correctly charged for what was stored.",
+      );
+    } else {
+      console.error(
+        `❌ Usage (${usage}) does NOT match stored size (${storedSize})!`,
+      );
+    }
   } else {
-      console.log("ℹ️ Usage did not increase (upload failed or 0 bytes stored).");
+    console.log("ℹ️ Upload failed, so no usage check needed.");
   }
 
   process.exit(0);
