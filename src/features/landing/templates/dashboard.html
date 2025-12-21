@@ -195,6 +195,7 @@
                 <th class="px-6 py-4">Name</th>
                 <th class="px-6 py-4">Access Key</th>
                 <th class="px-6 py-4">Usage</th>
+                <th class="px-6 py-4">Visibility</th>
                 <th class="px-6 py-4">Created</th>
                 <th class="px-6 py-4 text-right">Actions</th>
               </tr>
@@ -522,22 +523,20 @@
             .map(
               (bucket) => `
                     <tr class="hover:bg-white/5 transition-colors group">
-                        <td class="px-6 py-4 font-medium text-white font-mono">
-                          ${bucket.name}
-                          <div class="mt-1">
-                            <label class="inline-flex items-center cursor-pointer">
-                              <input type="checkbox" class="sr-only peer" onchange="togglePublic('${bucket.name}', this.checked)" ${bucket.isPublic ? "checked" : ""}>
-                              <div class="relative w-9 h-5 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-blue rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-hc-blue"></div>
-                              <span class="ms-2 text-xs font-medium text-text-muted peer-checked:text-white">Public</span>
-                            </label>
-                          </div>
-                        </td>
+                        <td class="px-6 py-4 font-medium text-white font-mono">${bucket.name}</td>
                         <td class="px-6 py-4 font-mono text-xs text-text-muted group-hover:text-white transition-colors">${bucket.accessKey}</td>
                         <td class="px-6 py-4 text-text-main">
                             <div class="text-xs font-mono">
                                 <div>${formatBytes(bucket.totalBytes)}</div>
                                 <div class="text-text-muted">${bucket.totalRequests.toLocaleString()} reqs</div>
                             </div>
+                        </td>
+                        <td class="px-6 py-4">
+                          <label class="inline-flex items-center cursor-pointer">
+                            <input type="checkbox" class="sr-only peer" onchange="togglePublic('${bucket.name}', this.checked)" ${bucket.isPublic ? "checked" : ""}>
+                            <div class="relative w-9 h-5 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-blue rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-hc-blue"></div>
+                            <span class="ms-2 text-xs font-medium text-text-muted peer-checked:text-white">${bucket.isPublic ? "Public" : "Private"}</span>
+                          </label>
                         </td>
                         <td class="px-6 py-4 text-text-muted text-xs font-mono">${new Date(bucket.createdAt).toLocaleDateString()}</td>
                         <td class="px-6 py-4 text-right">
