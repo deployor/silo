@@ -4,43 +4,24 @@ import { db } from "../src/db";
 import { buckets, users } from "../src/db/schema";
 import { eq } from "drizzle-orm";
 
-const S3_ENDPOINT = "http://localhost:3000";
+const S3_ENDPOINT = "https://cargo.deployor.dev";
 
 async function main() {
   console.log("🧪 Starting Presigned URL & Public Access Test...");
 
   // 1. Setup: Get a user and bucket
-  const user = await db.query.users.findFirst();
-  if (!user) {
-    console.error("❌ No users found. Run the app and login first, or seed data.");
-    process.exit(1);
-  }
+  const testBucketName = "testtest";
+  const accessKey = "CKD4DCC2B3BB4F9AEDC305";
+  const secretKey = "4495a68af0cb0c56778f5b363ea22a4e33588eaa";
 
   let bucket = await db.query.buckets.findFirst({
-    where: eq(buckets.userId, user.id),
+    where: eq(buckets.name, testBucketName),
   });
 
   if (!bucket) {
-    console.log("Creating test bucket...");
-    // Create a bucket manually for testing if none exists
-    const accessKey = "TEST" + Math.random().toString(36).substring(7).toUpperCase();
-    const secretKey = Math.random().toString(36).substring(7);
-    const name = "presigned-test-" + Math.random().toString(36).substring(7);
-    
-    await db.insert(buckets).values({
-      name,
-      userId: user.id,
-      accessKey,
-      secretKey,
-      isPublic: false,
-    });
-    
-    bucket = await db.query.buckets.findFirst({
-      where: eq(buckets.name, name),
-    });
+    console.error("❌ Test bucket not found in DB. Please run test-prod.ts first or ensure seed data.");
+    process.exit(1);
   }
-
-  if (!bucket) throw new Error("Failed to get bucket");
 
   console.log(`Using bucket: ${bucket.name}`);
   console.log(`Access Key: ${bucket.accessKey}`);
@@ -51,8 +32,8 @@ async function main() {
   const content = "This is a secret message " + Date.now();
   
   const aws = new AwsClient({
-    accessKeyId: bucket.accessKey,
-    secretAccessKey: bucket.secretKey,
+    accessKeyId: accessKey,
+    secretAccessKey: secretKey,
     service: "s3",
     region: "auto",
   });
@@ -81,14 +62,7 @@ async function main() {
   // 4. Generate Presigned URL
   console.log("\n3. Testing Presigned URL...");
   
-  // We use aws4fetch to sign a URL
-  // aws4fetch doesn't have a simple "getPresignedUrl" method that returns a string.
-  // We have to construct it.
-  // Or we can use the `sign` method with `aws: { signQuery: true }` and extract the url.
-  
   const urlToSign = new URL(`${S3_ENDPOINT}/${bucket.name}/${filename}`);
-  // We need to set the host header to match what the server expects if we were sending it?
-  // No, for presigned URL, the host in the URL matters.
   
   const signedReq = await aws.sign(urlToSign.toString(), {
     method: "GET",
