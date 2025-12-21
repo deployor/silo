@@ -3,6 +3,7 @@ import { buckets, users } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { createHmac } from "node:crypto";
 import { config } from "../config";
+import { verifyAwsV4Signature } from "../lib/auth-v4";
 
 const S3_DOMAIN = config.s3Domain;
 
@@ -63,6 +64,7 @@ export type AuthResult =
   | {
       user: typeof users.$inferSelect;
       bucket: typeof buckets.$inferSelect;
+      mode: "authenticated" | "public";
     }
   | Response;
 
@@ -131,7 +133,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
       );
     }
 
-    return { user, bucket };
+    return { user, bucket, mode: "public" };
   }
 
   const [accessKeyId, dateStamp, region, service, requestType] =
@@ -201,5 +203,19 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
       { status: 403, headers: { "Content-Type": "application/xml" } },
     );
 
-  return { user, bucket };
+  // Verify Signature
+  const isValid = await verifyAwsV4Signature(req, bucket.secretKey);
+  if (!isValid) {
+    return new Response(
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+    <Code>SignatureDoesNotMatch</Code>
+    <Message>The request signature we calculated does not match the signature you provided.</Message>
+    <RequestId>0000000000000000</RequestId>
+</Error>`,
+      { status: 403, headers: { "Content-Type": "application/xml" } },
+    );
+  }
+
+  return { user, bucket, mode: "authenticated" };
 };

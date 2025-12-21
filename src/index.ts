@@ -90,8 +90,8 @@ Bun.serve({
         return authResult;
       }
 
-      const { user, bucket } = authResult;
-      const response = await handleS3Request(req, user, bucket);
+      const { user, bucket, mode } = authResult;
+      const response = await handleS3Request(req, user, bucket, mode);
 
       updateStats(user, bucket, req, response);
 
