@@ -5,6 +5,7 @@ import { config } from "../../config";
 import { s3Client } from "../../lib/s3-client";
 import { getInternalPath } from "../s3-api/utils";
 import { XMLParser } from "fast-xml-parser";
+import { createHmac } from "node:crypto";
 
 const landingTemplate = await Bun.file(
   "src/features/landing/templates/landing.html",
@@ -393,6 +394,45 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
       return new Response("Deleted", { status: 200 });
     }
 
+    // Sign Preview URL
+    const signPreviewMatch = path.match(
+      /^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/files\/sign$/,
+    );
+    if (signPreviewMatch && req.method === "POST") {
+        const bucketName = signPreviewMatch[1];
+        
+        const bucket = await db
+            .select()
+            .from(buckets)
+            .where(eq(buckets.name, bucketName))
+            .limit(1);
+
+        if (bucket.length === 0)
+            return new Response("Bucket not found", { status: 404 });
+        if (bucket[0].userId !== user.id)
+            return new Response("Unauthorized", { status: 403 });
+
+        try {
+            const body = await req.json();
+            const key = body.key;
+            if (!key) return new Response("Missing key", { status: 400 });
+
+            const expires = Date.now() + 5 * 60 * 1000; // 5 minutes
+            const dataToSign = `${bucketName}:${key}:${expires}`;
+            const signature = createHmac("sha256", config.hcAuth.clientSecret)
+                .update(dataToSign)
+                .digest("hex");
+
+            const url = `/api/dashboard/buckets/${bucketName}/files/preview?key=${encodeURIComponent(key)}&expires=${expires}&signature=${signature}`;
+
+            return new Response(JSON.stringify({ url }), {
+                headers: { "Content-Type": "application/json" }
+            });
+        } catch (e) {
+            return new Response("Internal Error", { status: 500 });
+        }
+    }
+
     // Preview File (Proxy)
     const previewFileMatch = path.match(
       /^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/files\/preview$/,
@@ -400,8 +440,25 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
     if (previewFileMatch && req.method === "GET") {
         const bucketName = previewFileMatch[1];
         const key = url.searchParams.get("key");
+        const expires = url.searchParams.get("expires");
+        const signature = url.searchParams.get("signature");
 
-        if (!key) return new Response("Missing key", { status: 400 });
+        if (!key || !expires || !signature) return new Response("Missing params", { status: 400 });
+
+        // Verify expiration
+        if (Date.now() > parseInt(expires)) {
+            return new Response("Link expired", { status: 410 });
+        }
+
+        // Verify signature
+        const dataToSign = `${bucketName}:${key}:${expires}`;
+        const expectedSignature = createHmac("sha256", config.hcAuth.clientSecret)
+            .update(dataToSign)
+            .digest("hex");
+        
+        if (signature !== expectedSignature) {
+            return new Response("Invalid signature", { status: 403 });
+        }
 
         const bucket = await db
             .select()
@@ -428,6 +485,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
             const headers = new Headers(s3Res.headers);
             headers.set("Content-Disposition", "inline");
+            headers.set("Cache-Control", "private, max-age=300"); // Cache for 5 mins
             headers.delete("x-amz-request-id");
             headers.delete("x-amz-id-2");
 
