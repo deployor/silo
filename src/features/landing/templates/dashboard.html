@@ -406,6 +406,59 @@
       </div>
     </div>
 
+    <!-- Confirmation Modal -->
+    <div
+      id="confirm-modal"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50"
+    >
+      <div
+        class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-md card-shadow transform transition-all"
+      >
+        <h3 class="text-2xl font-bold mb-4 text-white" id="confirm-title">
+          Confirm Action
+        </h3>
+        <p class="text-text-muted mb-8" id="confirm-message">
+          Are you sure you want to proceed?
+        </p>
+
+        <div class="flex justify-end gap-3">
+          <button
+            onclick="closeConfirmModal()"
+            class="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            id="confirm-btn"
+            class="bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105 card-shadow flex items-center gap-2"
+          >
+            <span id="confirm-btn-text">Confirm</span>
+            <svg
+              id="confirm-spinner"
+              class="animate-spin h-4 w-4 text-white hidden"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script>
       // Format bytes to human readable string
       function formatBytes(bytes, decimals = 2) {
@@ -567,63 +620,93 @@
         });
       }
 
-      async function deleteBucket(name) {
-        if (
-          !confirm(
-            `Are you sure you want to delete bucket "${name}"? This action cannot be undone.`,
-          )
-        )
-          return;
+      function deleteBucket(name) {
+        openConfirmModal(
+            "Delete Bucket",
+            `Are you sure you want to delete bucket "${name}"? This action cannot be undone and all data will be permanently lost.`,
+            async () => {
+                const res = await fetch(`/api/dashboard/buckets/${name}`, {
+                    method: "DELETE",
+                });
 
-        try {
-          const res = await fetch(`/api/dashboard/buckets/${name}`, {
-            method: "DELETE",
-          });
+                if (!res.ok) {
+                    const err = await res.text();
+                    throw new Error(err);
+                }
 
-          if (!res.ok) {
-            const err = await res.text();
-            alert(err);
-            return;
-          }
+                await loadDashboard();
+            }
+        );
+      }
 
-          loadDashboard();
-        } catch (error) {
-          alert("Failed to delete bucket");
+      let pendingToggle = null;
+
+      function openConfirmModal(title, message, onConfirm) {
+        document.getElementById("confirm-title").textContent = title;
+        document.getElementById("confirm-message").textContent = message;
+        
+        const btn = document.getElementById("confirm-btn");
+        btn.onclick = async () => {
+            const spinner = document.getElementById("confirm-spinner");
+            const btnText = document.getElementById("confirm-btn-text");
+            
+            btn.disabled = true;
+            spinner.classList.remove("hidden");
+            btnText.textContent = "Processing...";
+            
+            try {
+                await onConfirm();
+                closeConfirmModal();
+            } catch (e) {
+                console.error(e);
+                alert("Action failed");
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add("hidden");
+                btnText.textContent = "Confirm";
+            }
+        };
+        
+        document.getElementById("confirm-modal").classList.remove("hidden");
+        document.getElementById("confirm-modal").classList.add("flex");
+      }
+
+      function closeConfirmModal() {
+        document.getElementById("confirm-modal").classList.add("hidden");
+        document.getElementById("confirm-modal").classList.remove("flex");
+        if (pendingToggle) {
+            // If cancelled, revert the toggle visually
+            loadDashboard();
+            pendingToggle = null;
         }
       }
 
-      async function togglePublic(name, isPublic) {
+      function togglePublic(name, isPublic) {
+        pendingToggle = { name, isPublic };
         const action = isPublic ? "make public" : "make private";
-        if (
-          !confirm(
-            `Are you sure you want to ${action} bucket "${name}"? This will affect who can access files in this bucket.`,
-          )
-        ) {
-          loadDashboard(); // Revert checkbox
-          return;
-        }
+        const message = isPublic
+            ? `Are you sure you want to make bucket "${name}" public? Anyone with the link will be able to view files.`
+            : `Are you sure you want to make bucket "${name}" private? Only authenticated users will be able to access files.`;
 
-        try {
-          const res = await fetch(`/api/dashboard/buckets/${name}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ isPublic }),
-          });
+        openConfirmModal(
+            `Confirm ${action}`,
+            message,
+            async () => {
+                const res = await fetch(`/api/dashboard/buckets/${name}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ isPublic }),
+                });
 
-          if (!res.ok) {
-            const err = await res.text();
-            alert(err);
-            // Revert checkbox if failed
-            loadDashboard();
-            return;
-          }
-          
-          // Reload to confirm state
-          loadDashboard();
-        } catch (error) {
-          alert("Failed to update bucket");
-          loadDashboard();
-        }
+                if (!res.ok) {
+                    const err = await res.text();
+                    throw new Error(err);
+                }
+                
+                await loadDashboard();
+                pendingToggle = null;
+            }
+        );
       }
 
       // Initial Load
