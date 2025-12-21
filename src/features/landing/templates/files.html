@@ -430,6 +430,10 @@
             const data = await res.json();
             const proxyUrl = data.url;
 
+            // Update download link to use signed proxy URL (works for private buckets)
+            download.href = proxyUrl;
+            download.setAttribute('download', key.split('/').pop());
+
             // Determine file type
             const ext = key.split('.').pop().toLowerCase();
             const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'];
