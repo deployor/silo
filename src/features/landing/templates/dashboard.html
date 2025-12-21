@@ -254,6 +254,54 @@
       </div>
     </div>
 
+    <!-- Manage Keys Modal -->
+    <div
+      id="manage-keys-modal"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50"
+    >
+      <div
+        class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-2xl card-shadow transform transition-all"
+      >
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h3 class="text-2xl font-bold text-white">Manage Keys</h3>
+                <p class="text-text-muted text-sm mt-1 font-mono" id="manage-keys-bucket-name">bucket-name</p>
+            </div>
+            <button
+              onclick="closeManageKeysModal()"
+              class="text-text-muted hover:text-white transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+        </div>
+
+        <div class="bg-black/30 rounded-xl border border-white/10 overflow-hidden mb-6">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
+                    <tr>
+                        <th class="px-4 py-3">Access Key ID</th>
+                        <th class="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5" id="manage-keys-table">
+                    <!-- Keys will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+
+        <div class="flex justify-end">
+            <button
+              onclick="generateKeyFromModal()"
+              class="bg-hc-blue hover:bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105 card-shadow"
+            >
+              + Generate New Key
+            </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Secret Key Modal -->
     <div
       id="key-modal"
@@ -471,11 +519,15 @@
         return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
       }
 
+      let currentDashboardData = null;
+      let currentManagedBucket = null;
+
       async function loadDashboard() {
         try {
           const res = await fetch("/api/dashboard/stats");
           if (!res.ok) throw new Error("Failed to load stats");
           const data = await res.json();
+          currentDashboardData = data;
 
           // Update User Info
           document.getElementById("user-id").textContent = data.user.id;
@@ -525,15 +577,12 @@
                     <tr class="hover:bg-white/5 transition-colors group">
                         <td class="px-6 py-4 font-medium text-white font-mono">${bucket.name}</td>
                         <td class="px-6 py-4 font-mono text-xs text-text-muted group-hover:text-white transition-colors">
-                            <div class="flex flex-col gap-1">
-                                ${bucket.keys.map(k => `
-                                    <div class="flex items-center justify-between bg-white/5 p-1 rounded">
-                                        <span>${k.accessKey}</span>
-                                        <button onclick="deleteKey('${bucket.name}', '${k.id}')" class="text-hc-red hover:text-white ml-2" title="Delete Key">×</button>
-                                    </div>
-                                `).join('')}
-                                <button onclick="generateKey('${bucket.name}')" class="text-hc-blue hover:text-white text-[10px] uppercase font-bold mt-1">+ New Key</button>
-                            </div>
+                            <button onclick="openManageKeysModal('${bucket.name}')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                </svg>
+                                ${bucket.keys.length} Keys
+                            </button>
                         </td>
                         <td class="px-6 py-4 text-text-main">
                             <div class="text-xs font-mono">
@@ -574,10 +623,13 @@
         document.getElementById("create-modal").classList.remove("flex");
       }
 
-      function closeKeyModal() {
+      async function closeKeyModal() {
         document.getElementById("key-modal").classList.add("hidden");
         document.getElementById("key-modal").classList.remove("flex");
-        loadDashboard(); // Reload to show new bucket
+        await loadDashboard(); // Reload to show new bucket
+        if (currentManagedBucket) {
+            openManageKeysModal(currentManagedBucket);
+        }
       }
 
       async function createBucket(e) {
@@ -690,8 +742,50 @@
                 }
 
                 await loadDashboard();
+                if (currentManagedBucket === bucketName) {
+                    openManageKeysModal(bucketName);
+                }
             }
         );
+      }
+
+      function openManageKeysModal(bucketName) {
+        currentManagedBucket = bucketName;
+        const bucket = currentDashboardData.buckets.find(b => b.name === bucketName);
+        if (!bucket) return;
+
+        document.getElementById('manage-keys-bucket-name').textContent = bucket.name;
+        renderManageKeysTable(bucket);
+
+        document.getElementById('manage-keys-modal').classList.remove('hidden');
+        document.getElementById('manage-keys-modal').classList.add('flex');
+      }
+
+      function closeManageKeysModal() {
+        document.getElementById('manage-keys-modal').classList.add('hidden');
+        document.getElementById('manage-keys-modal').classList.remove('flex');
+        currentManagedBucket = null;
+      }
+
+      function renderManageKeysTable(bucket) {
+        const tbody = document.getElementById('manage-keys-table');
+        if (bucket.keys.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="2" class="px-4 py-8 text-center text-text-muted italic">No keys found for this bucket.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = bucket.keys.map(k => `
+            <tr class="hover:bg-white/5 transition-colors">
+                <td class="px-4 py-3 font-mono text-white">${k.accessKey}</td>
+                <td class="px-4 py-3 text-right">
+                    <button onclick="deleteKey('${bucket.name}', '${k.id}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider transition-colors">Delete</button>
+                </td>
+            </tr>
+        `).join('');
+      }
+
+      function generateKeyFromModal() {
+        if (!currentManagedBucket) return;
+        generateKey(currentManagedBucket);
       }
 
       let pendingToggle = null;
