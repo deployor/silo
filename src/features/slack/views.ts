@@ -13,13 +13,19 @@ export const homeView = (user: any, buckets: any[]) => {
     ? (user.storageUsageBytes / user.storageLimitBytes) * 100
     : 0;
 
+  const progressBar = (percent: number) => {
+      const filled = Math.round(Math.min(percent, 100) / 10);
+      const empty = 10 - filled;
+      return "█".repeat(filled) + "░".repeat(empty);
+  };
+
   const bucketBlocks = buckets.map((bucket) => {
     return [
       {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*${bucket.name}*`
+          text: `*${bucket.name}*\n${bucket.isPublic ? "🌍 Public" : "🔒 Private"}  •  📦 ${formatBytes(bucket.totalBytes)}  •  ⚡ ${bucket.totalRequests} reqs`
         },
         accessory: {
           type: "overflow",
@@ -50,15 +56,6 @@ export const homeView = (user: any, buckets: any[]) => {
         },
       },
       {
-        type: "context",
-        elements: [
-          {
-            type: "mrkdwn",
-            text: `${bucket.isPublic ? "🌍 Public" : "🔒 Private"}   |   📦 ${formatBytes(bucket.totalBytes)}   |   ⚡ ${bucket.totalRequests} requests   |   📅 ${new Date(bucket.createdAt).toLocaleDateString()}`
-          }
-        ]
-      },
-      {
         type: "divider"
       }
     ];
@@ -76,45 +73,24 @@ export const homeView = (user: any, buckets: any[]) => {
         },
       },
       {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `Welcome back! Here is your current usage overview.`
-        }
-      },
-      {
-        type: "divider"
-      },
-      {
-        type: "section",
-        text: {
-            type: "mrkdwn",
-            text: "*📊 Storage & Limits*"
-        }
-      },
-      {
-        type: "section",
-        fields: [
-          {
-            type: "mrkdwn",
-            text: `*Storage Usage:*\n${formatBytes(user.storageUsageBytes)} / ${formatBytes(user.storageLimitBytes)}`
-          },
-          {
-            type: "mrkdwn",
-            text: `*Usage %:*\n${usagePercent.toFixed(1)}%`
-          }
-        ]
-      },
-      {
-        type: "section",
-        fields: [
+        type: "actions",
+        elements: [
             {
-                type: "mrkdwn",
-                text: `*Total Requests:*\n${user.totalRequests.toLocaleString()}`
+                type: "button",
+                text: {
+                    type: "plain_text",
+                    text: "🔄 Refresh",
+                },
+                action_id: "refresh_home"
             },
             {
-                type: "mrkdwn",
-                text: `*Buckets Used:*\n${buckets.length} / 50`
+                type: "button",
+                text: {
+                    type: "plain_text",
+                    text: "↗️ Web Dashboard",
+                },
+                url: `https://${config.s3Domain}`,
+                action_id: "open_web_dashboard"
             }
         ]
       },
@@ -125,21 +101,29 @@ export const homeView = (user: any, buckets: any[]) => {
         type: "section",
         text: {
             type: "mrkdwn",
-            text: "*📉 Network Traffic*"
+            text: `*Storage Usage*\n\`${progressBar(usagePercent)}\` ${usagePercent.toFixed(1)}%\n${formatBytes(user.storageUsageBytes)} of ${formatBytes(user.storageLimitBytes)}`
         }
       },
       {
-        type: "section",
-        fields: [
-          {
-            type: "mrkdwn",
-            text: `*Ingress (In):*\n${formatBytes(user.ingressBytes)}`
-          },
-          {
-            type: "mrkdwn",
-            text: `*Egress (Out):*\n${formatBytes(user.egressBytes)}`
-          }
-        ]
+          type: "section",
+          fields: [
+              {
+                  type: "mrkdwn",
+                  text: `*Total Requests*\n${user.totalRequests.toLocaleString()}`
+              },
+              {
+                  type: "mrkdwn",
+                  text: `*Buckets*\n${buckets.length} / 50`
+              },
+              {
+                  type: "mrkdwn",
+                  text: `*Ingress (In)*\n${formatBytes(user.ingressBytes)}`
+              },
+              {
+                  type: "mrkdwn",
+                  text: `*Egress (Out)*\n${formatBytes(user.egressBytes)}`
+              }
+          ]
       },
       {
         type: "divider"
@@ -148,13 +132,13 @@ export const homeView = (user: any, buckets: any[]) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: "*🪣 Your Buckets*",
+          text: "*Your Buckets*",
         },
         accessory: {
           type: "button",
           text: {
             type: "plain_text",
-            text: "Create New Bucket",
+            text: "Create Bucket",
             emoji: true,
           },
           style: "primary",
@@ -170,7 +154,7 @@ export const homeView = (user: any, buckets: any[]) => {
         elements: [
           {
             type: "mrkdwn",
-            text: `:gear: Manage advanced settings at <https://${config.s3Domain}|cargo.deployer.dev>`,
+            text: "Need help? Check out the <https://cargo.deployer.dev/docs|documentation>.",
           },
         ],
       },
