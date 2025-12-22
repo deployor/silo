@@ -493,15 +493,29 @@
 
             <div>
               <h3 class="text-lg font-bold text-white mb-2">Addressing Styles</h3>
-              <p class="text-text-muted mb-2">We support both virtual-hosted-style and path-style access.</p>
+              <p class="text-text-muted mb-4">
+                For authenticated API requests, you can simply use the root endpoint. Your Access Key is uniquely tied to a specific bucket, so we automatically route your requests to the correct bucket.
+              </p>
               
+              <div class="bg-hc-darker p-4 rounded-lg border border-white/10 space-y-2 font-mono text-sm mb-6">
+                <div class="flex flex-col gap-1">
+                  <span class="text-text-muted">// API Endpoint (Authenticated)</span>
+                  <span class="text-white">https://cargo.deployor.dev</span>
+                  <span class="text-xs text-text-muted mt-1">No bucket name needed in hostname or path for API calls.</span>
+                </div>
+              </div>
+
+              <p class="text-text-muted mb-2">
+                For <strong>Public Buckets</strong> (direct file access in browser), you should use virtual-hosted-style or path-style URLs:
+              </p>
+
               <div class="bg-hc-darker p-4 rounded-lg border border-white/10 space-y-2 font-mono text-sm">
                 <div class="flex flex-col gap-1">
-                  <span class="text-text-muted">// Virtual Host (Recommended)</span>
+                  <span class="text-text-muted">// Virtual Host (Public Access)</span>
                   <span class="text-white">https://<span class="text-hc-blue">{bucket}</span>.cargo.deployor.dev/<span class="text-green-400">{key}</span></span>
                 </div>
                 <div class="flex flex-col gap-1 mt-4">
-                  <span class="text-text-muted">// Path Style</span>
+                  <span class="text-text-muted">// Path Style (Public Access)</span>
                   <span class="text-white">https://cargo.deployor.dev/<span class="text-hc-blue">{bucket}</span>/<span class="text-green-400">{key}</span></span>
                 </div>
               </div>
