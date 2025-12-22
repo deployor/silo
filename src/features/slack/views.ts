@@ -214,7 +214,7 @@ export const createBucketModal = () => ({
   },
   close: {
     type: "plain_text",
-    text: "Nah :byee:",
+    text: "Cancel :byee:",
     emoji: true,
   },
   blocks: [
@@ -255,7 +255,7 @@ export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
                 type: "button",
                 text: {
                     type: "plain_text",
-                    text: "Yeet :angry-dino:",
+                    text: "Delete :angry-dino:",
                     emoji: true,
                 },
                 style: "danger",
@@ -264,7 +264,7 @@ export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
                 confirm: {
                     title: {
                         type: "plain_text",
-                        text: "Yeet Key? :panic:",
+                        text: "Delete Key? :panic:",
                         emoji: true,
                     },
                     text: {
@@ -273,12 +273,12 @@ export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
                     },
                     confirm: {
                         type: "plain_text",
-                        text: "Yeet It",
+                        text: "Delete Key",
                         emoji: true,
                     },
                     deny: {
                         type: "plain_text",
-                        text: "Nah, Keep It",
+                        text: "Keep It",
                         emoji: true,
                     }
                 }
