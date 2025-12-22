@@ -11,6 +11,7 @@ import {
 export const users = pgTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
+  slackId: text("slack_id"),
   storageLimitBytes: bigint("storage_limit_bytes", { mode: "number" }).default(
     1073741824,
   ),
