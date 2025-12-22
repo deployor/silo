@@ -51,7 +51,7 @@ async function runAdminTest() {
 		region: "auto",
 	});
 
-	const endpoint = "http://localhost:3000";
+	const endpoint = "https://cargo.deployor.dev";
 
 	try {
 		// 1. Test Normal Access
