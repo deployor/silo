@@ -21,12 +21,43 @@ export async function handleAppHomeOpened(event: any) {
       type: "home",
       blocks: [
         {
+          type: "header",
+          text: {
+            type: "plain_text",
+            text: "Welcome to Cargo! :wave:",
+            emoji: true,
+          },
+        },
+        {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: `*Welcome to Cargo!* :wave:\n\nPlease <https://${config.s3Domain}/auth/login|log in via the dashboard> first to link your Slack account.`,
+            text: `*Hold up!* :ms-stop-sign:\n\nWe don't recognize this Slack account yet. To get started, you need to log in to the web dashboard at least once to link your account.\n\n *<https://${config.s3Domain}/auth/login|Log in to Cargo Dashboard>*`,
           },
         },
+        {
+            type: "context",
+            elements: [
+                {
+                    type: "mrkdwn",
+                    text: "Once you've logged in, come back here and click 'Refresh'!"
+                }
+            ]
+        },
+        {
+            type: "actions",
+            elements: [
+                {
+                    type: "button",
+                    text: {
+                        type: "plain_text",
+                        text: "🔄 Refresh",
+                        emoji: true
+                    },
+                    action_id: "refresh_home"
+                }
+            ]
+        }
       ],
     });
     return;
