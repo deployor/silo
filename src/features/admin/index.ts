@@ -180,7 +180,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 			const body = await req.json();
 			await db
 				.update(buckets)
-				.set({ isPaused: body.isPaused })
+				.set({ isPaused: body.isPaused, pauseReason: body.pauseReason || null })
 				.where(eq(buckets.name, bucketName));
 			return new Response("Updated", { status: 200 });
 		}
@@ -225,7 +225,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 			const body = await req.json();
 			await db
 				.update(bucketKeys)
-				.set({ isPaused: body.isPaused })
+				.set({ isPaused: body.isPaused, pauseReason: body.pauseReason || null })
 				.where(eq(bucketKeys.id, keyId));
 			return new Response("Updated", { status: 200 });
 		}
