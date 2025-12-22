@@ -297,20 +297,99 @@
                 <li class="flex items-center gap-2"><span class="text-green-400">✓</span> GetBucketLocation <span class="text-xs opacity-50 ml-auto">(GET /bucket?location)</span></li>
                 
                 <!-- Unsupported Bucket Ops -->
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> CreateBucket <span class="text-xs opacity-50 ml-auto">(Use Dashboard)</span></li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteBucket <span class="text-xs opacity-50 ml-auto">(Use Dashboard)</span></li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Put/GetBucketAcl</li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Put/GetBucketCors</li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Put/GetBucketPolicy</li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Put/GetBucketVersioning</li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Put/GetBucketTagging</li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Put/GetBucketLifecycle</li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Put/GetBucketReplication</li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Put/GetBucketEncryption</li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Put/GetBucketWebsite</li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Put/GetPublicAccessBlock</li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> ListObjects (v1)</li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Analytics/Inventory/Metrics</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> CreateBucket</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteBucket</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> ListDirectoryBuckets</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> CreateSession</li>
+                
+                <!-- ACLs -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketAcl</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketAcl</li>
+                
+                <!-- CORS -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketCors</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketCors</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteBucketCors</li>
+                
+                <!-- Policy -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketPolicy</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketPolicy</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteBucketPolicy</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketPolicyStatus</li>
+                
+                <!-- Versioning -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketVersioning</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketVersioning</li>
+                
+                <!-- Tagging -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketTagging</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketTagging</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteBucketTagging</li>
+                
+                <!-- Lifecycle -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketLifecycle</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketLifecycleConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketLifecycle</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketLifecycleConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteBucketLifecycle</li>
+                
+                <!-- Replication -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketReplication</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketReplication</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteBucketReplication</li>
+                
+                <!-- Encryption -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketEncryption</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketEncryption</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteBucketEncryption</li>
+                
+                <!-- Website -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketWebsite</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketWebsite</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteBucketWebsite</li>
+                
+                <!-- Public Access Block -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutPublicAccessBlock</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetPublicAccessBlock</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeletePublicAccessBlock</li>
+                
+                <!-- Analytics/Inventory/Metrics -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketAnalyticsConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketAnalyticsConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteBucketAnalyticsConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> ListBucketAnalyticsConfigurations</li>
+                
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketInventoryConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketInventoryConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteBucketInventoryConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> ListBucketInventoryConfigurations</li>
+                
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketMetricsConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketMetricsConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteBucketMetricsConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> ListBucketMetricsConfigurations</li>
+                
+                <!-- Other Bucket Ops -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketLogging</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketLogging</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketNotificationConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketNotificationConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketOwnershipControls</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketOwnershipControls</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteBucketOwnershipControls</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketRequestPayment</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketRequestPayment</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketAccelerateConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketAccelerateConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketIntelligentTieringConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketIntelligentTieringConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteBucketIntelligentTieringConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> ListBucketIntelligentTieringConfigurations</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketAbac</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutBucketAbac</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetBucketMetadataTableConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> UpdateBucketMetadataTableConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteBucketMetadataTableConfiguration</li>
               </ul>
             </div>
 
@@ -326,13 +405,34 @@
                 <li class="flex items-center gap-2"><span class="text-green-400">✓</span> DeleteObjects <span class="text-xs opacity-50 ml-auto">(POST /bucket?delete)</span></li>
 
                 <!-- Unsupported Object Ops -->
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Put/GetObjectAcl</li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Put/GetObjectTagging</li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Put/GetObjectLegalHold</li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Put/GetObjectRetention</li>
-                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> Put/GetObjectLockConfig</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> ListObjects (v1)</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> ListObjectVersions</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> RenameObject</li>
                 <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> RestoreObject</li>
                 <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> SelectObjectContent</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetObjectTorrent</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetObjectAttributes</li>
+                
+                <!-- ACLs -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutObjectAcl</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetObjectAcl</li>
+                
+                <!-- Tagging -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutObjectTagging</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetObjectTagging</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> DeleteObjectTagging</li>
+                
+                <!-- Legal Hold -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutObjectLegalHold</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetObjectLegalHold</li>
+                
+                <!-- Retention -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutObjectRetention</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetObjectRetention</li>
+                
+                <!-- Lock Config -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> PutObjectLockConfiguration</li>
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> GetObjectLockConfiguration</li>
               </ul>
             </div>
 
@@ -346,6 +446,9 @@
                 <li class="flex items-center gap-2"><span class="text-green-400">✓</span> AbortMultipartUpload <span class="text-xs opacity-50 ml-auto">(DELETE /bucket/key?uploadId)</span></li>
                 <li class="flex items-center gap-2"><span class="text-green-400">✓</span> ListMultipartUploads <span class="text-xs opacity-50 ml-auto">(GET /bucket?uploads)</span></li>
                 <li class="flex items-center gap-2"><span class="text-green-400">✓</span> ListParts <span class="text-xs opacity-50 ml-auto">(GET /bucket/key?uploadId)</span></li>
+                
+                <!-- Unsupported Multipart Ops -->
+                <li class="flex items-center gap-2 opacity-60"><span class="text-red-400">✗</span> UploadPartCopy</li>
               </ul>
             </div>
           </div>
