@@ -59,20 +59,6 @@ export const homeView = (user: any, buckets: any[]) => {
         ],
       },
       {
-        type: "actions",
-        elements: [
-            {
-                type: "button",
-                text: {
-                    type: "plain_text",
-                    text: "View Files",
-                },
-                action_id: "view_files",
-                value: bucket.name
-            }
-        ]
-      },
-      {
         type: "divider",
       },
     ];
