@@ -33,21 +33,24 @@ export const homeView = (user: any, buckets: any[]) => {
             {
               text: {
                 type: "plain_text",
-                text: "Manage Keys",
+                text: ":ms-wrench: Manage Keys",
+                emoji: true,
               },
               value: `manage_keys:${bucket.id}`,
             },
             {
               text: {
                 type: "plain_text",
-                text: bucket.isPublic ? "Make Private" : "Make Public",
+                text: bucket.isPublic ? ":ms-shush: Make Private" : ":ms-globe: Make Public",
+                emoji: true,
               },
               value: `toggle_public:${bucket.id}`,
             },
             {
               text: {
                 type: "plain_text",
-                text: "Delete Bucket",
+                text: ":ms-no-entry: Delete Bucket",
+                emoji: true,
               },
               value: `delete_bucket:${bucket.name}`,
             },
@@ -60,7 +63,7 @@ export const homeView = (user: any, buckets: any[]) => {
         elements: [
           {
             type: "mrkdwn",
-            text: `${bucket.isPublic ? "🌍 Public" : "🔒 Private"}  •  📦 ${formatBytes(bucket.totalBytes)}  •  ⚡ ${bucket.totalRequests} reqs  •  📅 ${new Date(bucket.createdAt).toLocaleDateString()}`
+            text: `${bucket.isPublic ? ":ms-globe: Public" : ":ms-shush: Private"}  •  :ms-open-folder: ${formatBytes(bucket.totalBytes)}  •  :ms-high-speed-train: ${bucket.totalRequests} reqs  •  :ms-cd: ${new Date(bucket.createdAt).toLocaleDateString()}`
           }
         ]
       },
@@ -201,15 +204,18 @@ export const createBucketModal = () => ({
   callback_id: "create_bucket_submission",
   title: {
     type: "plain_text",
-    text: "Create Bucket",
+    text: "New Bucket :ms-open-folder:",
+    emoji: true,
   },
   submit: {
     type: "plain_text",
-    text: "Create",
+    text: "Ship It! :ms-high-speed-train:",
+    emoji: true,
   },
   close: {
     type: "plain_text",
-    text: "Cancel",
+    text: "Nah :ms-no:",
+    emoji: true,
   },
   blocks: [
     {
@@ -226,10 +232,12 @@ export const createBucketModal = () => ({
       label: {
         type: "plain_text",
         text: "Bucket Name",
+        emoji: true,
       },
       hint: {
         type: "plain_text",
-        text: "Lowercase letters, numbers, and hyphens only.",
+        text: "Lowercase letters, numbers, and hyphens only. Keep it clean! :ms-wink:",
+        emoji: true,
       },
     },
   ],
@@ -247,7 +255,8 @@ export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
                 type: "button",
                 text: {
                     type: "plain_text",
-                    text: "Delete",
+                    text: "Yeet :ms-no-entry:",
+                    emoji: true,
                 },
                 style: "danger",
                 action_id: "delete_key",
@@ -255,19 +264,22 @@ export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
                 confirm: {
                     title: {
                         type: "plain_text",
-                        text: "Delete Key?"
+                        text: "Yeet Key? :ms-scared:",
+                        emoji: true,
                     },
                     text: {
                         type: "mrkdwn",
-                        text: "Are you sure you want to delete this access key? This action cannot be undone."
+                        text: "Are you sure you want to delete this access key? This action cannot be undone. :ms-concern:"
                     },
                     confirm: {
                         type: "plain_text",
-                        text: "Delete"
+                        text: "Yeet It",
+                        emoji: true,
                     },
                     deny: {
                         type: "plain_text",
-                        text: "Cancel"
+                        text: "Nah, Keep It",
+                        emoji: true,
                     }
                 }
             }
@@ -282,13 +294,13 @@ export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
             type: "section",
             text: {
                 type: "mrkdwn",
-                text: "Manage access keys for this bucket. These keys allow programmatic access."
+                text: "Here are the keys to the kingdom. :ms-wrench: Don't lose them!"
             },
             accessory: {
                 type: "button",
                 text: {
                     type: "plain_text",
-                    text: "Generate New Key",
+                    text: "Mint New Key :ms-hot:",
                     emoji: true
                 },
                 style: "primary",
@@ -306,7 +318,7 @@ export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
             type: "section",
             text: {
                 type: "mrkdwn",
-                text: `:white_check_mark: *New Key Generated*\n\n*Access Key:*\n\`${newKey.accessKey}\`\n*Secret Key:*\n\`${newKey.secretKey}\`\n\n:warning: *Save this secret key now. It will not be shown again.*`
+                text: `:ms-green-tick: *Fresh Key Minted*\n\n*Access Key:*\n\`${newKey.accessKey}\`\n*Secret Key:*\n\`${newKey.secretKey}\`\n\n:ms-red-exclamation-mark: *Save this secret key now. It will vanish like a ghost!*`
             }
         });
         blocks.push({
@@ -321,7 +333,7 @@ export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
         elements: [
             {
                 type: "mrkdwn",
-                text: "⚠️ Keep your secret keys secure. Do not share them publicly."
+                text: ":ms-concern: Keep your secret keys secret. Don't share them with strangers!"
             }
         ]
     });
@@ -333,10 +345,12 @@ export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
         title: {
             type: "plain_text",
             text: `Keys: ${bucket.name}`,
+            emoji: true,
         },
         close: {
             type: "plain_text",
-            text: "Close",
+            text: "Done",
+            emoji: true,
         },
         blocks: blocks
     };
@@ -346,25 +360,27 @@ export const deleteBucketWarningModal = () => ({
     type: "modal",
     title: {
         type: "plain_text",
-        text: "Delete Bucket"
+        text: "Whoa there! :ms-scared:",
+        emoji: true,
     },
     close: {
         type: "plain_text",
-        text: "Close"
+        text: "Got it",
+        emoji: true,
     },
     blocks: [
         {
             type: "section",
             text: {
                 type: "mrkdwn",
-                text: ":warning: *For security reasons, buckets cannot be deleted from Slack.*"
+                text: ":ms-stop-sign: *Hold your horses!*"
             }
         },
         {
             type: "section",
             text: {
                 type: "mrkdwn",
-                text: `Please visit the <https://${config.s3Domain}|web dashboard> to delete your buckets.`
+                text: `For security, you gotta head over to the <https://${config.s3Domain}|web dashboard> to delete buckets. Safety first! :ms-cowhand:`
             }
         }
     ]
@@ -381,7 +397,8 @@ export const filesModal = (bucketName: string, files: any[]) => {
             type: "button",
             text: {
                 type: "plain_text",
-                text: "Open",
+                text: "Peek :ms-raised-eyebrow:",
+                emoji: true,
             },
             url: file.url,
             action_id: "open_file_url"
@@ -391,7 +408,7 @@ export const filesModal = (bucketName: string, files: any[]) => {
             type: "section",
             text: {
                 type: "mrkdwn",
-                text: "_No files found in this bucket._"
+                text: "_This bucket is empty! :ms-pleading:_"
             }
         }
     ];
@@ -403,7 +420,7 @@ export const filesModal = (bucketName: string, files: any[]) => {
             type: "section",
             text: {
                 type: "mrkdwn",
-                text: `_...and ${files.length - 20} more files. View all in the dashboard._`
+                text: `_...and ${files.length - 20} more files. Check the dashboard for the full stash! :ms-bar-chart:_`
             }
         });
     }
@@ -412,18 +429,20 @@ export const filesModal = (bucketName: string, files: any[]) => {
         type: "modal",
         title: {
             type: "plain_text",
-            text: `Files: ${bucketName}`
+            text: `Stash: ${bucketName}`,
+            emoji: true,
         },
         close: {
             type: "plain_text",
-            text: "Close"
+            text: "Done",
+            emoji: true,
         },
         blocks: [
             {
                 type: "section",
                 text: {
                     type: "mrkdwn",
-                    text: `Files in *${bucketName}*:`
+                    text: `Contents of *${bucketName}* :ms-open-folder:`
                 }
             },
             {
