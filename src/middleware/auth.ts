@@ -120,13 +120,37 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 
 		const { bucket, user } = bucketResult[0];
 
+		if (user.isLocked) {
+			return new Response(
+				`<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+		  <Code>AccessDenied</Code>
+		  <Message>Account is temporarily locked.</Message>
+		  <RequestId>0000000000000000</RequestId>
+</Error>`,
+				{ status: 403, headers: { "Content-Type": "application/xml" } },
+			);
+		}
+
+		if (bucket.isPaused) {
+			return new Response(
+				`<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+		  <Code>AccessDenied</Code>
+		  <Message>Bucket is temporarily paused.</Message>
+		  <RequestId>0000000000000000</RequestId>
+</Error>`,
+				{ status: 403, headers: { "Content-Type": "application/xml" } },
+			);
+		}
+
 		if (!bucket.isPublic) {
 			return new Response(
 				`<?xml version="1.0" encoding="UTF-8"?>
 <Error>
-    <Code>AccessDenied</Code>
-    <Message>Access Denied</Message>
-    <RequestId>0000000000000000</RequestId>
+		  <Code>AccessDenied</Code>
+		  <Message>Access Denied</Message>
+		  <RequestId>0000000000000000</RequestId>
 </Error>`,
 				{ status: 403, headers: { "Content-Type": "application/xml" } },
 			);
@@ -175,6 +199,42 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 	}
 
 	const { bucket, user, key } = keyResult[0];
+
+	if (user.isLocked) {
+		return new Response(
+			`<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+	   <Code>AccessDenied</Code>
+	   <Message>Account is temporarily locked.</Message>
+	   <RequestId>0000000000000000</RequestId>
+</Error>`,
+			{ status: 403, headers: { "Content-Type": "application/xml" } },
+		);
+	}
+
+	if (bucket.isPaused) {
+		return new Response(
+			`<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+	   <Code>AccessDenied</Code>
+	   <Message>Bucket is temporarily paused.</Message>
+	   <RequestId>0000000000000000</RequestId>
+</Error>`,
+			{ status: 403, headers: { "Content-Type": "application/xml" } },
+		);
+	}
+
+	if (key.isPaused) {
+		return new Response(
+			`<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+	   <Code>AccessDenied</Code>
+	   <Message>Access Key is temporarily paused.</Message>
+	   <RequestId>0000000000000000</RequestId>
+</Error>`,
+			{ status: 403, headers: { "Content-Type": "application/xml" } },
+		);
+	}
 
 	// const requestedBucket = getBucketFromRequest(req);
 

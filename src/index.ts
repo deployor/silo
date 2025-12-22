@@ -1,4 +1,5 @@
 import { config } from "./config";
+import { handleAdminRequest } from "./features/admin";
 import { handleDashboardRequest } from "./features/landing";
 import { handleS3Request } from "./features/s3-api";
 import { updateStats } from "./features/s3-api/utils";
@@ -56,6 +57,9 @@ Bun.serve({
 		}
 
 		if (isDashboard) {
+			if (url.pathname.startsWith("/admin") || url.pathname.startsWith("/api/admin")) {
+				return handleAdminRequest(req);
+			}
 			if (url.pathname === "/api/slack/events") {
 				return handleSlackRequest(req);
 			}

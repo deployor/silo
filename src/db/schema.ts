@@ -27,6 +27,8 @@ export const users = pgTable("users", {
 		.default(0),
 	createdAt: timestamp("created_at").defaultNow(),
 	updatedAt: timestamp("updated_at").defaultNow(),
+	isAdmin: boolean("is_admin").default(false).notNull(),
+	isLocked: boolean("is_locked").default(false).notNull(),
 });
 
 export const buckets = pgTable(
@@ -39,6 +41,8 @@ export const buckets = pgTable(
 			.notNull(),
 		region: text("region").default("auto"),
 		isPublic: boolean("is_public").default(false).notNull(),
+		isPaused: boolean("is_paused").default(false).notNull(),
+		pauseReason: text("pause_reason"),
 		totalBytes: bigint("total_bytes", { mode: "number" }).notNull().default(0),
 		totalRequests: bigint("total_requests", { mode: "number" })
 			.notNull()
@@ -63,6 +67,8 @@ export const bucketKeys = pgTable(
 			.notNull(),
 		accessKey: text("access_key").notNull().unique(),
 		secretKey: text("secret_key").notNull(),
+		isPaused: boolean("is_paused").default(false).notNull(),
+		pauseReason: text("pause_reason"),
 		createdAt: timestamp("created_at").defaultNow(),
 	},
 	(table) => {
