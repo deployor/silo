@@ -61,7 +61,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
   if (path.startsWith("/auth/")) {
     if (path === "/auth/login") {
-      const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${config.hcAuth.clientId}&redirect_uri=${encodeURIComponent(config.hcAuth.redirectUri)}&response_type=code&scope=openid%20profile%20email`;
+      const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${config.hcAuth.clientId}&redirect_uri=${encodeURIComponent(config.hcAuth.redirectUri)}&response_type=code&scope=openid%20profile%20email%20slack_id%20verification_status`;
       return Response.redirect(authUrl);
     }
 
@@ -104,16 +104,21 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
         const userData = await userRes.json();
 
         const userId = userData.sub;
+        const slackId = userData.slack_id;
 
         await db
           .insert(users)
           .values({
             id: userId,
             email: userData.email,
+            slackId: slackId,
           })
           .onConflictDoUpdate({
             target: users.id,
-            set: { email: userData.email },
+            set: {
+              email: userData.email,
+              slackId: slackId,
+            },
           });
 
         const headers = new Headers();
@@ -172,6 +177,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
         JSON.stringify({
           user: {
             id: user.id,
+            slackId: user.slackId,
             storageUsage: user.storageUsageBytes,
             storageLimit: user.storageLimitBytes,
             ingressBytes: user.ingressBytes,
