@@ -726,7 +726,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	}
 
 	if (user.isLocked) {
-		return new Response(lockedTemplate, {
+		const reason = user.lockReason ? `<p class="text-text-muted mb-4 text-sm">Reason: ${user.lockReason}</p>` : "";
+		const finalLocked = lockedTemplate.replace("<!-- REASON_PLACEHOLDER -->", reason);
+		return new Response(finalLocked, {
 			status: 403,
 			headers: { "Content-Type": "text/html" },
 		});

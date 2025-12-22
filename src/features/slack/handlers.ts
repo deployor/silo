@@ -36,7 +36,7 @@ export async function handleAppHomeOpened(event: { user: string }) {
 					type: "section",
 					text: {
 						type: "mrkdwn",
-						text: "Your account has been temporarily locked by an administrator. You cannot perform any actions at this time.",
+						text: `Your account has been temporarily locked by an administrator. You cannot perform any actions at this time.${user[0].lockReason ? `\n\n*Reason:* ${user[0].lockReason}` : ""}`,
 					},
 				},
 				{

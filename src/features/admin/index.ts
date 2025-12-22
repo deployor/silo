@@ -100,7 +100,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 			const body = await req.json();
 			await db
 				.update(users)
-				.set({ isLocked: body.isLocked })
+				.set({ isLocked: body.isLocked, lockReason: body.lockReason || null })
 				.where(eq(users.id, userId));
 			return new Response("Updated", { status: 200 });
 		}
