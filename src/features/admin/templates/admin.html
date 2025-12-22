@@ -279,7 +279,7 @@
                     </td>
                     <td class="px-6 py-4 font-mono text-xs text-white">${formatBytes(u.egressBytes)}</td>
                     <td class="px-6 py-4">
-                        ${u.isLocked ? '<span class="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-bold border border-red-500/30">LOCKED</span>' : '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-bold border border-emerald-500/30">ACTIVE</span>'}
+                        ${u.isLocked ? `<span class="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-bold border border-red-500/30" title="${u.lockReason || ''}">LOCKED</span>` : '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-bold border border-emerald-500/30">ACTIVE</span>'}
                     </td>
                     <td class="px-6 py-4 text-right">
                         <button class="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider">Manage</button>
@@ -326,7 +326,7 @@
                     <td class="px-4 py-3 font-mono text-white">${b.name}</td>
                     <td class="px-4 py-3 font-mono text-xs text-text-muted">${formatBytes(b.totalBytes)}</td>
                     <td class="px-4 py-3">
-                         ${b.isPaused ? '<span class="text-red-400 text-xs font-bold">PAUSED</span>' : '<span class="text-emerald-400 text-xs font-bold">ACTIVE</span>'}
+                         ${b.isPaused ? `<span class="text-red-400 text-xs font-bold" title="${b.pauseReason || ''}">PAUSED</span>` : '<span class="text-emerald-400 text-xs font-bold">ACTIVE</span>'}
                     </td>
                     <td class="px-4 py-3 text-right">
                         <button onclick="openAdminBucketModal('${b.name}')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
@@ -363,11 +363,15 @@
 
         async function toggleUserLock(locked) {
             if (!currentUser) return;
+            let reason = null;
+            if (locked) {
+                reason = prompt("Enter reason for locking account (optional):");
+            }
             
             await fetch(`/api/admin/users/${currentUser.id}/lock`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ isLocked: locked })
+                body: JSON.stringify({ isLocked: locked, lockReason: reason })
             });
             
             loadUsers();
