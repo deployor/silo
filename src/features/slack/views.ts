@@ -82,7 +82,7 @@ export const homeView = (user: any, buckets: any[], page: number = 0) => {
           type: "section",
           text: {
               type: "mrkdwn",
-              text: "_You don't have any buckets yet. Create one to get started!_"
+              text: "_You don't have any buckets yet. Create one!_"
           }
       },
       {
