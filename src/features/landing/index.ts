@@ -45,6 +45,52 @@ async function getCurrentUser(req: Request) {
   return null;
 }
 
+async function deleteBucketContents(prefix: string) {
+  console.log(`[DELETE BUCKET] Emptying prefix: ${prefix}`);
+  let continuationToken: string | undefined;
+  do {
+    const query = new URLSearchParams();
+    query.set("list-type", "2");
+    query.set("prefix", prefix);
+    if (continuationToken) {
+      query.set("continuation-token", continuationToken);
+    }
+
+    const res = await s3Client.fetch(`?${query.toString()}`, { method: "GET" });
+    if (!res.ok) throw new Error(`Failed to list objects: ${res.status}`);
+
+    const xml = await res.text();
+    const parser = new XMLParser();
+    const result = parser.parse(xml).ListBucketResult;
+
+    if (!result.Contents) break;
+
+    const contents = Array.isArray(result.Contents)
+      ? result.Contents
+      : [result.Contents];
+
+    if (contents.length === 0) break;
+
+    console.log(`[DELETE BUCKET] Deleting ${contents.length} objects...`);
+
+    const objects = contents
+      .map((item: any) => `<Object><Key>${item.Key}</Key></Object>`)
+      .join("");
+
+    const deleteBody = `<Delete><Quiet>true</Quiet>${objects}</Delete>`;
+
+    const deleteRes = await s3Client.fetch("?delete", {
+      method: "POST",
+      body: deleteBody,
+    });
+
+    if (!deleteRes.ok)
+      throw new Error(`Failed to delete objects: ${deleteRes.status}`);
+
+    continuationToken = result.NextContinuationToken;
+  } while (continuationToken);
+}
+
 export async function handleDashboardRequest(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const path = url.pathname;
@@ -286,6 +332,14 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
         return new Response("Bucket not found", { status: 404 });
       if (bucket[0].userId !== user.id)
         return new Response("Unauthorized", { status: 403 });
+
+      try {
+        const internalPrefix = getInternalPath("", user, bucket[0]);
+        await deleteBucketContents(internalPrefix);
+      } catch (e) {
+        console.error("Failed to empty bucket:", e);
+        return new Response("Failed to empty bucket contents", { status: 500 });
+      }
 
       await db.delete(buckets).where(eq(buckets.name, bucketName));
 
