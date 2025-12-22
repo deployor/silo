@@ -229,7 +229,7 @@
                 <p class="text-text-muted text-sm mt-1 font-mono" id="manage-keys-bucket-name">bucket-name</p>
             </div>
             <button
-              onclick="hideManageKeysModal()"
+              onclick="closeManageKeysModal()"
               class="text-text-muted hover:text-white transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -243,7 +243,6 @@
                 <thead class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
                     <tr>
                         <th class="px-4 py-3">Access Key ID</th>
-                        <th class="px-4 py-3">Secret Key</th>
                         <th class="px-4 py-3 text-right">Actions</th>
                     </tr>
                 </thead>
@@ -679,12 +678,19 @@
             return;
           }
 
+          const data = await res.json();
+
           closeCreateModal();
           form.reset();
           
-          await loadDashboard();
-          openManageKeysModal(name);
+          // Show keys modal
+          document.getElementById("new-access-key").textContent = data.accessKey;
+          document.getElementById("new-secret-key").textContent = data.secretKey;
+          document.getElementById("new-public-url").textContent = data.publicUrl;
+          document.getElementById("key-modal").classList.remove("hidden");
+          document.getElementById("key-modal").classList.add("flex");
         } catch (_error) {
+          console.error(_error);
           alert("Failed to create bucket");
         }
       }
@@ -735,8 +741,14 @@
                     throw new Error(err);
                 }
 
-                await loadDashboard();
-                openManageKeysModal(bucketName);
+                const data = await res.json();
+
+                // Show keys modal
+                document.getElementById("new-access-key").textContent = data.accessKey;
+                document.getElementById("new-secret-key").textContent = data.secretKey;
+                document.getElementById("new-public-url").textContent = data.publicUrl;
+                document.getElementById("key-modal").classList.remove("hidden");
+                document.getElementById("key-modal").classList.add("flex");
             }
         );
       }
@@ -775,7 +787,7 @@
         document.getElementById('manage-keys-modal').classList.add('flex');
       }
 
-      function hideManageKeysModal() {
+      function closeManageKeysModal() {
         document.getElementById('manage-keys-modal').classList.add('hidden');
         document.getElementById('manage-keys-modal').classList.remove('flex');
         currentManagedBucket = null;
@@ -784,18 +796,12 @@
       function renderManageKeysTable(bucket) {
         const tbody = document.getElementById('manage-keys-table');
         if (bucket.keys.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-8 text-center text-text-muted italic">No keys found for this bucket.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="2" class="px-4 py-8 text-center text-text-muted italic">No keys found for this bucket.</td></tr>';
             return;
         }
         tbody.innerHTML = bucket.keys.map(k => `
             <tr class="hover:bg-white/5 transition-colors">
                 <td class="px-4 py-3 font-mono text-white">${k.accessKey}</td>
-                <td class="px-4 py-3 font-mono text-text-muted text-xs break-all">
-                    <div class="group/key relative cursor-pointer" onclick="navigator.clipboard.writeText('${k.secretKey}'); alert('Secret key copied!')">
-                        <span class="blur-sm group-hover/key:blur-none transition-all">${k.secretKey}</span>
-                        <span class="absolute top-0 right-0 text-xs text-white opacity-0 group-hover/key:opacity-100 bg-black/50 px-1 rounded">Copy</span>
-                    </div>
-                </td>
                 <td class="px-4 py-3 text-right">
                     <button onclick="deleteKey('${bucket.name}', '${k.id}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider transition-colors">Delete</button>
                 </td>

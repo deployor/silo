@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cargo Admin</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body
+    class="min-h-screen selection:bg-hc-red selection:text-white flex flex-col font-sans"
+  >
+    <nav
+      class="w-full bg-hc-darker border-b border-white/10 px-6 py-4 sticky top-0 z-50 flex justify-between items-center"
+    >
+      <div class="flex items-center gap-4">
+        <a
+          href="/"
+          class="font-bold text-2xl tracking-tighter italic text-white hover:text-hc-red transition-colors"
+          >CARGO</a
+        >
+        <span
+          class="bg-hc-red/20 text-hc-red px-2 py-0.5 rounded text-sm font-mono border border-hc-red/30"
+          >ADMIN</span
+        >
+      </div>
+      <div class="flex items-center gap-6 font-bold text-sm">
+        <a
+          href="/"
+          class="text-text-muted hover:text-white transition-colors"
+          >User Dashboard</a
+        >
+        <div class="flex items-center gap-2">
+          <img id="admin-avatar" src="" alt="Admin Avatar" class="w-6 h-6 rounded-full hidden" />
+          <span class="text-text-muted font-mono" id="admin-id">Loading...</span>
+        </div>
+        <a
+          href="/auth/logout"
+          class="text-hc-red hover:text-white transition-colors"
+          >Logout</a
+        >
+      </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto w-full px-6 py-8">
+      <!-- Users Section -->
+      <div
+        class="bg-hc-dark rounded-3xl border border-white/10 overflow-hidden card-shadow mb-8"
+      >
+        <div
+          class="p-6 border-b border-white/10 flex justify-between items-center"
+        >
+          <div>
+            <h2 class="text-xl font-bold text-white">Users</h2>
+            <p class="text-text-muted text-sm mt-1">
+              Manage all users, quotas, and access.
+            </p>
+          </div>
+          <div class="relative">
+             <input type="text" id="user-search" placeholder="Search users..." class="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red font-mono placeholder-white/20 transition-colors text-sm w-64" oninput="filterUsers()">
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead
+              class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider"
+            >
+              <tr>
+                <th class="px-6 py-4">User</th>
+                <th class="px-6 py-4">Slack ID</th>
+                <th class="px-6 py-4">Storage</th>
+                <th class="px-6 py-4">Egress</th>
+                <th class="px-6 py-4">Status</th>
+                <th class="px-6 py-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-white/5" id="users-table">
+              <!-- Users will be inserted here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <!-- User Details Modal -->
+    <div
+      id="user-modal"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50"
+    >
+      <div
+        class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-4xl card-shadow transform transition-all max-h-[90vh] overflow-y-auto"
+      >
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h3 class="text-2xl font-bold text-white" id="modal-user-id">User Details</h3>
+                <p class="text-text-muted text-sm mt-1 font-mono" id="modal-user-email">email@example.com</p>
+            </div>
+            <button
+              onclick="closeUserModal()"
+              class="text-text-muted hover:text-white transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+        </div>
+
+        <!-- Quota Management -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div class="bg-black/30 p-6 rounded-xl border border-white/10">
+                <h4 class="text-white font-bold mb-4">Storage Quota</h4>
+                <div class="flex gap-4 items-center">
+                    <input type="number" id="modal-storage-limit" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full" placeholder="Bytes">
+                    <button onclick="updateQuota('storage')" class="bg-hc-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">Update</button>
+                </div>
+                <p class="text-xs text-text-muted mt-2">Current Usage: <span id="modal-storage-usage" class="text-white font-mono">0 B</span></p>
+            </div>
+             <div class="bg-black/30 p-6 rounded-xl border border-white/10">
+                <h4 class="text-white font-bold mb-4">Account Status</h4>
+                <div class="flex items-center gap-4">
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="modal-is-locked" class="sr-only peer" onchange="toggleUserLock(this.checked)">
+                        <div class="relative w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-red rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-hc-red"></div>
+                        <span class="ms-3 text-sm font-medium text-text-muted peer-checked:text-white">Account Locked</span>
+                    </label>
+                </div>
+                <p class="text-xs text-text-muted mt-2">Locking an account denies all access immediately.</p>
+            </div>
+        </div>
+
+        <!-- User Buckets -->
+        <h4 class="text-white font-bold mb-4 text-lg">Buckets</h4>
+        <div class="bg-black/30 rounded-xl border border-white/10 overflow-hidden mb-6">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
+                    <tr>
+                        <th class="px-4 py-3">Name</th>
+                        <th class="px-4 py-3">Usage</th>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5" id="modal-buckets-table">
+                    <!-- Buckets inserted here -->
+                </tbody>
+            </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bucket Details Modal (Admin View) -->
+    <div
+      id="admin-bucket-modal"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50"
+    >
+      <div
+        class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-4xl card-shadow transform transition-all max-h-[90vh] overflow-y-auto"
+      >
+         <div class="flex justify-between items-center mb-6">
+            <div>
+                <h3 class="text-2xl font-bold text-white" id="admin-bucket-name">Bucket Name</h3>
+                <p class="text-text-muted text-sm mt-1 font-mono" id="admin-bucket-owner">Owner: ...</p>
+            </div>
+            <button
+              onclick="closeAdminBucketModal()"
+              class="text-text-muted hover:text-white transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+        </div>
+
+        <div class="mb-6 flex gap-4">
+             <button onclick="deleteBucketAdmin()" class="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">Delete Bucket</button>
+             <label class="inline-flex items-center cursor-pointer bg-black/30 px-4 py-2 rounded-lg border border-white/10">
+                <input type="checkbox" id="admin-bucket-paused" class="sr-only peer" onchange="toggleBucketPause(this.checked)">
+                <div class="relative w-9 h-5 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-red rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-hc-red"></div>
+                <span class="ms-2 text-xs font-medium text-text-muted peer-checked:text-white">Pause Bucket</span>
+            </label>
+        </div>
+
+        <h4 class="text-white font-bold mb-4">Keys</h4>
+        <div class="bg-black/30 rounded-xl border border-white/10 overflow-hidden mb-6">
+             <table class="w-full text-left text-sm">
+                <thead class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
+                    <tr>
+                        <th class="px-4 py-3">Access Key</th>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5" id="admin-bucket-keys-table">
+                    <!-- Keys inserted here -->
+                </tbody>
+            </table>
+        </div>
+
+        <h4 class="text-white font-bold mb-4">Files</h4>
+        <div class="bg-black/30 rounded-xl border border-white/10 overflow-hidden h-64 overflow-y-auto">
+             <table class="w-full text-left text-sm">
+                <thead class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider sticky top-0">
+                    <tr>
+                        <th class="px-4 py-3">Key</th>
+                        <th class="px-4 py-3">Size</th>
+                        <th class="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5" id="admin-bucket-files-table">
+                    <!-- Files inserted here -->
+                </tbody>
+            </table>
+        </div>
+      </div>
+    </div>
+
+    <script>
+        function formatBytes(bytes, decimals = 2) {
+            if (!+bytes) return "0 Bytes";
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`;
+        }
+
+        let allUsers = [];
+        let currentUser = null;
+        let currentBucket = null;
+
+        async function loadUsers() {
+            try {
+                const res = await fetch("/api/admin/users");
+                if (!res.ok) throw new Error("Failed to load users");
+                const data = await res.json();
+                allUsers = data.users;
+                
+                // Set admin info
+                document.getElementById("admin-id").textContent = data.admin.id;
+                if (data.admin.slackId) {
+                     const avatar = document.getElementById("admin-avatar");
+                     avatar.src = `https://cachet.dunkirk.sh/users/${data.admin.slackId}/r`;
+                     avatar.classList.remove("hidden");
+                }
+
+                renderUsers(allUsers);
+            } catch (e) {
+                console.error(e);
+                if (e.message.includes("403") || e.message.includes("401")) {
+                    window.location.href = "/";
+                }
+            }
+        }
+
+        function renderUsers(users) {
+            const tbody = document.getElementById("users-table");
+            tbody.innerHTML = users.map(u => `
+                <tr class="hover:bg-white/5 transition-colors cursor-pointer" onclick="openUserModal('${u.id}')">
+                    <td class="px-6 py-4 font-medium text-white">
+                        <div>${u.email}</div>
+                        <div class="text-xs text-text-muted font-mono">${u.id}</div>
+                    </td>
+                    <td class="px-6 py-4 font-mono text-xs text-text-muted">${u.slackId || '-'}</td>
+                    <td class="px-6 py-4">
+                        <div class="text-xs font-mono">
+                            <span class="text-white">${formatBytes(u.storageUsageBytes)}</span>
+                            <span class="text-text-muted">/ ${formatBytes(u.storageLimitBytes)}</span>
+                        </div>
+                        <div class="w-24 bg-white/10 rounded-full h-1.5 mt-1 overflow-hidden">
+                            <div class="bg-hc-blue h-1.5 rounded-full" style="width: ${Math.min((u.storageUsageBytes / u.storageLimitBytes) * 100, 100)}%"></div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 font-mono text-xs text-white">${formatBytes(u.egressBytes)}</td>
+                    <td class="px-6 py-4">
+                        ${u.isLocked ? '<span class="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-bold border border-red-500/30">LOCKED</span>' : '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-bold border border-emerald-500/30">ACTIVE</span>'}
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <button class="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider">Manage</button>
+                    </td>
+                </tr>
+            `).join("");
+        }
+
+        function filterUsers() {
+            const query = document.getElementById("user-search").value.toLowerCase();
+            const filtered = allUsers.filter(u => 
+                u.email.toLowerCase().includes(query) || 
+                u.id.toLowerCase().includes(query) ||
+                (u.slackId && u.slackId.toLowerCase().includes(query))
+            );
+            renderUsers(filtered);
+        }
+
+        async function openUserModal(userId) {
+            const user = allUsers.find(u => u.id === userId);
+            if (!user) return;
+            currentUser = user;
+
+            document.getElementById("modal-user-id").textContent = user.id;
+            document.getElementById("modal-user-email").textContent = user.email;
+            document.getElementById("modal-storage-limit").value = user.storageLimitBytes;
+            document.getElementById("modal-storage-usage").textContent = formatBytes(user.storageUsageBytes);
+            document.getElementById("modal-is-locked").checked = user.isLocked;
+
+            // Load buckets for user
+            const res = await fetch(`/api/admin/users/${userId}/buckets`);
+            const buckets = await res.json();
+            
+            const tbody = document.getElementById("modal-buckets-table");
+            tbody.innerHTML = buckets.map(b => `
+                <tr class="hover:bg-white/5 transition-colors">
+                    <td class="px-4 py-3 font-mono text-white">${b.name}</td>
+                    <td class="px-4 py-3 font-mono text-xs text-text-muted">${formatBytes(b.totalBytes)}</td>
+                    <td class="px-4 py-3">
+                         ${b.isPaused ? '<span class="text-red-400 text-xs font-bold">PAUSED</span>' : '<span class="text-emerald-400 text-xs font-bold">ACTIVE</span>'}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <button onclick="openAdminBucketModal('${b.name}')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
+                            View
+                        </button>
+                    </td>
+                </tr>
+            `).join("");
+
+            document.getElementById("user-modal").classList.remove("hidden");
+            document.getElementById("user-modal").classList.add("flex");
+        }
+
+        function closeUserModal() {
+            document.getElementById("user-modal").classList.add("hidden");
+            document.getElementById("user-modal").classList.remove("flex");
+            currentUser = null;
+        }
+
+        async function updateQuota(type) {
+            if (!currentUser) return;
+            const limit = document.getElementById("modal-storage-limit").value;
+            
+            await fetch(`/api/admin/users/${currentUser.id}/quota`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ storageLimitBytes: limit })
+            });
+            
+            // Refresh
+            loadUsers();
+            alert("Quota updated");
+        }
+
+        async function toggleUserLock(locked) {
+            if (!currentUser) return;
+            
+            await fetch(`/api/admin/users/${currentUser.id}/lock`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ isLocked: locked })
+            });
+            
+            loadUsers();
+        }
+
+        async function openAdminBucketModal(bucketName) {
+            // Fetch bucket details including keys and files
+            const res = await fetch(`/api/admin/buckets/${bucketName}`);
+            if (!res.ok) return alert("Failed to load bucket");
+            const data = await res.json();
+            currentBucket = data;
+
+            document.getElementById("admin-bucket-name").textContent = data.name;
+            document.getElementById("admin-bucket-owner").textContent = `Owner: ${data.userId}`;
+            document.getElementById("admin-bucket-paused").checked = data.isPaused;
+
+            // Render Keys
+            const keysBody = document.getElementById("admin-bucket-keys-table");
+            keysBody.innerHTML = data.keys.map(k => `
+                <tr class="hover:bg-white/5 transition-colors">
+                    <td class="px-4 py-3 font-mono text-white">${k.accessKey}</td>
+                    <td class="px-4 py-3">
+                        ${k.isPaused ? '<span class="text-red-400 text-xs font-bold">PAUSED</span>' : '<span class="text-emerald-400 text-xs font-bold">ACTIVE</span>'}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <button onclick="toggleKeyPause('${k.id}', ${!k.isPaused})" class="text-xs font-bold uppercase tracking-wider ${k.isPaused ? 'text-emerald-400' : 'text-yellow-400'}">
+                            ${k.isPaused ? 'Resume' : 'Pause'}
+                        </button>
+                        <button onclick="deleteKeyAdmin('${k.id}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider ml-2">Delete</button>
+                    </td>
+                </tr>
+            `).join("");
+
+            // Render Files (Preview)
+            // We'll just list the first 50 or so for admin overview
+            const filesBody = document.getElementById("admin-bucket-files-table");
+            filesBody.innerHTML = data.files.map(f => `
+                <tr class="hover:bg-white/5 transition-colors">
+                    <td class="px-4 py-3 font-mono text-white text-xs truncate max-w-xs" title="${f.key}">${f.key}</td>
+                    <td class="px-4 py-3 font-mono text-xs text-text-muted">${formatBytes(f.size)}</td>
+                    <td class="px-4 py-3 text-right">
+                        <a href="${f.url}" target="_blank" class="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider">View</a>
+                        <button onclick="deleteFileAdmin('${f.key}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider ml-2">Delete</button>
+                    </td>
+                </tr>
+            `).join("");
+
+            document.getElementById("admin-bucket-modal").classList.remove("hidden");
+            document.getElementById("admin-bucket-modal").classList.add("flex");
+        }
+
+        function closeAdminBucketModal() {
+            document.getElementById("admin-bucket-modal").classList.add("hidden");
+            document.getElementById("admin-bucket-modal").classList.remove("flex");
+            currentBucket = null;
+        }
+
+        async function toggleBucketPause(paused) {
+            if (!currentBucket) return;
+            await fetch(`/api/admin/buckets/${currentBucket.name}/pause`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ isPaused: paused })
+            });
+            // Refresh modal
+            openAdminBucketModal(currentBucket.name);
+        }
+
+        async function deleteBucketAdmin() {
+            if (!currentBucket || !confirm("Delete this bucket and ALL data?")) return;
+            await fetch(`/api/admin/buckets/${currentBucket.name}`, { method: "DELETE" });
+            closeAdminBucketModal();
+            if (currentUser) openUserModal(currentUser.id); // Refresh user modal
+        }
+
+        async function toggleKeyPause(keyId, pause) {
+            if (!currentBucket) return;
+            await fetch(`/api/admin/keys/${keyId}/pause`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ isPaused: pause })
+            });
+            openAdminBucketModal(currentBucket.name);
+        }
+
+        async function deleteKeyAdmin(keyId) {
+            if (!confirm("Delete key?")) return;
+            await fetch(`/api/admin/keys/${keyId}`, { method: "DELETE" });
+            openAdminBucketModal(currentBucket.name);
+        }
+
+        async function deleteFileAdmin(key) {
+            if (!currentBucket || !confirm("Delete file?")) return;
+            await fetch(`/api/admin/buckets/${currentBucket.name}/files?key=${encodeURIComponent(key)}`, { method: "DELETE" });
+            openAdminBucketModal(currentBucket.name);
+        }
+
+        loadUsers();
+    </script>
+  </body>
+</html>

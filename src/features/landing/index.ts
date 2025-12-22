@@ -196,6 +196,10 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		const user = await getCurrentUser(req);
 		if (!user) return new Response("Unauthorized", { status: 401 });
 
+		if (user.isLocked) {
+			return new Response("Account Locked", { status: 403 });
+		}
+
 		if (path === "/api/dashboard/stats") {
 			const userBuckets = await db
 				.select()
@@ -715,6 +719,10 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		return new Response(landingTemplate, {
 			headers: { "Content-Type": "text/html" },
 		});
+	}
+
+	if (user.isLocked) {
+		return new Response("Account Locked", { status: 403 });
 	}
 
 	// Serve File Explorer Page
