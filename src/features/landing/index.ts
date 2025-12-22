@@ -735,8 +735,33 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	}
 
 	if (user.isLocked) {
-		const reason = user.lockReason ? `<p class="text-text-muted mb-4 text-sm">Reason: ${user.lockReason}</p>` : "";
-		const finalLocked = lockedTemplate.replace("<!-- REASON_PLACEHOLDER -->", reason);
+		const reason = user.lockReason
+			? `<p class="text-text-muted mb-4 text-sm">Reason: ${user.lockReason}</p>`
+			: "";
+		let finalLocked = lockedTemplate.replace(
+			"<!-- REASON_PLACEHOLDER -->",
+			reason,
+		);
+
+		// Fetch buckets for locked user to display
+		const userBuckets = await db
+			.select()
+			.from(buckets)
+			.where(eq(buckets.userId, user.id));
+
+		const bucketsHtml =
+			userBuckets.length > 0
+				? `
+	       <div class="bg-white/5 rounded-xl p-4 border border-white/10 text-left mb-8">
+	           <h3 class="text-sm font-bold text-white mb-2">Your Buckets</h3>
+	           <ul class="text-xs text-text-muted space-y-1 list-disc list-inside ml-1">
+	               ${userBuckets.map((b) => `<li>${b.name} (${b.isPublic ? "Public" : "Private"})</li>`).join("")}
+	           </ul>
+	       </div>`
+				: "";
+
+		finalLocked = finalLocked.replace("<!-- BUCKETS_PLACEHOLDER -->", bucketsHtml);
+
 		return new Response(finalLocked, {
 			status: 403,
 			headers: { "Content-Type": "text/html" },
