@@ -209,7 +209,7 @@ export const createBucketModal = () => ({
   },
   submit: {
     type: "plain_text",
-    text: "Ship :lightningmcqueen:",
+    text: "Confirm",
     emoji: true,
   },
   close: {
