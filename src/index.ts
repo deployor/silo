@@ -63,7 +63,12 @@ Bun.serve({
 				const filePath = `src${url.pathname}`;
 				const file = Bun.file(filePath);
 				if (await file.exists()) {
-					return new Response(file);
+					return new Response(file, {
+						headers: {
+							"Content-Type": file.type,
+							"Cache-Control": "public, max-age=31536000",
+						},
+					});
 				}
 			}
 			return handleDashboardRequest(req);
