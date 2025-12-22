@@ -177,7 +177,7 @@ export const createBucketModal = () => ({
   ],
 });
 
-export const manageKeysModal = (bucket: any, keys: any[]) => {
+export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
     const keyBlocks = keys.map(key => [
         {
             type: "section",
@@ -219,6 +219,55 @@ export const manageKeysModal = (bucket: any, keys: any[]) => {
         }
     ]).flat();
 
+    const blocks: any[] = [
+        {
+            type: "section",
+            text: {
+                type: "mrkdwn",
+                text: "Manage access keys for this bucket. These keys allow programmatic access."
+            },
+            accessory: {
+                type: "button",
+                text: {
+                    type: "plain_text",
+                    text: "Generate New Key",
+                    emoji: true
+                },
+                style: "primary",
+                action_id: "generate_key",
+                value: bucket.id
+            }
+        },
+        {
+            type: "divider"
+        }
+    ];
+
+    if (newKey) {
+        blocks.push({
+            type: "section",
+            text: {
+                type: "mrkdwn",
+                text: `:white_check_mark: *New Key Generated*\n\n*Access Key:*\n\`${newKey.accessKey}\`\n*Secret Key:*\n\`${newKey.secretKey}\`\n\n:warning: *Save this secret key now. It will not be shown again.*`
+            }
+        });
+        blocks.push({
+            type: "divider"
+        });
+    }
+
+    blocks.push(...keyBlocks);
+    
+    blocks.push({
+        type: "context",
+        elements: [
+            {
+                type: "mrkdwn",
+                text: "⚠️ Keep your secret keys secure. Do not share them publicly."
+            }
+        ]
+    });
+
     return {
         type: "modal",
         callback_id: "manage_keys_view",
@@ -231,39 +280,7 @@ export const manageKeysModal = (bucket: any, keys: any[]) => {
             type: "plain_text",
             text: "Close",
         },
-        blocks: [
-            {
-                type: "section",
-                text: {
-                    type: "mrkdwn",
-                    text: "Manage access keys for this bucket. These keys allow programmatic access."
-                },
-                accessory: {
-                    type: "button",
-                    text: {
-                        type: "plain_text",
-                        text: "Generate New Key",
-                        emoji: true
-                    },
-                    style: "primary",
-                    action_id: "generate_key",
-                    value: bucket.id
-                }
-            },
-            {
-                type: "divider"
-            },
-            ...keyBlocks,
-            {
-                type: "context",
-                elements: [
-                    {
-                        type: "mrkdwn",
-                        text: "⚠️ Keep your secret keys secure. Do not share them publicly."
-                    }
-                ]
-            }
-        ]
+        blocks: blocks
     };
 }
 
