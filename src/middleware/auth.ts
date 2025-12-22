@@ -137,7 +137,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 				`<?xml version="1.0" encoding="UTF-8"?>
 <Error>
 		  <Code>AccessDenied</Code>
-		  <Message>Bucket is temporarily paused.</Message>
+		  <Message>Bucket is temporarily paused.${bucket.pauseReason ? ` Reason: ${bucket.pauseReason}` : ""}</Message>
 		  <RequestId>0000000000000000</RequestId>
 </Error>`,
 				{ status: 403, headers: { "Content-Type": "application/xml" } },
@@ -217,7 +217,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 			`<?xml version="1.0" encoding="UTF-8"?>
 <Error>
 	   <Code>AccessDenied</Code>
-	   <Message>Bucket is temporarily paused.</Message>
+	   <Message>Bucket is temporarily paused.${bucket.pauseReason ? ` Reason: ${bucket.pauseReason}` : ""}</Message>
 	   <RequestId>0000000000000000</RequestId>
 </Error>`,
 			{ status: 403, headers: { "Content-Type": "application/xml" } },
@@ -229,7 +229,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 			`<?xml version="1.0" encoding="UTF-8"?>
 <Error>
 	   <Code>AccessDenied</Code>
-	   <Message>Access Key is temporarily paused.</Message>
+	   <Message>Access Key is temporarily paused.${key.pauseReason ? ` Reason: ${key.pauseReason}` : ""}</Message>
 	   <RequestId>0000000000000000</RequestId>
 </Error>`,
 			{ status: 403, headers: { "Content-Type": "application/xml" } },
