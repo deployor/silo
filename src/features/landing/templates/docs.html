@@ -236,10 +236,10 @@
             Cargo is free S3 storage for Hack Clubbers.
           </p>
           <p class="text-lg mb-6 text-text-muted leading-relaxed">
-            If you're a teen building cool stuff and need a place to dump your files—whether it's for a game, a website, or a hackathon project—this is for you.
+            If you're a teen building something and need storage whether it's for a game, a website, or a hackathon project, this is for you.
           </p>
           <p class="text-lg mb-6 text-text-muted leading-relaxed">
-            Under the hood, we just proxy your requests to a real storage provider. This lets us handle the boring stuff (like quotas and auth) while giving you a standard S3 API. You can use all the normal tools (AWS CLI, libraries, etc.) without needing a credit card.
+            Under the hood, we just proxy all requests into one single bucket under routes. This lets us handle the boring stuff (like quotas and auth) while giving you a standard S3 API. You can use all the normal tools (AWS CLI, libraries, etc.) without needing a credit card, a cloudflare account etc.
           </p>
           <p class="text-lg mb-6 text-text-muted leading-relaxed">
             Just log in and start shipping.
@@ -250,17 +250,16 @@
         <div id="auth" class="section-content">
           <h1 class="text-4xl font-bold mb-6 text-white">Authentication</h1>
           <p class="text-lg mb-6 text-text-muted">
-            To access Cargo programmatically, you need an Access Key and a Secret Key.
+            To get your credentials:
           </p>
           <ol class="list-decimal list-inside space-y-4 text-text-muted mb-8">
-            <li>Log in to the <a href="/" class="text-hc-red hover:underline">Dashboard</a> using your Hack Club Slack account.</li>
-            <li>Create a new Bucket.</li>
-            <li>Click on the bucket to view its details.</li>
-            <li>Generate a new Access Key pair.</li>
+            <li>Log in to the <a href="/" class="text-hc-red hover:underline">Dashboard</a>.</li>
+            <li>Click <strong>Create Bucket</strong>.</li>
+            <li>Copy your Access Key and Secret Key.</li>
           </ol>
           <div class="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-lg">
             <p class="text-yellow-200 text-sm">
-              <strong>Important:</strong> Your Secret Key is only shown once. Make sure to save it securely. If you lose it, you'll need to generate a new pair.
+              <strong>Important:</strong> Your Secret Key is only shown once. Make sure to save it securely.
             </p>
           </div>
         </div>
