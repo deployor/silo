@@ -294,7 +294,7 @@ export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
             type: "section",
             text: {
                 type: "mrkdwn",
-                text: "Here are the keys to the kingdom. :ms-wrench: Don't lose them!"
+                text: "Here are the keys :ms-wrench:"
             },
             accessory: {
                 type: "button",
