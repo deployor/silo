@@ -164,7 +164,7 @@ export const homeView = (user: any, buckets: any[]) => {
           fields: [
               {
                   type: "mrkdwn",
-                  text: `*Total Requests*\n${user.totalRequests.toLocaleString()} :ms-clap-hmn:`
+                  text: `*Total Requests*\n${user.totalRequests.toLocaleString()}`
               },
               {
                   type: "mrkdwn",
