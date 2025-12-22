@@ -25,7 +25,7 @@ export const homeView = (user: any, buckets: any[], page: number = 0) => {
   const end = start + ITEMS_PER_PAGE;
   const displayBuckets = buckets.slice(start, end);
 
-  const bucketBlocks = displayBuckets.length > 0 ? displayBuckets.map((bucket) => {
+  const bucketBlocks: any[] = displayBuckets.length > 0 ? displayBuckets.map((bucket) => {
     return [
       {
         type: "section",
