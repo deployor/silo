@@ -73,6 +73,18 @@
       ::-webkit-scrollbar-thumb:hover {
         background: rgba(255, 255, 255, 0.2);
       }
+      
+      code {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 0.9em;
+        background: rgba(255,255,255,0.1);
+        padding: 0.2em 0.4em;
+        border-radius: 4px;
+      }
+      pre code {
+        background: transparent;
+        padding: 0;
+      }
     </style>
   </head>
   <body
@@ -124,7 +136,7 @@
                   class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
                   id="nav-intro"
                 >
-                  What is this?
+                  Introduction
                 </button>
               </li>
               <li>
@@ -133,16 +145,16 @@
                   class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
                   id="nav-auth"
                 >
-                  Get Access
+                  Authentication
                 </button>
               </li>
               <li>
                 <button
-                  onclick="showSection('structure')"
+                  onclick="showSection('public-buckets')"
                   class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
-                  id="nav-structure"
+                  id="nav-public-buckets"
                 >
-                  Projects & Keys
+                  Public Buckets
                 </button>
               </li>
             </ul>
@@ -152,46 +164,18 @@
             <h5
               class="font-bold text-text-muted text-xs uppercase tracking-wider mb-3 pl-3"
             >
-              How To Use
+              API Reference
             </h5>
             <ul class="space-y-1 text-sm font-medium">
               <li>
                 <button
-                  onclick="showSection('aws-cli')"
+                  onclick="showSection('supported-api')"
                   class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
-                  id="nav-aws-cli"
+                  id="nav-supported-api"
                 >
-                  AWS CLI
+                  Supported Operations
                 </button>
               </li>
-              <li>
-                <button
-                  onclick="showSection('js')"
-                  class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
-                  id="nav-js"
-                >
-                  JavaScript / Bun
-                </button>
-              </li>
-              <li>
-                <button
-                  onclick="showSection('rclone')"
-                  class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
-                  id="nav-rclone"
-                >
-                  rclone
-                </button>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <h5
-              class="font-bold text-text-muted text-xs uppercase tracking-wider mb-3 pl-3"
-            >
-              Reference
-            </h5>
-            <ul class="space-y-1 text-sm font-medium">
               <li>
                 <button
                   onclick="showSection('endpoints')"
@@ -212,6 +196,34 @@
               </li>
             </ul>
           </div>
+
+          <div>
+            <h5
+              class="font-bold text-text-muted text-xs uppercase tracking-wider mb-3 pl-3"
+            >
+              Examples
+            </h5>
+            <ul class="space-y-1 text-sm font-medium">
+              <li>
+                <button
+                  onclick="showSection('aws-cli')"
+                  class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
+                  id="nav-aws-cli"
+                >
+                  AWS CLI
+                </button>
+              </li>
+              <li>
+                <button
+                  onclick="showSection('js')"
+                  class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
+                  id="nav-js"
+                >
+                  JavaScript / Bun
+                </button>
+              </li>
+            </ul>
+          </div>
         </div>
       </aside>
 
@@ -219,65 +231,221 @@
       <main class="flex-1 p-6 md:p-12 max-w-3xl">
         <!-- Intro -->
         <div id="intro" class="section-content active">
-          <h1 class="text-4xl font-bold mb-6 text-white">WIP</h1>
+          <h1 class="text-4xl font-bold mb-6 text-white">Introduction</h1>
           <p class="text-lg mb-6 text-text-muted leading-relaxed">
-            WIP WIP WIP
+            Cargo is a high-performance, S3-compatible object storage gateway designed for Hack Clubbers. It provides a simple, familiar interface for storing and retrieving files, backed by robust infrastructure.
+          </p>
+          <p class="text-lg mb-6 text-text-muted leading-relaxed">
+            Whether you're hosting assets for a game, storing user uploads, or backing up data, Cargo offers a standard S3 API that works with your favorite tools and libraries.
           </p>
         </div>
 
         <!-- Auth -->
         <div id="auth" class="section-content">
-          <h1 class="text-4xl font-bold mb-6 text-white">WIP</h1>
+          <h1 class="text-4xl font-bold mb-6 text-white">Authentication</h1>
           <p class="text-lg mb-6 text-text-muted">
-            WIP WIP WIP
+            To access Cargo programmatically, you need an Access Key and a Secret Key.
           </p>
+          <ol class="list-decimal list-inside space-y-4 text-text-muted mb-8">
+            <li>Log in to the <a href="/" class="text-hc-red hover:underline">Dashboard</a> using your Hack Club Slack account.</li>
+            <li>Create a new Bucket.</li>
+            <li>Click on the bucket to view its details.</li>
+            <li>Generate a new Access Key pair.</li>
+          </ol>
+          <div class="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-lg">
+            <p class="text-yellow-200 text-sm">
+              <strong>Important:</strong> Your Secret Key is only shown once. Make sure to save it securely. If you lose it, you'll need to generate a new pair.
+            </p>
+          </div>
         </div>
 
-        <!-- Structure -->
-        <div id="structure" class="section-content">
-          <h1 class="text-4xl font-bold mb-6 text-white">WIP</h1>
+        <!-- Public Buckets -->
+        <div id="public-buckets" class="section-content">
+          <h1 class="text-4xl font-bold mb-6 text-white">Public Buckets</h1>
           <p class="text-lg mb-6 text-text-muted">
-            WIP WIP WIP
+            By default, all buckets are <strong>private</strong>. This means every request requires valid authentication signatures.
+          </p>
+          <p class="text-lg mb-6 text-text-muted">
+            You can toggle a bucket to be <strong>Public</strong> in the dashboard settings.
+          </p>
+          
+          <h3 class="text-2xl font-bold mb-4 text-white">What does Public mean?</h3>
+          <ul class="list-disc list-inside space-y-2 text-text-muted mb-6">
+            <li>Anyone can perform <code>GetObject</code> and <code>HeadObject</code> requests without authentication.</li>
+            <li>Files are accessible via direct URL: <code>https://cargo.deployor.dev/bucket-name/key</code>.</li>
+            <li><code>ListObjects</code> and other operations still require authentication.</li>
+          </ul>
+          
+          <p class="text-text-muted">
+            This is ideal for hosting static assets like images, CSS, or game files that need to be publicly accessible on the web.
           </p>
         </div>
 
-        <!-- AWS CLI -->
-        <div id="aws-cli" class="section-content">
-          <h1 class="text-4xl font-bold mb-6 text-white">WIP</h1>
+        <!-- Supported API -->
+        <div id="supported-api" class="section-content">
+          <h1 class="text-4xl font-bold mb-6 text-white">Supported Operations</h1>
           <p class="mb-6 text-text-muted">
-            WIP WIP WIP
+            Cargo implements a subset of the Amazon S3 API. The following operations are fully supported:
           </p>
-        </div>
 
-        <!-- JS -->
-        <div id="js" class="section-content">
-          <h1 class="text-4xl font-bold mb-6 text-white">WIP</h1>
-          <p class="mb-6 text-text-muted">
-            WIP WIP WIP
-          </p>
-        </div>
+          <div class="space-y-8">
+            <div>
+              <h3 class="text-xl font-bold mb-3 text-white">Bucket Operations</h3>
+              <ul class="grid grid-cols-1 md:grid-cols-2 gap-2 text-text-muted font-mono text-sm">
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> ListBuckets</li>
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> HeadBucket</li>
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> GetBucketLocation</li>
+                <li class="flex items-center gap-2 opacity-50"><span class="text-red-400">✗</span> GetBucketPolicy (Not Supported)</li>
+              </ul>
+            </div>
 
-        <!-- rclone -->
-        <div id="rclone" class="section-content">
-          <h1 class="text-4xl font-bold mb-6 text-white">WIP</h1>
-          <p class="mb-6 text-text-muted">
-            WIP WIP WIP
-          </p>
+            <div>
+              <h3 class="text-xl font-bold mb-3 text-white">Object Operations</h3>
+              <ul class="grid grid-cols-1 md:grid-cols-2 gap-2 text-text-muted font-mono text-sm">
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> PutObject</li>
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> GetObject</li>
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> HeadObject</li>
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> DeleteObject</li>
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> CopyObject *</li>
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> ListObjectsV2</li>
+              </ul>
+              <p class="text-xs text-text-muted mt-2 italic">* Note: CopyObject behavior may vary slightly depending on the upstream provider (Hetzner), particularly with complex metadata directives.</p>
+            </div>
+
+            <div>
+              <h3 class="text-xl font-bold mb-3 text-white">Multipart Uploads</h3>
+              <p class="text-sm text-text-muted mb-3">Fully supported for large files.</p>
+              <ul class="grid grid-cols-1 md:grid-cols-2 gap-2 text-text-muted font-mono text-sm">
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> CreateMultipartUpload</li>
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> UploadPart</li>
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> CompleteMultipartUpload</li>
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> AbortMultipartUpload</li>
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> ListMultipartUploads</li>
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> ListParts</li>
+              </ul>
+            </div>
+          </div>
         </div>
 
         <!-- Endpoints -->
         <div id="endpoints" class="section-content">
-          <h1 class="text-4xl font-bold mb-6 text-white">WIP</h1>
-          <p class="mb-6 text-text-muted">
-            WIP WIP WIP
-          </p>
+          <h1 class="text-4xl font-bold mb-6 text-white">Endpoints & Regions</h1>
+          
+          <div class="space-y-6">
+            <div>
+              <h3 class="text-lg font-bold text-white mb-2">Region</h3>
+              <code class="text-hc-red">eu-central-1</code>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-bold text-white mb-2">Endpoint URL</h3>
+              <code class="text-hc-blue">https://cargo.deployor.dev</code>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-bold text-white mb-2">Addressing Styles</h3>
+              <p class="text-text-muted mb-2">We support both virtual-hosted-style and path-style access.</p>
+              
+              <div class="bg-hc-darker p-4 rounded-lg border border-white/10 space-y-2 font-mono text-sm">
+                <div class="flex flex-col gap-1">
+                  <span class="text-text-muted">// Virtual Host (Recommended)</span>
+                  <span class="text-white">https://<span class="text-hc-blue">{bucket}</span>.cargo.deployor.dev/<span class="text-green-400">{key}</span></span>
+                </div>
+                <div class="flex flex-col gap-1 mt-4">
+                  <span class="text-text-muted">// Path Style</span>
+                  <span class="text-white">https://cargo.deployor.dev/<span class="text-hc-blue">{bucket}</span>/<span class="text-green-400">{key}</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Limits -->
         <div id="limits" class="section-content">
-          <h1 class="text-4xl font-bold mb-6 text-white">WIP</h1>
-          <p class="mb-6 text-text-muted">WIP WIP WIP</p>
+          <h1 class="text-4xl font-bold mb-6 text-white">Limits & Quotas</h1>
+          
+          <div class="space-y-6">
+            <div>
+              <h3 class="text-xl font-bold text-white mb-2">Storage & Bandwidth</h3>
+              <p class="text-text-muted mb-4">
+                We monitor storage usage and egress bandwidth.
+              </p>
+              <ul class="list-disc list-inside space-y-2 text-text-muted">
+                <li><strong>Storage Limit:</strong> Defined per user (check dashboard).</li>
+                <li><strong>Egress Limit:</strong> Typically 3x your storage limit.</li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="text-xl font-bold text-white mb-2">Unsupported Features</h3>
+              <p class="text-text-muted mb-2">
+                The following features are currently <strong>not implemented</strong> or blocked. Requests containing these headers or parameters will return a <code>501 Not Implemented</code> error.
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <span class="px-2 py-1 bg-red-500/10 text-red-400 rounded text-xs font-mono border border-red-500/20">ACLs</span>
+                <span class="px-2 py-1 bg-red-500/10 text-red-400 rounded text-xs font-mono border border-red-500/20">Bucket Policy</span>
+                <span class="px-2 py-1 bg-red-500/10 text-red-400 rounded text-xs font-mono border border-red-500/20">Encryption</span>
+                <span class="px-2 py-1 bg-red-500/10 text-red-400 rounded text-xs font-mono border border-red-500/20">Versioning</span>
+                <span class="px-2 py-1 bg-red-500/10 text-red-400 rounded text-xs font-mono border border-red-500/20">Lifecycle</span>
+                <span class="px-2 py-1 bg-red-500/10 text-red-400 rounded text-xs font-mono border border-red-500/20">Replication</span>
+                <span class="px-2 py-1 bg-red-500/10 text-red-400 rounded text-xs font-mono border border-red-500/20">Object Lock</span>
+              </div>
+            </div>
+          </div>
         </div>
+
+        <!-- AWS CLI -->
+        <div id="aws-cli" class="section-content">
+          <h1 class="text-4xl font-bold mb-6 text-white">AWS CLI</h1>
+          <p class="mb-6 text-text-muted">
+            You can use the standard AWS CLI to interact with Cargo. Configure a profile with your keys and our endpoint.
+          </p>
+
+          <h3 class="text-lg font-bold text-white mb-3">Configuration</h3>
+          <pre class="rounded-lg mb-6"><code class="language-bash">aws configure --profile cargo
+# AWS Access Key ID: [Your Access Key]
+# AWS Secret Access Key: [Your Secret Key]
+# Default region name: eu-central-1
+# Default output format: json</code></pre>
+
+          <h3 class="text-lg font-bold text-white mb-3">Usage Examples</h3>
+          <pre class="rounded-lg"><code class="language-bash"># List Buckets
+aws s3 ls --endpoint-url https://cargo.deployor.dev --profile cargo
+
+# Upload a file
+aws s3 cp myfile.txt s3://my-bucket/myfile.txt --endpoint-url https://cargo.deployor.dev --profile cargo
+
+# List Objects
+aws s3 ls s3://my-bucket --endpoint-url https://cargo.deployor.dev --profile cargo</code></pre>
+        </div>
+
+        <!-- JS -->
+        <div id="js" class="section-content">
+          <h1 class="text-4xl font-bold mb-6 text-white">JavaScript / Bun</h1>
+          <p class="mb-6 text-text-muted">
+            Use the <code>@aws-sdk/client-s3</code> package.
+          </p>
+
+          <pre class="rounded-lg"><code class="language-javascript">import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+
+const s3 = new S3Client({
+  region: "eu-central-1",
+  endpoint: "https://cargo.deployor.dev",
+  credentials: {
+    accessKeyId: "YOUR_ACCESS_KEY",
+    secretAccessKey: "YOUR_SECRET_KEY",
+  },
+});
+
+await s3.send(
+  new PutObjectCommand({
+    Bucket: "my-bucket",
+    Key: "hello.txt",
+    Body: "Hello World!",
+  })
+);</code></pre>
+        </div>
+
       </main>
     </div>
 
@@ -292,6 +460,9 @@
           el.classList.remove("active");
         });
         document.getElementById("nav-" + id).classList.add("active");
+        
+        // Update URL hash without scrolling
+        history.pushState(null, null, '#' + id);
       }
 
       if (window.location.hash) {
@@ -299,6 +470,9 @@
         if (document.getElementById(hash)) {
           showSection(hash);
         }
+      } else {
+        // Default to intro
+        showSection('intro');
       }
     </script>
   </body>
