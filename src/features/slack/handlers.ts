@@ -233,4 +233,9 @@ export async function handleInteraction(payload: any) {
       }
   }
 
+  // 8. Refresh Home
+  if (actionId === "refresh_home") {
+      await handleAppHomeOpened({ user: payload.user.id });
+  }
+
 }
