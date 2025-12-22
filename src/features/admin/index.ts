@@ -4,7 +4,7 @@ import { config } from "../../config";
 import { db } from "../../db";
 import { bucketKeys, buckets, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
-import { getInternalPath } from "../s3-api/utils";
+import { deleteBucketContents, getInternalPath } from "../s3-api/utils";
 
 const adminTemplate = await Bun.file(
 	"src/features/admin/templates/admin.html",
@@ -204,12 +204,12 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					.where(eq(users.id, bucket[0].userId))
 					.limit(1);
 				if (owner.length > 0) {
-					// TODO: Import deleteBucketContents from landing/index.ts or move to shared utils
-					// For now, we'll just delete the DB record and let S3 be dirty (or implement full cleanup later)
-					// Actually, let's try to be clean.
-					// We can't easily import the function if it's not exported or if it depends on request context.
-					// Let's just delete the DB record for now to satisfy the requirement "delete bucket".
-					// Real implementation should clean S3.
+					const internalPrefix = getInternalPath("", owner[0], bucket[0]);
+					try {
+						await deleteBucketContents(internalPrefix);
+					} catch (e) {
+						console.error("Failed to empty bucket during admin delete:", e);
+					}
 				}
 			}
 			await db.delete(buckets).where(eq(buckets.name, bucketName));
