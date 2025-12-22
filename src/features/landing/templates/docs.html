@@ -324,6 +324,39 @@
                 <li class="flex items-center gap-2"><span class="text-green-400">✓</span> ListParts</li>
               </ul>
             </div>
+
+            <div>
+              <h3 class="text-xl font-bold mb-3 text-white">Unsupported Operations</h3>
+              <p class="text-sm text-text-muted mb-4">
+                The following features and their associated API calls are <strong>not supported</strong>. Requests attempting to use these features will typically return <code>501 Not Implemented</code> or <code>403 Access Denied</code>.
+              </p>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm bg-hc-darker p-6 rounded-xl border border-white/5">
+                <div>
+                    <h4 class="font-bold text-white mb-3 uppercase tracking-wider text-xs">Access Control & Security</h4>
+                    <ul class="space-y-2 text-text-muted font-mono">
+                        <li class="flex items-start gap-2"><span class="text-red-400 select-none">✗</span> <span><strong>ACLs</strong><br><span class="text-xs opacity-50">PutBucketAcl, GetBucketAcl, PutObjectAcl, GetObjectAcl</span></span></li>
+                        <li class="flex items-start gap-2"><span class="text-red-400 select-none">✗</span> <span><strong>Bucket Policies</strong><br><span class="text-xs opacity-50">PutBucketPolicy, GetBucketPolicy, DeleteBucketPolicy</span></span></li>
+                        <li class="flex items-start gap-2"><span class="text-red-400 select-none">✗</span> <span><strong>CORS</strong><br><span class="text-xs opacity-50">PutBucketCors, GetBucketCors, DeleteBucketCors</span></span></li>
+                        <li class="flex items-start gap-2"><span class="text-red-400 select-none">✗</span> <span><strong>Encryption</strong><br><span class="text-xs opacity-50">PutBucketEncryption, GetBucketEncryption</span></span></li>
+                        <li class="flex items-start gap-2"><span class="text-red-400 select-none">✗</span> <span><strong>Object Lock</strong><br><span class="text-xs opacity-50">PutObjectLockConfiguration, GetObjectLockConfiguration</span></span></li>
+                        <li class="flex items-start gap-2"><span class="text-red-400 select-none">✗</span> <span><strong>Public Access Block</strong><br><span class="text-xs opacity-50">PutPublicAccessBlock, GetPublicAccessBlock</span></span></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 class="font-bold text-white mb-3 uppercase tracking-wider text-xs">Management & Features</h4>
+                    <ul class="space-y-2 text-text-muted font-mono">
+                        <li class="flex items-start gap-2"><span class="text-red-400 select-none">✗</span> <span><strong>Versioning</strong><br><span class="text-xs opacity-50">PutBucketVersioning, GetBucketVersioning</span></span></li>
+                        <li class="flex items-start gap-2"><span class="text-red-400 select-none">✗</span> <span><strong>Lifecycle</strong><br><span class="text-xs opacity-50">PutBucketLifecycle, GetBucketLifecycle</span></span></li>
+                        <li class="flex items-start gap-2"><span class="text-red-400 select-none">✗</span> <span><strong>Replication</strong><br><span class="text-xs opacity-50">PutBucketReplication, GetBucketReplication</span></span></li>
+                        <li class="flex items-start gap-2"><span class="text-red-400 select-none">✗</span> <span><strong>Tagging</strong><br><span class="text-xs opacity-50">PutBucketTagging, PutObjectTagging, GetBucketTagging</span></span></li>
+                        <li class="flex items-start gap-2"><span class="text-red-400 select-none">✗</span> <span><strong>Website</strong><br><span class="text-xs opacity-50">PutBucketWebsite, GetBucketWebsite</span></span></li>
+                        <li class="flex items-start gap-2"><span class="text-red-400 select-none">✗</span> <span><strong>Other</strong><br><span class="text-xs opacity-50">Logging, Analytics, Inventory, Metrics, Accelerate, Payment, RestoreObject, SelectObjectContent</span></span></li>
+                    </ul>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
