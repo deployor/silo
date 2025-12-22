@@ -49,7 +49,7 @@ export const homeView = (user: any, buckets: any[]) => {
             {
               text: {
                 type: "plain_text",
-                text: ":ms-no-entry: Delete Bucket",
+                text: ":angry-dino: Delete Bucket",
                 emoji: true,
               },
               value: `delete_bucket:${bucket.name}`,
@@ -128,7 +128,7 @@ export const homeView = (user: any, buckets: any[]) => {
                 type: "button",
                 text: {
                     type: "plain_text",
-                    text: ":ms-globe: Web Dashboard",
+                    text: ":dinowow: Web Dashboard",
                     emoji: true
                 },
                 url: `https://${config.s3Domain}`,
@@ -143,7 +143,7 @@ export const homeView = (user: any, buckets: any[]) => {
         type: "section",
         text: {
             type: "mrkdwn",
-            text: "*:ms-bar-chart: Usage Overview*"
+            text: "*:beachball: Usage Overview*"
         }
       },
       {
@@ -255,7 +255,7 @@ export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
                 type: "button",
                 text: {
                     type: "plain_text",
-                    text: "Yeet :ms-no-entry:",
+                    text: "Yeet :angry-dino:",
                     emoji: true,
                 },
                 style: "danger",
@@ -264,12 +264,12 @@ export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
                 confirm: {
                     title: {
                         type: "plain_text",
-                        text: "Yeet Key? :ms-scared:",
+                        text: "Yeet Key? :panic:",
                         emoji: true,
                     },
                     text: {
                         type: "mrkdwn",
-                        text: "Are you sure you want to delete this access key? This action cannot be undone. :ms-concern:"
+                        text: "Are you sure you want to delete this access key? This action cannot be undone. :floshed:"
                     },
                     confirm: {
                         type: "plain_text",
