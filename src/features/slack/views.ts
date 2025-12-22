@@ -307,7 +307,7 @@ export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
                 type: "button",
                 text: {
                     type: "plain_text",
-                    text: "Delete :angry-dino:",
+                    text: "Delete",
                     emoji: true,
                 },
                 style: "danger",
