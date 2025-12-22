@@ -56,8 +56,15 @@
             </p>
           </div>
           <div class="relative">
-             <input type="text" id="user-search" placeholder="Search users..." class="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red font-mono placeholder-white/20 transition-colors text-sm w-64" oninput="filterUsers()">
-          </div>
+           <input type="text" id="user-search" placeholder="Search users..." class="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red font-mono placeholder-white/20 transition-colors text-sm w-64" oninput="filterUsers()">
+        </div>
+        <div class="ml-4">
+          <label class="inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="show-admins-only" class="sr-only peer" onchange="filterUsers()">
+              <div class="relative w-9 h-5 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-red rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-hc-red"></div>
+              <span class="ms-2 text-xs font-medium text-text-muted peer-checked:text-white">Admins Only</span>
+          </label>
+        </div>
         </div>
 
         <div class="overflow-x-auto">
@@ -283,11 +290,18 @@
 
         function filterUsers() {
             const query = document.getElementById("user-search").value.toLowerCase();
-            const filtered = allUsers.filter(u => 
-                u.email.toLowerCase().includes(query) || 
-                u.id.toLowerCase().includes(query) ||
-                (u.slackId && u.slackId.toLowerCase().includes(query))
-            );
+            const showAdmins = document.getElementById("show-admins-only").checked;
+            
+            const filtered = allUsers.filter(u => {
+                const matchesQuery = u.email.toLowerCase().includes(query) ||
+                                   u.id.toLowerCase().includes(query) ||
+                                   (u.slackId && u.slackId.toLowerCase().includes(query));
+                
+                if (showAdmins) {
+                    return matchesQuery && u.isAdmin;
+                }
+                return matchesQuery;
+            });
             renderUsers(filtered);
         }
 
@@ -413,10 +427,15 @@
 
         async function toggleBucketPause(paused) {
             if (!currentBucket) return;
+            let reason = null;
+            if (paused) {
+                reason = prompt("Enter reason for pausing bucket (optional):");
+            }
+            
             await fetch(`/api/admin/buckets/${currentBucket.name}/pause`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ isPaused: paused })
+                body: JSON.stringify({ isPaused: paused, pauseReason: reason })
             });
             // Refresh modal
             openAdminBucketModal(currentBucket.name);
@@ -431,10 +450,15 @@
 
         async function toggleKeyPause(keyId, pause) {
             if (!currentBucket) return;
+            let reason = null;
+            if (pause) {
+                reason = prompt("Enter reason for pausing key (optional):");
+            }
+
             await fetch(`/api/admin/keys/${keyId}/pause`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ isPaused: pause })
+                body: JSON.stringify({ isPaused: pause, pauseReason: reason })
             });
             openAdminBucketModal(currentBucket.name);
         }
