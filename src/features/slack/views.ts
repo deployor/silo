@@ -63,7 +63,7 @@ export const homeView = (user: any, buckets: any[]) => {
         elements: [
           {
             type: "mrkdwn",
-            text: `${bucket.isPublic ? ":ms-globe: Public" : ":ms-shush: Private"}  •  :ms-floppy-disk: ${formatBytes(bucket.totalBytes)}  •  ${bucket.totalRequests} reqs  •  :ms-cd: ${new Date(bucket.createdAt).toLocaleDateString()}`
+            text: `${bucket.isPublic ? ":ms-globe: Public" : ":ms-shush: Private"}  •  :ms-floppy-disk: ${formatBytes(bucket.totalBytes)}  •  ${bucket.totalRequests} reqs  •  Made on ${new Date(bucket.createdAt).toLocaleDateString()}`
           }
         ]
       },
