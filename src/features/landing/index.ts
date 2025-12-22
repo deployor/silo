@@ -293,7 +293,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				.limit(1);
 			if (bucket.length === 0)
 				return new Response("Bucket not found", { status: 404 });
-			if (bucket[0].userId !== user.id)
+			if (bucket[0].userId !== user.id && !user.isAdmin)
 				return new Response("Unauthorized", { status: 403 });
 
 			try {
@@ -325,9 +325,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				.limit(1);
 			if (bucket.length === 0)
 				return new Response("Bucket not found", { status: 404 });
-			if (bucket[0].userId !== user.id)
+			if (bucket[0].userId !== user.id && !user.isAdmin)
 				return new Response("Unauthorized", { status: 403 });
-			if (bucket[0].isPaused)
+			if (bucket[0].isPaused && !user.isAdmin)
 				return new Response("Bucket is paused", { status: 403 });
 
 			try {
@@ -360,9 +360,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 			if (bucket.length === 0)
 				return new Response("Bucket not found", { status: 404 });
-			if (bucket[0].userId !== user.id)
+			if (bucket[0].userId !== user.id && !user.isAdmin)
 				return new Response("Unauthorized", { status: 403 });
-			if (bucket[0].isPaused)
+			if (bucket[0].isPaused && !user.isAdmin)
 				return new Response("Bucket is paused", { status: 403 });
 
 			const accessKey =
@@ -412,9 +412,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 					status: 404,
 				});
 			}
-			if (bucket[0].userId !== user.id)
+			if (bucket[0].userId !== user.id && !user.isAdmin)
 				return new Response("Unauthorized", { status: 403 });
-			if (bucket[0].isPaused)
+			if (bucket[0].isPaused && !user.isAdmin)
 				return new Response("Bucket is paused", { status: 403 });
 
 			await db.delete(bucketKeys).where(eq(bucketKeys.id, keyId));
@@ -437,9 +437,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 			if (bucket.length === 0)
 				return new Response("Bucket not found", { status: 404 });
-			if (bucket[0].userId !== user.id)
+			if (bucket[0].userId !== user.id && !user.isAdmin)
 				return new Response("Unauthorized", { status: 403 });
-			if (bucket[0].isPaused)
+			if (bucket[0].isPaused && !user.isAdmin)
 				return new Response("Bucket is paused", { status: 403 });
 
 			try {
@@ -499,12 +499,25 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 			if (bucket.length === 0)
 				return new Response("Bucket not found", { status: 404 });
-			if (bucket[0].userId !== user.id)
+			if (bucket[0].userId !== user.id && !user.isAdmin)
 				return new Response("Unauthorized", { status: 403 });
-			if (bucket[0].isPaused)
+			if (bucket[0].isPaused && !user.isAdmin)
 				return new Response("Bucket is paused", { status: 403 });
 
-			const internalKey = getInternalPath(key, user, bucket[0]);
+			// If admin is viewing another user's bucket, we need the owner's user object for the path
+			let owner = user;
+			if (bucket[0].userId !== user.id) {
+				const ownerResult = await db
+					.select()
+					.from(users)
+					.where(eq(users.id, bucket[0].userId))
+					.limit(1);
+				if (ownerResult.length > 0) {
+					owner = ownerResult[0];
+				}
+			}
+
+			const internalKey = getInternalPath(key, owner, bucket[0]);
 
 			try {
 				const s3Res = await s3Client.fetch(internalKey, {
@@ -550,13 +563,26 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 			if (bucket.length === 0)
 				return new Response("Bucket not found", { status: 404 });
-			if (bucket[0].userId !== user.id)
+			if (bucket[0].userId !== user.id && !user.isAdmin)
 				return new Response("Unauthorized", { status: 403 });
-			if (bucket[0].isPaused)
+			if (bucket[0].isPaused && !user.isAdmin)
 				return new Response("Bucket is paused", { status: 403 });
 
+			// If admin is viewing another user's bucket, we need the owner's user object for the path
+			let owner = user;
+			if (bucket[0].userId !== user.id) {
+				const ownerResult = await db
+					.select()
+					.from(users)
+					.where(eq(users.id, bucket[0].userId))
+					.limit(1);
+				if (ownerResult.length > 0) {
+					owner = ownerResult[0];
+				}
+			}
+
 			// Construct internal prefix
-			const internalPrefix = getInternalPath(prefix, user, bucket[0]);
+			const internalPrefix = getInternalPath(prefix, owner, bucket[0]);
 
 			// We need to list objects from S3
 			// We'll use the s3Client directly
@@ -664,12 +690,25 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 			if (bucket.length === 0)
 				return new Response("Bucket not found", { status: 404 });
-			if (bucket[0].userId !== user.id)
+			if (bucket[0].userId !== user.id && !user.isAdmin)
 				return new Response("Unauthorized", { status: 403 });
-			if (bucket[0].isPaused)
+			if (bucket[0].isPaused && !user.isAdmin)
 				return new Response("Bucket is paused", { status: 403 });
 
-			const internalKey = getInternalPath(key, user, bucket[0]);
+			// If admin is viewing another user's bucket, we need the owner's user object for the path
+			let owner = user;
+			if (bucket[0].userId !== user.id) {
+				const ownerResult = await db
+					.select()
+					.from(users)
+					.where(eq(users.id, bucket[0].userId))
+					.limit(1);
+				if (ownerResult.length > 0) {
+					owner = ownerResult[0];
+				}
+			}
+
+			const internalKey = getInternalPath(key, owner, bucket[0]);
 
 			try {
 				const s3Res = await s3Client.fetch(internalKey, {
