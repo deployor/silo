@@ -8,7 +8,7 @@ function formatBytes(bytes: number) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
-export const homeView = (user: any, buckets: any[]) => {
+export const homeView = (user: any, buckets: any[], page: number = 0) => {
   const usagePercent = user.storageLimitBytes > 0
     ? (user.storageUsageBytes / user.storageLimitBytes) * 100
     : 0;
@@ -19,7 +19,13 @@ export const homeView = (user: any, buckets: any[]) => {
       return "█".repeat(filled) + "░".repeat(empty);
   };
 
-  const bucketBlocks = buckets.length > 0 ? buckets.map((bucket) => {
+  const ITEMS_PER_PAGE = 10;
+  const totalPages = Math.ceil(buckets.length / ITEMS_PER_PAGE);
+  const start = page * ITEMS_PER_PAGE;
+  const end = start + ITEMS_PER_PAGE;
+  const displayBuckets = buckets.slice(start, end);
+
+  const bucketBlocks = displayBuckets.length > 0 ? displayBuckets.map((bucket) => {
     return [
       {
         type: "section",
@@ -83,6 +89,52 @@ export const homeView = (user: any, buckets: any[]) => {
           type: "divider"
       }
   ];
+
+  // Pagination Controls
+  if (totalPages > 1) {
+      const navElements = [];
+      
+      if (page > 0) {
+          navElements.push({
+              type: "button",
+              text: {
+                  type: "plain_text",
+                  text: "⬅️ Previous",
+                  emoji: true
+              },
+              value: `${page - 1}`,
+              action_id: "home_nav_prev"
+          });
+      }
+
+      if (page < totalPages - 1) {
+          navElements.push({
+              type: "button",
+              text: {
+                  type: "plain_text",
+                  text: "Next ➡️",
+                  emoji: true
+              },
+              value: `${page + 1}`,
+              action_id: "home_nav_next"
+          });
+      }
+
+      bucketBlocks.push({
+          type: "actions",
+          elements: navElements
+      });
+      
+      bucketBlocks.push({
+          type: "context",
+          elements: [
+              {
+                  type: "mrkdwn",
+                  text: `Page ${page + 1} of ${totalPages}`
+              }
+          ]
+      });
+  }
 
   return {
     type: "home",
