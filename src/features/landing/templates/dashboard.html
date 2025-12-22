@@ -34,6 +34,12 @@
           <span class="text-text-muted font-mono" id="user-id">Loading...</span>
         </div>
         <a
+          href="/admin"
+          id="admin-link"
+          class="text-text-muted hover:text-white transition-colors hidden"
+          >Admin</a
+        >
+        <a
           href="/auth/logout"
           class="text-hc-red hover:text-white transition-colors"
           >Logout</a
@@ -531,6 +537,10 @@
           // Update User Info
           document.getElementById("user-id").textContent = data.user.id;
           
+          if (data.user.isAdmin) {
+            document.getElementById("admin-link").classList.remove("hidden");
+          }
+
           if (data.user.slackId) {
             const avatar = document.getElementById("user-avatar");
             const newSrc = `https://cachet.dunkirk.sh/users/${data.user.slackId}/r`;

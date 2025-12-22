@@ -236,6 +236,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 						egressBytes: user.egressBytes,
 						totalBytes: user.ingressBytes + user.egressBytes,
 						totalRequests: user.totalRequests,
+						isAdmin: user.isAdmin,
 					},
 					buckets: bucketsWithKeys.map((b) => ({
 						name: b.name,
