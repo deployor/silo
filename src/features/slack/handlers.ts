@@ -124,7 +124,14 @@ export async function handleInteraction(payload: any) {
     // But we can fire and forget
     handleAppHomeOpened({ user: payload.user.id });
     
-    return; // Close modal
+    // Show the keys immediately
+    const keys = await db.select().from(bucketKeys).where(eq(bucketKeys.bucketId, newBucket[0].id));
+    const newKeyObj = { accessKey, secretKey };
+
+    return {
+        response_action: "push",
+        view: manageKeysModal(newBucket[0], keys, newKeyObj)
+    };
   }
 
   // 3. Open Manage Keys Modal
@@ -156,6 +163,7 @@ export async function handleInteraction(payload: any) {
 
         // Update the modal
         const keys = await db.select().from(bucketKeys).where(eq(bucketKeys.bucketId, bucketId));
+        const newKeyObj = { accessKey, secretKey };
         
         // We need to update the view using response_action or views.update
         // Since this is a button click, we should use views.update
@@ -171,7 +179,7 @@ export async function handleInteraction(payload: any) {
             },
             body: JSON.stringify({
                 view_id: payload.view.id,
-                view: manageKeysModal(bucket[0], keys)
+                view: manageKeysModal(bucket[0], keys, newKeyObj)
             })
         });
       }
