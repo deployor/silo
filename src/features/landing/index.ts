@@ -213,7 +213,6 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 						keys: keys.map((k) => ({
 							id: k.id,
 							accessKey: k.accessKey,
-							secretKey: k.secretKey,
 						})),
 					};
 				}),
