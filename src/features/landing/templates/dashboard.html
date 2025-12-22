@@ -81,7 +81,10 @@
           class="text-text-muted hover:text-white transition-colors"
           >Docs</a
         >
-        <span class="text-text-muted font-mono" id="user-id">Loading...</span>
+        <div class="flex items-center gap-2">
+          <img id="user-avatar" src="" alt="User Avatar" class="w-6 h-6 rounded-full hidden" />
+          <span class="text-text-muted font-mono" id="user-id">Loading...</span>
+        </div>
         <a
           href="/auth/logout"
           class="text-hc-red hover:text-white transition-colors"
@@ -580,6 +583,12 @@
 
           // Update User Info
           document.getElementById("user-id").textContent = data.user.id;
+          
+          if (data.user.slackId) {
+            const avatar = document.getElementById("user-avatar");
+            avatar.onload = () => avatar.classList.remove("hidden");
+            avatar.src = `https://cachet.dunkirk.sh/users/${data.user.slackId}/r`;
+          }
 
           // Update Storage Stats
           const usageGB = (
