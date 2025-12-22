@@ -99,7 +99,7 @@ export const homeView = (user: any, buckets: any[], page: number = 0) => {
               type: "button",
               text: {
                   type: "plain_text",
-                  text: "⬅️ Previous",
+                  text: "Previous",
                   emoji: true
               },
               value: `${page - 1}`,
@@ -112,7 +112,7 @@ export const homeView = (user: any, buckets: any[], page: number = 0) => {
               type: "button",
               text: {
                   type: "plain_text",
-                  text: "Next ➡️",
+                  text: "Next",
                   emoji: true
               },
               value: `${page + 1}`,
