@@ -203,7 +203,10 @@
             </table>
         </div>
 
-        <h4 class="text-white font-bold mb-4">Files</h4>
+        <div class="flex justify-between items-center mb-4">
+            <h4 class="text-white font-bold">Files</h4>
+            <a id="admin-view-files-link" href="#" target="_blank" class="text-hc-blue hover:text-blue-400 text-sm font-bold">Open File Explorer &rarr;</a>
+        </div>
         <div class="bg-black/30 rounded-xl border border-white/10 overflow-hidden h-64 overflow-y-auto">
              <table class="w-full text-left text-sm">
                 <thead class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider sticky top-0">
@@ -387,6 +390,7 @@
             document.getElementById("admin-bucket-name").textContent = data.name;
             document.getElementById("admin-bucket-owner").textContent = `Owner: ${data.userId}`;
             document.getElementById("admin-bucket-paused").checked = data.isPaused;
+            document.getElementById("admin-view-files-link").href = `/dashboard/buckets/${data.name}`;
 
             // Render Keys
             const keysBody = document.getElementById("admin-bucket-keys-table");
