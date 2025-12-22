@@ -2,11 +2,8 @@ import { db } from "../../db";
 import { users, buckets, bucketKeys } from "../../db/schema";
 import { eq, and } from "drizzle-orm";
 import { publishView, openModal } from "./client";
-import { homeView, createBucketModal, manageKeysModal, deleteBucketWarningModal, filesModal } from "./views";
+import { homeView, createBucketModal, manageKeysModal, deleteBucketWarningModal } from "./views";
 import { config } from "../../config";
-import { s3Client } from "../../lib/s3-client";
-import { getInternalPath } from "../s3-api/utils";
-import { XMLParser } from "fast-xml-parser";
 
 export async function handleAppHomeOpened(event: any) {
   const slackId = event.user;
@@ -53,9 +50,18 @@ export async function handleInteraction(payload: any) {
   if (user.length === 0) return; // Should not happen if they are interacting
 
   const action = payload.actions?.[0];
+  let actionId = action?.action_id;
+  let actionValue = action?.value;
+
+  // Handle Overflow Menu
+  if (actionId === "bucket_overflow_action") {
+      const parts = action.selected_option.value.split(":");
+      actionId = parts[0];
+      actionValue = parts[1];
+  }
 
   // 1. Open Create Bucket Modal
-  if (action?.action_id === "open_create_bucket_modal") {
+  if (actionId === "open_create_bucket_modal") {
     await openModal(payload.trigger_id, createBucketModal());
   }
 
@@ -122,8 +128,8 @@ export async function handleInteraction(payload: any) {
   }
 
   // 3. Open Manage Keys Modal
-  if (action?.action_id === "manage_keys") {
-      const bucketId = action.value;
+  if (actionId === "manage_keys") {
+      const bucketId = actionValue;
       const bucket = await db.select().from(buckets).where(and(eq(buckets.id, bucketId), eq(buckets.userId, user[0].id))).limit(1);
       
       if (bucket.length > 0) {
@@ -133,8 +139,8 @@ export async function handleInteraction(payload: any) {
   }
 
   // 4. Generate New Key (inside modal)
-  if (action?.action_id === "generate_key") {
-      const bucketId = action.value;
+  if (actionId === "generate_key") {
+      const bucketId = actionValue;
       // Verify ownership
       const bucket = await db.select().from(buckets).where(and(eq(buckets.id, bucketId), eq(buckets.userId, user[0].id))).limit(1);
       
@@ -172,8 +178,8 @@ export async function handleInteraction(payload: any) {
   }
 
   // 5. Delete Key (inside modal)
-  if (action?.action_id === "delete_key") {
-      const keyId = action.value;
+  if (actionId === "delete_key") {
+      const keyId = actionValue;
       const bucketId = payload.view.private_metadata; // We stored bucketId here
 
       // Verify ownership via bucket
@@ -200,13 +206,13 @@ export async function handleInteraction(payload: any) {
   }
 
   // 6. Delete Bucket Attempt (Home Tab)
-  if (action?.action_id === "delete_bucket_attempt") {
+  if (actionId === "delete_bucket") {
       await openModal(payload.trigger_id, deleteBucketWarningModal());
   }
 
   // 7. Toggle Bucket Public/Private
-  if (action?.action_id === "toggle_bucket_public") {
-      const bucketId = action.value;
+  if (actionId === "toggle_public") {
+      const bucketId = actionValue;
       const bucket = await db.select().from(buckets).where(and(eq(buckets.id, bucketId), eq(buckets.userId, user[0].id))).limit(1);
 
       if (bucket.length > 0) {
