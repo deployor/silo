@@ -59,10 +59,12 @@ Bun.serve({
 			if (url.pathname === "/api/slack/events") {
 				return handleSlackRequest(req);
 			}
-			if (url.pathname === "/assets/styles.css") {
-				return new Response(Bun.file("src/assets/styles.css"), {
-					headers: { "Content-Type": "text/css" },
-				});
+			if (url.pathname.startsWith("/assets/")) {
+				const filePath = `src${url.pathname}`;
+				const file = Bun.file(filePath);
+				if (await file.exists()) {
+					return new Response(file);
+				}
 			}
 			return handleDashboardRequest(req);
 		}
