@@ -20,6 +20,30 @@ export async function handleAppHomeOpened(event: { user: string }) {
 		.where(eq(users.slackId, slackId))
 		.limit(1);
 
+	if (user.length > 0 && user[0].isLocked) {
+		await publishView(slackId, {
+			type: "home",
+			blocks: [
+				{
+					type: "header",
+					text: {
+						type: "plain_text",
+						text: "Account Locked 🔒",
+						emoji: true,
+					},
+				},
+				{
+					type: "section",
+					text: {
+						type: "mrkdwn",
+						text: "Your account has been temporarily locked by an administrator. You cannot perform any actions at this time.",
+					},
+				},
+			],
+		});
+		return;
+	}
+
 	if (user.length === 0) {
 		// User not found, show welcome/login message
 		await publishView(slackId, {

@@ -38,7 +38,9 @@ Bun.serve({
 					path.startsWith("/dashboard/") ||
 					path.startsWith("/docs") ||
 					path.startsWith("/api/slack/") ||
-					path.startsWith("/assets/")
+					path.startsWith("/assets/") ||
+					path.startsWith("/admin") ||
+					path.startsWith("/api/admin")
 				) {
 					isDashboard = true;
 				} else {
