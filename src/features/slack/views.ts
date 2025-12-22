@@ -19,16 +19,34 @@ export const homeView = (user: any, buckets: any[]) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*${bucket.name}*\n${bucket.isPublic ? "🌍 Public" : "🔒 Private"} • ${formatBytes(bucket.totalBytes)} • ${bucket.totalRequests} requests`,
+          text: `*${bucket.name}*`,
         },
         accessory: {
-          type: "button",
-          text: {
-            type: "plain_text",
-            text: "Manage Keys",
-          },
-          action_id: "manage_keys",
-          value: bucket.id,
+          type: "overflow",
+          options: [
+            {
+              text: {
+                type: "plain_text",
+                text: "Manage Keys",
+              },
+              value: `manage_keys:${bucket.id}`,
+            },
+            {
+              text: {
+                type: "plain_text",
+                text: bucket.isPublic ? "Make Private" : "Make Public",
+              },
+              value: `toggle_public:${bucket.id}`,
+            },
+            {
+              text: {
+                type: "plain_text",
+                text: "Delete Bucket",
+              },
+              value: `delete_bucket:${bucket.name}`,
+            },
+          ],
+          action_id: "bucket_overflow_action",
         },
       },
       {
@@ -36,7 +54,7 @@ export const homeView = (user: any, buckets: any[]) => {
         elements: [
           {
             type: "mrkdwn",
-            text: `Created: ${new Date(bucket.createdAt).toLocaleDateString()}`,
+            text: `${bucket.isPublic ? "🌍 Public" : "🔒 Private"}  •  ${formatBytes(bucket.totalBytes)}  •  ${bucket.totalRequests} requests  •  Created ${new Date(bucket.createdAt).toLocaleDateString()}`,
           },
         ],
       },
@@ -51,25 +69,6 @@ export const homeView = (user: any, buckets: any[]) => {
                 },
                 action_id: "view_files",
                 value: bucket.name
-            },
-            {
-                type: "button",
-                text: {
-                    type: "plain_text",
-                    text: bucket.isPublic ? "Make Private" : "Make Public",
-                },
-                action_id: "toggle_bucket_public",
-                value: bucket.id
-            },
-            {
-                type: "button",
-                text: {
-                    type: "plain_text",
-                    text: "Delete Bucket",
-                },
-                style: "danger",
-                action_id: "delete_bucket_attempt",
-                value: bucket.name // passing name for the message
             }
         ]
       },
@@ -198,7 +197,7 @@ export const manageKeysModal = (bucket: any, keys: any[]) => {
             type: "section",
             text: {
                 type: "mrkdwn",
-                text: `*Access Key:*\n\`${key.accessKey}\`\n*Secret Key:*\n\`${key.secretKey}\``
+                text: `*Access Key:*\n\`${key.accessKey}\`\n*Secret Key:*\n\`${key.secretKey.substring(0, 4)}...${key.secretKey.substring(key.secretKey.length - 4)}\``
             },
             accessory: {
                 type: "button",
