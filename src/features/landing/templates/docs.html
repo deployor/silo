@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cargo Docs</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.bunny.net" />
     <link
       href="https://fonts.bunny.net/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;700&display=swap"
@@ -17,74 +16,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
-
-    <script>
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ["Space Grotesk", "sans-serif"],
-              mono: ["JetBrains Mono", "monospace"],
-            },
-            colors: {
-              "hc-red": "#ec3750",
-              "hc-dark": "#17171d",
-              "hc-darker": "#131316",
-              "hc-blue": "#338eda",
-              "sidebar-bg": "#1c1c21",
-              "text-main": "#e0e6ed",
-              "text-muted": "#94a3b8",
-            },
-          },
-        },
-      };
-    </script>
-    <style>
-      body {
-        background-color: #131316;
-        color: #e0e6ed;
-      }
-      .section-content {
-        display: none;
-      }
-      .section-content.active {
-        display: block;
-      }
-      .nav-link.active {
-        color: #ec3750;
-        font-weight: bold;
-        background-color: rgba(236, 55, 80, 0.1);
-      }
-
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 3px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.2);
-      }
-      
-      code {
-        font-family: "JetBrains Mono", monospace;
-        font-size: 0.9em;
-        background: rgba(255,255,255,0.1);
-        padding: 0.2em 0.4em;
-        border-radius: 4px;
-      }
-      pre code {
-        background: transparent;
-        padding: 0;
-      }
-    </style>
+    <link rel="stylesheet" href="/assets/styles.css" />
   </head>
   <body
     class="min-h-screen selection:bg-hc-red selection:text-white flex flex-col"
@@ -119,7 +51,7 @@
     <div class="flex flex-1 max-w-7xl mx-auto w-full">
       <!-- Sidebar -->
       <aside
-        class="w-64 hidden md:block h-[calc(100vh-65px)] sticky top-[65px] border-r border-white/10 bg-hc-dark p-6 overflow-y-auto"
+        class="w-64 hidden md:block h-[calc(100vh-65px)] sticky top-16.25 border-r border-white/10 bg-hc-dark p-6 overflow-y-auto"
       >
         <div class="space-y-8">
           <div>
@@ -611,10 +543,10 @@ await s3.send(
         document.querySelectorAll(".nav-link").forEach((el) => {
           el.classList.remove("active");
         });
-        document.getElementById("nav-" + id).classList.add("active");
+        document.getElementById(`nav-${id}`).classList.add("active");
         
         // Update URL hash without scrolling
-        history.pushState(null, null, '#' + id);
+        history.pushState(null, null, `#${id}`);
       }
 
       if (window.location.hash) {

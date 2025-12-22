@@ -25,3 +25,4 @@ Thumbs.db
 *.swo
 
 coverage
+src/assets/styles.css
