@@ -19,13 +19,13 @@ export const homeView = (user: any, buckets: any[]) => {
       return "█".repeat(filled) + "░".repeat(empty);
   };
 
-  const bucketBlocks = buckets.map((bucket) => {
+  const bucketBlocks = buckets.length > 0 ? buckets.map((bucket) => {
     return [
       {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*${bucket.name}*\n${bucket.isPublic ? "🌍 Public" : "🔒 Private"}  •  📦 ${formatBytes(bucket.totalBytes)}  •  ⚡ ${bucket.totalRequests} reqs`
+          text: `*${bucket.name}*`
         },
         accessory: {
           type: "overflow",
@@ -56,10 +56,30 @@ export const homeView = (user: any, buckets: any[]) => {
         },
       },
       {
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: `${bucket.isPublic ? "🌍 Public" : "🔒 Private"}  •  📦 ${formatBytes(bucket.totalBytes)}  •  ⚡ ${bucket.totalRequests} reqs  •  📅 ${new Date(bucket.createdAt).toLocaleDateString()}`
+          }
+        ]
+      },
+      {
         type: "divider"
       }
     ];
-  }).flat();
+  }).flat() : [
+      {
+          type: "section",
+          text: {
+              type: "mrkdwn",
+              text: "_You don't have any buckets yet. Create one to get started!_"
+          }
+      },
+      {
+          type: "divider"
+      }
+  ];
 
   return {
     type: "home",
@@ -79,7 +99,7 @@ export const homeView = (user: any, buckets: any[]) => {
                 type: "button",
                 text: {
                     type: "plain_text",
-                    text: "🔄 Refresh",
+                    text: "🔄 Refresh Stats",
                 },
                 action_id: "refresh_home"
             },
@@ -101,7 +121,7 @@ export const homeView = (user: any, buckets: any[]) => {
         type: "section",
         text: {
             type: "mrkdwn",
-            text: `*Storage Usage*\n\`${progressBar(usagePercent)}\` ${usagePercent.toFixed(1)}%\n${formatBytes(user.storageUsageBytes)} of ${formatBytes(user.storageLimitBytes)}`
+            text: `*📊 Storage Overview*\n\`${progressBar(usagePercent)}\` *${usagePercent.toFixed(1)}%* used\n${formatBytes(user.storageUsageBytes)} of ${formatBytes(user.storageLimitBytes)} available`
         }
       },
       {
@@ -113,15 +133,20 @@ export const homeView = (user: any, buckets: any[]) => {
               },
               {
                   type: "mrkdwn",
-                  text: `*Buckets*\n${buckets.length} / 50`
+                  text: `*Active Buckets*\n${buckets.length} / 50`
+              }
+          ]
+      },
+      {
+          type: "section",
+          fields: [
+              {
+                  type: "mrkdwn",
+                  text: `*⬇️ Ingress (In)*\n${formatBytes(user.ingressBytes)}`
               },
               {
                   type: "mrkdwn",
-                  text: `*Ingress (In)*\n${formatBytes(user.ingressBytes)}`
-              },
-              {
-                  type: "mrkdwn",
-                  text: `*Egress (Out)*\n${formatBytes(user.egressBytes)}`
+                  text: `*⬆️ Egress (Out)*\n${formatBytes(user.egressBytes)}`
               }
           ]
       },
@@ -132,13 +157,13 @@ export const homeView = (user: any, buckets: any[]) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: "*Your Buckets*",
+          text: `*🪣 Your Buckets (${buckets.length})*`,
         },
         accessory: {
           type: "button",
           text: {
             type: "plain_text",
-            text: "Create Bucket",
+            text: "Create New Bucket",
             emoji: true,
           },
           style: "primary",
@@ -154,7 +179,7 @@ export const homeView = (user: any, buckets: any[]) => {
         elements: [
           {
             type: "mrkdwn",
-            text: "Need help? Check out the <https://cargo.deployer.dev/docs|documentation>.",
+            text: `Last updated: ${new Date().toLocaleTimeString()}  |  <https://cargo.deployer.dev/docs|Documentation>`,
           },
         ],
       },
