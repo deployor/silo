@@ -605,14 +605,19 @@
           const tbody = document.getElementById("buckets-table");
           tbody.innerHTML = data.buckets
             .map(
-              (bucket) => `
-                    <tr class="hover:bg-white/5 transition-colors group">
+              (bucket) => {
+                const isPaused = bucket.isPaused;
+                const disabledClass = isPaused ? "opacity-50 cursor-not-allowed pointer-events-none" : "";
+                const disabledAttr = isPaused ? "disabled" : "";
+                
+                return `
+                    <tr class="hover:bg-white/5 transition-colors group ${isPaused ? 'bg-red-500/5' : ''}">
                         <td class="px-6 py-4 font-medium text-white font-mono">
                             ${bucket.name}
-                            ${bucket.isPaused ? `<span class="ml-2 bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-500/30" title="${bucket.pauseReason || 'Paused by admin'}">PAUSED</span>` : ''}
+                            ${isPaused ? `<span class="ml-2 bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-500/30" title="${bucket.pauseReason || 'Paused by admin'}">PAUSED</span>` : ''}
                         </td>
                         <td class="px-6 py-4 font-mono text-xs text-text-muted group-hover:text-white transition-colors">
-                            <button onclick="openManageKeysModal('${bucket.name}')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2">
+                            <button onclick="openManageKeysModal('${bucket.name}')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2 ${disabledClass}" ${disabledAttr}>
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                                 </svg>
@@ -626,24 +631,25 @@
                             </div>
                         </td>
                         <td class="px-6 py-4">
-                          <label class="inline-flex items-center cursor-pointer">
-                            <input type="checkbox" class="sr-only peer" onchange="togglePublic('${bucket.name}', this.checked)" ${bucket.isPublic ? "checked" : ""}>
+                          <label class="inline-flex items-center cursor-pointer ${disabledClass}">
+                            <input type="checkbox" class="sr-only peer" onchange="togglePublic('${bucket.name}', this.checked)" ${bucket.isPublic ? "checked" : ""} ${disabledAttr}>
                             <div class="relative w-9 h-5 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-blue rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-hc-blue"></div>
                             <span class="ms-2 text-xs font-medium text-text-muted peer-checked:text-white">${bucket.isPublic ? "Public" : "Private"}</span>
                           </label>
                         </td>
                         <td class="px-6 py-4 text-text-muted text-xs font-mono">${new Date(bucket.createdAt).toLocaleDateString()}</td>
                         <td class="px-6 py-4 text-right flex justify-end items-center gap-3">
-                            <a href="/dashboard/buckets/${bucket.name}" class="bg-hc-blue/10 hover:bg-hc-blue/20 text-hc-blue px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2">
+                            <a href="/dashboard/buckets/${bucket.name}" class="bg-hc-blue/10 hover:bg-hc-blue/20 text-hc-blue px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${disabledClass}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
                                 </svg>
                                 Files
                             </a>
-                            <button onclick="deleteBucket('${bucket.name}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all">Delete</button>
+                            <button onclick="deleteBucket('${bucket.name}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all ${disabledClass}" ${disabledAttr}>Delete</button>
                         </td>
                     </tr>
-                `,
+                `;
+              }
             )
             .join("");
         } catch (error) {

@@ -327,6 +327,8 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				return new Response("Bucket not found", { status: 404 });
 			if (bucket[0].userId !== user.id)
 				return new Response("Unauthorized", { status: 403 });
+			if (bucket[0].isPaused)
+				return new Response("Bucket is paused", { status: 403 });
 
 			try {
 				const body = await req.json();
@@ -360,6 +362,8 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				return new Response("Bucket not found", { status: 404 });
 			if (bucket[0].userId !== user.id)
 				return new Response("Unauthorized", { status: 403 });
+			if (bucket[0].isPaused)
+				return new Response("Bucket is paused", { status: 403 });
 
 			const accessKey =
 				"CK" +
@@ -410,6 +414,8 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			}
 			if (bucket[0].userId !== user.id)
 				return new Response("Unauthorized", { status: 403 });
+			if (bucket[0].isPaused)
+				return new Response("Bucket is paused", { status: 403 });
 
 			await db.delete(bucketKeys).where(eq(bucketKeys.id, keyId));
 
@@ -433,6 +439,8 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				return new Response("Bucket not found", { status: 404 });
 			if (bucket[0].userId !== user.id)
 				return new Response("Unauthorized", { status: 403 });
+			if (bucket[0].isPaused)
+				return new Response("Bucket is paused", { status: 403 });
 
 			try {
 				const body = await req.json();
@@ -493,6 +501,8 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				return new Response("Bucket not found", { status: 404 });
 			if (bucket[0].userId !== user.id)
 				return new Response("Unauthorized", { status: 403 });
+			if (bucket[0].isPaused)
+				return new Response("Bucket is paused", { status: 403 });
 
 			const internalKey = getInternalPath(key, user, bucket[0]);
 
@@ -542,6 +552,8 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				return new Response("Bucket not found", { status: 404 });
 			if (bucket[0].userId !== user.id)
 				return new Response("Unauthorized", { status: 403 });
+			if (bucket[0].isPaused)
+				return new Response("Bucket is paused", { status: 403 });
 
 			// Construct internal prefix
 			const internalPrefix = getInternalPath(prefix, user, bucket[0]);
@@ -654,6 +666,8 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				return new Response("Bucket not found", { status: 404 });
 			if (bucket[0].userId !== user.id)
 				return new Response("Unauthorized", { status: 403 });
+			if (bucket[0].isPaused)
+				return new Response("Bucket is paused", { status: 403 });
 
 			const internalKey = getInternalPath(key, user, bucket[0]);
 
