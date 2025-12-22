@@ -151,7 +151,7 @@ export const homeView = (user: any, buckets: any[]) => {
         fields: [
             {
                 type: "mrkdwn",
-                text: `*Storage Used*\n${formatBytes(user.storageUsageBytes)} / ${formatBytes(user.storageLimitBytes)}\n\`${progressBar(usagePercent)}\``
+                text: `*Storage Used*\n${formatBytes(user.storageUsageBytes)} / ${formatBytes(user.storageLimitBytes)} (${usagePercent.toFixed(1)}%)`
             },
             {
                 type: "mrkdwn",
@@ -179,7 +179,7 @@ export const homeView = (user: any, buckets: any[]) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*:ms-cd: Your Buckets (${buckets.length})*`,
+          text: `*:lava-bucket: Your Buckets (${buckets.length})*`,
         }
       },
       {
@@ -191,7 +191,7 @@ export const homeView = (user: any, buckets: any[]) => {
         elements: [
           {
             type: "mrkdwn",
-            text: `Last updated: ${new Date().toLocaleTimeString()} :ms-tick:  |  <https://cargo.deployer.dev/docs|Documentation :ms-info:>`,
+            text: `Last updated: ${new Date().toLocaleTimeString()} :ms-tick:  |  <https://cargo.deployor.dev/docs|Documentation :ms-info:>`,
           },
         ],
       },
@@ -300,7 +300,7 @@ export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
                 type: "button",
                 text: {
                     type: "plain_text",
-                    text: "Mint New Key :ms-hot:",
+                    text: "Make New Key :blobby-lock:",
                     emoji: true
                 },
                 style: "primary",
@@ -318,7 +318,7 @@ export const manageKeysModal = (bucket: any, keys: any[], newKey?: any) => {
             type: "section",
             text: {
                 type: "mrkdwn",
-                text: `:yay: *Fresh Key Minted*\n\n*Access Key:*\n\`${newKey.accessKey}\`\n*Secret Key:*\n\`${newKey.secretKey}\`\n\n:ms-red-exclamation-mark: *Save this secret key now. It will vanish like a ghost!*`
+                text: `:yay: *New Key Made *\n\n*Access Key:*\n\`${newKey.accessKey}\`\n*Secret Key:*\n\`${newKey.secretKey}\`\n\n:ms-red-exclamation-mark: *Save this secret key now. It will only be shown to you here once!*`
             }
         });
         blocks.push({
