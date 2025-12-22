@@ -2,8 +2,11 @@ import { db } from "../../db";
 import { users, buckets, bucketKeys } from "../../db/schema";
 import { eq, and } from "drizzle-orm";
 import { publishView, openModal } from "./client";
-import { homeView, createBucketModal, manageKeysModal, deleteBucketWarningModal } from "./views";
+import { homeView, createBucketModal, manageKeysModal, deleteBucketWarningModal, filesModal } from "./views";
 import { config } from "../../config";
+import { s3Client } from "../../lib/s3-client";
+import { getInternalPath } from "../s3-api/utils";
+import { XMLParser } from "fast-xml-parser";
 
 export async function handleAppHomeOpened(event: any) {
   const slackId = event.user;
@@ -199,5 +202,65 @@ export async function handleInteraction(payload: any) {
   // 6. Delete Bucket Attempt (Home Tab)
   if (action?.action_id === "delete_bucket_attempt") {
       await openModal(payload.trigger_id, deleteBucketWarningModal());
+  }
+
+  // 7. Toggle Bucket Public/Private
+  if (action?.action_id === "toggle_bucket_public") {
+      const bucketId = action.value;
+      const bucket = await db.select().from(buckets).where(and(eq(buckets.id, bucketId), eq(buckets.userId, user[0].id))).limit(1);
+
+      if (bucket.length > 0) {
+          await db.update(buckets)
+              .set({ isPublic: !bucket[0].isPublic })
+              .where(eq(buckets.id, bucketId));
+
+          // Refresh Home
+          await handleAppHomeOpened({ user: payload.user.id });
+      }
+  }
+
+  // 8. View Files
+  if (action?.action_id === "view_files") {
+      const bucketName = action.value;
+      const bucket = await db.select().from(buckets).where(and(eq(buckets.name, bucketName), eq(buckets.userId, user[0].id))).limit(1);
+
+      if (bucket.length > 0) {
+          // List files from S3
+          const internalPrefix = getInternalPath("", user[0], bucket[0]);
+          const query = new URLSearchParams();
+          query.set("list-type", "2");
+          query.set("prefix", internalPrefix);
+          query.set("delimiter", "/");
+
+          try {
+              const s3Res = await s3Client.fetch(`?${query.toString()}`, { method: "GET" });
+              if (s3Res.ok) {
+                  const xml = await s3Res.text();
+                  const parser = new XMLParser();
+                  const result = parser.parse(xml).ListBucketResult;
+                  
+                  let files = [];
+                  if (result.Contents) {
+                      const contents = Array.isArray(result.Contents) ? result.Contents : [result.Contents];
+                      files = contents.map((item: any) => {
+                          const key = item.Key;
+                          const rootPrefix = getInternalPath("", user[0], bucket[0]);
+                          const relativeKey = key.startsWith(rootPrefix) ? key.slice(rootPrefix.length) : key;
+                          
+                          return {
+                              name: relativeKey.split('/').pop(),
+                              size: item.Size,
+                              lastModified: item.LastModified,
+                              url: `https://${config.s3Domain}/${bucketName}/${relativeKey}`
+                          };
+                      }).filter((f: any) => f.name !== "");
+                  }
+
+                  await openModal(payload.trigger_id, filesModal(bucketName, files));
+              }
+          } catch (e) {
+              console.error("Error listing files for Slack:", e);
+          }
+      }
   }
 }

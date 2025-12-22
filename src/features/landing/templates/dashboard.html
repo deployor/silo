@@ -637,7 +637,7 @@
           document.getElementById("egress-bar").style.width = `${egressPercent}%`;
           
           document.getElementById("total-bytes").textContent = formatBytes(
-            data.user.totalBytes,
+            data.user.ingressBytes + data.user.egressBytes,
           );
           document.getElementById("total-requests").textContent =
             data.user.totalRequests.toLocaleString();

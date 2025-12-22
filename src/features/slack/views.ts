@@ -47,6 +47,24 @@ export const homeView = (user: any, buckets: any[]) => {
                 type: "button",
                 text: {
                     type: "plain_text",
+                    text: "View Files",
+                },
+                action_id: "view_files",
+                value: bucket.name
+            },
+            {
+                type: "button",
+                text: {
+                    type: "plain_text",
+                    text: bucket.isPublic ? "Make Private" : "Make Public",
+                },
+                action_id: "toggle_bucket_public",
+                value: bucket.id
+            },
+            {
+                type: "button",
+                text: {
+                    type: "plain_text",
                     text: "Delete Bucket",
                 },
                 style: "danger",
@@ -82,6 +100,19 @@ export const homeView = (user: any, buckets: any[]) => {
           {
             type: "mrkdwn",
             text: `*Total Requests:*\n${user.totalRequests}`,
+          },
+        ],
+      },
+      {
+        type: "section",
+        fields: [
+          {
+            type: "mrkdwn",
+            text: `*Ingress:*\n${formatBytes(user.ingressBytes)}`,
+          },
+          {
+            type: "mrkdwn",
+            text: `*Egress:*\n${formatBytes(user.egressBytes)}`,
           },
         ],
       },
@@ -278,3 +309,67 @@ export const deleteBucketWarningModal = () => ({
         }
     ]
 });
+
+export const filesModal = (bucketName: string, files: any[]) => {
+    const fileBlocks = files.length > 0 ? files.map(file => ({
+        type: "section",
+        text: {
+            type: "mrkdwn",
+            text: `*${file.name}*\n${formatBytes(file.size)} • ${new Date(file.lastModified).toLocaleDateString()}`
+        },
+        accessory: {
+            type: "button",
+            text: {
+                type: "plain_text",
+                text: "Open",
+            },
+            url: file.url,
+            action_id: "open_file_url"
+        }
+    })) : [
+        {
+            type: "section",
+            text: {
+                type: "mrkdwn",
+                text: "_No files found in this bucket._"
+            }
+        }
+    ];
+
+    // Slack modals have a limit of 100 blocks. We'll show the first 20 files to be safe.
+    const displayBlocks = fileBlocks.slice(0, 20);
+    if (files.length > 20) {
+        displayBlocks.push({
+            type: "section",
+            text: {
+                type: "mrkdwn",
+                text: `_...and ${files.length - 20} more files. View all in the dashboard._`
+            }
+        });
+    }
+
+    return {
+        type: "modal",
+        title: {
+            type: "plain_text",
+            text: `Files: ${bucketName}`
+        },
+        close: {
+            type: "plain_text",
+            text: "Close"
+        },
+        blocks: [
+            {
+                type: "section",
+                text: {
+                    type: "mrkdwn",
+                    text: `Files in *${bucketName}*:`
+                }
+            },
+            {
+                type: "divider"
+            },
+            ...displayBlocks
+        ]
+    };
+};
