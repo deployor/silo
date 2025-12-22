@@ -221,6 +221,56 @@ export async function updateStats(
 	logQueue.push({
 		bucketId: bucket.id,
 		ownerId: user.id,
+		// If authenticated, the requester is the user.
+		// BUT, if the user is the owner, we can just store it.
+		// The foreign key constraint requires requesterId to exist in users table.
+		// If mode is authenticated, user object comes from DB, so it exists.
+		// However, if we are in a test environment or something weird happens, maybe it fails?
+		// The error says "request_logs_requester_id_users_id_fk" violation.
+		// This implies `user.id` is being passed but doesn't exist in `users` table?
+		// But `user` comes from `authenticate` which fetches from DB.
+		// Wait, if `mode` is public, `requesterId` is null.
+		// If `mode` is authenticated, `requesterId` is `user.id`.
+		// Is it possible `user` is not the owner but the requester?
+		// In `authenticate`, `user` is the owner of the bucket (or the key owner).
+		// Ah, `authenticate` returns `{ user, bucket, mode }`.
+		// If using keys, `user` is the owner of the bucket (joined from buckets->users).
+		// So `user.id` is the owner.
+		// Who is the requester?
+		// If using keys, the requester IS the owner (or at least someone with keys for that bucket).
+		// We don't have a separate "requester" user entity if they are just using keys.
+		// The keys belong to the bucket, which belongs to the user.
+		// So effectively the owner is the requester.
+		//
+		// The error might be happening if we are deleting a user but logs are still flushing?
+		// Or if the user ID in the log doesn't match a user in the DB?
+		//
+		// Let's look at the error again: `insert or update on table "request_logs" violates foreign key constraint "request_logs_requester_id_users_id_fk"`
+		// This means the value in `requester_id` column does not exist in `users.id`.
+		//
+		// In `updateStats`, we use `user.id` for `requesterId` if authenticated.
+		// `user` is passed in.
+		//
+		// If this is happening during tests, maybe we delete the user before the logs flush?
+		// Yes! `flushLogs` is async and batched.
+		// In `scripts/test-admin.ts`, we delete users at the end.
+		// If logs flush AFTER deletion, the FK constraint fails.
+		//
+		// We should probably set `onDelete: "set null"` for requesterId in the schema,
+		// OR we just handle the error gracefully in `flushLogs` (which we do with try/catch),
+		// BUT the user sees the error in the console.
+		//
+		// To fix the noise, we can try to flush logs before exiting tests,
+		// OR we can just ignore the error in `flushLogs` more quietly.
+		//
+		// However, for production stability, `onDelete: "set null"` is better.
+		// But I can't change schema easily without migration.
+		//
+		// Let's just make sure we don't log if the user might be gone, or just catch it better.
+		// Actually, the user asked to "Fix this".
+		//
+		// If I change the schema now, I need to run migration.
+		// Let's check `src/db/schema.ts` again.
 		requesterId: mode === "authenticated" ? user.id : null,
 		method,
 		path,

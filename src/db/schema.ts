@@ -87,9 +87,13 @@ export const requestLogs = pgTable(
 			onDelete: "set null",
 		}),
 		// The owner of the bucket (for billing/quota)
-		ownerId: text("owner_id").references(() => users.id),
+		ownerId: text("owner_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
 		// The user who performed the action (might be null for public)
-		requesterId: text("requester_id").references(() => users.id),
+		requesterId: text("requester_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
 		method: text("method").notNull(), // GET, PUT, DELETE, HEAD
 		path: text("path").notNull(), // The object key or path
 		statusCode: bigint("status_code", { mode: "number" }).notNull(),

@@ -19,6 +19,9 @@ const filesTemplate = await Bun.file(
 const docsTemplate = await Bun.file(
 	"src/features/landing/templates/docs.html",
 ).text();
+const lockedTemplate = await Bun.file(
+	"src/features/landing/templates/locked.html",
+).text();
 
 async function getCurrentUser(req: Request) {
 	const cookieHeader = req.headers.get("Cookie");
@@ -722,7 +725,10 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	}
 
 	if (user.isLocked) {
-		return new Response("Account Locked", { status: 403 });
+		return new Response(lockedTemplate, {
+			status: 403,
+			headers: { "Content-Type": "text/html" },
+		});
 	}
 
 	// Serve File Explorer Page
