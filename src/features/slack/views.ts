@@ -236,7 +236,7 @@ export const createBucketModal = () => ({
       },
       hint: {
         type: "plain_text",
-        text: "Lowercase letters, numbers, and hyphens only. Keep it clean! :ms-wink:",
+        text: "Lowercase letters, numbers, and hyphens only. :ms-wink:",
         emoji: true,
       },
     },
