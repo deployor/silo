@@ -642,7 +642,7 @@
       }
 
       // Modal Logic
-      function _openCreateModal() {
+      function openCreateModal() {
         document.getElementById("create-modal").classList.remove("hidden");
         document.getElementById("create-modal").classList.add("flex");
       }
@@ -652,7 +652,7 @@
         document.getElementById("create-modal").classList.remove("flex");
       }
 
-      async function _closeKeyModal() {
+      async function closeKeyModal() {
         document.getElementById("key-modal").classList.add("hidden");
         document.getElementById("key-modal").classList.remove("flex");
         await loadDashboard(); // Reload to show new bucket
@@ -661,7 +661,7 @@
         }
       }
 
-      async function _createBucket(e) {
+      async function createBucket(e) {
         e.preventDefault();
         const form = e.target;
         const name = form.name.value;
@@ -689,7 +689,7 @@
         }
       }
 
-      function _copyToClipboard(elementId) {
+      function copyToClipboard(elementId) {
         const text = document.getElementById(elementId).textContent;
         navigator.clipboard.writeText(text).then(() => {
           const btn = document.getElementById(`btn-${elementId}`);
@@ -702,7 +702,7 @@
         });
       }
 
-      function _deleteBucket(name) {
+      function deleteBucket(name) {
         openConfirmModal(
             "Delete Bucket",
             `Are you sure you want to delete bucket "${name}"? This action cannot be undone and all data will be permanently lost.`,
@@ -741,7 +741,7 @@
         );
       }
 
-      function _deleteKey(bucketName, keyId) {
+      function deleteKey(bucketName, keyId) {
         openConfirmModal(
             "Delete Key",
             `Are you sure you want to delete this access key? Any applications using it will lose access immediately.`,
@@ -775,7 +775,7 @@
         document.getElementById('manage-keys-modal').classList.add('flex');
       }
 
-      function _closeManageKeysModal() {
+      function closeManageKeysModal() {
         document.getElementById('manage-keys-modal').classList.add('hidden');
         document.getElementById('manage-keys-modal').classList.remove('flex');
         currentManagedBucket = null;
@@ -803,7 +803,7 @@
         `).join('');
       }
 
-      function _generateKeyFromModal() {
+      function generateKeyFromModal() {
         if (!currentManagedBucket) return;
         generateKey(currentManagedBucket);
       }
@@ -850,7 +850,7 @@
         }
       }
 
-      function _togglePublic(name, isPublic) {
+      function togglePublic(name, isPublic) {
         pendingToggle = { name, isPublic };
         const action = isPublic ? "make public" : "make private";
         const message = isPublic
