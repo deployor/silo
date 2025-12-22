@@ -1,24 +1,32 @@
 {
-  "name": "cargo-s3-gateway",
-  "version": "1.0.0",
-  "scripts": {
-    "dev": "bun run --hot src/index.ts",
-    "start": "bun run src/index.ts",
-    "db:generate": "drizzle-kit generate:pg",
-    "db:push": "drizzle-kit push:pg",
-    "db:studio": "drizzle-kit studio",
-    "test": "bun run scripts/test.ts"
-  },
-  "dependencies": {
-    "@aws-sdk/client-s3": "^3.956.0",
-    "aws4fetch": "^1.0.20",
-    "drizzle-orm": "^0.30.10",
-    "fast-xml-parser": "^4.5.3",
-    "postgres": "^3.4.7"
-  },
-  "devDependencies": {
-    "bun-types": "latest",
-    "drizzle-kit": "^0.20.18",
-    "@types/node": "^20.19.27"
-  }
+	"name": "cargo-s3-gateway",
+	"version": "1.0.0",
+	"scripts": {
+		"dev": "concurrently \"bun run --hot src/index.ts\" \"postcss src/styles.css -o src/assets/styles.css --watch\"",
+		"build:css": "postcss src/styles.css -o src/assets/styles.css",
+		"start": "bun run src/index.ts",
+		"db:generate": "drizzle-kit generate:pg",
+		"db:push": "drizzle-kit push:pg",
+		"db:studio": "drizzle-kit studio",
+		"test": "bun run scripts/test.ts"
+	},
+	"dependencies": {
+		"@aws-sdk/client-s3": "^3.956.0",
+		"aws4fetch": "^1.0.20",
+		"drizzle-orm": "^0.30.10",
+		"fast-xml-parser": "^4.5.3",
+		"postgres": "^3.4.7"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.3.10",
+		"@tailwindcss/postcss": "^4.1.18",
+		"@types/node": "^20.19.27",
+		"autoprefixer": "^10.4.23",
+		"bun-types": "latest",
+		"concurrently": "^9.2.1",
+		"drizzle-kit": "^0.20.18",
+		"postcss": "^8.5.6",
+		"postcss-cli": "^11.0.1",
+		"tailwindcss": "^4.1.18"
+	}
 }

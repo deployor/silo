@@ -1,12 +1,12 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import * as schema from "./schema";
 import { config } from "../config";
+import * as schema from "./schema";
 
 const connectionString = config.databaseUrl;
 
 if (!connectionString) {
-  throw new Error("DATABASE_URL environment variable is missing");
+	throw new Error("DATABASE_URL environment variable is missing");
 }
 
 const client = postgres(connectionString, { prepare: false });

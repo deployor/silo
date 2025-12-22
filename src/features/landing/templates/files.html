@@ -4,58 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>File Explorer - Cargo</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.bunny.net" />
     <link
       href="https://fonts.bunny.net/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@400;700&display=swap"
       rel="stylesheet"
     />
-    <script>
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ["Space Grotesk", "sans-serif"],
-              mono: ["JetBrains Mono", "monospace"],
-            },
-            colors: {
-              "hc-red": "#ec3750",
-              "hc-dark": "#17171d",
-              "hc-darker": "#131316",
-              "hc-blue": "#338eda",
-              "sidebar-bg": "#1c1c21",
-              "text-main": "#e0e6ed",
-              "text-muted": "#94a3b8",
-            },
-          },
-        },
-      };
-    </script>
-    <style>
-      body {
-        background-color: #131316;
-        color: #e0e6ed;
-      }
-      .card-shadow {
-        box-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 0.3);
-      }
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 3px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.2);
-      }
-    </style>
+    <link rel="stylesheet" href="/assets/styles.css" />
   </head>
   <body
     class="min-h-screen selection:bg-hc-red selection:text-white flex flex-col font-sans"
@@ -241,7 +195,7 @@
         const dm = decimals < 0 ? 0 : decimals;
         const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+        return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`;
       }
 
       async function loadFiles(prefix = '', token = null, reset = false) {
@@ -294,7 +248,7 @@
         
         let currentPath = '';
         parts.forEach((part, index) => {
-            currentPath += part + '/';
+            currentPath += `${part}/`;
             const isLast = index === parts.length - 1;
             html += ` <span class="text-text-muted">/</span> `;
             html += `<button onclick="navigateTo('${currentPath}')" class="hover:text-white ${isLast ? 'text-white font-bold' : 'text-text-muted'}">${part}</button>`;
@@ -361,13 +315,13 @@
         loadFiles(prefix, null, true);
       }
 
-      function loadMore() {
+      function _loadMore() {
         if (continuationToken) {
             loadFiles(currentPrefix, continuationToken, false);
         }
       }
 
-      function searchFiles() {
+      function _searchFiles() {
         const query = document.getElementById('search-input').value;
         // For now, search is just filtering by prefix if we wanted, but S3 doesn't support full text search easily.
         // We can treat the search query as a prefix search?
@@ -385,7 +339,7 @@
         loadFiles(query, null, true);
       }
 
-      function deleteFile(key) {
+      function _deleteFile(key) {
         openConfirmModal(
             "Delete File",
             `Are you sure you want to delete "${key}"? This cannot be undone.`,
@@ -404,7 +358,7 @@
         );
       }
 
-      async function previewFile(key, url) {
+      async function _previewFile(key, url) {
         const modal = document.getElementById('preview-modal');
         const content = document.getElementById('preview-content');
         const filename = document.getElementById('preview-filename');
@@ -465,12 +419,12 @@
                     </div>
                 `;
             }
-        } catch (e) {
+        } catch (_e) {
             content.innerHTML = '<div class="text-hc-red flex items-center justify-center h-64">Failed to load preview</div>';
         }
       }
 
-      function closePreview() {
+      function _closePreview() {
         document.getElementById('preview-modal').classList.add('hidden');
         document.getElementById('preview-modal').classList.remove('flex');
         document.getElementById('preview-content').innerHTML = '';

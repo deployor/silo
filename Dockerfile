@@ -13,6 +13,7 @@ RUN cd /temp/prod && bun install --frozen-lockfile --production
 FROM base AS prerelease
 COPY --from=install /temp/dev/node_modules node_modules
 COPY . .
+RUN bun run build:css
 
 FROM base AS release
 COPY --from=install /temp/prod/node_modules node_modules
