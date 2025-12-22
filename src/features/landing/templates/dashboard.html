@@ -586,8 +586,14 @@
           
           if (data.user.slackId) {
             const avatar = document.getElementById("user-avatar");
-            avatar.onload = () => avatar.classList.remove("hidden");
-            avatar.src = `https://cachet.dunkirk.sh/users/${data.user.slackId}/r`;
+            const newSrc = `https://cachet.dunkirk.sh/users/${data.user.slackId}/r`;
+            
+            if (avatar.getAttribute("src") !== newSrc) {
+              avatar.classList.add("hidden");
+              avatar.onload = () => avatar.classList.remove("hidden");
+              avatar.onerror = () => avatar.classList.add("hidden");
+              avatar.src = newSrc;
+            }
           }
 
           // Update Storage Stats
