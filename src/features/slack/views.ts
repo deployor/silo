@@ -88,7 +88,7 @@ export const homeView = (user: any, buckets: any[]) => {
         type: "header",
         text: {
           type: "plain_text",
-          text: "Cargo Dashboard",
+          text: "Cargo Control Center :ms-high-speed-train:",
           emoji: true,
         },
       },
@@ -96,7 +96,7 @@ export const homeView = (user: any, buckets: any[]) => {
         type: "section",
         text: {
             type: "mrkdwn",
-            text: "Welcome to your Cargo control center. Manage your buckets, keys, and monitor usage."
+            text: "Howdy partner! :ms-cowhand: Ready to ship some bits? Here's your stash stats and bucket brigade."
         }
       },
       {
@@ -106,7 +106,7 @@ export const homeView = (user: any, buckets: any[]) => {
                 type: "button",
                 text: {
                     type: "plain_text",
-                    text: "➕ Create Bucket",
+                    text: ":ms-wrench: New Bucket",
                     emoji: true
                 },
                 style: "primary",
@@ -116,7 +116,7 @@ export const homeView = (user: any, buckets: any[]) => {
                 type: "button",
                 text: {
                     type: "plain_text",
-                    text: "🔄 Refresh",
+                    text: ":ms-wink: Refresh",
                     emoji: true
                 },
                 action_id: "refresh_home"
@@ -125,7 +125,7 @@ export const homeView = (user: any, buckets: any[]) => {
                 type: "button",
                 text: {
                     type: "plain_text",
-                    text: "↗️ Web Dashboard",
+                    text: ":ms-globe: The Big Screen",
                     emoji: true
                 },
                 url: `https://${config.s3Domain}`,
@@ -140,7 +140,7 @@ export const homeView = (user: any, buckets: any[]) => {
         type: "section",
         text: {
             type: "mrkdwn",
-            text: "*📊 Usage Overview*"
+            text: "*:ms-bar-chart: The Stash Stats*"
         }
       },
       {
@@ -148,11 +148,11 @@ export const homeView = (user: any, buckets: any[]) => {
         fields: [
             {
                 type: "mrkdwn",
-                text: `*Storage Used*\n${formatBytes(user.storageUsageBytes)} / ${formatBytes(user.storageLimitBytes)}\n\`${progressBar(usagePercent)}\``
+                text: `*Storage Space*\n${formatBytes(user.storageUsageBytes)} / ${formatBytes(user.storageLimitBytes)}\n\`${progressBar(usagePercent)}\``
             },
             {
                 type: "mrkdwn",
-                text: `*Active Buckets*\n${buckets.length} / 50`
+                text: `*Bucket Count*\n${buckets.length} / 50 :ms-open-folder:`
             }
         ]
       },
@@ -161,11 +161,11 @@ export const homeView = (user: any, buckets: any[]) => {
           fields: [
               {
                   type: "mrkdwn",
-                  text: `*Total Requests*\n${user.totalRequests.toLocaleString()}`
+                  text: `*Total Hits*\n${user.totalRequests.toLocaleString()} :ms-clap-hmn:`
               },
               {
                   type: "mrkdwn",
-                  text: `*Network Traffic*\n⬇️ ${formatBytes(user.ingressBytes)}  ⬆️ ${formatBytes(user.egressBytes)}`
+                  text: `*Traffic Flow*\n:ms-inbox: ${formatBytes(user.ingressBytes)}  :ms-outbox: ${formatBytes(user.egressBytes)}`
               }
           ]
       },
@@ -176,7 +176,7 @@ export const homeView = (user: any, buckets: any[]) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*🪣 Your Buckets (${buckets.length})*`,
+          text: `*:ms-cd: Your Buckets of Joy (${buckets.length})*`,
         }
       },
       {
@@ -188,7 +188,7 @@ export const homeView = (user: any, buckets: any[]) => {
         elements: [
           {
             type: "mrkdwn",
-            text: `Last updated: ${new Date().toLocaleTimeString()}  |  <https://cargo.deployer.dev/docs|Documentation>`,
+            text: `Last checked: ${new Date().toLocaleTimeString()} :ms-tick:  |  <https://cargo.deployer.dev/docs|Read the Docs :ms-raised-eyebrow:>`,
           },
         ],
       },
