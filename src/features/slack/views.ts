@@ -99,7 +99,7 @@ export const homeView = (user: any, buckets: any[]) => {
         type: "section",
         text: {
             type: "mrkdwn",
-            text: "Howdy partner! :ms-cowhand: Welcome to your Cargo control center. Ready to ship some bits? :lightningmcqueen:"
+            text: "Howdy partner! :ms-cowhand:"
         }
       },
       {
@@ -143,7 +143,7 @@ export const homeView = (user: any, buckets: any[]) => {
         type: "section",
         text: {
             type: "mrkdwn",
-            text: "*:beachball: Usage Overview*"
+            text: "*:ms-increasing-graph: Usage Overview*"
         }
       },
       {
@@ -155,7 +155,7 @@ export const homeView = (user: any, buckets: any[]) => {
             },
             {
                 type: "mrkdwn",
-                text: `*Active Buckets*\n${buckets.length} / 50 :neofox_box:`
+                text: `*Active Buckets*\n${buckets.length} / 50`
             }
         ]
       },
@@ -209,7 +209,7 @@ export const createBucketModal = () => ({
   },
   submit: {
     type: "plain_text",
-    text: "Ship It! :lightningmcqueen:",
+    text: "Ship :lightningmcqueen:",
     emoji: true,
   },
   close: {
