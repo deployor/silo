@@ -9,8 +9,8 @@ function formatBytes(bytes: number) {
 }
 
 export const homeView = (user: any, buckets: any[]) => {
-  const usagePercent = user.storageLimitBytes > 0 
-    ? (user.storageUsageBytes / user.storageLimitBytes) * 100 
+  const usagePercent = user.storageLimitBytes > 0
+    ? (user.storageUsageBytes / user.storageLimitBytes) * 100
     : 0;
 
   const bucketBlocks = buckets.map((bucket) => {
@@ -19,7 +19,7 @@ export const homeView = (user: any, buckets: any[]) => {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*${bucket.name}*`,
+          text: `*${bucket.name}*`
         },
         accessory: {
           type: "overflow",
@@ -54,13 +54,13 @@ export const homeView = (user: any, buckets: any[]) => {
         elements: [
           {
             type: "mrkdwn",
-            text: `${bucket.isPublic ? "🌍 Public" : "🔒 Private"}  •  ${formatBytes(bucket.totalBytes)}  •  ${bucket.totalRequests} requests  •  Created ${new Date(bucket.createdAt).toLocaleDateString()}`,
-          },
-        ],
+            text: `${bucket.isPublic ? "🌍 Public" : "🔒 Private"}   |   📦 ${formatBytes(bucket.totalBytes)}   |   ⚡ ${bucket.totalRequests} requests   |   📅 ${new Date(bucket.createdAt).toLocaleDateString()}`
+          }
+        ]
       },
       {
-        type: "divider",
-      },
+        type: "divider"
+      }
     ];
   }).flat();
 
@@ -77,44 +77,84 @@ export const homeView = (user: any, buckets: any[]) => {
       },
       {
         type: "section",
-        fields: [
-          {
+        text: {
+          type: "mrkdwn",
+          text: `Welcome back! Here is your current usage overview.`
+        }
+      },
+      {
+        type: "divider"
+      },
+      {
+        type: "section",
+        text: {
             type: "mrkdwn",
-            text: `*Storage Usage:*\n${formatBytes(user.storageUsageBytes)} / ${formatBytes(user.storageLimitBytes)} (${usagePercent.toFixed(1)}%)`,
-          },
-          {
-            type: "mrkdwn",
-            text: `*Total Requests:*\n${user.totalRequests}`,
-          },
-        ],
+            text: "*📊 Storage & Limits*"
+        }
       },
       {
         type: "section",
         fields: [
           {
             type: "mrkdwn",
-            text: `*Ingress:*\n${formatBytes(user.ingressBytes)}`,
+            text: `*Storage Usage:*\n${formatBytes(user.storageUsageBytes)} / ${formatBytes(user.storageLimitBytes)}`
           },
           {
             type: "mrkdwn",
-            text: `*Egress:*\n${formatBytes(user.egressBytes)}`,
-          },
-        ],
+            text: `*Usage %:*\n${usagePercent.toFixed(1)}%`
+          }
+        ]
       },
       {
-        type: "divider",
+        type: "section",
+        fields: [
+            {
+                type: "mrkdwn",
+                text: `*Total Requests:*\n${user.totalRequests.toLocaleString()}`
+            },
+            {
+                type: "mrkdwn",
+                text: `*Buckets Used:*\n${buckets.length} / 50`
+            }
+        ]
+      },
+      {
+        type: "divider"
+      },
+      {
+        type: "section",
+        text: {
+            type: "mrkdwn",
+            text: "*📉 Network Traffic*"
+        }
+      },
+      {
+        type: "section",
+        fields: [
+          {
+            type: "mrkdwn",
+            text: `*Ingress (In):*\n${formatBytes(user.ingressBytes)}`
+          },
+          {
+            type: "mrkdwn",
+            text: `*Egress (Out):*\n${formatBytes(user.egressBytes)}`
+          }
+        ]
+      },
+      {
+        type: "divider"
       },
       {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: "*Your Buckets*",
+          text: "*🪣 Your Buckets*",
         },
         accessory: {
           type: "button",
           text: {
             type: "plain_text",
-            text: "Create Bucket",
+            text: "Create New Bucket",
             emoji: true,
           },
           style: "primary",
@@ -130,7 +170,7 @@ export const homeView = (user: any, buckets: any[]) => {
         elements: [
           {
             type: "mrkdwn",
-            text: `Manage everything at <https://${config.s3Domain}|cargo.deployer.dev>`,
+            text: `:gear: Manage advanced settings at <https://${config.s3Domain}|cargo.deployer.dev>`,
           },
         ],
       },
