@@ -2,6 +2,7 @@ import { authenticate } from "./middleware/auth";
 import { handleS3Request } from "./features/s3-api";
 import { updateStats } from "./features/s3-api/utils";
 import { handleDashboardRequest } from "./features/landing";
+import { handleSlackRequest } from "./features/slack";
 import { config } from "./config";
 
 const S3_DOMAIN = config.s3Domain;
@@ -53,6 +54,9 @@ Bun.serve({
     }
 
     if (isDashboard) {
+      if (url.pathname === "/api/slack/events") {
+        return handleSlackRequest(req);
+      }
       return handleDashboardRequest(req);
     }
 

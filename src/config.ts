@@ -13,4 +13,8 @@ export const config = {
     clientSecret: process.env.HC_AUTH_CLIENT_SECRET!,
     redirectUri: process.env.HC_AUTH_REDIRECT_URI!,
   },
+  slack: {
+    botToken: process.env.SLACK_BOT_TOKEN!,
+    signingSecret: process.env.SLACK_SIGNING_SECRET!,
+  },
 };
