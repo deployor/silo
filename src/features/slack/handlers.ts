@@ -269,4 +269,15 @@ export async function handleInteraction(payload: any) {
       await handleAppHomeOpened({ user: payload.user.id });
   }
 
+  // 9. Pagination
+  if (actionId === "home_nav_prev" || actionId === "home_nav_next") {
+      const page = parseInt(actionValue, 10);
+      const userBuckets = await db
+        .select()
+        .from(buckets)
+        .where(eq(buckets.userId, user[0].id));
+      
+      await publishView(payload.user.id, homeView(user[0], userBuckets, page));
+  }
+
 }
