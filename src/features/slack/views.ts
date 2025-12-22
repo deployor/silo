@@ -91,7 +91,7 @@ export const homeView = (user: any, buckets: any[]) => {
         type: "header",
         text: {
           type: "plain_text",
-          text: "Cargo Dashboard :ms-high-speed-train:",
+          text: "Cargo (no clue what to call this still) Dashboard",
           emoji: true,
         },
       },
