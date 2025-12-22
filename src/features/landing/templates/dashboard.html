@@ -607,7 +607,10 @@
             .map(
               (bucket) => `
                     <tr class="hover:bg-white/5 transition-colors group">
-                        <td class="px-6 py-4 font-medium text-white font-mono">${bucket.name}</td>
+                        <td class="px-6 py-4 font-medium text-white font-mono">
+                            ${bucket.name}
+                            ${bucket.isPaused ? `<span class="ml-2 bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-500/30" title="${bucket.pauseReason || 'Paused by admin'}">PAUSED</span>` : ''}
+                        </td>
                         <td class="px-6 py-4 font-mono text-xs text-text-muted group-hover:text-white transition-colors">
                             <button onclick="openManageKeysModal('${bucket.name}')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -199,6 +199,8 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 						totalBytes: b.totalBytes,
 						totalRequests: b.totalRequests,
 						isPublic: b.isPublic,
+						isPaused: b.isPaused,
+						pauseReason: b.pauseReason,
 					})),
 				}),
 				{ headers: { "Content-Type": "application/json" } },

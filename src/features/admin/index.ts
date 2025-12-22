@@ -152,7 +152,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 							files = contents.map((item: any) => ({
 								key: item.Key.replace(internalPrefix, ""),
 								size: item.Size,
-								url: `https://${config.s3Domain}/${item.Key.replace(internalPrefix, "")}`,
+								url: `/api/admin/buckets/${bucketName}/files/preview?key=${encodeURIComponent(item.Key.replace(internalPrefix, ""))}`,
 							}));
 						}
 					}
@@ -169,6 +169,48 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				}),
 				{ headers: { "Content-Type": "application/json" } },
 			);
+		}
+
+		// Preview File (Admin)
+		const previewMatch = path.match(
+			/^\/api\/admin\/buckets\/([a-z0-9-]+)\/files\/preview$/,
+		);
+		if (previewMatch && req.method === "GET") {
+			const bucketName = previewMatch[1];
+			const key = url.searchParams.get("key");
+			if (!key) return new Response("Missing key", { status: 400 });
+
+			const bucket = await db
+				.select()
+				.from(buckets)
+				.where(eq(buckets.name, bucketName))
+				.limit(1);
+			if (bucket.length === 0)
+				return new Response("Not Found", { status: 404 });
+
+			const owner = await db
+				.select()
+				.from(users)
+				.where(eq(users.id, bucket[0].userId))
+				.limit(1);
+			if (owner.length === 0)
+				return new Response("Owner not found", { status: 404 });
+
+			const internalKey = getInternalPath(key, owner[0], bucket[0]);
+
+			try {
+				const s3Res = await s3Client.fetch(internalKey, { method: "GET" });
+				if (!s3Res.ok) return new Response(s3Res.body, { status: s3Res.status });
+
+				const headers = new Headers(s3Res.headers);
+				headers.set("Content-Disposition", "inline");
+				return new Response(s3Res.body, {
+					status: s3Res.status,
+					headers,
+				});
+			} catch (e) {
+				return new Response("Error fetching file", { status: 500 });
+			}
 		}
 
 		// Pause/Resume Bucket
