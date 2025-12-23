@@ -202,6 +202,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 						isPublic: b.isPublic,
 						isPaused: b.isPaused,
 						pauseReason: b.pauseReason,
+						corsConfig: b.corsConfig,
 					})),
 				}),
 				{ headers: { "Content-Type": "application/json" } },
@@ -675,6 +676,58 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			} catch (e) {
 				console.error("List Files Error:", e);
 				return new Response("Failed to list files", { status: 500 });
+			}
+		}
+
+		// CORS Management
+		const corsMatch = path.match(
+			/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/cors$/,
+		);
+		if (corsMatch) {
+			const bucketName = corsMatch[1];
+			const bucket = await db
+				.select()
+				.from(buckets)
+				.where(eq(buckets.name, bucketName))
+				.limit(1);
+
+			if (bucket.length === 0)
+				return new Response("Bucket not found", { status: 404 });
+			if (bucket[0].userId !== user.id && !user.isAdmin)
+				return new Response("Unauthorized", { status: 403 });
+			if (bucket[0].isPaused && !user.isAdmin)
+				return new Response("Bucket is paused", { status: 403 });
+
+			if (req.method === "PUT") {
+				try {
+					const body = await req.json();
+					const rules = body.rules;
+					
+					if (!Array.isArray(rules)) {
+						return new Response("Invalid rules format", { status: 400 });
+					}
+
+					const corsConfig = {
+						CORSRules: rules
+					};
+
+					await db
+						.update(buckets)
+						.set({ corsConfig: JSON.stringify(corsConfig) })
+						.where(eq(buckets.name, bucketName));
+
+					return new Response("Updated", { status: 200 });
+				} catch (e) {
+					return new Response("Invalid JSON", { status: 400 });
+				}
+			}
+
+			if (req.method === "DELETE") {
+				await db
+					.update(buckets)
+					.set({ corsConfig: null })
+					.where(eq(buckets.name, bucketName));
+				return new Response("Deleted", { status: 200 });
 			}
 		}
 

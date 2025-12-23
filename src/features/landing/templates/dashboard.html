@@ -221,6 +221,66 @@
       </div>
     </div>
 
+    <!-- CORS Modal -->
+    <div
+      id="cors-modal"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50"
+    >
+      <div
+        class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-2xl card-shadow transform transition-all"
+      >
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h3 class="text-2xl font-bold text-white">CORS Configuration</h3>
+                <p class="text-text-muted text-sm mt-1 font-mono" id="cors-bucket-name">bucket-name</p>
+            </div>
+            <button
+              onclick="closeCorsModal()"
+              class="text-text-muted hover:text-white transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+        </div>
+
+        <div class="mb-6">
+            <p class="text-text-muted text-sm mb-4">
+                Configure Cross-Origin Resource Sharing (CORS) for this bucket. Enter a JSON array of rules.
+            </p>
+            <textarea
+                id="cors-editor"
+                class="w-full h-64 bg-black/30 border border-white/10 rounded-xl p-4 text-white font-mono text-sm focus:outline-none focus:border-hc-blue focus:ring-1 focus:ring-hc-blue resize-none"
+                placeholder='[
+  {
+    "AllowedOrigins": ["*"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": [],
+    "MaxAgeSeconds": 3000
+  }
+]'
+            ></textarea>
+            <p class="text-xs text-red-400 mt-2 hidden" id="cors-error"></p>
+        </div>
+
+        <div class="flex justify-end gap-3">
+            <button
+              onclick="resetCors()"
+              class="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+            >
+              Reset to Default
+            </button>
+            <button
+              onclick="saveCors()"
+              class="bg-hc-blue hover:bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105 card-shadow"
+            >
+              Save Configuration
+            </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Manage Keys Modal -->
     <div
       id="manage-keys-modal"
@@ -526,6 +586,7 @@
 
       let currentDashboardData = null;
       let currentManagedBucket = null;
+      let currentCorsBucket = null;
 
       async function loadDashboard() {
         try {
@@ -662,6 +723,7 @@
                         </td>
                         <td class="px-6 py-4 text-text-muted text-xs font-mono">${new Date(bucket.createdAt).toLocaleDateString()}</td>
                         <td class="px-6 py-4 text-right flex justify-end items-center gap-3">
+                            <button onclick="openCorsModal('${bucket.name}')" class="text-text-muted hover:text-white text-xs font-bold uppercase tracking-wider transition-colors ${disabledClass}" ${disabledAttr}>CORS</button>
                             <a href="/dashboard/buckets/${bucket.name}" class="bg-hc-blue/10 hover:bg-hc-blue/20 text-hc-blue px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${disabledClass}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
@@ -833,6 +895,98 @@
         document.getElementById('manage-keys-modal').classList.add('hidden');
         document.getElementById('manage-keys-modal').classList.remove('flex');
         currentManagedBucket = null;
+      }
+
+      function openCorsModal(bucketName) {
+        currentCorsBucket = bucketName;
+        const bucket = currentDashboardData.buckets.find(b => b.name === bucketName);
+        if (!bucket) return;
+
+        document.getElementById('cors-bucket-name').textContent = bucket.name;
+        
+        // Format existing config or default
+        let configStr = '';
+        if (bucket.corsConfig) {
+            try {
+                const parsed = JSON.parse(bucket.corsConfig);
+                // If it's the S3 XML structure converted to JSON, it might be wrapped in CORSConfiguration
+                // But our DB stores it as { CORSRules: [...] } usually if coming from API
+                // Let's just show what's in DB but formatted
+                configStr = JSON.stringify(parsed.CORSRules || parsed, null, 2);
+            } catch (e) {
+                configStr = bucket.corsConfig;
+            }
+        } else {
+            configStr = '[]';
+        }
+        
+        document.getElementById('cors-editor').value = configStr;
+        document.getElementById('cors-error').classList.add('hidden');
+
+        document.getElementById('cors-modal').classList.remove('hidden');
+        document.getElementById('cors-modal').classList.add('flex');
+      }
+
+      function closeCorsModal() {
+        document.getElementById('cors-modal').classList.add('hidden');
+        document.getElementById('cors-modal').classList.remove('flex');
+        currentCorsBucket = null;
+      }
+
+      async function saveCors() {
+        if (!currentCorsBucket) return;
+        const editor = document.getElementById('cors-editor');
+        const errorEl = document.getElementById('cors-error');
+        
+        try {
+            const rules = JSON.parse(editor.value);
+            if (!Array.isArray(rules)) throw new Error("Configuration must be an array of rules");
+            
+            // Basic validation
+            rules.forEach(r => {
+                if (!r.AllowedOrigins || !r.AllowedMethods) {
+                    throw new Error("Each rule must have AllowedOrigins and AllowedMethods");
+                }
+            });
+
+            const res = await fetch(`/api/dashboard/buckets/${currentCorsBucket}/cors`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ rules }),
+            });
+
+            if (!res.ok) {
+                const err = await res.text();
+                throw new Error(err);
+            }
+
+            await loadDashboard();
+            closeCorsModal();
+        } catch (e) {
+            errorEl.textContent = e.message;
+            errorEl.classList.remove('hidden');
+        }
+      }
+
+      async function resetCors() {
+        if (!currentCorsBucket) return;
+        if (!confirm("Are you sure you want to remove all CORS configuration?")) return;
+
+        try {
+            const res = await fetch(`/api/dashboard/buckets/${currentCorsBucket}/cors`, {
+                method: "DELETE",
+            });
+
+            if (!res.ok) {
+                const err = await res.text();
+                throw new Error(err);
+            }
+
+            await loadDashboard();
+            closeCorsModal();
+        } catch (e) {
+            alert("Failed to reset CORS: " + e.message);
+        }
       }
 
       function renderManageKeysTable(bucket) {

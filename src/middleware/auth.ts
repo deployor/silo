@@ -71,13 +71,37 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 	const credential = getCredential(req);
 
 	if (!credential) {
+		// Allow OPTIONS requests for CORS preflight
+		if (req.method === "OPTIONS") {
+			const requestedBucket = getBucketFromRequest(req);
+			if (!requestedBucket) {
+				return new Response(null, { status: 400 });
+			}
+			const bucketResult = await db
+				.select({
+					bucket: buckets,
+					user: users,
+				})
+				.from(buckets)
+				.innerJoin(users, eq(buckets.userId, users.id))
+				.where(eq(buckets.name, requestedBucket))
+				.limit(1);
+
+			if (bucketResult.length === 0) {
+				return new Response(null, { status: 404 });
+			}
+
+			const { bucket, user } = bucketResult[0];
+			return { user, bucket, mode: "public" };
+		}
+
 		if (req.method !== "GET" && req.method !== "HEAD") {
 			return new Response(
 				`<?xml version="1.0" encoding="UTF-8"?>
 <Error>
-    <Code>AccessDenied</Code>
-    <Message>Access Denied</Message>
-    <RequestId>0000000000000000</RequestId>
+	   <Code>AccessDenied</Code>
+	   <Message>Access Denied</Message>
+	   <RequestId>0000000000000000</RequestId>
 </Error>`,
 				{ status: 403, headers: { "Content-Type": "application/xml" } },
 			);

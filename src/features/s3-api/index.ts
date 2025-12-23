@@ -133,7 +133,139 @@ export async function handleS3Request(
 		}
 	}
 
+	if (method === "OPTIONS") {
+		// Handle CORS Preflight
+		const corsConfig = bucket.corsConfig
+			? JSON.parse(bucket.corsConfig)
+			: null;
+
+		if (!corsConfig || !Array.isArray(corsConfig.CORSRules)) {
+			return new Response(null, { status: 403 });
+		}
+
+		const origin = req.headers.get("Origin");
+		const requestMethod = req.headers.get("Access-Control-Request-Method");
+		const requestHeaders = req.headers.get("Access-Control-Request-Headers");
+
+		if (!origin || !requestMethod) {
+			return new Response(null, { status: 403 });
+		}
+
+		// Find matching rule
+		const rule = corsConfig.CORSRules.find((r: any) => {
+			const allowedOrigins = Array.isArray(r.AllowedOrigins)
+				? r.AllowedOrigins
+				: [r.AllowedOrigins];
+			const allowedMethods = Array.isArray(r.AllowedMethods)
+				? r.AllowedMethods
+				: [r.AllowedMethods];
+
+			const originMatch = allowedOrigins.some((o: string) => {
+				if (o === "*") return true;
+				return o === origin;
+			});
+
+			const methodMatch = allowedMethods.includes(requestMethod);
+
+			return originMatch && methodMatch;
+		});
+
+		if (!rule) {
+			return new Response(null, { status: 403 });
+		}
+
+		const headers = new Headers();
+		headers.set("Access-Control-Allow-Origin", origin);
+		headers.set("Access-Control-Allow-Methods", requestMethod);
+
+		if (rule.AllowedHeaders) {
+			const allowedHeaders = Array.isArray(rule.AllowedHeaders)
+				? rule.AllowedHeaders
+				: [rule.AllowedHeaders];
+			// If request asks for headers, check if they are allowed
+			// For simplicity, we just echo back what's allowed if it matches wildcard or specific
+			// But strictly we should check against requestHeaders
+			headers.set("Access-Control-Allow-Headers", allowedHeaders.join(", "));
+		} else if (requestHeaders) {
+			// If no allowed headers defined but request has them, maybe allow all? No, default is deny.
+		}
+
+		if (rule.ExposeHeaders) {
+			const exposeHeaders = Array.isArray(rule.ExposeHeaders)
+				? rule.ExposeHeaders
+				: [rule.ExposeHeaders];
+			headers.set("Access-Control-Expose-Headers", exposeHeaders.join(", "));
+		}
+
+		if (rule.MaxAgeSeconds) {
+			headers.set("Access-Control-Max-Age", rule.MaxAgeSeconds.toString());
+		}
+
+		headers.set("Vary", "Origin, Access-Control-Request-Headers, Access-Control-Request-Method");
+
+		return new Response(null, { status: 200, headers });
+	}
+
 	if (method === "GET") {
+		if (key === "" && url.searchParams.has("cors")) {
+			if (!bucket.corsConfig) {
+				return new Response(
+					`<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+	   <Code>NoSuchCORSConfiguration</Code>
+	   <Message>The CORS configuration does not exist</Message>
+	   <RequestId>0000000000000000</RequestId>
+</Error>`,
+					{ status: 404, headers: { "Content-Type": "application/xml" } },
+				);
+			}
+
+			const config = JSON.parse(bucket.corsConfig);
+			const rulesXml = config.CORSRules.map((r: any) => {
+				let rule = "<CORSRule>";
+				if (r.ID) rule += `<ID>${r.ID}</ID>`;
+				
+				const allowedOrigins = Array.isArray(r.AllowedOrigins) ? r.AllowedOrigins : [r.AllowedOrigins];
+				for (const o of allowedOrigins) {
+					rule += `<AllowedOrigin>${o}</AllowedOrigin>`;
+				}
+
+				const allowedMethods = Array.isArray(r.AllowedMethods) ? r.AllowedMethods : [r.AllowedMethods];
+				for (const m of allowedMethods) {
+					rule += `<AllowedMethod>${m}</AllowedMethod>`;
+				}
+
+				if (r.AllowedHeaders) {
+					const allowedHeaders = Array.isArray(r.AllowedHeaders) ? r.AllowedHeaders : [r.AllowedHeaders];
+					for (const h of allowedHeaders) {
+						rule += `<AllowedHeader>${h}</AllowedHeader>`;
+					}
+				}
+
+				if (r.ExposeHeaders) {
+					const exposeHeaders = Array.isArray(r.ExposeHeaders) ? r.ExposeHeaders : [r.ExposeHeaders];
+					for (const h of exposeHeaders) {
+						rule += `<ExposeHeader>${h}</ExposeHeader>`;
+					}
+				}
+
+				if (r.MaxAgeSeconds) {
+					rule += `<MaxAgeSeconds>${r.MaxAgeSeconds}</MaxAgeSeconds>`;
+				}
+
+				rule += "</CORSRule>";
+				return rule;
+			}).join("");
+
+			return new Response(
+				`<?xml version="1.0" encoding="UTF-8"?>
+<CORSConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+${rulesXml}
+</CORSConfiguration>`,
+				{ headers: { "Content-Type": "application/xml" } },
+			);
+		}
+
 		// Egress Limit Check
 		// Rule: Manual Limit OR (Storage Limit * 3 OR 10GB, whichever is higher)
 		let egressLimit: bigint | null = null;
@@ -299,6 +431,60 @@ export async function handleS3Request(
 	}
 
 	if (method === "PUT") {
+		if (key === "" && url.searchParams.has("cors")) {
+			const bodyText = await req.text();
+			// Simple XML parsing to JSON
+			// We expect <CORSConfiguration><CORSRule>...</CORSRule></CORSConfiguration>
+			// This is a quick and dirty parser, might need a real one if complex
+			// But for now let's try to extract rules.
+			
+			// Using fast-xml-parser would be better if available, and it is in package.json
+			const { XMLParser } = require("fast-xml-parser");
+			const parser = new XMLParser({
+				ignoreAttributes: false,
+				isArray: (name: string) => {
+					return ["CORSRule", "AllowedOrigin", "AllowedMethod", "AllowedHeader", "ExposeHeader"].indexOf(name) !== -1;
+				}
+			});
+			
+			try {
+				const parsed = parser.parse(bodyText);
+				if (!parsed.CORSConfiguration || !parsed.CORSConfiguration.CORSRule) {
+					throw new Error("Invalid CORS Configuration");
+				}
+
+				const rules = parsed.CORSConfiguration.CORSRule.map((r: any) => ({
+					ID: r.ID,
+					AllowedOrigins: r.AllowedOrigin,
+					AllowedMethods: r.AllowedMethod,
+					AllowedHeaders: r.AllowedHeader,
+					ExposeHeaders: r.ExposeHeader,
+					MaxAgeSeconds: r.MaxAgeSeconds
+				}));
+
+				const corsConfig = {
+					CORSRules: rules
+				};
+
+				await db
+					.update(buckets)
+					.set({ corsConfig: JSON.stringify(corsConfig) })
+					.where(eq(buckets.id, bucket.id));
+
+				return new Response(null, { status: 200 });
+			} catch (e) {
+				return new Response(
+					`<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+	   <Code>MalformedXML</Code>
+	   <Message>The XML you provided was not well-formed or did not validate against our published schema</Message>
+	   <RequestId>0000000000000000</RequestId>
+</Error>`,
+					{ status: 400, headers: { "Content-Type": "application/xml" } },
+				);
+			}
+		}
+
 		const limit = user.storageLimitBytes;
 		const upstreamHeaders = filterUpstreamHeaders(req.headers);
 
@@ -428,6 +614,15 @@ export async function handleS3Request(
 	}
 
 	if (method === "DELETE") {
+		if (key === "" && url.searchParams.has("cors")) {
+			await db
+				.update(buckets)
+				.set({ corsConfig: null })
+				.where(eq(buckets.id, bucket.id));
+			
+			return new Response(null, { status: 204 });
+		}
+
 		try {
 			const cleanUrl = stripAuthQueryParams(url);
 			const queryStr = cleanUrl.searchParams.toString();

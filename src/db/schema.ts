@@ -45,6 +45,7 @@ export const buckets = pgTable(
 		isPublic: boolean("is_public").default(false).notNull(),
 		isPaused: boolean("is_paused").default(false).notNull(),
 		pauseReason: text("pause_reason"),
+		corsConfig: text("cors_config"), // JSON string of CORS rules
 		totalBytes: bigint("total_bytes", { mode: "number" }).notNull().default(0),
 		totalRequests: bigint("total_requests", { mode: "number" })
 			.notNull()
