@@ -269,7 +269,7 @@
               onclick="resetCors()"
               class="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
             >
-              Reset to Default
+              Reset
             </button>
             <button
               onclick="saveCors()"
@@ -723,7 +723,12 @@
                         </td>
                         <td class="px-6 py-4 text-text-muted text-xs font-mono">${new Date(bucket.createdAt).toLocaleDateString()}</td>
                         <td class="px-6 py-4 text-right flex justify-end items-center gap-3">
-                            <button onclick="openCorsModal('${bucket.name}')" class="text-text-muted hover:text-white text-xs font-bold uppercase tracking-wider transition-colors ${disabledClass}" ${disabledAttr}>CORS</button>
+                            <button onclick="openCorsModal('${bucket.name}')" class="bg-white/5 hover:bg-white/10 text-text-muted hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${disabledClass}" ${disabledAttr}>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                </svg>
+                                CORS
+                            </button>
                             <a href="/dashboard/buckets/${bucket.name}" class="bg-hc-blue/10 hover:bg-hc-blue/20 text-hc-blue px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${disabledClass}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
