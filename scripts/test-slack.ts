@@ -36,8 +36,9 @@ const mockS3Client = {
 };
 
 // Monkey patch s3Client
-import * as s3ClientModule from "../src/lib/s3-client";
-(s3ClientModule as any).s3Client = mockS3Client;
+import { s3Client } from "../src/lib/s3-client";
+// @ts-ignore
+s3Client.fetch = mockS3Client.fetch;
 
 async function runTest() {
 	console.log("Running Slack Integration Test...");
@@ -82,6 +83,11 @@ async function runTest() {
 
 	if (bucket.length > 0) {
 		console.log("✅ CDN Bucket created:", bucket[0].name);
+		if (bucket[0].isCdn) {
+			console.log("✅ Bucket marked as CDN");
+		} else {
+			console.error("❌ Bucket NOT marked as CDN");
+		}
 	} else {
 		console.error("❌ CDN Bucket not created");
 	}

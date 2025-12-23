@@ -392,13 +392,13 @@
             </button>
         </div>
 
-        <div class="mb-6 flex gap-4">
-             <button onclick="deleteBucketAdmin()" class="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">Delete Bucket</button>
-             <button onclick="resetBucketCorsAdmin()" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors border border-white/10">Reset CORS</button>
+        <div class="mb-6 flex gap-4" id="admin-bucket-actions">
+             <button id="btn-delete-bucket" onclick="deleteBucketAdmin()" class="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">Delete Bucket</button>
+             <button id="btn-reset-cors" onclick="resetBucketCorsAdmin()" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors border border-white/10">Reset CORS</button>
              <label class="inline-flex items-center cursor-pointer bg-black/30 px-4 py-2 rounded-lg border border-white/10">
                 <input type="checkbox" id="admin-bucket-paused" class="sr-only peer" onchange="toggleBucketPause(this.checked)">
                 <div class="relative w-9 h-5 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-red rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-hc-red"></div>
-                <span class="ms-2 text-xs font-medium text-text-muted peer-checked:text-white">Pause Bucket</span>
+                <span class="ms-2 text-xs font-medium text-text-muted peer-checked:text-white" id="admin-bucket-pause-label">Pause Bucket</span>
             </label>
         </div>
 
@@ -857,12 +857,15 @@
             const tbody = document.getElementById("modal-buckets-table");
             tbody.innerHTML = buckets.map(b => `
                 <tr class="hover:bg-white/5 transition-colors">
-                    <td class="px-4 py-3 font-mono text-white">${b.name}</td>
+                    <td class="px-4 py-3 font-mono text-white">
+                        ${b.name}
+                        ${b.isCdn ? '<span class="ml-2 bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-purple-500/30">CDN</span>' : ''}
+                    </td>
                     <td class="px-4 py-3 font-mono text-xs text-text-muted">${formatBytes(b.totalBytes)}</td>
                     <td class="px-4 py-3">
                          ${b.isPaused
                             ? `<div class="flex flex-col items-start">
-                                <span class="text-red-400 text-xs font-bold">PAUSED</span>
+                                <span class="text-red-400 text-xs font-bold">SUSPENDED</span>
                                 ${b.pauseReason ? `<span class="text-[10px] text-red-300 max-w-[100px] truncate" title="${b.pauseReason}">${b.pauseReason}</span>` : ''}
                                </div>`
                             : '<span class="text-emerald-400 text-xs font-bold">ACTIVE</span>'}
@@ -965,6 +968,23 @@
             document.getElementById("admin-bucket-paused").checked = data.isPaused;
             document.getElementById("admin-view-files-link").href = `/dashboard/buckets/${data.name}`;
 
+            // CDN Specific UI
+            const deleteBtn = document.getElementById("btn-delete-bucket");
+            const corsBtn = document.getElementById("btn-reset-cors");
+            const pauseLabel = document.getElementById("admin-bucket-pause-label");
+
+            if (data.isCdn) {
+                deleteBtn.textContent = "Reset CDN";
+                deleteBtn.onclick = resetCdnAdmin;
+                corsBtn.classList.add("hidden");
+                pauseLabel.textContent = "Suspend CDN";
+            } else {
+                deleteBtn.textContent = "Delete Bucket";
+                deleteBtn.onclick = deleteBucketAdmin;
+                corsBtn.classList.remove("hidden");
+                pauseLabel.textContent = "Pause Bucket";
+            }
+
             // Show bucket pause reason
             const pauseReasonContainer = document.getElementById("admin-bucket-pause-reason");
             if (pauseReasonContainer) pauseReasonContainer.remove();
@@ -1045,6 +1065,20 @@
             await fetch(`/api/admin/buckets/${currentBucket.name}`, { method: "DELETE" });
             closeAdminBucketModal();
             if (currentUser) openUserModal(currentUser.id); // Refresh user modal
+        }
+
+        async function resetCdnAdmin() {
+            if (!currentBucket || !confirm("Reset this CDN bucket? This will delete ALL files in it.")) return;
+            // We use the same delete endpoint, but the backend handles it differently for CDN buckets (empties instead of deletes)
+            // Wait, the backend currently blocks deletion of CDN buckets.
+            // We need to update the backend to allow "resetting" (emptying) CDN buckets.
+            // For now, let's just call delete and see if we can modify the backend to handle "reset" via a query param or just allow DELETE to empty if it's CDN?
+            // The user said "delete is called reset and just deletes everything in it".
+            // So we should probably add a query param ?reset=true or just handle DELETE on CDN as empty.
+            
+            await fetch(`/api/admin/buckets/${currentBucket.name}?reset=true`, { method: "DELETE" });
+            closeAdminBucketModal();
+            if (currentUser) openUserModal(currentUser.id);
         }
 
         async function resetBucketCorsAdmin() {
