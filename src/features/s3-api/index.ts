@@ -135,11 +135,33 @@ export async function handleS3Request(
 
 	if (method === "GET") {
 		// Egress Limit Check
-		// We allow 3x the storage limit as egress
-		const egressLimit =
-			user.storageLimitBytes !== null
-				? BigInt(user.storageLimitBytes) * 3n
-				: null;
+		// Rule: Manual Limit OR (Storage Limit * 3 OR 10GB, whichever is higher)
+		let egressLimit: bigint | null = null;
+
+		if (user.egressLimitBytes !== null) {
+			// Manual Limit
+			const manualLimit = BigInt(user.egressLimitBytes);
+			if (manualLimit === -1n) {
+				// Unlimited
+				egressLimit = null;
+			} else {
+				egressLimit = manualLimit;
+			}
+		} else {
+			// Default Logic
+			// 10GB or 3x Storage Limit
+			if (user.storageLimitBytes === null) {
+				// If storage is unlimited, egress is unlimited by default?
+				// Or should we enforce the 10GB minimum?
+				// Assuming unlimited storage implies unlimited egress for now unless specified.
+				egressLimit = null;
+			} else {
+				const storageLimit = BigInt(user.storageLimitBytes);
+				const calculated = storageLimit * 3n;
+				const minLimit = 10n * 1024n * 1024n * 1024n; // 10GB
+				egressLimit = calculated > minLimit ? calculated : minLimit;
+			}
+		}
 
 		if (egressLimit !== null && BigInt(user.egressBytes) > egressLimit) {
 			return new Response(

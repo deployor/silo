@@ -18,6 +18,7 @@ export const users = pgTable("users", {
 	storageUsageBytes: bigint("storage_usage_bytes", { mode: "number" })
 		.notNull()
 		.default(0),
+	egressLimitBytes: bigint("egress_limit_bytes", { mode: "number" }),
 	ingressBytes: bigint("ingress_bytes", { mode: "number" })
 		.notNull()
 		.default(0),
