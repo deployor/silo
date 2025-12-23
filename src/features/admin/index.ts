@@ -1,8 +1,8 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { config } from "../../config";
 import { db } from "../../db";
-import { bucketKeys, buckets, users } from "../../db/schema";
+import { bucketKeys, buckets, requestLogs, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 import { deleteBucketContents, getInternalPath } from "../s3-api/utils";
 
@@ -322,6 +322,78 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				}
 			}
 			return new Response("Deleted", { status: 200 });
+		}
+
+		// Get Logs (Admin)
+		if (path === "/api/admin/logs" && req.method === "GET") {
+			const limit = Number.parseInt(url.searchParams.get("limit") || "50");
+			const offset = Number.parseInt(url.searchParams.get("offset") || "0");
+			const search = url.searchParams.get("search");
+
+			let conditions = undefined;
+			if (search) {
+				conditions = or(
+					ilike(requestLogs.path, `%${search}%`),
+					ilike(requestLogs.method, `%${search}%`),
+					ilike(buckets.name, `%${search}%`),
+					ilike(users.email, `%${search}%`),
+				);
+			}
+
+			const logsQuery = db
+				.select({
+					id: requestLogs.id,
+					method: requestLogs.method,
+					path: requestLogs.path,
+					statusCode: requestLogs.statusCode,
+					latencyMs: requestLogs.latencyMs,
+					createdAt: requestLogs.createdAt,
+					bucketName: buckets.name,
+					ownerEmail: users.email,
+					ipAddress: requestLogs.ipAddress,
+				})
+				.from(requestLogs)
+				.leftJoin(buckets, eq(requestLogs.bucketId, buckets.id))
+				.leftJoin(users, eq(requestLogs.ownerId, users.id))
+				.orderBy(desc(requestLogs.createdAt))
+				.limit(limit)
+				.offset(offset);
+
+			if (conditions) {
+				logsQuery.where(conditions);
+			}
+
+			const logs = await logsQuery;
+
+			// Get total count for stats (approximate if search is empty, or exact if search is present)
+			// For now, let's just return the logs and maybe a total count if easy
+			// A separate count query is needed for total results with filter
+			let total = 0;
+			if (conditions) {
+				const countRes = await db
+					.select({ count: sql<number>`count(*)` })
+					.from(requestLogs)
+					.leftJoin(buckets, eq(requestLogs.bucketId, buckets.id))
+					.leftJoin(users, eq(requestLogs.ownerId, users.id))
+					.where(conditions);
+				total = Number(countRes[0].count);
+			} else {
+				// Fast count for all logs
+				const countRes = await db
+					.select({ count: sql<number>`count(*)` })
+					.from(requestLogs);
+				total = Number(countRes[0].count);
+			}
+
+			return new Response(
+				JSON.stringify({
+					logs,
+					total,
+					limit,
+					offset,
+				}),
+				{ headers: { "Content-Type": "application/json" } },
+			);
 		}
 	}
 
