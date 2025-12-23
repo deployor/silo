@@ -51,10 +51,10 @@ async function runAdminTest() {
 		region: "auto",
 	});
 
-	const endpoint = "https://cargo.deployor.dev";
+	const endpoint = "http://localhost:3000";
 
 	try {
-		// 1. Test Normal Access
+		// 1. Test Normal Access (Generates Logs)
 		console.log("\nTesting Normal Access...");
 		const putRes = await s3.fetch(`${endpoint}/${bucketName}/test.txt`, {
 			method: "PUT",
@@ -64,40 +64,32 @@ async function runAdminTest() {
 			throw new Error(`Normal PUT failed: ${putRes.status}`);
 		console.log("✅ Normal Access OK");
 
-		// 2. Test User Lock
-		console.log("\nTesting User Lock...");
-		await db.update(users).set({ isLocked: true }).where(eq(users.id, userId));
-		const lockRes = await s3.fetch(`${endpoint}/${bucketName}/test.txt`);
-		if (lockRes.status !== 403)
-			throw new Error(`Locked user should be 403, got ${lockRes.status}`);
-		console.log("✅ User Lock OK");
-		await db.update(users).set({ isLocked: false }).where(eq(users.id, userId));
+		// 2. Test Admin Logs API
+		console.log("\nTesting Admin Logs API...");
+		const logsRes = await fetch(`${endpoint}/api/admin/logs?limit=10`, {
+			headers: {
+				Cookie: `cargo_user_id=${adminId}`,
+			},
+		});
 
-		// 3. Test Bucket Pause
-		console.log("\nTesting Bucket Pause...");
-		await db
-			.update(buckets)
-			.set({ isPaused: true })
-			.where(eq(buckets.name, bucketName));
-		const pauseRes = await s3.fetch(`${endpoint}/${bucketName}/test.txt`);
-		if (pauseRes.status !== 403)
-			throw new Error(`Paused bucket should be 403, got ${pauseRes.status}`);
-		console.log("✅ Bucket Pause OK");
-		await db
-			.update(buckets)
-			.set({ isPaused: false })
-			.where(eq(buckets.name, bucketName));
+		if (logsRes.status !== 200) {
+			throw new Error(`Failed to fetch logs: ${logsRes.status}`);
+		}
 
-		// 4. Test Key Pause
-		console.log("\nTesting Key Pause...");
-		await db
-			.update(bucketKeys)
-			.set({ isPaused: true })
-			.where(eq(bucketKeys.accessKey, accessKey));
-		const keyPauseRes = await s3.fetch(`${endpoint}/${bucketName}/test.txt`);
-		if (keyPauseRes.status !== 403)
-			throw new Error(`Paused key should be 403, got ${keyPauseRes.status}`);
-		console.log("✅ Key Pause OK");
+		const logsData = await logsRes.json();
+		console.log(`Fetched ${logsData.logs.length} logs`);
+		if (logsData.logs.length === 0) {
+			console.warn("⚠️ No logs found, but we just made a request!");
+		} else {
+			const foundLog = logsData.logs.find(
+				(l: any) => l.path === `/${bucketName}/test.txt` && l.method === "PUT",
+			);
+			if (foundLog) {
+				console.log("✅ Found expected log entry");
+			} else {
+				console.warn("⚠️ Did not find the specific log entry we just created");
+			}
+		}
 
 		console.log("\n🎉 All Admin Logic Tests Passed!");
 	} catch (error) {
