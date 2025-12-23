@@ -134,6 +134,7 @@
                 <th class="px-6 py-4">Bucket</th>
                 <th class="px-6 py-4">User</th>
                 <th class="px-6 py-4">IP</th>
+                <th class="px-6 py-4">User Agent</th>
                 <th class="px-6 py-4">Ingress</th>
                 <th class="px-6 py-4">Egress</th>
                 <th class="px-6 py-4 text-right">Latency</th>
@@ -643,6 +644,8 @@
                     </td>
                     <td class="px-6 py-4 font-mono text-xs text-text-muted">
                         ${log.ipAddress || '-'}
+                    </td>
+                    <td class="px-6 py-4 font-mono text-xs text-text-muted truncate max-w-[150px]" title="${log.userAgent || ''}">
                     </td>
                     <td class="px-6 py-4 font-mono text-xs text-text-muted">
                         ${formatBytes(log.ingressBytes)}
