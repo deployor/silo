@@ -213,6 +213,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 						isPaused: b.isPaused,
 						pauseReason: b.pauseReason,
 						corsConfig: b.corsConfig,
+						isCdn: b.isCdn,
 					})),
 				}),
 				{ headers: { "Content-Type": "application/json" } },
@@ -442,6 +443,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				return new Response("Unauthorized", { status: 403 });
 			if (bucket[0].isPaused && !user.isAdmin)
 				return new Response("Bucket is paused", { status: 403 });
+
+			if (bucket[0].isCdn)
+				return new Response("Cannot delete keys for CDN bucket", { status: 403 });
 
 			await db.delete(bucketKeys).where(eq(bucketKeys.id, keyId));
 

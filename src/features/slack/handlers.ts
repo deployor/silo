@@ -379,6 +379,38 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 
 	// 6. Delete Bucket Attempt (Home Tab)
 	if (actionId === "delete_bucket") {
+		// Check if CDN bucket
+		const bucketId = actionValue; // We need to pass bucket ID in the button value
+		if (bucketId) {
+			const bucket = await db
+				.select()
+				.from(buckets)
+				.where(eq(buckets.id, bucketId))
+				.limit(1);
+
+			if (bucket.length > 0 && bucket[0].isCdn) {
+				// Show error modal or message
+				await openModal(payload.trigger_id, {
+					type: "modal",
+					title: {
+						type: "plain_text",
+						text: "Cannot Delete",
+						emoji: true,
+					},
+					blocks: [
+						{
+							type: "section",
+							text: {
+								type: "mrkdwn",
+								text: "This is your Slack CDN bucket. It cannot be deleted manually. It is managed automatically by your Slack uploads.",
+							},
+						},
+					],
+				});
+				return;
+			}
+		}
+
 		await openModal(payload.trigger_id, deleteBucketWarningModal());
 	}
 
