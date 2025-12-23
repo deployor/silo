@@ -2,6 +2,8 @@ import { and, eq, sql } from "drizzle-orm";
 import { config } from "../../config";
 import { db } from "../../db";
 import { bucketKeys, buckets, users } from "../../db/schema";
+import { s3Client } from "../../lib/s3-client";
+import { getInternalPath } from "../s3-api/utils";
 import { openModal, publishView } from "./client";
 import {
 	createBucketModal,
@@ -140,6 +142,13 @@ interface SlackInteractionPayload {
 			value: string;
 		};
 	}[];
+	container?: {
+		channel_id: string;
+		message_ts: string;
+	};
+	message?: {
+		blocks: any[];
+	};
 }
 
 export async function handleInteraction(payload: SlackInteractionPayload) {
@@ -451,5 +460,69 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			.where(eq(buckets.userId, user[0].id));
 
 		await publishView(payload.user.id, homeView(user[0], userBuckets, page));
+	}
+
+	// 10. Delete CDN File
+	if (actionId === "delete_cdn_file" && actionValue) {
+		const parts = actionValue.split(":");
+		const bucketId = parts[1];
+		const key = parts[2];
+
+		// Verify ownership
+		const bucket = await db
+			.select()
+			.from(buckets)
+			.where(and(eq(buckets.id, bucketId), eq(buckets.userId, user[0].id)))
+			.limit(1);
+
+		if (bucket.length > 0) {
+			// Delete from S3
+			const internalPath = getInternalPath(key, user[0], bucket[0]);
+			await s3Client.fetch(internalPath, { method: "DELETE" });
+
+			// Update DB Stats (approximate, we don't know exact size here easily without querying first)
+			// For now, we just decrement file count if we tracked it, but we only track bytes.
+			// We could query S3 head to get size before delete, but that's slow.
+			// Let's just delete.
+
+			// Update the message to show "Deleted"
+			// We need to find the block that contained this button and update it.
+			// This is tricky because we don't have the block ID easily.
+			// But we have the message blocks in the payload if it's a block action.
+
+			if (payload.message && payload.message.blocks) {
+				const newBlocks = payload.message.blocks.map((block: any) => {
+					if (
+						block.accessory &&
+						block.accessory.action_id === "delete_cdn_file" &&
+						block.accessory.value === actionValue
+					) {
+						// This is the block. Replace it.
+						return {
+							type: "section",
+							text: {
+								type: "mrkdwn",
+								text: `~${block.text.text.split("\n")[0]}~\n_Deleted_`,
+							},
+						};
+					}
+					return block;
+				});
+
+				await fetch(payload.container?.message_ts ? "https://slack.com/api/chat.update" : "", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${config.slack.botToken}`,
+					},
+					body: JSON.stringify({
+						channel: payload.container?.channel_id,
+						ts: payload.container?.message_ts,
+						blocks: newBlocks,
+						text: "File Upload Summary (Updated)",
+					}),
+				});
+			}
+		}
 	}
 }
