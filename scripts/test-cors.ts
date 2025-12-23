@@ -89,7 +89,7 @@ test("CORS: PutBucketCors sets configuration", async () => {
 	expect(updatedBucket.corsConfig).toBeTruthy();
 	const parsed = JSON.parse(updatedBucket.corsConfig!);
 	expect(parsed.CORSRules.length).toBe(2);
-	expect(parsed.CORSRules[0].AllowedOrigins).toBe("http://www.example.com");
+	expect(parsed.CORSRules[0].AllowedOrigins).toEqual(["http://www.example.com"]);
 
 	await teardown();
 });
