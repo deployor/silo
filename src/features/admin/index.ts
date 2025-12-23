@@ -86,10 +86,13 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		if (userQuotaMatch && req.method === "POST") {
 			const userId = userQuotaMatch[1];
 			const body = await req.json();
-			await db
-				.update(users)
-				.set({ storageLimitBytes: body.storageLimitBytes })
-				.where(eq(users.id, userId));
+			const updateData: any = {};
+			if (body.storageLimitBytes !== undefined)
+				updateData.storageLimitBytes = body.storageLimitBytes;
+			if (body.egressLimitBytes !== undefined)
+				updateData.egressLimitBytes = body.egressLimitBytes;
+
+			await db.update(users).set(updateData).where(eq(users.id, userId));
 			return new Response("Updated", { status: 200 });
 		}
 

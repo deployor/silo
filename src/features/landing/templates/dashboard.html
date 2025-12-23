@@ -584,6 +584,7 @@
           );
           
           // Egress Limit Logic
+          // Egress limit is 3x storage limit
           const egressLimitBytes = data.user.storageLimit * 3;
           document.getElementById("egress-limit").textContent = `/ ${formatBytes(egressLimitBytes)}`;
           

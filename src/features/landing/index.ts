@@ -779,12 +779,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		// However, we need to inject the bucket name or just let the client side handle it from URL.
 		// The template uses window.location to get bucket name.
 
-		const adminLink = user.isAdmin
-			? '<a href="/admin" class="text-hc-red hover:text-white transition-colors">Admin</a>'
-			: "";
-		const finalFiles = filesTemplate.replace("<!-- ADMIN_LINK -->", adminLink);
-
-		return new Response(finalFiles, {
+		return new Response(filesTemplate, {
 			headers: { "Content-Type": "text/html" },
 		});
 	}

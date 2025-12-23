@@ -130,6 +130,30 @@
                 <p class="text-xs text-text-muted mt-2">Current Usage: <span id="modal-storage-usage" class="text-white font-mono">0 B</span></p>
             </div>
              <div class="bg-black/30 p-6 rounded-xl border border-white/10">
+                <h4 class="text-white font-bold mb-4">Egress Limit</h4>
+                <div class="flex flex-col gap-3">
+                    <select id="modal-egress-mode" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white cursor-pointer w-full" onchange="toggleEgressInput()">
+                        <option value="default">Default (Max(10GB, 3x Storage))</option>
+                        <option value="unlimited">Unlimited</option>
+                        <option value="custom">Custom Amount</option>
+                    </select>
+                    
+                    <div id="modal-egress-custom-container" class="flex gap-2 items-center hidden">
+                        <input type="number" id="modal-egress-limit" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full" placeholder="Amount" step="0.01">
+                        <select id="modal-egress-unit" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white cursor-pointer">
+                            <option value="1">Bytes</option>
+                            <option value="1024">KB</option>
+                            <option value="1048576">MB</option>
+                            <option value="1073741824">GB</option>
+                            <option value="1099511627776">TB</option>
+                        </select>
+                    </div>
+                    
+                    <button onclick="updateQuota('egress')" class="bg-hc-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors w-full">Update Egress Limit</button>
+                </div>
+                <p class="text-xs text-text-muted mt-2">Current Usage: <span id="modal-egress-usage" class="text-white font-mono">0 B</span></p>
+            </div>
+             <div class="bg-black/30 p-6 rounded-xl border border-white/10">
                 <h4 class="text-white font-bold mb-4">Account Status</h4>
                 <div class="flex items-center gap-4">
                     <label class="inline-flex items-center cursor-pointer">
@@ -252,6 +276,18 @@
             };
         }
 
+        function toggleEgressInput() {
+            const mode = document.getElementById("modal-egress-mode").value;
+            const container = document.getElementById("modal-egress-custom-container");
+            if (mode === "custom") {
+                container.classList.remove("hidden");
+                container.classList.add("flex");
+            } else {
+                container.classList.add("hidden");
+                container.classList.remove("flex");
+            }
+        }
+
         let allUsers = [];
         let currentUser = null;
         let currentBucket = null;
@@ -351,6 +387,23 @@
             document.getElementById("modal-storage-unit").value = bestUnit.unit > maxUnit ? maxUnit : bestUnit.unit;
 
             document.getElementById("modal-storage-usage").textContent = formatBytes(user.storageUsageBytes);
+
+            // Egress Limit Setup
+            const egressModeSelect = document.getElementById("modal-egress-mode");
+            if (user.egressLimitBytes === null || user.egressLimitBytes === undefined) {
+                egressModeSelect.value = "default";
+            } else if (user.egressLimitBytes === -1 || user.egressLimitBytes === "-1") {
+                egressModeSelect.value = "unlimited";
+            } else {
+                egressModeSelect.value = "custom";
+                const bestUnit = getBestUnit(user.egressLimitBytes);
+                document.getElementById("modal-egress-limit").value = bestUnit.value;
+                const maxUnit = 1099511627776;
+                document.getElementById("modal-egress-unit").value = bestUnit.unit > maxUnit ? maxUnit : bestUnit.unit;
+            }
+            toggleEgressInput();
+            document.getElementById("modal-egress-usage").textContent = formatBytes(user.egressBytes);
+            
             document.getElementById("modal-is-locked").checked = user.isLocked;
 
             // Show lock reason in modal if locked
@@ -403,25 +456,54 @@
 
         async function updateQuota(type) {
             if (!currentUser) return;
-            const amount = parseFloat(document.getElementById("modal-storage-limit").value);
-            const unit = parseFloat(document.getElementById("modal-storage-unit").value);
+            
+            let body = {};
+            let message = "";
 
-            if (isNaN(amount) || amount < 0) {
-                alert("Invalid amount.");
-                return;
+            if (type === 'storage') {
+                const amount = parseFloat(document.getElementById("modal-storage-limit").value);
+                const unit = parseFloat(document.getElementById("modal-storage-unit").value);
+
+                if (isNaN(amount) || amount < 0) {
+                    alert("Invalid amount.");
+                    return;
+                }
+                const totalBytes = Math.floor(amount * unit);
+                body = { storageLimitBytes: totalBytes };
+                message = `Storage quota updated to ${formatBytes(totalBytes)}`;
+            } else if (type === 'egress') {
+                const mode = document.getElementById("modal-egress-mode").value;
+                let limit = null;
+                
+                if (mode === 'unlimited') {
+                    limit = -1;
+                    message = "Egress limit set to Unlimited";
+                } else if (mode === 'custom') {
+                    const amount = parseFloat(document.getElementById("modal-egress-limit").value);
+                    const unit = parseFloat(document.getElementById("modal-egress-unit").value);
+                    if (isNaN(amount) || amount < 0) {
+                        alert("Invalid amount.");
+                        return;
+                    }
+                    limit = Math.floor(amount * unit);
+                    message = `Egress limit updated to ${formatBytes(limit)}`;
+                } else {
+                    // Default
+                    limit = null;
+                    message = "Egress limit set to Default (Max(10GB, 3x Storage))";
+                }
+                body = { egressLimitBytes: limit };
             }
 
-            const totalBytes = Math.floor(amount * unit);
-            
             await fetch(`/api/admin/users/${currentUser.id}/quota`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ storageLimitBytes: totalBytes })
+                body: JSON.stringify(body)
             });
             
             // Refresh
             loadUsers();
-            alert(`Quota updated to ${formatBytes(totalBytes)}`);
+            alert(message);
         }
 
         async function toggleUserLock(locked) {

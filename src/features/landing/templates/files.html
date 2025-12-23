@@ -27,7 +27,12 @@
         >
       </div>
       <div class="flex items-center gap-6 font-bold text-sm">
-        <!-- ADMIN_LINK -->
+        <a
+          href="/admin"
+          class="text-hc-red hover:text-white transition-colors hidden"
+          id="admin-link"
+          >Admin</a
+        >
         <a
           href="/docs"
           class="text-text-muted hover:text-white transition-colors"
@@ -214,6 +219,11 @@
             
             // Update User ID if present in response (optional, but good for consistency)
             if (data.userId) document.getElementById("user-id").textContent = data.userId;
+
+            // Show Admin Link if user is admin
+            if (data.isAdmin) {
+                document.getElementById("admin-link").classList.remove("hidden");
+            }
 
             renderBreadcrumbs(prefix);
             renderFiles(data.files, data.folders, reset);
