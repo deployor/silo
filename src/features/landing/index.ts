@@ -171,7 +171,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			const userBuckets = await db
 				.select()
 				.from(buckets)
-				.where(and(eq(buckets.userId, user.id), eq(buckets.isCdn, false)));
+				.where(eq(buckets.userId, user.id));
 
 			const bucketsWithKeys = await Promise.all(
 				userBuckets.map(async (b) => {
