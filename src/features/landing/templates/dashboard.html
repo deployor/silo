@@ -584,14 +584,36 @@
           );
           
           // Egress Limit Logic
-          // Egress limit is 3x storage limit
-          const egressLimitBytes = data.user.storageLimit * 3;
-          document.getElementById("egress-limit").textContent = `/ ${formatBytes(egressLimitBytes)}`;
+          let egressLimitBytes;
+          let egressLimitText;
           
-          const egressPercent = Math.min(
-            (data.user.egressBytes / egressLimitBytes) * 100,
-            100
-          );
+          if (data.user.egressLimit === null) {
+             // Default: Max(10GB, 3x Storage)
+             const calculated = data.user.storageLimit * 3;
+             const minLimit = 10 * 1024 * 1024 * 1024; // 10GB
+             egressLimitBytes = Math.max(calculated, minLimit);
+             egressLimitText = `/ ${formatBytes(egressLimitBytes)} (Default)`;
+          } else if (data.user.egressLimit === -1) {
+             // Unlimited
+             egressLimitBytes = Infinity;
+             egressLimitText = "/ Unlimited";
+          } else {
+             // Custom
+             egressLimitBytes = data.user.egressLimit;
+             egressLimitText = `/ ${formatBytes(egressLimitBytes)}`;
+          }
+
+          document.getElementById("egress-limit").textContent = egressLimitText;
+          
+          let egressPercent = 0;
+          if (egressLimitBytes === Infinity) {
+             egressPercent = 0; // Or maybe show a small bar to indicate usage?
+          } else {
+             egressPercent = Math.min(
+                (data.user.egressBytes / egressLimitBytes) * 100,
+                100
+             );
+          }
           document.getElementById("egress-bar").style.width = `${egressPercent}%`;
           
           document.getElementById("total-bytes").textContent = formatBytes(
