@@ -66,10 +66,17 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	const path = url.pathname;
 
 	if (path === "/docs" || path === "/docs/") {
-		const finalDocs = docsTemplate.replace(
+		const user = await getCurrentUser(req);
+		let finalDocs = docsTemplate.replace(
 			/https:\/\/silo\.deployor\.dev/g,
 			`https://${config.s3Domain}`,
 		);
+
+		const cdnLink = user
+			? '<a href="/cdn" class="hover:text-white transition-colors">CDN</a>'
+			: "";
+		finalDocs = finalDocs.replace("<!-- CDN_LINK_PLACEHOLDER -->", cdnLink);
+
 		return new Response(finalDocs, {
 			headers: { "Content-Type": "text/html" },
 		});
