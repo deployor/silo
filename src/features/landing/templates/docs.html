@@ -83,6 +83,15 @@
                   Public Buckets
                 </button>
               </li>
+              <li>
+                <button
+                  onclick="showSection('cors')"
+                  class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg"
+                  id="nav-cors"
+                >
+                  CORS Configuration
+                </button>
+              </li>
             </ul>
           </div>
 
@@ -212,6 +221,34 @@
           </p>
         </div>
 
+        <!-- CORS -->
+        <div id="cors" class="section-content">
+          <h1 class="text-4xl font-bold mb-6 text-white">CORS Configuration</h1>
+          <p class="text-lg mb-6 text-text-muted">
+            Cross-Origin Resource Sharing (CORS) allows client-side web applications loaded in one domain to interact with resources in a different domain.
+          </p>
+          <p class="text-lg mb-6 text-text-muted">
+            Cargo supports per-bucket CORS configuration. You can manage this directly in the <strong>Dashboard</strong> or via the standard S3 API.
+          </p>
+          
+          <h3 class="text-2xl font-bold mb-4 text-white">How it works</h3>
+          <p class="text-text-muted mb-6">
+            We handle CORS at the proxy level ("Virtual CORS"). When you set a CORS configuration, we store it and intercept <code>OPTIONS</code> requests to respond with the correct headers. We also inject the appropriate CORS headers into <code>GET</code> and other responses based on your rules.
+          </p>
+
+          <h3 class="text-2xl font-bold mb-4 text-white">Example Configuration</h3>
+          <pre class="rounded-lg mb-6"><code class="language-json">{
+  "CORSRules": [
+    {
+      "AllowedHeaders": ["*"],
+      "AllowedMethods": ["GET", "HEAD"],
+      "AllowedOrigins": ["https://myapp.com"],
+      "ExposeHeaders": []
+    }
+  ]
+}</code></pre>
+        </div>
+
         <!-- Supported API -->
         <div id="supported-api" class="section-content">
           <h1 class="text-4xl font-bold mb-6 text-white">Supported Operations</h1>
@@ -226,6 +263,9 @@
                 <li class="flex items-center gap-2"><span class="text-green-400">✓</span> ListBuckets <span class="text-xs opacity-50 ml-auto">(GET /)</span></li>
                 <li class="flex items-center gap-2"><span class="text-green-400">✓</span> HeadBucket <span class="text-xs opacity-50 ml-auto">(HEAD /bucket)</span></li>
                 <li class="flex items-center gap-2"><span class="text-green-400">✓</span> GetBucketLocation <span class="text-xs opacity-50 ml-auto">(GET /bucket?location)</span></li>
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> PutBucketCors <span class="text-xs opacity-50 ml-auto">(PUT /bucket?cors)</span></li>
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> GetBucketCors <span class="text-xs opacity-50 ml-auto">(GET /bucket?cors)</span></li>
+                <li class="flex items-center gap-2"><span class="text-green-400">✓</span> DeleteBucketCors <span class="text-xs opacity-50 ml-auto">(DELETE /bucket?cors)</span></li>
               </ul>
             </div>
 
@@ -293,9 +333,6 @@
                         <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketAcl</span>
                         <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutObjectAcl</span>
                         <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetObjectAcl</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketCors</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketCors</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeleteBucketCors</span>
                         <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketPolicy</span>
                         <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketPolicy</span>
                         <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeleteBucketPolicy</span>
