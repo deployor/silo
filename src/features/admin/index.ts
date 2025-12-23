@@ -79,7 +79,30 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 
 			const conditions = filters.length > 0 ? and(...filters) : undefined;
 
-			const usersQuery = db.select().from(users).limit(limit).offset(offset);
+			const usersQuery = db
+				.select({
+					id: users.id,
+					email: users.email,
+					slackId: users.slackId,
+					storageLimitBytes: users.storageLimitBytes,
+					storageUsageBytes: sql<number>`COALESCE(sum(${buckets.totalBytes}), 0)`.mapWith(
+						Number,
+					),
+					egressLimitBytes: users.egressLimitBytes,
+					ingressBytes: users.ingressBytes,
+					egressBytes: users.egressBytes,
+					totalRequests: users.totalRequests,
+					createdAt: users.createdAt,
+					updatedAt: users.updatedAt,
+					isAdmin: users.isAdmin,
+					isLocked: users.isLocked,
+					lockReason: users.lockReason,
+				})
+				.from(users)
+				.leftJoin(buckets, eq(users.id, buckets.userId))
+				.limit(limit)
+				.offset(offset)
+				.groupBy(users.id);
 
 			if (conditions) {
 				usersQuery.where(conditions);
@@ -364,7 +387,25 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					.limit(1);
 				if (owner.length > 0) {
 					const internalKey = getInternalPath(key, owner[0], bucket[0]);
-					await s3Client.fetch(internalKey, { method: "DELETE" });
+
+					// Get file size first to update quota
+					try {
+						const headRes = await s3Client.fetch(internalKey, { method: "HEAD" });
+						const size = Number(headRes.headers.get("content-length") || 0);
+
+						await s3Client.fetch(internalKey, { method: "DELETE" });
+
+						if (size > 0) {
+							await db
+								.update(buckets)
+								.set({
+									totalBytes: sql`${buckets.totalBytes} - ${size}`,
+								})
+								.where(eq(buckets.id, bucket[0].id));
+						}
+					} catch (e) {
+						console.error("Failed to delete file (admin):", e);
+					}
 				}
 			}
 			return new Response("Deleted", { status: 200 });
