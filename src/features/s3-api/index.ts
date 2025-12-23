@@ -207,6 +207,38 @@ export async function handleS3Request(
 	}
 
 	if (method === "GET") {
+		// Handle CORS Headers for actual requests
+		const origin = req.headers.get("Origin");
+		let corsHeaders = new Headers();
+		
+		if (origin && bucket.corsConfig) {
+			try {
+				const corsConfig = JSON.parse(bucket.corsConfig);
+				if (Array.isArray(corsConfig.CORSRules)) {
+					const rule = corsConfig.CORSRules.find((r: any) => {
+						const allowedOrigins = Array.isArray(r.AllowedOrigins) ? r.AllowedOrigins : [r.AllowedOrigins];
+						const allowedMethods = Array.isArray(r.AllowedMethods) ? r.AllowedMethods : [r.AllowedMethods];
+						
+						const originMatch = allowedOrigins.some((o: string) => o === "*" || o === origin);
+						const methodMatch = allowedMethods.includes("GET");
+						
+						return originMatch && methodMatch;
+					});
+
+					if (rule) {
+						corsHeaders.set("Access-Control-Allow-Origin", origin);
+						if (rule.ExposeHeaders) {
+							const exposeHeaders = Array.isArray(rule.ExposeHeaders) ? rule.ExposeHeaders : [rule.ExposeHeaders];
+							corsHeaders.set("Access-Control-Expose-Headers", exposeHeaders.join(", "));
+						}
+						corsHeaders.set("Vary", "Origin");
+					}
+				}
+			} catch (e) {
+				console.error("Failed to parse CORS config for GET request", e);
+			}
+		}
+
 		if (key === "" && url.searchParams.has("cors")) {
 			if (!bucket.corsConfig) {
 				return new Response(
@@ -356,9 +388,15 @@ ${rulesXml}
 			const rootPrefix = getInternalPath("", user, bucket);
 			const rewrittenXml = rewriteListObjectsV2Response(xml, rootPrefix);
 
+			// Merge CORS headers
+			const headers = new Headers({ "Content-Type": "application/xml" });
+			for (const [k, v] of corsHeaders.entries()) {
+				headers.set(k, v);
+			}
+
 			return new Response(rewrittenXml, {
 				status: response.status,
-				headers: { "Content-Type": "application/xml" },
+				headers,
 			});
 		}
 
@@ -393,9 +431,15 @@ ${rulesXml}
 			const rootPrefix = getInternalPath("", user, bucket);
 			const rewrittenXml = rewriteMultipartUploadResponse(xml, rootPrefix);
 
+			// Merge CORS headers
+			const headers = new Headers({ "Content-Type": "application/xml" });
+			for (const [k, v] of corsHeaders.entries()) {
+				headers.set(k, v);
+			}
+
 			return new Response(rewrittenXml, {
 				status: response.status,
-				headers: { "Content-Type": "application/xml" },
+				headers,
 			});
 		}
 
@@ -415,15 +459,27 @@ ${rulesXml}
 				const xml = await response.text();
 				const rootPrefix = getInternalPath("", user, bucket);
 				const rewrittenXml = rewriteMultipartUploadResponse(xml, rootPrefix);
+				// Merge CORS headers
+				const headers = new Headers({ "Content-Type": "application/xml" });
+				for (const [k, v] of corsHeaders.entries()) {
+					headers.set(k, v);
+				}
+
 				return new Response(rewrittenXml, {
 					status: response.status,
-					headers: { "Content-Type": "application/xml" },
+					headers,
 				});
+			}
+
+			// Merge CORS headers with upstream headers
+			const headers = new Headers(response.headers);
+			for (const [k, v] of corsHeaders.entries()) {
+				headers.set(k, v);
 			}
 
 			return new Response(response.body, {
 				status: response.status,
-				headers: response.headers,
+				headers,
 			});
 		} catch (_e) {
 			return new Response("Internal Error", { status: 500 });
