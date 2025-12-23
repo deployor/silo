@@ -51,7 +51,7 @@ async function runAdminTest() {
 		region: "auto",
 	});
 
-	const endpoint = "http://localhost:3000";
+	const endpoint = "https://cargo.deployor.dev";
 
 	try {
 		// 1. Test Normal Access (Generates Logs)
@@ -90,6 +90,25 @@ async function runAdminTest() {
 				console.warn("⚠️ Did not find the specific log entry we just created");
 			}
 		}
+
+		// 3. Test Admin Users API (Pagination)
+		console.log("\nTesting Admin Users API...");
+		const usersRes = await fetch(`${endpoint}/api/admin/users?limit=10`, {
+			headers: {
+				Cookie: `cargo_user_id=${adminId}`,
+			},
+		});
+
+		if (usersRes.status !== 200) {
+			throw new Error(`Failed to fetch users: ${usersRes.status}`);
+		}
+
+		const usersData = await usersRes.json();
+		console.log(`Fetched ${usersData.users.length} users`);
+		if (usersData.users.length < 2) {
+			throw new Error("Expected at least 2 users (admin + user)");
+		}
+		console.log("✅ Users API OK");
 
 		console.log("\n🎉 All Admin Logic Tests Passed!");
 	} catch (error) {
