@@ -327,27 +327,47 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		// Delete Bucket (Admin Force Delete)
 		if (bucketMatch && req.method === "DELETE") {
 			const bucketName = bucketMatch[1];
-			// Logic to empty bucket first would be good, similar to user dashboard
-			// For now, we assume the admin knows what they are doing or we reuse the empty logic
-			// Reusing empty logic requires user context, but we are admin.
-			// We can fetch the owner and use that.
+			const isReset = url.searchParams.get("reset") === "true";
+
 			const bucket = await db
 				.select()
 				.from(buckets)
 				.where(eq(buckets.name, bucketName))
 				.limit(1);
+			
 			if (bucket.length > 0) {
 				const owner = await db
 					.select()
 					.from(users)
 					.where(eq(users.id, bucket[0].userId))
 					.limit(1);
+				
 				if (owner.length > 0) {
-					// Prevent deletion of CDN buckets (Slack integration)
+					// CDN Bucket Handling
 					if (bucket[0].isCdn) {
-						return new Response("Cannot delete CDN bucket", { status: 403 });
+						if (!isReset) {
+							return new Response("Cannot delete CDN bucket. Use reset to empty it.", { status: 403 });
+						}
+						
+						// Reset: Empty bucket but don't delete it
+						const internalPrefix = getInternalPath("", owner[0], bucket[0]);
+						try {
+							await deleteBucketContents(internalPrefix);
+							
+							// Reset usage stats
+							await db
+								.update(buckets)
+								.set({ totalBytes: 0, totalRequests: 0 })
+								.where(eq(buckets.id, bucket[0].id));
+								
+							return new Response("Reset", { status: 200 });
+						} catch (e) {
+							console.error("Failed to reset CDN bucket:", e);
+							return new Response("Failed to reset bucket", { status: 500 });
+						}
 					}
 
+					// Normal Bucket Deletion
 					const internalPrefix = getInternalPath("", owner[0], bucket[0]);
 					try {
 						await deleteBucketContents(internalPrefix);
@@ -356,6 +376,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					}
 				}
 			}
+			
 			await db.delete(buckets).where(eq(buckets.name, bucketName));
 			return new Response("Deleted", { status: 200 });
 		}
