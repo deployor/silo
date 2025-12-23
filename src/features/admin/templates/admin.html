@@ -110,16 +110,41 @@
               View all request logs across all buckets.
             </p>
           </div>
-          <div class="flex items-center gap-4">
-             <div class="text-xs text-text-muted font-mono" id="logs-stats">
-                Showing 0 logs
+          <div class="flex flex-col gap-4 items-end">
+             <div class="flex items-center gap-4">
+                 <div class="text-xs text-text-muted font-mono" id="logs-stats">
+                    Showing 0 logs
+                 </div>
+                 <div class="relative">
+                    <input type="text" id="logs-search" placeholder="Search logs..." class="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red font-mono placeholder-white/20 transition-colors text-sm w-64" onkeydown="if(event.key === 'Enter') loadLogs(true)">
+                 </div>
+                 <button onclick="loadLogs(true)" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors">
+                    Search
+                 </button>
+                 <button onclick="toggleFilters()" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                    Filters
+                 </button>
              </div>
-             <div class="relative">
-                <input type="text" id="logs-search" placeholder="Search logs..." class="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red font-mono placeholder-white/20 transition-colors text-sm w-64" onkeydown="if(event.key === 'Enter') loadLogs(true)">
+             
+             <!-- Advanced Filters -->
+             <div id="logs-filters" class="hidden flex-wrap gap-2 items-center bg-black/20 p-3 rounded-xl border border-white/5 w-full justify-end">
+                <input type="text" id="filter-bucket" placeholder="Bucket Name" class="bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-hc-red w-32">
+                <select id="filter-method" class="bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-hc-red cursor-pointer">
+                    <option value="">All Methods</option>
+                    <option value="GET">GET</option>
+                    <option value="PUT">PUT</option>
+                    <option value="DELETE">DELETE</option>
+                    <option value="HEAD">HEAD</option>
+                    <option value="POST">POST</option>
+                </select>
+                <input type="number" id="filter-status" placeholder="Status Code" class="bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-hc-red w-24">
+                <input type="text" id="filter-ip" placeholder="IP Address" class="bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-hc-red w-32">
+                <button onclick="loadLogs(true)" class="bg-hc-blue hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">Apply</button>
+                <button onclick="clearFilters()" class="text-text-muted hover:text-white text-xs underline ml-2">Clear</button>
              </div>
-             <button onclick="loadLogs(true)" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors">
-                Search
-             </button>
           </div>
         </div>
 
@@ -127,17 +152,17 @@
           <table class="w-full text-left text-sm">
             <thead class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
               <tr>
-                <th class="px-6 py-4">Time</th>
+                <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors" onclick="sortLogs('createdAt')">Time <span id="sort-createdAt" class="ml-1">↓</span></th>
                 <th class="px-6 py-4">Method</th>
-                <th class="px-6 py-4">Status</th>
+                <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors" onclick="sortLogs('statusCode')">Status <span id="sort-statusCode" class="ml-1"></span></th>
                 <th class="px-6 py-4">Path</th>
                 <th class="px-6 py-4">Bucket</th>
                 <th class="px-6 py-4">User</th>
                 <th class="px-6 py-4">IP</th>
                 <th class="px-6 py-4">User Agent</th>
-                <th class="px-6 py-4">Ingress</th>
-                <th class="px-6 py-4">Egress</th>
-                <th class="px-6 py-4 text-right">Latency</th>
+                <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors" onclick="sortLogs('ingressBytes')">Ingress <span id="sort-ingressBytes" class="ml-1"></span></th>
+                <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors" onclick="sortLogs('egressBytes')">Egress <span id="sort-egressBytes" class="ml-1"></span></th>
+                <th class="px-6 py-4 text-right cursor-pointer hover:text-white transition-colors" onclick="sortLogs('latencyMs')">Latency <span id="sort-latencyMs" class="ml-1"></span></th>
                 <th class="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -474,10 +499,12 @@
             document.getElementById("log-modal").classList.remove("flex");
         }
 
-        // Pagination State
+        // Pagination & Filter State
         let logsOffset = 0;
         const logsLimit = 50;
         let logsLoading = false;
+        let logsSortBy = 'createdAt';
+        let logsSortOrder = 'desc';
 
         let usersOffset = 0;
         const usersLimit = 50;
@@ -562,6 +589,40 @@
             loadUsers(false);
         }
 
+        function toggleFilters() {
+            const filters = document.getElementById("logs-filters");
+            filters.classList.toggle("hidden");
+            filters.classList.toggle("flex");
+        }
+
+        function clearFilters() {
+            document.getElementById("filter-bucket").value = "";
+            document.getElementById("filter-method").value = "";
+            document.getElementById("filter-status").value = "";
+            document.getElementById("filter-ip").value = "";
+            document.getElementById("logs-search").value = "";
+            loadLogs(true);
+        }
+
+        function sortLogs(field) {
+            if (logsSortBy === field) {
+                logsSortOrder = logsSortOrder === 'desc' ? 'asc' : 'desc';
+            } else {
+                logsSortBy = field;
+                logsSortOrder = 'desc';
+            }
+            
+            // Update UI indicators
+            ['createdAt', 'statusCode', 'ingressBytes', 'egressBytes', 'latencyMs'].forEach(f => {
+                const el = document.getElementById(`sort-${f}`);
+                if (el) el.textContent = '';
+            });
+            const currentEl = document.getElementById(`sort-${field}`);
+            if (currentEl) currentEl.textContent = logsSortOrder === 'asc' ? '↑' : '↓';
+
+            loadLogs(true);
+        }
+
         async function loadLogs(reset = false) {
             if (logsLoading) return;
             logsLoading = true;
@@ -572,11 +633,23 @@
             }
 
             const search = document.getElementById("logs-search").value;
+            const bucket = document.getElementById("filter-bucket").value;
+            const method = document.getElementById("filter-method").value;
+            const status = document.getElementById("filter-status").value;
+            const ip = document.getElementById("filter-ip").value;
+
             const query = new URLSearchParams({
                 limit: logsLimit,
                 offset: logsOffset,
-                search: search
+                search: search,
+                sortBy: logsSortBy,
+                sortOrder: logsSortOrder
             });
+
+            if (bucket) query.set("bucket", bucket);
+            if (method) query.set("method", method);
+            if (status) query.set("status", status);
+            if (ip) query.set("ip", ip);
 
             try {
                 const res = await fetch(`/api/admin/logs?${query.toString()}`);

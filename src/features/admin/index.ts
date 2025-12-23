@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { config } from "../../config";
 import { db } from "../../db";
@@ -375,15 +375,75 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 			const limit = Number.parseInt(url.searchParams.get("limit") || "50");
 			const offset = Number.parseInt(url.searchParams.get("offset") || "0");
 			const search = url.searchParams.get("search");
+			const bucketFilter = url.searchParams.get("bucket");
+			const methodFilter = url.searchParams.get("method");
+			const statusFilter = url.searchParams.get("status");
+			const ipFilter = url.searchParams.get("ip");
+			const sortBy = url.searchParams.get("sortBy") || "createdAt";
+			const sortOrder = url.searchParams.get("sortOrder") || "desc";
 
-			let conditions = undefined;
+			const filters = [];
+
 			if (search) {
-				conditions = or(
-					ilike(requestLogs.path, `%${search}%`),
-					ilike(requestLogs.method, `%${search}%`),
-					ilike(requestLogs.bucketName, `%${search}%`),
-					ilike(users.email, `%${search}%`),
+				filters.push(
+					or(
+						ilike(requestLogs.path, `%${search}%`),
+						ilike(requestLogs.method, `%${search}%`),
+						ilike(requestLogs.bucketName, `%${search}%`),
+						ilike(users.email, `%${search}%`),
+						ilike(requestLogs.userAgent, `%${search}%`),
+					),
 				);
+			}
+
+			if (bucketFilter) {
+				filters.push(eq(requestLogs.bucketName, bucketFilter));
+			}
+			if (methodFilter) {
+				filters.push(eq(requestLogs.method, methodFilter));
+			}
+			if (statusFilter) {
+				filters.push(eq(requestLogs.statusCode, Number.parseInt(statusFilter)));
+			}
+			if (ipFilter) {
+				filters.push(eq(requestLogs.ipAddress, ipFilter));
+			}
+
+			const conditions = filters.length > 0 ? and(...filters) : undefined;
+
+			let orderBy: any;
+			switch (sortBy) {
+				case "latencyMs":
+					orderBy =
+						sortOrder === "asc"
+							? asc(requestLogs.latencyMs)
+							: desc(requestLogs.latencyMs);
+					break;
+				case "ingressBytes":
+					orderBy =
+						sortOrder === "asc"
+							? asc(requestLogs.ingressBytes)
+							: desc(requestLogs.ingressBytes);
+					break;
+				case "egressBytes":
+					orderBy =
+						sortOrder === "asc"
+							? asc(requestLogs.egressBytes)
+							: desc(requestLogs.egressBytes);
+					break;
+				case "statusCode":
+					orderBy =
+						sortOrder === "asc"
+							? asc(requestLogs.statusCode)
+							: desc(requestLogs.statusCode);
+					break;
+				case "createdAt":
+				default:
+					orderBy =
+						sortOrder === "asc"
+							? asc(requestLogs.createdAt)
+							: desc(requestLogs.createdAt);
+					break;
 			}
 
 			const logsQuery = db
@@ -404,7 +464,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				})
 				.from(requestLogs)
 				.leftJoin(users, eq(requestLogs.ownerId, users.id))
-				.orderBy(desc(requestLogs.createdAt))
+				.orderBy(orderBy)
 				.limit(limit)
 				.offset(offset);
 
@@ -414,9 +474,6 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 
 			const logs = await logsQuery;
 
-			// Get total count for stats (approximate if search is empty, or exact if search is present)
-			// For now, let's just return the logs and maybe a total count if easy
-			// A separate count query is needed for total results with filter
 			let total = 0;
 			if (conditions) {
 				const countRes = await db
@@ -426,7 +483,6 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					.where(conditions);
 				total = Number(countRes[0].count);
 			} else {
-				// Fast count for all logs
 				const countRes = await db
 					.select({ count: sql<number>`count(*)` })
 					.from(requestLogs);
