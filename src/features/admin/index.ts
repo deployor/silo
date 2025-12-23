@@ -381,7 +381,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				conditions = or(
 					ilike(requestLogs.path, `%${search}%`),
 					ilike(requestLogs.method, `%${search}%`),
-					ilike(buckets.name, `%${search}%`),
+					ilike(requestLogs.bucketName, `%${search}%`),
 					ilike(users.email, `%${search}%`),
 				);
 			}
@@ -394,12 +394,11 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					statusCode: requestLogs.statusCode,
 					latencyMs: requestLogs.latencyMs,
 					createdAt: requestLogs.createdAt,
-					bucketName: buckets.name,
+					bucketName: requestLogs.bucketName,
 					ownerEmail: users.email,
 					ipAddress: requestLogs.ipAddress,
 				})
 				.from(requestLogs)
-				.leftJoin(buckets, eq(requestLogs.bucketId, buckets.id))
 				.leftJoin(users, eq(requestLogs.ownerId, users.id))
 				.orderBy(desc(requestLogs.createdAt))
 				.limit(limit)
@@ -419,7 +418,6 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				const countRes = await db
 					.select({ count: sql<number>`count(*)` })
 					.from(requestLogs)
-					.leftJoin(buckets, eq(requestLogs.bucketId, buckets.id))
 					.leftJoin(users, eq(requestLogs.ownerId, users.id))
 					.where(conditions);
 				total = Number(countRes[0].count);
