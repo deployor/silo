@@ -339,7 +339,25 @@
                             <div class="bg-hc-blue h-1.5 rounded-full" style="width: ${Math.min((u.storageUsageBytes / u.storageLimitBytes) * 100, 100)}%"></div>
                         </div>
                     </td>
-                    <td class="px-6 py-4 font-mono text-xs text-white">${formatBytes(u.egressBytes)}</td>
+                    <td class="px-6 py-4">
+                        <div class="text-xs font-mono">
+                            <span class="text-white">${formatBytes(u.egressBytes)}</span>
+                            <span class="text-text-muted">/ ${
+                                u.egressLimitBytes === null
+                                    ? formatBytes(Math.max(u.storageLimitBytes * 3, 10 * 1024 * 1024 * 1024)) + ' (Def)'
+                                    : u.egressLimitBytes === -1
+                                        ? 'Unlimited'
+                                        : formatBytes(u.egressLimitBytes)
+                            }</span>
+                        </div>
+                        <div class="w-24 bg-white/10 rounded-full h-1.5 mt-1 overflow-hidden">
+                            <div class="bg-hc-red h-1.5 rounded-full" style="width: ${
+                                u.egressLimitBytes === -1
+                                    ? 0
+                                    : Math.min((u.egressBytes / (u.egressLimitBytes === null ? Math.max(u.storageLimitBytes * 3, 10 * 1024 * 1024 * 1024) : u.egressLimitBytes)) * 100, 100)
+                            }%"></div>
+                        </div>
+                    </td>
                     <td class="px-6 py-4">
                         ${u.isLocked
                             ? `<div class="flex flex-col items-start gap-1">
