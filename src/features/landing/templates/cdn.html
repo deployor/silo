@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Silo CDN - Drag & Drop Upload</title>
+    <title>Silo CDN</title>
     <link rel="stylesheet" href="/assets/styles.css" />
   </head>
   <body
@@ -19,7 +19,7 @@
           >SILO</a
         >
         <span
-          class="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded text-sm font-mono border border-blue-500/30"
+          class="bg-hc-red/20 text-hc-red px-2 py-0.5 rounded text-sm font-mono border border-hc-red/30"
           >CDN</span
         >
       </div>
@@ -39,20 +39,18 @@
     <main class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-5xl mx-auto">
       
       <div class="text-center mb-12">
-        <h1 class="text-5xl md:text-7xl font-black text-white mb-6 tracking-tighter italic">
-          DROP IT LIKE IT'S <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">HOT.</span>
+        <h1 class="text-6xl md:text-9xl font-black text-white mb-6 tracking-tighter italic">
+          CDN
         </h1>
         <p class="text-text-muted text-xl max-w-2xl mx-auto font-medium">
-          Instant public hosting for your assets. Drag, drop, and get a link.
-          <br>
-          <span class="text-sm opacity-60 mt-2 block">Powered by your Slack identity.</span>
+          Drag and drop any file to upload.
         </p>
       </div>
 
       <!-- Upload Zone -->
       <div
         id="drop-zone"
-        class="w-full max-w-3xl aspect-[21/9] bg-hc-dark border-2 border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center p-12 transition-all duration-300 hover:border-blue-400/50 hover:bg-blue-500/5 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/10 cursor-pointer relative overflow-hidden group card-shadow"
+        class="w-full max-w-3xl aspect-[21/9] bg-hc-dark border-2 border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center p-12 transition-all duration-300 hover:border-hc-red/50 hover:bg-hc-red/5 hover:scale-[1.02] hover:shadow-2xl hover:shadow-hc-red/10 cursor-pointer relative overflow-hidden group card-shadow"
       >
         <input
           type="file"
@@ -62,26 +60,26 @@
         />
         
         <div class="text-center pointer-events-none transition-transform duration-300 group-hover:scale-110" id="upload-prompt">
-          <div class="bg-gradient-to-br from-blue-500/20 to-emerald-500/20 p-6 rounded-2xl inline-flex mb-6 text-blue-400 border border-white/5 shadow-inner">
+          <div class="bg-hc-red/10 p-6 rounded-2xl inline-flex mb-6 text-hc-red border border-hc-red/20 shadow-inner">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
           </div>
-          <h3 class="text-2xl font-bold text-white mb-2">Drag & Drop Files</h3>
-          <p class="text-text-muted font-mono text-sm">or click to browse your system</p>
+          <h3 class="text-2xl font-bold text-white mb-2">Drop files here</h3>
+          <p class="text-text-muted font-mono text-sm">or click to browse</p>
         </div>
 
         <!-- Uploading State -->
         <div id="uploading-state" class="hidden flex-col items-center w-full max-w-md z-20 pointer-events-none">
             <div class="w-full bg-white/10 rounded-full h-3 mb-6 overflow-hidden backdrop-blur-sm">
-                <div id="progress-bar" class="bg-gradient-to-r from-blue-500 to-emerald-400 h-3 rounded-full transition-all duration-100 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style="width: 0%"></div>
+                <div id="progress-bar" class="bg-hc-red h-3 rounded-full transition-all duration-100 shadow-[0_0_10px_rgba(236,55,80,0.5)]" style="width: 0%"></div>
             </div>
             <p class="text-white font-mono text-lg animate-pulse flex items-center gap-2">
-                <svg class="animate-spin h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg class="animate-spin h-5 w-5 text-hc-red" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Uploading <span id="file-count" class="font-bold text-blue-400">0</span> files...
+                Uploading <span id="file-count" class="font-bold text-hc-red">0</span> files...
             </p>
         </div>
       </div>
@@ -118,12 +116,12 @@
       });
 
       function highlight(e) {
-        dropZone.classList.add('border-blue-400', 'bg-blue-500/10', 'scale-[1.02]');
+        dropZone.classList.add('border-hc-red', 'bg-hc-red/5', 'scale-[1.02]');
         dropZone.classList.remove('border-white/10', 'bg-hc-dark');
       }
 
       function unhighlight(e) {
-        dropZone.classList.remove('border-blue-400', 'bg-blue-500/10', 'scale-[1.02]');
+        dropZone.classList.remove('border-hc-red', 'bg-hc-red/5', 'scale-[1.02]');
         dropZone.classList.add('border-white/10', 'bg-hc-dark');
       }
 
@@ -212,7 +210,7 @@
                             <div class="flex items-center gap-2 text-xs">
                                 <span class="text-text-muted font-mono">${formatBytes(res.size)}</span>
                                 <span class="text-white/20">•</span>
-                                <a href="${res.url}" target="_blank" class="text-blue-400 hover:text-blue-300 truncate hover:underline font-mono">${res.url}</a>
+                                <a href="${res.url}" target="_blank" class="text-hc-red hover:text-red-400 truncate hover:underline font-mono">${res.url}</a>
                             </div>
                         </div>
                     </div>
