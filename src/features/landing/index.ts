@@ -295,6 +295,8 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				return new Response("Bucket not found", { status: 404 });
 			if (bucket[0].userId !== user.id && !user.isAdmin)
 				return new Response("Unauthorized", { status: 403 });
+			if (bucket[0].isPaused && !user.isAdmin)
+				return new Response("Bucket is paused", { status: 403 });
 
 			try {
 				const internalPrefix = getInternalPath("", user, bucket[0]);
@@ -777,7 +779,12 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		// However, we need to inject the bucket name or just let the client side handle it from URL.
 		// The template uses window.location to get bucket name.
 
-		return new Response(filesTemplate, {
+		const adminLink = user.isAdmin
+			? '<a href="/admin" class="text-hc-red hover:text-white transition-colors">Admin</a>'
+			: "";
+		const finalFiles = filesTemplate.replace("<!-- ADMIN_LINK -->", adminLink);
+
+		return new Response(finalFiles, {
 			headers: { "Content-Type": "text/html" },
 		});
 	}
