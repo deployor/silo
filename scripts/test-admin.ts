@@ -51,7 +51,7 @@ async function runAdminTest() {
 		region: "auto",
 	});
 
-	const endpoint = "https://cargo.deployor.dev";
+	const endpoint = "https://silo.deployor.dev";
 
 	try {
 		// 1. Test Normal Access (Generates Logs)
@@ -68,7 +68,7 @@ async function runAdminTest() {
 		console.log("\nTesting Admin Logs API...");
 		const logsRes = await fetch(`${endpoint}/api/admin/logs?limit=10`, {
 			headers: {
-				Cookie: `cargo_user_id=${adminId}`,
+				Cookie: `silo_user_id=${adminId}`,
 			},
 		});
 
@@ -95,7 +95,7 @@ async function runAdminTest() {
 		console.log("\nTesting Admin Users API...");
 		const usersRes = await fetch(`${endpoint}/api/admin/users?limit=10`, {
 			headers: {
-				Cookie: `cargo_user_id=${adminId}`,
+				Cookie: `silo_user_id=${adminId}`,
 			},
 		});
 

@@ -61,7 +61,7 @@ test("Security: Cross-Bucket Access (Auth Mismatch)", async () => {
     // We need to manually construct the request to pass to authenticate
     // AwsClient.fetch signs the request.
     
-    const url = `https://cargo.deployor.dev/${BUCKET_B_NAME}/secret.txt`;
+    const url = `https://silo.deployor.dev/${BUCKET_B_NAME}/secret.txt`;
     const signed = await clientA.sign(url, { method: "PUT" });
     
     // We need to convert the signed request (which might be a Request object or headers) to something we can pass to authenticate
@@ -107,7 +107,7 @@ test("Security: Public Bucket Access", async () => {
     // Make Bucket B public
     await db.update(buckets).set({ isPublic: true }).where(eq(buckets.id, bucketB.id));
 
-    const req = new Request(`https://cargo.deployor.dev/${BUCKET_B_NAME}/public.txt`, {
+    const req = new Request(`https://silo.deployor.dev/${BUCKET_B_NAME}/public.txt`, {
         method: "GET"
     });
 
@@ -125,7 +125,7 @@ test("Security: Public Bucket Access", async () => {
 test("Security: Private Bucket Access (Anonymous)", async () => {
     await setup();
 
-    const req = new Request(`https://cargo.deployor.dev/${BUCKET_A_NAME}/private.txt`, {
+    const req = new Request(`https://silo.deployor.dev/${BUCKET_A_NAME}/private.txt`, {
         method: "GET"
     });
 

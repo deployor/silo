@@ -22,11 +22,11 @@ async function getCurrentUser(req: Request) {
 			{} as Record<string, string>,
 		);
 
-		if (cookies.cargo_user_id) {
+		if (cookies.silo_user_id) {
 			const user = await db
 				.select()
 				.from(users)
-				.where(eq(users.id, cookies.cargo_user_id))
+				.where(eq(users.id, cookies.silo_user_id))
 				.limit(1);
 			if (user.length > 0) return user[0];
 		}
@@ -46,7 +46,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	// Serve Admin Dashboard
 	if (path === "/admin" || path === "/admin/") {
 		const finalHtml = adminTemplate.replace(
-			/https:\/\/cargo\.deployor\.dev/g,
+			/https:\/\/silo\.deployor\.dev/g,
 			`https://${config.s3Domain}`,
 		);
 		return new Response(finalHtml, {
@@ -392,6 +392,10 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 						ilike(requestLogs.bucketName, `%${search}%`),
 						ilike(users.email, `%${search}%`),
 						ilike(requestLogs.userAgent, `%${search}%`),
+						ilike(requestLogs.ipAddress, `%${search}%`),
+						ilike(requestLogs.requesterId, `%${search}%`),
+						// Cast status code to text for search
+						sql`CAST(${requestLogs.statusCode} AS TEXT) ILIKE ${`%${search}%`}`,
 					),
 				);
 			}

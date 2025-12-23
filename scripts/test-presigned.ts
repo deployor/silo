@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../src/db";
 import { buckets } from "../src/db/schema";
 
-const S3_ENDPOINT = "https://cargo.deployor.dev";
+const S3_ENDPOINT = "https://silo.deployor.dev";
 
 async function main() {
 	console.log("🧪 Starting Presigned URL & Public Access Test...");

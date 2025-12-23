@@ -25,7 +25,7 @@ async function runTest() {
 	const testBucketName = "testtest";
 	const accessKey = "CK879AF852B314B4D652E7";
 	const secretKey = "344efd09e342553e9578cd8b92b448d70c7c2f75";
-	const endpoint = "https://cargo.deployor.dev";
+	const endpoint = "https://silo.deployor.dev";
 
 	const s3 = new S3Client({
 		region: "auto",

@@ -69,7 +69,7 @@ test("CORS: GET request includes CORS headers", async () => {
 		.from(buckets)
 		.where(eq(buckets.id, bucket.id));
 
-	const req = new Request(`https://cargo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`, {
+	const req = new Request(`https://silo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`, {
 		method: "GET",
 		headers: {
 			Origin: "http://example.com",

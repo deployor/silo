@@ -62,7 +62,7 @@ export async function handleAppHomeOpened(event: { user: string }) {
 					type: "header",
 					text: {
 						type: "plain_text",
-						text: "Welcome to Cargo! :wave:",
+						text: "Welcome to Silo! :wave:",
 						emoji: true,
 					},
 				},
@@ -70,7 +70,7 @@ export async function handleAppHomeOpened(event: { user: string }) {
 					type: "section",
 					text: {
 						type: "mrkdwn",
-						text: `*Hold up!* :ms-stop-sign:\n\nWe don't recognize this Slack account yet. To get started, you need to log in to the web dashboard at least once to link your account.\n\n *<https://${config.s3Domain}/auth/login|Log in to Cargo Dashboard>*`,
+						text: `*Hold up!* :ms-stop-sign:\n\nWe don't recognize this Slack account yet. To get started, you need to log in to the web dashboard at least once to link your account.\n\n *<https://${config.s3Domain}/auth/login|Log in to Silo Dashboard>*`,
 					},
 				},
 				{

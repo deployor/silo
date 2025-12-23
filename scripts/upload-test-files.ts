@@ -2,7 +2,7 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 const client = new S3Client({
 	region: "auto",
-	endpoint: "https://cargo.deployor.dev",
+	endpoint: "https://silo.deployor.dev",
 	credentials: {
 		accessKeyId: "CK34738ADC4E2AC8F72239",
 		secretAccessKey: "756e5f82796d112fd76dfa788f0ad899a07e1c96",
@@ -33,7 +33,7 @@ async function main() {
 	await upload("hello.txt", "Hello World! This is a test file.", "text/plain");
 	await upload(
 		"folder/config.json",
-		JSON.stringify({ app: "cargo", version: 1 }),
+		JSON.stringify({ app: "silo", version: 1 }),
 		"application/json",
 	);
 	await upload(

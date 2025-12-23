@@ -7,7 +7,7 @@ import {
 async function runIsolationTest() {
 	console.log("🧪 Starting Strict Bucket Isolation Test...");
 
-	const endpoint = "https://cargo.deployor.dev";
+	const endpoint = "https://silo.deployor.dev";
 
 	// User 1 / Bucket 1
 	const bucket1 = "testtest";

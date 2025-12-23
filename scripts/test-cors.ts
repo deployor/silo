@@ -71,7 +71,7 @@ test("CORS: PutBucketCors sets configuration", async () => {
 `;
 
 	const req = new Request(
-		`https://cargo.deployor.dev/${TEST_BUCKET_NAME}?cors`,
+		`https://silo.deployor.dev/${TEST_BUCKET_NAME}?cors`,
 		{
 			method: "PUT",
 			body: corsConfig,
@@ -121,7 +121,7 @@ test("CORS: GetBucketCors retrieves configuration", async () => {
 		.where(eq(buckets.id, bucket.id));
 
 	const req = new Request(
-		`https://cargo.deployor.dev/${TEST_BUCKET_NAME}?cors`,
+		`https://silo.deployor.dev/${TEST_BUCKET_NAME}?cors`,
 		{
 			method: "GET",
 		},
@@ -150,7 +150,7 @@ test("CORS: DeleteBucketCors removes configuration", async () => {
 		.where(eq(buckets.id, bucket.id));
 
 	const req = new Request(
-		`https://cargo.deployor.dev/${TEST_BUCKET_NAME}?cors`,
+		`https://silo.deployor.dev/${TEST_BUCKET_NAME}?cors`,
 		{
 			method: "DELETE",
 		},
@@ -198,7 +198,7 @@ test("CORS: OPTIONS Preflight check", async () => {
 		.where(eq(buckets.id, bucket.id));
 
 	// Valid Preflight
-	const req = new Request(`https://cargo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`, {
+	const req = new Request(`https://silo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`, {
 		method: "OPTIONS",
 		headers: {
 			Origin: "http://example.com",
@@ -220,7 +220,7 @@ test("CORS: OPTIONS Preflight check", async () => {
 
 	// Invalid Origin
 	const reqInvalid = new Request(
-		`https://cargo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`,
+		`https://silo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`,
 		{
 			method: "OPTIONS",
 			headers: {
@@ -239,7 +239,7 @@ test("CORS: OPTIONS Preflight check", async () => {
 
 	// Invalid Method
 	const reqInvalidMethod = new Request(
-		`https://cargo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`,
+		`https://silo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`,
 		{
 			method: "OPTIONS",
 			headers: {
@@ -276,7 +276,7 @@ test("CORS: Security - No Config returns 403 for OPTIONS", async () => {
 		.from(buckets)
 		.where(eq(buckets.id, bucket.id));
 
-	const req = new Request(`https://cargo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`, {
+	const req = new Request(`https://silo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`, {
 		method: "OPTIONS",
 		headers: {
 			Origin: "http://example.com",
