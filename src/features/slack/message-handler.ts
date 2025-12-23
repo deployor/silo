@@ -13,6 +13,7 @@ export async function handleMessage(event: any) {
 
 	const slackId = event.user;
 	const channelId = event.channel;
+	const threadTs = event.thread_ts || event.ts;
 
 	// 1. Find User
 	const userResult = await db
@@ -25,6 +26,7 @@ export async function handleMessage(event: any) {
 		await postMessage(
 			channelId,
 			`I don't know who you are! Please <https://${config.s3Domain}/auth/login|login to the dashboard> first to link your account.`,
+			threadTs,
 		);
 		return;
 	}
@@ -35,6 +37,7 @@ export async function handleMessage(event: any) {
 		await postMessage(
 			channelId,
 			`Your account is locked. Reason: ${user.lockReason || "No reason provided."}`,
+			threadTs,
 		);
 		return;
 	}
@@ -70,6 +73,7 @@ export async function handleMessage(event: any) {
 		await postMessage(
 			channelId,
 			`Your CDN bucket is paused. Reason: ${targetBucket.pauseReason || "No reason provided."}`,
+			threadTs,
 		);
 		return;
 	}
@@ -88,6 +92,7 @@ export async function handleMessage(event: any) {
 			await postMessage(
 				channelId,
 				`❌ Failed to upload *${file.name}*: Quota exceeded.`,
+				threadTs,
 			);
 			continue;
 		}
@@ -104,6 +109,7 @@ export async function handleMessage(event: any) {
 			await postMessage(
 				channelId,
 				`❌ Failed to download *${file.name}* from Slack.`,
+				threadTs,
 			);
 			continue;
 		}
@@ -145,24 +151,26 @@ export async function handleMessage(event: any) {
 			await postMessage(
 				channelId,
 				`Uploaded *${file.name}*! :rocket:\n${publicUrl}`,
+				threadTs,
 			);
 		} catch (e) {
 			console.error(e);
 			await postMessage(
 				channelId,
 				`❌ Failed to upload *${file.name}* to storage.`,
+				threadTs,
 			);
 		}
 	}
 }
 
-async function postMessage(channel: string, text: string) {
+async function postMessage(channel: string, text: string, threadTs?: string) {
 	await fetch("https://slack.com/api/chat.postMessage", {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
 			Authorization: `Bearer ${config.slack.botToken}`,
 		},
-		body: JSON.stringify({ channel, text }),
+		body: JSON.stringify({ channel, text, thread_ts: threadTs }),
 	});
 }
