@@ -353,32 +353,93 @@
         let allUsers = [];
         let currentUser = null;
         let currentBucket = null;
+        
+        // Pagination State
         let logsOffset = 0;
         const logsLimit = 50;
         let logsLoading = false;
 
-        async function loadUsers() {
+        let usersOffset = 0;
+        const usersLimit = 50;
+        let usersLoading = false;
+
+        function switchTab(tab) {
+            document.getElementById("section-users").classList.add("hidden");
+            document.getElementById("section-logs").classList.add("hidden");
+            document.getElementById("tab-users").classList.remove("bg-white/10", "text-white");
+            document.getElementById("tab-users").classList.add("text-text-muted");
+            document.getElementById("tab-logs").classList.remove("bg-white/10", "text-white");
+            document.getElementById("tab-logs").classList.add("text-text-muted");
+
+            document.getElementById(`section-${tab}`).classList.remove("hidden");
+            document.getElementById(`tab-${tab}`).classList.add("bg-white/10", "text-white");
+            document.getElementById(`tab-${tab}`).classList.remove("text-text-muted");
+        }
+
+        async function loadUsers(reset = false) {
+            if (usersLoading) return;
+            usersLoading = true;
+
+            if (reset) {
+                usersOffset = 0;
+                document.getElementById("users-table").innerHTML = "";
+            }
+
+            const search = document.getElementById("user-search").value;
+            const showAdmins = document.getElementById("show-admins-only").checked;
+            
+            const query = new URLSearchParams({
+                limit: usersLimit,
+                offset: usersOffset,
+                search: search,
+                adminsOnly: showAdmins
+            });
+
             try {
-                const res = await fetch("/api/admin/users");
+                const res = await fetch(`/api/admin/users?${query.toString()}`);
                 if (!res.ok) throw new Error("Failed to load users");
                 const data = await res.json();
-                allUsers = data.users;
                 
-                // Set admin info
-                document.getElementById("admin-id").textContent = data.admin.id;
-                if (data.admin.slackId) {
-                     const avatar = document.getElementById("admin-avatar");
-                     avatar.src = `https://cachet.dunkirk.sh/users/${data.admin.slackId}/r`;
-                     avatar.classList.remove("hidden");
+                // Set admin info on first load
+                if (usersOffset === 0) {
+                    document.getElementById("admin-id").textContent = data.admin.id;
+                    if (data.admin.slackId) {
+                        const avatar = document.getElementById("admin-avatar");
+                        avatar.src = `https://cachet.dunkirk.sh/users/${data.admin.slackId}/r`;
+                        avatar.classList.remove("hidden");
+                    }
                 }
 
-                renderUsers(allUsers);
+                // Append users to list
+                allUsers = reset ? data.users : [...allUsers, ...data.users];
+                renderUsers(data.users, reset);
+                
+                usersOffset += data.users.length;
+                
+                // Update stats
+                const total = data.total;
+                document.getElementById("users-stats").textContent = `Showing ${usersOffset} of ${total} users`;
+
+                // Show/hide load more button
+                const loadMoreBtn = document.getElementById("load-more-users-btn");
+                if (usersOffset < total) {
+                    loadMoreBtn.classList.remove("hidden");
+                } else {
+                    loadMoreBtn.classList.add("hidden");
+                }
+
             } catch (e) {
                 console.error(e);
                 if (e.message.includes("403") || e.message.includes("401")) {
                     window.location.href = "/";
                 }
+            } finally {
+                usersLoading = false;
             }
+        }
+
+        function loadMoreUsers() {
+            loadUsers(false);
         }
 
         async function loadLogs(reset = false) {
@@ -474,9 +535,9 @@
             tbody.insertAdjacentHTML('beforeend', html);
         }
 
-        function renderUsers(users) {
+        function renderUsers(users, reset) {
             const tbody = document.getElementById("users-table");
-            tbody.innerHTML = users.map(u => `
+            const html = users.map(u => `
                 <tr class="hover:bg-white/5 transition-colors cursor-pointer" onclick="openUserModal('${u.id}')">
                     <td class="px-6 py-4 font-medium text-white">
                         <div class="flex items-center gap-3">
@@ -529,23 +590,12 @@
                     </td>
                 </tr>
             `).join("");
-        }
-
-        function filterUsers() {
-            const query = document.getElementById("user-search").value.toLowerCase();
-            const showAdmins = document.getElementById("show-admins-only").checked;
             
-            const filtered = allUsers.filter(u => {
-                const matchesQuery = u.email.toLowerCase().includes(query) ||
-                                   u.id.toLowerCase().includes(query) ||
-                                   (u.slackId && u.slackId.toLowerCase().includes(query));
-                
-                if (showAdmins) {
-                    return matchesQuery && u.isAdmin;
-                }
-                return matchesQuery;
-            });
-            renderUsers(filtered);
+            if (reset) {
+                tbody.innerHTML = html;
+            } else {
+                tbody.insertAdjacentHTML('beforeend', html);
+            }
         }
 
         async function openUserModal(userId) {
