@@ -646,6 +646,7 @@
                         ${log.ipAddress || '-'}
                     </td>
                     <td class="px-6 py-4 font-mono text-xs text-text-muted truncate max-w-[150px]" title="${log.userAgent || ''}">
+                        ${log.userAgent ? log.userAgent.substring(0, 20) + (log.userAgent.length > 20 ? '...' : '') : '-'}
                     </td>
                     <td class="px-6 py-4 font-mono text-xs text-text-muted">
                         ${formatBytes(log.ingressBytes)}
