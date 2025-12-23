@@ -27,7 +27,7 @@ export async function handleS3Request(
 	// console.log(`[S3] ${method} ${req.url}`);
 	// console.log("[S3] Headers:", JSON.stringify(Object.fromEntries(req.headers.entries())));
 
-	if (mode === "public" && method !== "GET" && method !== "HEAD") {
+	if (mode === "public" && method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
 		return new Response(
 			`<?xml version="1.0" encoding="UTF-8"?>
 <Error>
@@ -105,28 +105,28 @@ export async function handleS3Request(
 	const internalPath = getInternalPath(key, user, bucket);
 
 	if (key === "") {
-		if (method === "PUT") {
+		if (method === "PUT" && !url.searchParams.has("cors")) {
 			return new Response(
 				`
 <?xml version="1.0" encoding="UTF-8"?>
 <Error>
-  <Code>AccessDenied</Code>
-  <Message>Bucket creation is not allowed. Please use the dashboard.</Message>
-  <Resource>/</Resource>
-  <RequestId>0000000000000000</RequestId>
+	 <Code>AccessDenied</Code>
+	 <Message>Bucket creation is not allowed. Please use the dashboard.</Message>
+	 <Resource>/</Resource>
+	 <RequestId>0000000000000000</RequestId>
 </Error>`.trim(),
 				{ status: 403, headers: { "Content-Type": "application/xml" } },
 			);
 		}
-		if (method === "DELETE") {
+		if (method === "DELETE" && !url.searchParams.has("cors")) {
 			return new Response(
 				`
 <?xml version="1.0" encoding="UTF-8"?>
 <Error>
-    <Code>AccessDenied</Code>
-    <Message>Bucket deletion is not allowed. Please use the dashboard.</Message>
-    <Resource>/</Resource>
-    <RequestId>0000000000000000</RequestId>
+	   <Code>AccessDenied</Code>
+	   <Message>Bucket deletion is not allowed. Please use the dashboard.</Message>
+	   <Resource>/</Resource>
+	   <RequestId>0000000000000000</RequestId>
 </Error>`.trim(),
 				{ status: 403, headers: { "Content-Type": "application/xml" } },
 			);
