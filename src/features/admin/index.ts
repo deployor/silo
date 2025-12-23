@@ -230,6 +230,19 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 			return new Response("Updated", { status: 200 });
 		}
 
+		// Reset CORS (Admin)
+		const bucketCorsMatch = path.match(
+			/^\/api\/admin\/buckets\/([a-z0-9-]+)\/cors$/,
+		);
+		if (bucketCorsMatch && req.method === "DELETE") {
+			const bucketName = bucketCorsMatch[1];
+			await db
+				.update(buckets)
+				.set({ corsConfig: null })
+				.where(eq(buckets.name, bucketName));
+			return new Response("Reset", { status: 200 });
+		}
+
 		// Delete Bucket (Admin Force Delete)
 		if (bucketMatch && req.method === "DELETE") {
 			const bucketName = bucketMatch[1];
