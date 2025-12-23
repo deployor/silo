@@ -15,6 +15,9 @@ export async function handleMessage(event: any) {
 	const channelId = event.channel;
 	const threadTs = event.thread_ts || event.ts;
 
+	// 0. Add Eyes Reaction
+	await addReaction(channelId, event.ts, "eyes");
+
 	// 1. Find User
 	const userResult = await db
 		.select()
@@ -28,6 +31,7 @@ export async function handleMessage(event: any) {
 			`I don't know who you are! Please <https://${config.s3Domain}/auth/login|login to the dashboard> first to link your account.`,
 			threadTs,
 		);
+		await addReaction(channelId, event.ts, "x");
 		return;
 	}
 	const user = userResult[0];
@@ -39,6 +43,7 @@ export async function handleMessage(event: any) {
 			`Your account is locked. Reason: ${user.lockReason || "No reason provided."}`,
 			threadTs,
 		);
+		await addReaction(channelId, event.ts, "x");
 		return;
 	}
 
@@ -76,11 +81,21 @@ export async function handleMessage(event: any) {
 			`Your CDN bucket is paused. Reason: ${targetBucket.pauseReason || "No reason provided."}`,
 			threadTs,
 		);
+		await addReaction(channelId, event.ts, "x");
 		return;
 	}
 
+	const results: { name: string; url?: string; error?: string }[] = [];
+	let successCount = 0;
+
 	// 5. Process Files
 	for (const file of event.files) {
+		// Check 100MB Limit
+		if (file.size > 100 * 1024 * 1024) {
+			results.push({ name: file.name, error: "File too large (>100MB)" });
+			continue;
+		}
+
 		// Check Quota
 		const usageResult = await db
 			.select({ total: sql<number>`sum(${buckets.totalBytes})` })
@@ -90,11 +105,7 @@ export async function handleMessage(event: any) {
 		const limit = user.storageLimitBytes || 1073741824; // Default 1GB
 
 		if (currentUsage + file.size > limit) {
-			await postMessage(
-				channelId,
-				`❌ Failed to upload *${file.name}*: Quota exceeded.`,
-				threadTs,
-			);
+			results.push({ name: file.name, error: "Quota exceeded" });
 			continue;
 		}
 
@@ -107,11 +118,7 @@ export async function handleMessage(event: any) {
 		});
 
 		if (!fileRes.ok) {
-			await postMessage(
-				channelId,
-				`❌ Failed to download *${file.name}* from Slack.`,
-				threadTs,
-			);
+			results.push({ name: file.name, error: "Failed to download from Slack" });
 			continue;
 		}
 
@@ -165,20 +172,39 @@ export async function handleMessage(event: any) {
 
 			// Reply
 			const publicUrl = `https://${config.s3Domain}/${bucketName}/${fileName}`;
-			await postMessage(
-				channelId,
-				`Uploaded *${file.name}*! :rocket:\n${publicUrl}`,
-				threadTs,
-			);
+			results.push({ name: file.name, url: publicUrl });
+			successCount++;
 		} catch (e) {
 			console.error(e);
-			await postMessage(
-				channelId,
-				`❌ Failed to upload *${file.name}* to storage.`,
-				threadTs,
-			);
+			results.push({ name: file.name, error: "Storage upload failed" });
 		}
 	}
+
+	// 6. Send Summary
+	let messageText = "";
+	if (successCount === 0) {
+		messageText = "❌ *Failed to upload files*";
+		await addReaction(channelId, event.ts, "x");
+	} else if (successCount === event.files.length) {
+		messageText = `🚀 *Uploaded ${successCount} file${successCount > 1 ? "s" : ""}!*`;
+		await addReaction(channelId, event.ts, "white_check_mark");
+	} else {
+		messageText = `⚠️ *Uploaded ${successCount}/${event.files.length} files*`;
+		await addReaction(channelId, event.ts, "warning");
+	}
+
+	// Build details
+	const details = results
+		.map((r) => {
+			if (r.url) {
+				return `• <${r.url}|${r.name}>`;
+			} else {
+				return `• ~${r.name}~ (${r.error})`;
+			}
+		})
+		.join("\n");
+
+	await postMessage(channelId, `${messageText}\n\n${details}`, threadTs);
 }
 
 async function postMessage(channel: string, text: string, threadTs?: string) {
@@ -189,5 +215,16 @@ async function postMessage(channel: string, text: string, threadTs?: string) {
 			Authorization: `Bearer ${config.slack.botToken}`,
 		},
 		body: JSON.stringify({ channel, text, thread_ts: threadTs }),
+	});
+}
+
+async function addReaction(channel: string, timestamp: string, name: string) {
+	await fetch("https://slack.com/api/reactions.add", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${config.slack.botToken}`,
+		},
+		body: JSON.stringify({ channel, timestamp, name }),
 	});
 }
