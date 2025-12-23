@@ -36,21 +36,23 @@
       </div>
     </nav>
 
-    <main class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto">
+    <main class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-5xl mx-auto">
       
-      <div class="text-center mb-10">
-        <h1 class="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight">
-          Drag. Drop. <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Deploy.</span>
+      <div class="text-center mb-12">
+        <h1 class="text-5xl md:text-7xl font-black text-white mb-6 tracking-tighter italic">
+          DROP IT LIKE IT'S <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">HOT.</span>
         </h1>
-        <p class="text-text-muted text-lg max-w-2xl mx-auto">
-          Upload files directly to your personal CDN bucket. Instant public links, backed by your Slack identity.
+        <p class="text-text-muted text-xl max-w-2xl mx-auto font-medium">
+          Instant public hosting for your assets. Drag, drop, and get a link.
+          <br>
+          <span class="text-sm opacity-60 mt-2 block">Powered by your Slack identity.</span>
         </p>
       </div>
 
       <!-- Upload Zone -->
       <div
         id="drop-zone"
-        class="w-full max-w-2xl aspect-video bg-white/5 border-2 border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center p-8 transition-all duration-300 hover:border-blue-400/50 hover:bg-blue-500/5 cursor-pointer relative overflow-hidden group"
+        class="w-full max-w-3xl aspect-[21/9] bg-hc-dark border-2 border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center p-12 transition-all duration-300 hover:border-blue-400/50 hover:bg-blue-500/5 hover:scale-[1.02] hover:shadow-2xl hover:shadow-blue-500/10 cursor-pointer relative overflow-hidden group card-shadow"
       >
         <input
           type="file"
@@ -59,29 +61,38 @@
           multiple
         />
         
-        <div class="text-center pointer-events-none transition-transform duration-300 group-hover:scale-105" id="upload-prompt">
-          <div class="bg-blue-500/20 p-4 rounded-full inline-flex mb-4 text-blue-400">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        <div class="text-center pointer-events-none transition-transform duration-300 group-hover:scale-110" id="upload-prompt">
+          <div class="bg-gradient-to-br from-blue-500/20 to-emerald-500/20 p-6 rounded-2xl inline-flex mb-6 text-blue-400 border border-white/5 shadow-inner">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
           </div>
-          <h3 class="text-xl font-bold text-white mb-2">Drop files here</h3>
-          <p class="text-text-muted text-sm">or click to browse</p>
+          <h3 class="text-2xl font-bold text-white mb-2">Drag & Drop Files</h3>
+          <p class="text-text-muted font-mono text-sm">or click to browse your system</p>
         </div>
 
         <!-- Uploading State -->
         <div id="uploading-state" class="hidden flex-col items-center w-full max-w-md z-20 pointer-events-none">
-            <div class="w-full bg-white/10 rounded-full h-2 mb-4 overflow-hidden">
-                <div id="progress-bar" class="bg-blue-500 h-2 rounded-full transition-all duration-100" style="width: 0%"></div>
+            <div class="w-full bg-white/10 rounded-full h-3 mb-6 overflow-hidden backdrop-blur-sm">
+                <div id="progress-bar" class="bg-gradient-to-r from-blue-500 to-emerald-400 h-3 rounded-full transition-all duration-100 shadow-[0_0_10px_rgba(59,130,246,0.5)]" style="width: 0%"></div>
             </div>
-            <p class="text-white font-mono text-sm animate-pulse">Uploading <span id="file-count">0</span> files...</p>
+            <p class="text-white font-mono text-lg animate-pulse flex items-center gap-2">
+                <svg class="animate-spin h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Uploading <span id="file-count" class="font-bold text-blue-400">0</span> files...
+            </p>
         </div>
       </div>
 
       <!-- Recent Uploads -->
-      <div id="results-area" class="w-full max-w-2xl mt-8 hidden">
-        <h3 class="text-sm font-bold text-text-muted uppercase tracking-wider mb-4">Just Uploaded</h3>
-        <div class="space-y-3" id="results-list">
+      <div id="results-area" class="w-full max-w-3xl mt-12 hidden">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-sm font-bold text-text-muted uppercase tracking-wider">Recent Uploads</h3>
+            <button onclick="clearResults()" class="text-xs text-text-muted hover:text-white transition-colors">Clear All</button>
+        </div>
+        <div class="space-y-4" id="results-list">
             <!-- Results injected here -->
         </div>
       </div>
@@ -107,13 +118,13 @@
       });
 
       function highlight(e) {
-        dropZone.classList.add('border-blue-400', 'bg-blue-500/10');
-        dropZone.classList.remove('border-white/10', 'bg-white/5');
+        dropZone.classList.add('border-blue-400', 'bg-blue-500/10', 'scale-[1.02]');
+        dropZone.classList.remove('border-white/10', 'bg-hc-dark');
       }
 
       function unhighlight(e) {
-        dropZone.classList.remove('border-blue-400', 'bg-blue-500/10');
-        dropZone.classList.add('border-white/10', 'bg-white/5');
+        dropZone.classList.remove('border-blue-400', 'bg-blue-500/10', 'scale-[1.02]');
+        dropZone.classList.add('border-white/10', 'bg-hc-dark');
       }
 
       // Handle File Selection
@@ -150,7 +161,7 @@
 
                 if (res.ok) {
                     const data = await res.json();
-                    results.push({ success: true, name: file.name, url: data.url });
+                    results.push({ success: true, name: file.name, url: data.url, size: file.size });
                 } else {
                     const err = await res.text();
                     results.push({ success: false, name: file.name, error: err });
@@ -172,43 +183,63 @@
         displayResults(results);
       }
 
+      function formatBytes(bytes, decimals = 2) {
+        if (!+bytes) return "0 Bytes";
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`;
+      }
+
       function displayResults(results) {
         resultsArea.classList.remove('hidden');
         
         results.forEach(res => {
             const div = document.createElement('div');
-            div.className = 'bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between animate-fade-in';
+            div.className = 'bg-hc-dark border border-white/10 rounded-2xl p-5 flex items-center justify-between animate-fade-in card-shadow hover:border-white/20 transition-colors group';
             
             if (res.success) {
                 div.innerHTML = `
-                    <div class="flex items-center gap-3 overflow-hidden">
-                        <div class="bg-emerald-500/20 p-2 rounded-lg text-emerald-400 shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="flex items-center gap-4 overflow-hidden">
+                        <div class="bg-emerald-500/10 p-3 rounded-xl text-emerald-400 shrink-0 border border-emerald-500/20">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                             </svg>
                         </div>
                         <div class="min-w-0">
-                            <p class="text-white font-medium truncate text-sm">${res.name}</p>
-                            <a href="${res.url}" target="_blank" class="text-blue-400 hover:text-blue-300 text-xs truncate block hover:underline">${res.url}</a>
+                            <p class="text-white font-bold truncate text-base">${res.name}</p>
+                            <div class="flex items-center gap-2 text-xs">
+                                <span class="text-text-muted font-mono">${formatBytes(res.size)}</span>
+                                <span class="text-white/20">•</span>
+                                <a href="${res.url}" target="_blank" class="text-blue-400 hover:text-blue-300 truncate hover:underline font-mono">${res.url}</a>
+                            </div>
                         </div>
                     </div>
-                    <button onclick="copyToClipboard('${res.url}', this)" class="ml-4 text-text-muted hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg shrink-0" title="Copy URL">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button onclick="copyToClipboard('${res.url}', this)" class="text-text-muted hover:text-white hover:bg-white/10 p-2 rounded-lg transition-all active:scale-95" title="Copy URL">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                        </button>
+                        <a href="${res.url}" target="_blank" class="text-text-muted hover:text-white hover:bg-white/10 p-2 rounded-lg transition-all active:scale-95" title="Open">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                        </a>
+                    </div>
                 `;
             } else {
                 div.innerHTML = `
-                    <div class="flex items-center gap-3 overflow-hidden">
-                        <div class="bg-red-500/20 p-2 rounded-lg text-red-400 shrink-0">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="flex items-center gap-4 overflow-hidden">
+                        <div class="bg-red-500/10 p-3 rounded-xl text-red-400 shrink-0 border border-red-500/20">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </div>
                         <div class="min-w-0">
-                            <p class="text-white font-medium truncate text-sm">${res.name}</p>
-                            <p class="text-red-400 text-xs truncate">${res.error}</p>
+                            <p class="text-white font-bold truncate text-base">${res.name}</p>
+                            <p class="text-red-400 text-sm truncate font-mono">${res.error}</p>
                         </div>
                     </div>
                 `;
@@ -227,6 +258,11 @@
                 btn.innerHTML = originalHTML;
             }, 2000);
         });
+      }
+
+      function clearResults() {
+        resultsList.innerHTML = '';
+        resultsArea.classList.add('hidden');
       }
 
       // Load User Info
