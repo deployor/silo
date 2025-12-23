@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { config } from "../../config";
 import { db } from "../../db";
 import { bucketKeys, buckets, users } from "../../db/schema";
@@ -19,6 +19,16 @@ export async function handleAppHomeOpened(event: { user: string }) {
 		.from(users)
 		.where(eq(users.slackId, slackId))
 		.limit(1);
+
+	if (user.length > 0) {
+		// Calculate storage usage from all buckets
+		const usageResult = await db
+			.select({ total: sql<number>`sum(${buckets.totalBytes})` })
+			.from(buckets)
+			.where(eq(buckets.userId, user[0].id));
+
+		user[0].storageUsageBytes = Number(usageResult[0]?.total) || 0;
+	}
 
 	if (user.length > 0 && user[0].isLocked) {
 		await publishView(slackId, {

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { config } from "../config";
 import { db } from "../db";
 import { bucketKeys, buckets, users } from "../db/schema";
@@ -144,6 +144,14 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 
 		const { bucket, user } = bucketResult[0];
 
+		// Calculate storage usage from all buckets
+		const usageResult = await db
+			.select({ total: sql<number>`sum(${buckets.totalBytes})` })
+			.from(buckets)
+			.where(eq(buckets.userId, user.id));
+
+		user.storageUsageBytes = Number(usageResult[0]?.total) || 0;
+
 		if (user.isLocked) {
 			return new Response(
 				`<?xml version="1.0" encoding="UTF-8"?>
@@ -223,6 +231,14 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 	}
 
 	const { bucket, user, key } = keyResult[0];
+
+	// Calculate storage usage from all buckets
+	const usageResult = await db
+		.select({ total: sql<number>`sum(${buckets.totalBytes})` })
+		.from(buckets)
+		.where(eq(buckets.userId, user.id));
+
+	user.storageUsageBytes = Number(usageResult[0]?.total) || 0;
 
 	if (user.isLocked) {
 		return new Response(

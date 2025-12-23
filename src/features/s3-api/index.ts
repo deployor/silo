@@ -588,10 +588,10 @@ ${rulesXml}
 						return new Response(
 							`<?xml version="1.0" encoding="UTF-8"?>
 <Error>
-    <Code>QuotaExceeded</Code>
-    <Message>You have exceeded your storage quota.</Message>
-    <Resource>${key}</Resource>
-    <RequestId>0000000000000000</RequestId>
+			 <Code>QuotaExceeded</Code>
+			 <Message>You have exceeded your storage quota.</Message>
+			 <Resource>${key}</Resource>
+			 <RequestId>0000000000000000</RequestId>
 </Error>`.trim(),
 							{ status: 403, headers: { "Content-Type": "application/xml" } },
 						);
@@ -615,12 +615,23 @@ ${rulesXml}
 
 			if (response.ok && !copySource) {
 				if (actualSize > 0) {
+					// Update bucket usage
 					await db
-						.update(users)
+						.update(buckets)
 						.set({
-							storageUsageBytes: sql`${users.storageUsageBytes} + ${actualSize}`,
+							totalBytes: sql`${buckets.totalBytes} + ${actualSize}`,
 						})
-						.where(eq(users.id, user.id));
+						.where(eq(buckets.id, bucket.id));
+
+					// We don't need to update users.storageUsageBytes anymore as it's calculated on the fly
+					// But for backward compatibility or caching, we might want to?
+					// The instruction says "The total sotorage of every user should be computed by every bcukes usage"
+					// So we should rely on the sum of buckets.
+					// However, updating the user record might still be useful for quick lookups if we didn't change the read logic everywhere.
+					// But we DID change the read logic in auth.ts.
+					// Let's keep the user update for now but maybe it's redundant if we always calculate.
+					// Actually, if we only update buckets, the sum will be correct next time we fetch.
+					// So we can remove the user update.
 				}
 			}
 

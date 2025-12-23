@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { config } from "../../config";
 import { db } from "../../db";
@@ -41,7 +41,17 @@ async function getCurrentUser(req: Request) {
 				.from(users)
 				.where(eq(users.id, cookies.silo_user_id))
 				.limit(1);
-			if (user.length > 0) return user[0];
+			if (user.length > 0) {
+				const u = user[0];
+				// Calculate storage usage from all buckets
+				const usageResult = await db
+					.select({ total: sql<number>`sum(${buckets.totalBytes})` })
+					.from(buckets)
+					.where(eq(buckets.userId, u.id));
+
+				u.storageUsageBytes = Number(usageResult[0]?.total) || 0;
+				return u;
+			}
 		}
 	}
 
@@ -302,6 +312,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 			try {
 				const internalPrefix = getInternalPath("", user, bucket[0]);
+				// We don't need to update bucket usage here because we are deleting the bucket
 				await deleteBucketContents(internalPrefix);
 			} catch (e) {
 				console.error("Failed to empty bucket:", e);
@@ -767,12 +778,25 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			const internalKey = getInternalPath(key, owner, bucket[0]);
 
 			try {
+				// Get file size first to update quota
+				const headRes = await s3Client.fetch(internalKey, { method: "HEAD" });
+				const size = Number(headRes.headers.get("content-length") || 0);
+
 				const s3Res = await s3Client.fetch(internalKey, {
 					method: "DELETE",
 				});
 
 				if (!s3Res.ok) {
 					throw new Error(`S3 Delete Error: ${s3Res.status}`);
+				}
+
+				if (size > 0) {
+					await db
+						.update(buckets)
+						.set({
+							totalBytes: sql`${buckets.totalBytes} - ${size}`,
+						})
+						.where(eq(buckets.id, bucket[0].id));
 				}
 
 				return new Response("Deleted", { status: 200 });
