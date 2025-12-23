@@ -116,8 +116,15 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             <div class="bg-black/30 p-6 rounded-xl border border-white/10">
                 <h4 class="text-white font-bold mb-4">Storage Quota</h4>
-                <div class="flex gap-4 items-center">
-                    <input type="number" id="modal-storage-limit" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full" placeholder="Bytes">
+                <div class="flex gap-2 items-center">
+                    <input type="number" id="modal-storage-limit" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full" placeholder="Amount" step="0.01">
+                    <select id="modal-storage-unit" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white cursor-pointer">
+                        <option value="1">Bytes</option>
+                        <option value="1024">KB</option>
+                        <option value="1048576">MB</option>
+                        <option value="1073741824">GB</option>
+                        <option value="1099511627776">TB</option>
+                    </select>
                     <button onclick="updateQuota('storage')" class="bg-hc-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">Update</button>
                 </div>
                 <p class="text-xs text-text-muted mt-2">Current Usage: <span id="modal-storage-usage" class="text-white font-mono">0 B</span></p>
@@ -234,6 +241,17 @@
             return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`;
         }
 
+        function getBestUnit(bytes) {
+            if (!+bytes) return { value: 0, unit: 1 };
+            const k = 1024;
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            const unitVal = Math.pow(k, i);
+            return {
+                value: parseFloat((bytes / unitVal).toFixed(2)),
+                unit: unitVal
+            };
+        }
+
         let allUsers = [];
         let currentUser = null;
         let currentBucket = null;
@@ -282,7 +300,12 @@
                     </td>
                     <td class="px-6 py-4 font-mono text-xs text-white">${formatBytes(u.egressBytes)}</td>
                     <td class="px-6 py-4">
-                        ${u.isLocked ? `<span class="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-bold border border-red-500/30" title="${u.lockReason || ''}">LOCKED</span>` : '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-bold border border-emerald-500/30">ACTIVE</span>'}
+                        ${u.isLocked
+                            ? `<div class="flex flex-col items-start gap-1">
+                                <span class="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-bold border border-red-500/30">LOCKED</span>
+                                ${u.lockReason ? `<span class="text-[10px] text-red-300 max-w-[150px] truncate" title="${u.lockReason}">${u.lockReason}</span>` : ''}
+                               </div>`
+                            : '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-bold border border-emerald-500/30">ACTIVE</span>'}
                     </td>
                     <td class="px-6 py-4 text-right">
                         <button class="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider">Manage</button>
@@ -315,9 +338,28 @@
 
             document.getElementById("modal-user-id").textContent = user.id;
             document.getElementById("modal-user-email").textContent = user.email;
-            document.getElementById("modal-storage-limit").value = user.storageLimitBytes;
+            
+            const bestUnit = getBestUnit(user.storageLimitBytes);
+            document.getElementById("modal-storage-limit").value = bestUnit.value;
+            // If unit is larger than TB (PB etc), default to TB
+            const maxUnit = 1099511627776;
+            document.getElementById("modal-storage-unit").value = bestUnit.unit > maxUnit ? maxUnit : bestUnit.unit;
+
             document.getElementById("modal-storage-usage").textContent = formatBytes(user.storageUsageBytes);
             document.getElementById("modal-is-locked").checked = user.isLocked;
+
+            // Show lock reason in modal if locked
+            const lockReasonContainer = document.getElementById("modal-lock-reason-container");
+            if (lockReasonContainer) lockReasonContainer.remove(); // Clean up previous
+            
+            if (user.isLocked && user.lockReason) {
+                const reasonHtml = `
+                    <div id="modal-lock-reason-container" class="mt-2 p-2 bg-red-500/10 border border-red-500/20 rounded text-xs text-red-300">
+                        <span class="font-bold">Reason:</span> ${user.lockReason}
+                    </div>
+                `;
+                document.getElementById("modal-is-locked").closest(".bg-black\\/30").insertAdjacentHTML('beforeend', reasonHtml);
+            }
 
             // Load buckets for user
             const res = await fetch(`/api/admin/users/${userId}/buckets`);
@@ -329,7 +371,12 @@
                     <td class="px-4 py-3 font-mono text-white">${b.name}</td>
                     <td class="px-4 py-3 font-mono text-xs text-text-muted">${formatBytes(b.totalBytes)}</td>
                     <td class="px-4 py-3">
-                         ${b.isPaused ? `<span class="text-red-400 text-xs font-bold" title="${b.pauseReason || ''}">PAUSED</span>` : '<span class="text-emerald-400 text-xs font-bold">ACTIVE</span>'}
+                         ${b.isPaused
+                            ? `<div class="flex flex-col items-start">
+                                <span class="text-red-400 text-xs font-bold">PAUSED</span>
+                                ${b.pauseReason ? `<span class="text-[10px] text-red-300 max-w-[100px] truncate" title="${b.pauseReason}">${b.pauseReason}</span>` : ''}
+                               </div>`
+                            : '<span class="text-emerald-400 text-xs font-bold">ACTIVE</span>'}
                     </td>
                     <td class="px-4 py-3 text-right">
                         <button onclick="openAdminBucketModal('${b.name}')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
@@ -351,17 +398,25 @@
 
         async function updateQuota(type) {
             if (!currentUser) return;
-            const limit = document.getElementById("modal-storage-limit").value;
+            const amount = parseFloat(document.getElementById("modal-storage-limit").value);
+            const unit = parseFloat(document.getElementById("modal-storage-unit").value);
+
+            if (isNaN(amount) || amount < 0) {
+                alert("Invalid amount.");
+                return;
+            }
+
+            const totalBytes = Math.floor(amount * unit);
             
             await fetch(`/api/admin/users/${currentUser.id}/quota`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ storageLimitBytes: limit })
+                body: JSON.stringify({ storageLimitBytes: totalBytes })
             });
             
             // Refresh
             loadUsers();
-            alert("Quota updated");
+            alert(`Quota updated to ${formatBytes(totalBytes)}`);
         }
 
         async function toggleUserLock(locked) {
@@ -392,13 +447,31 @@
             document.getElementById("admin-bucket-paused").checked = data.isPaused;
             document.getElementById("admin-view-files-link").href = `/dashboard/buckets/${data.name}`;
 
+            // Show bucket pause reason
+            const pauseReasonContainer = document.getElementById("admin-bucket-pause-reason");
+            if (pauseReasonContainer) pauseReasonContainer.remove();
+
+            if (data.isPaused && data.pauseReason) {
+                const reasonHtml = `
+                    <div id="admin-bucket-pause-reason" class="mt-2 text-xs text-red-300">
+                        <span class="font-bold">Reason:</span> ${data.pauseReason}
+                    </div>
+                `;
+                document.getElementById("admin-bucket-paused").closest("div").insertAdjacentHTML('beforeend', reasonHtml);
+            }
+
             // Render Keys
             const keysBody = document.getElementById("admin-bucket-keys-table");
             keysBody.innerHTML = data.keys.map(k => `
                 <tr class="hover:bg-white/5 transition-colors">
                     <td class="px-4 py-3 font-mono text-white">${k.accessKey}</td>
                     <td class="px-4 py-3">
-                        ${k.isPaused ? '<span class="text-red-400 text-xs font-bold">PAUSED</span>' : '<span class="text-emerald-400 text-xs font-bold">ACTIVE</span>'}
+                        ${k.isPaused
+                            ? `<div class="flex flex-col items-start">
+                                <span class="text-red-400 text-xs font-bold">PAUSED</span>
+                                ${k.pauseReason ? `<span class="text-[10px] text-red-300 max-w-[100px] truncate" title="${k.pauseReason}">${k.pauseReason}</span>` : ''}
+                               </div>`
+                            : '<span class="text-emerald-400 text-xs font-bold">ACTIVE</span>'}
                     </td>
                     <td class="px-4 py-3 text-right">
                         <button onclick="toggleKeyPause('${k.id}', ${!k.isPaused})" class="text-xs font-bold uppercase tracking-wider ${k.isPaused ? 'text-emerald-400' : 'text-yellow-400'}">
