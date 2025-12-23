@@ -285,8 +285,13 @@
             tbody.innerHTML = users.map(u => `
                 <tr class="hover:bg-white/5 transition-colors cursor-pointer" onclick="openUserModal('${u.id}')">
                     <td class="px-6 py-4 font-medium text-white">
-                        <div>${u.email}</div>
-                        <div class="text-xs text-text-muted font-mono">${u.id}</div>
+                        <div class="flex items-center gap-3">
+                            ${u.slackId ? `<img src="https://cachet.dunkirk.sh/users/${u.slackId}/r" class="w-8 h-8 rounded-full bg-white/10" alt="">` : '<div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs text-text-muted">?</div>'}
+                            <div>
+                                <div>${u.email}</div>
+                                <div class="text-xs text-text-muted font-mono">${u.id}</div>
+                            </div>
+                        </div>
                     </td>
                     <td class="px-6 py-4 font-mono text-xs text-text-muted">${u.slackId || '-'}</td>
                     <td class="px-6 py-4">
