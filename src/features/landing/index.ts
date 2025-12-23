@@ -310,6 +310,12 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			if (bucket[0].isPaused && !user.isAdmin)
 				return new Response("Bucket is paused", { status: 403 });
 
+			// Prevent deletion of CDN buckets (Slack integration)
+			// CDN buckets are named after the user's Slack ID (lowercase)
+			if (user.slackId && bucketName === user.slackId.toLowerCase()) {
+				return new Response("Cannot delete CDN bucket", { status: 403 });
+			}
+
 			try {
 				const internalPrefix = getInternalPath("", user, bucket[0]);
 				// We don't need to update bucket usage here because we are deleting the bucket
