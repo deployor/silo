@@ -137,6 +137,7 @@
                 <th class="px-6 py-4">Ingress</th>
                 <th class="px-6 py-4">Egress</th>
                 <th class="px-6 py-4 text-right">Latency</th>
+                <th class="px-6 py-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-white/5" id="logs-table">
@@ -151,6 +152,92 @@
         </div>
       </div>
     </main>
+
+    <!-- Log Details Modal -->
+    <div
+      id="log-modal"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50"
+    >
+      <div
+        class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-2xl card-shadow transform transition-all"
+      >
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-2xl font-bold text-white">Log Details</h3>
+            <button
+              onclick="closeLogModal()"
+              class="text-text-muted hover:text-white transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+        </div>
+
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                    <div class="text-xs text-text-muted uppercase font-bold mb-1">Method</div>
+                    <div class="text-white font-mono" id="modal-log-method"></div>
+                </div>
+                <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                    <div class="text-xs text-text-muted uppercase font-bold mb-1">Status Code</div>
+                    <div class="text-white font-mono" id="modal-log-status"></div>
+                </div>
+            </div>
+
+            <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                <div class="text-xs text-text-muted uppercase font-bold mb-1">Path</div>
+                <div class="text-white font-mono break-all" id="modal-log-path"></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                    <div class="text-xs text-text-muted uppercase font-bold mb-1">Bucket</div>
+                    <div class="text-white font-mono" id="modal-log-bucket"></div>
+                </div>
+                <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                    <div class="text-xs text-text-muted uppercase font-bold mb-1">Owner</div>
+                    <div class="text-white font-mono truncate" id="modal-log-owner"></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                    <div class="text-xs text-text-muted uppercase font-bold mb-1">Ingress</div>
+                    <div class="text-white font-mono" id="modal-log-ingress"></div>
+                </div>
+                <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                    <div class="text-xs text-text-muted uppercase font-bold mb-1">Egress</div>
+                    <div class="text-white font-mono" id="modal-log-egress"></div>
+                </div>
+            </div>
+
+            <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                <div class="text-xs text-text-muted uppercase font-bold mb-1">User Agent</div>
+                <div class="text-white font-mono text-xs break-all" id="modal-log-ua"></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                    <div class="text-xs text-text-muted uppercase font-bold mb-1">IP Address</div>
+                    <div class="text-white font-mono" id="modal-log-ip"></div>
+                </div>
+                <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                    <div class="text-xs text-text-muted uppercase font-bold mb-1">Latency</div>
+                    <div class="text-white font-mono" id="modal-log-latency"></div>
+                </div>
+            </div>
+             <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                <div class="text-xs text-text-muted uppercase font-bold mb-1">Requester ID</div>
+                <div class="text-white font-mono text-xs" id="modal-log-requester"></div>
+            </div>
+             <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                <div class="text-xs text-text-muted uppercase font-bold mb-1">Timestamp</div>
+                <div class="text-white font-mono text-xs" id="modal-log-time"></div>
+            </div>
+        </div>
+      </div>
+    </div>
 
     <!-- User Details Modal -->
     <div
@@ -356,6 +443,29 @@
         let currentUser = null;
         let currentBucket = null;
         
+        function openLogModal(log) {
+            document.getElementById("modal-log-method").textContent = log.method;
+            document.getElementById("modal-log-status").textContent = log.statusCode;
+            document.getElementById("modal-log-path").textContent = log.path;
+            document.getElementById("modal-log-bucket").textContent = log.bucketName || '-';
+            document.getElementById("modal-log-owner").textContent = log.ownerEmail || '-';
+            document.getElementById("modal-log-ingress").textContent = formatBytes(log.ingressBytes);
+            document.getElementById("modal-log-egress").textContent = formatBytes(log.egressBytes);
+            document.getElementById("modal-log-ua").textContent = log.userAgent || '-';
+            document.getElementById("modal-log-ip").textContent = log.ipAddress || '-';
+            document.getElementById("modal-log-latency").textContent = log.latencyMs ? log.latencyMs + 'ms' : '-';
+            document.getElementById("modal-log-requester").textContent = log.requesterId || '-';
+            document.getElementById("modal-log-time").textContent = new Date(log.createdAt).toLocaleString();
+
+            document.getElementById("log-modal").classList.remove("hidden");
+            document.getElementById("log-modal").classList.add("flex");
+        }
+
+        function closeLogModal() {
+            document.getElementById("log-modal").classList.add("hidden");
+            document.getElementById("log-modal").classList.remove("flex");
+        }
+
         // Pagination State
         let logsOffset = 0;
         const logsLimit = 50;
@@ -535,6 +645,9 @@
                     </td>
                     <td class="px-6 py-4 text-right font-mono text-xs text-text-muted">
                         ${log.latencyMs ? log.latencyMs + 'ms' : '-'}
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <button onclick='openLogModal(${JSON.stringify(log).replace(/'/g, "'")})' class="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider">View</button>
                     </td>
                 </tr>
                 `;
