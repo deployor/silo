@@ -33,46 +33,64 @@ export const homeView = (user: User, buckets: Bucket[], page = 0) => {
 	const bucketBlocks: Record<string, unknown>[] =
 		displayBuckets.length > 0
 			? displayBuckets.flatMap((bucket) => {
-					return [
-						{
-							type: "section",
+					const options = [];
+
+					if (!bucket.isCdn) {
+						options.push({
 							text: {
-								type: "mrkdwn",
-								text: `*${bucket.name}*`,
+								type: "plain_text",
+								text: ":ms-wrench: Manage Keys",
+								emoji: true,
 							},
-							accessory: {
-								type: "overflow",
-								options: [
-									{
-										text: {
-											type: "plain_text",
-											text: ":ms-wrench: Manage Keys",
-											emoji: true,
-										},
-										value: `manage_keys:${bucket.id}`,
-									},
-									{
-										text: {
-											type: "plain_text",
-											text: bucket.isPublic
-												? ":ms-shush: Make Private"
-												: ":ms-globe: Make Public",
-											emoji: true,
-										},
-										value: `toggle_public:${bucket.id}`,
-									},
-									{
-										text: {
-											type: "plain_text",
-											text: ":angry-dino: Delete Bucket",
-											emoji: true,
-										},
-										value: `delete_bucket:${bucket.name}`,
-									},
-								],
-								action_id: "bucket_overflow_action",
+							value: `manage_keys:${bucket.id}`,
+						});
+						options.push({
+							text: {
+								type: "plain_text",
+								text: bucket.isPublic
+									? ":ms-shush: Make Private"
+									: ":ms-globe: Make Public",
+								emoji: true,
 							},
+							value: `toggle_public:${bucket.id}`,
+						});
+						options.push({
+							text: {
+								type: "plain_text",
+								text: ":angry-dino: Delete Bucket",
+								emoji: true,
+							},
+							value: `delete_bucket:${bucket.name}`,
+						});
+					} else {
+						options.push({
+							text: {
+								type: "plain_text",
+								text: ":ms-info: CDN Bucket (Managed)",
+								emoji: true,
+							},
+							value: "noop",
+						});
+					}
+
+					const block: any = {
+						type: "section",
+						text: {
+							type: "mrkdwn",
+							text: `*${bucket.name}*${bucket.isCdn ? " (CDN)" : ""}`,
 						},
+					};
+
+					if (options.length > 0 && options[0].value !== "noop") {
+						block.accessory = {
+							type: "overflow",
+							options: options,
+							action_id: "bucket_overflow_action",
+						};
+					}
+
+					return [
+						block,
 						{
 							type: "context",
 							elements: [
