@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { config } from "../../config";
 import { db } from "../../db";
@@ -171,7 +171,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			const userBuckets = await db
 				.select()
 				.from(buckets)
-				.where(eq(buckets.userId, user.id));
+				.where(and(eq(buckets.userId, user.id), eq(buckets.isCdn, false)));
 
 			const bucketsWithKeys = await Promise.all(
 				userBuckets.map(async (b) => {
@@ -310,9 +310,8 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			if (bucket[0].isPaused && !user.isAdmin)
 				return new Response("Bucket is paused", { status: 403 });
 
-			// Prevent deletion of CDN buckets (Slack integration)
-			// CDN buckets are named after the user's Slack ID (lowercase)
-			if (user.slackId && bucketName === user.slackId.toLowerCase()) {
+			// Prevent deletion of CDN buckets
+			if (bucket[0].isCdn) {
 				return new Response("Cannot delete CDN bucket", { status: 403 });
 			}
 
@@ -351,6 +350,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			if (bucket[0].isPaused && !user.isAdmin)
 				return new Response("Bucket is paused", { status: 403 });
 
+			if (bucket[0].isCdn)
+				return new Response("Cannot modify CDN bucket", { status: 403 });
+
 			try {
 				const body = await req.json();
 
@@ -385,6 +387,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				return new Response("Unauthorized", { status: 403 });
 			if (bucket[0].isPaused && !user.isAdmin)
 				return new Response("Bucket is paused", { status: 403 });
+
+			if (bucket[0].isCdn)
+				return new Response("Cannot create keys for CDN bucket", { status: 403 });
 
 			const accessKey =
 				"CK" +
@@ -714,6 +719,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				return new Response("Unauthorized", { status: 403 });
 			if (bucket[0].isPaused && !user.isAdmin)
 				return new Response("Bucket is paused", { status: 403 });
+
+			if (bucket[0].isCdn)
+				return new Response("Cannot modify CDN bucket CORS", { status: 403 });
 
 			if (req.method === "PUT") {
 				try {

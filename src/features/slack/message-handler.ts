@@ -60,6 +60,7 @@ export async function handleMessage(event: any) {
 				name: bucketName,
 				userId: user.id,
 				isPublic: true,
+				isCdn: true,
 				region: "auto",
 			})
 			.returning();
