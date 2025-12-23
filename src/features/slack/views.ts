@@ -153,7 +153,7 @@ export const homeView = (user: User, buckets: Bucket[], page = 0) => {
 				type: "header",
 				text: {
 					type: "plain_text",
-					text: "Cargo (no clue what to call this still) Dashboard",
+					text: "Silo (no clue what to call this still) Dashboard",
 					emoji: true,
 				},
 			},
@@ -253,7 +253,7 @@ export const homeView = (user: User, buckets: Bucket[], page = 0) => {
 				elements: [
 					{
 						type: "mrkdwn",
-						text: `Last updated: ${new Date().toLocaleTimeString()} :ms-tick:  |  <https://cargo.deployor.dev/docs|Documentation :ms-info:>`,
+						text: `Last updated: ${new Date().toLocaleTimeString()} :ms-tick:  |  <https://silo.deployor.dev/docs|Documentation :ms-info:>`,
 					},
 				],
 			},

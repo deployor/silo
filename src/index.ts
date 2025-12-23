@@ -136,4 +136,4 @@ Bun.serve({
 	},
 });
 
-console.log(`Cargo S3 Gateway running on port ${process.env.PORT || 3000}`);
+console.log(`Silo S3 Gateway running on port ${process.env.PORT || 3000}`);

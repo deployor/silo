@@ -1,6 +1,6 @@
 display_information:
-  name: Cargo
-  description: Manage your Cargo S3 buckets directly from Slack.
+  name: Silo
+  description: Manage your Silo S3 buckets directly from Slack.
   background_color: "#2C2D30"
 features:
   app_home:
@@ -8,7 +8,7 @@ features:
     messages_tab_enabled: false
     messages_tab_read_only_enabled: true
   bot_user:
-    display_name: Cargo
+    display_name: Silo
     always_online: true
 oauth_config:
   scopes:
@@ -16,12 +16,12 @@ oauth_config:
       - chat:write
 settings:
   event_subscriptions:
-    request_url: https://cargo.deployor.dev/api/slack/events
+    request_url: https://silo.deployor.dev/api/slack/events
     bot_events:
       - app_home_opened
   interactivity:
     is_enabled: true
-    request_url: https://cargo.deployor.dev/api/slack/events
+    request_url: https://silo.deployor.dev/api/slack/events
   org_deploy_enabled: false
   socket_mode_enabled: false
   token_rotation_enabled: false

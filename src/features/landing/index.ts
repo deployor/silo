@@ -35,11 +35,11 @@ async function getCurrentUser(req: Request) {
 			{} as Record<string, string>,
 		);
 
-		if (cookies.cargo_user_id) {
+		if (cookies.silo_user_id) {
 			const user = await db
 				.select()
 				.from(users)
-				.where(eq(users.id, cookies.cargo_user_id))
+				.where(eq(users.id, cookies.silo_user_id))
 				.limit(1);
 			if (user.length > 0) return user[0];
 		}
@@ -54,7 +54,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 	if (path === "/docs" || path === "/docs/") {
 		const finalDocs = docsTemplate.replace(
-			/https:\/\/cargo\.deployor\.dev/g,
+			/https:\/\/silo\.deployor\.dev/g,
 			`https://${config.s3Domain}`,
 		);
 		return new Response(finalDocs, {
@@ -127,7 +127,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				const headers = new Headers();
 				headers.set(
 					"Set-Cookie",
-					`cargo_user_id=${userId}; Path=/; HttpOnly; SameSite=Lax`,
+					`silo_user_id=${userId}; Path=/; HttpOnly; SameSite=Lax`,
 				);
 				headers.set("Location", "/");
 
@@ -142,7 +142,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			const headers = new Headers();
 			headers.set(
 				"Set-Cookie",
-				`cargo_user_id=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
+				`silo_user_id=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
 			);
 			headers.set("Location", "/");
 			return new Response(null, { status: 302, headers });
@@ -839,7 +839,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	}
 
 	const finalDashboard = dashboardTemplate.replace(
-		/https:\/\/cargo\.deployor\.dev/g,
+		/https:\/\/silo\.deployor\.dev/g,
 		`https://${config.s3Domain}`,
 	);
 	return new Response(finalDashboard, {

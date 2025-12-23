@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cargo Docs</title>
+    <title>Silo Docs</title>
     <link
       href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
       rel="stylesheet"
@@ -23,7 +23,7 @@
         <a
           href="/"
           class="font-bold text-2xl tracking-tighter italic text-white hover:text-hc-red transition-colors"
-          >CARGO</a
+          >SILO</a
         >
         <span
           class="bg-hc-red/20 text-hc-red px-2 py-0.5 rounded text-sm font-mono border border-hc-red/30"
@@ -168,7 +168,7 @@
         <div id="intro" class="section-content active">
           <h1 class="text-4xl font-bold mb-6 text-white">Introduction</h1>
           <p class="text-lg mb-6 text-text-muted leading-relaxed">
-            Cargo is free S3 storage for Hack Clubbers.
+            Silo is free S3 storage for Hack Clubbers.
           </p>
           <p class="text-lg mb-6 text-text-muted leading-relaxed">
             If you're a teen building something and need storage whether it's for a game, a website, or a hackathon project, this is for you.
@@ -212,7 +212,7 @@
           <h3 class="text-2xl font-bold mb-4 text-white">What does Public mean?</h3>
           <ul class="list-disc list-inside space-y-2 text-text-muted mb-6">
             <li>Anyone can perform <code>GetObject</code> and <code>HeadObject</code> requests without authentication.</li>
-            <li>Files are accessible via direct URL: <code>https://cargo.deployor.dev/bucket-name/key</code>.</li>
+            <li>Files are accessible via direct URL: <code>https://silo.deployor.dev/bucket-name/key</code>.</li>
             <li><code>ListObjects</code> and other operations still require authentication.</li>
           </ul>
           
@@ -228,7 +228,7 @@
             Cross-Origin Resource Sharing (CORS) allows client-side web applications loaded in one domain to interact with resources in a different domain.
           </p>
           <p class="text-lg mb-6 text-text-muted">
-            Cargo supports per-bucket CORS configuration. You can manage this directly in the <strong>Dashboard</strong> or via the standard S3 API.
+            Silo supports per-bucket CORS configuration. You can manage this directly in the <strong>Dashboard</strong> or via the standard S3 API.
           </p>
           
           <h3 class="text-2xl font-bold mb-4 text-white">How it works</h3>
@@ -253,7 +253,7 @@
         <div id="supported-api" class="section-content">
           <h1 class="text-4xl font-bold mb-6 text-white">Supported Operations</h1>
           <p class="mb-6 text-text-muted">
-            Cargo implements a subset of the Amazon S3 API. The following operations are fully supported:
+            Silo implements a subset of the Amazon S3 API. The following operations are fully supported:
           </p>
 
           <div class="space-y-8">
@@ -315,7 +315,7 @@
                     </div>
                     <div class="flex items-center gap-2">
                       <span class="w-3 h-3 rounded bg-red-500/10 border border-red-500/20"></span>
-                      <span class="text-text-muted">Not Implemented in Cargo</span>
+                      <span class="text-text-muted">Not Implemented in Silo</span>
                     </div>
                   </div>
 
@@ -339,11 +339,11 @@
                     </div>
                   </div>
 
-                  <!-- Not Implemented in Cargo -->
+                  <!-- Not Implemented in Silo -->
                   <div>
-                    <h4 class="font-bold text-white mb-2 uppercase tracking-wider text-xs">Not Implemented in Cargo</h4>
+                    <h4 class="font-bold text-white mb-2 uppercase tracking-wider text-xs">Not Implemented in Silo</h4>
                     <p class="text-xs text-text-muted mb-3 italic">
-                        These are valid S3 features that are not currently supported by Cargo's infrastructure.
+                        These are valid S3 features that are not currently supported by Silo's infrastructure.
                     </p>
                     <div class="flex flex-wrap gap-2 font-mono text-xs">
                         <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20 text-red-400">Versioning</span>
@@ -376,7 +376,7 @@
 
             <div>
               <h3 class="text-lg font-bold text-white mb-2">Endpoint URL</h3>
-              <code class="text-hc-blue">https://cargo.deployor.dev</code>
+              <code class="text-hc-blue">https://silo.deployor.dev</code>
             </div>
 
             <div>
@@ -388,7 +388,7 @@
               <div class="bg-hc-darker p-4 rounded-lg border border-white/10 space-y-2 font-mono text-sm mb-6">
                 <div class="flex flex-col gap-1">
                   <span class="text-text-muted">// API Endpoint (Authenticated)</span>
-                  <span class="text-white">https://cargo.deployor.dev</span>
+                  <span class="text-white">https://silo.deployor.dev</span>
                   <span class="text-xs text-text-muted mt-1">No bucket name needed in hostname or path for API calls.</span>
                 </div>
               </div>
@@ -400,11 +400,11 @@
               <div class="bg-hc-darker p-4 rounded-lg border border-white/10 space-y-2 font-mono text-sm">
                 <div class="flex flex-col gap-1">
                   <span class="text-text-muted">// Virtual Host (Public Access)</span>
-                  <span class="text-white">https://<span class="text-hc-blue">{bucket}</span>.cargo.deployor.dev/<span class="text-green-400">{key}</span></span>
+                  <span class="text-white">https://<span class="text-hc-blue">{bucket}</span>.silo.deployor.dev/<span class="text-green-400">{key}</span></span>
                 </div>
                 <div class="flex flex-col gap-1 mt-4">
                   <span class="text-text-muted">// Path Style (Public Access)</span>
-                  <span class="text-white">https://cargo.deployor.dev/<span class="text-hc-blue">{bucket}</span>/<span class="text-green-400">{key}</span></span>
+                  <span class="text-white">https://silo.deployor.dev/<span class="text-hc-blue">{bucket}</span>/<span class="text-green-400">{key}</span></span>
                 </div>
               </div>
             </div>
@@ -434,11 +434,11 @@
         <div id="aws-cli" class="section-content">
           <h1 class="text-4xl font-bold mb-6 text-white">AWS CLI</h1>
           <p class="mb-6 text-text-muted">
-            You can use the standard AWS CLI to interact with Cargo. Configure a profile with your keys and our endpoint.
+            You can use the standard AWS CLI to interact with Silo. Configure a profile with your keys and our endpoint.
           </p>
 
           <h3 class="text-lg font-bold text-white mb-3">Configuration</h3>
-          <pre class="rounded-lg mb-6"><code class="language-bash">aws configure --profile cargo
+          <pre class="rounded-lg mb-6"><code class="language-bash">aws configure --profile silo
 # AWS Access Key ID: [Your Access Key]
 # AWS Secret Access Key: [Your Secret Key]
 # Default region name: eu-central-1
@@ -446,13 +446,13 @@
 
           <h3 class="text-lg font-bold text-white mb-3">Usage Examples</h3>
           <pre class="rounded-lg"><code class="language-bash"># List Buckets
-aws s3 ls --endpoint-url https://cargo.deployor.dev --profile cargo
+aws s3 ls --endpoint-url https://silo.deployor.dev --profile silo
 
 # Upload a file
-aws s3 cp myfile.txt s3://my-bucket/myfile.txt --endpoint-url https://cargo.deployor.dev --profile cargo
+aws s3 cp myfile.txt s3://my-bucket/myfile.txt --endpoint-url https://silo.deployor.dev --profile silo
 
 # List Objects
-aws s3 ls s3://my-bucket --endpoint-url https://cargo.deployor.dev --profile cargo</code></pre>
+aws s3 ls s3://my-bucket --endpoint-url https://silo.deployor.dev --profile silo</code></pre>
         </div>
 
         <!-- JS -->
@@ -466,7 +466,7 @@ aws s3 ls s3://my-bucket --endpoint-url https://cargo.deployor.dev --profile car
 
 const s3 = new S3Client({
   region: "eu-central-1",
-  endpoint: "https://cargo.deployor.dev",
+  endpoint: "https://silo.deployor.dev",
   credentials: {
     accessKeyId: "YOUR_ACCESS_KEY",
     secretAccessKey: "YOUR_SECRET_KEY",
