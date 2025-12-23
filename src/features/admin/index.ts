@@ -397,6 +397,8 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					bucketName: requestLogs.bucketName,
 					ownerEmail: users.email,
 					ipAddress: requestLogs.ipAddress,
+					ingressBytes: requestLogs.ingressBytes,
+					egressBytes: requestLogs.egressBytes,
 				})
 				.from(requestLogs)
 				.leftJoin(users, eq(requestLogs.ownerId, users.id))

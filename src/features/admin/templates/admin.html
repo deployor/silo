@@ -134,6 +134,8 @@
                 <th class="px-6 py-4">Bucket</th>
                 <th class="px-6 py-4">User</th>
                 <th class="px-6 py-4">IP</th>
+                <th class="px-6 py-4">Ingress</th>
+                <th class="px-6 py-4">Egress</th>
                 <th class="px-6 py-4 text-right">Latency</th>
               </tr>
             </thead>
@@ -524,6 +526,12 @@
                     </td>
                     <td class="px-6 py-4 font-mono text-xs text-text-muted">
                         ${log.ipAddress || '-'}
+                    </td>
+                    <td class="px-6 py-4 font-mono text-xs text-text-muted">
+                        ${formatBytes(log.ingressBytes)}
+                    </td>
+                    <td class="px-6 py-4 font-mono text-xs text-text-muted">
+                        ${formatBytes(log.egressBytes)}
                     </td>
                     <td class="px-6 py-4 text-right font-mono text-xs text-text-muted">
                         ${log.latencyMs ? log.latencyMs + 'ms' : '-'}
