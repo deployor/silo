@@ -211,6 +211,7 @@
 
         <div class="mb-6 flex gap-4">
              <button onclick="deleteBucketAdmin()" class="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">Delete Bucket</button>
+             <button onclick="resetBucketCorsAdmin()" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors border border-white/10">Reset CORS</button>
              <label class="inline-flex items-center cursor-pointer bg-black/30 px-4 py-2 rounded-lg border border-white/10">
                 <input type="checkbox" id="admin-bucket-paused" class="sr-only peer" onchange="toggleBucketPause(this.checked)">
                 <div class="relative w-9 h-5 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-red rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-hc-red"></div>
@@ -632,6 +633,12 @@
             await fetch(`/api/admin/buckets/${currentBucket.name}`, { method: "DELETE" });
             closeAdminBucketModal();
             if (currentUser) openUserModal(currentUser.id); // Refresh user modal
+        }
+
+        async function resetBucketCorsAdmin() {
+            if (!currentBucket || !confirm("Reset CORS configuration for this bucket?")) return;
+            await fetch(`/api/admin/buckets/${currentBucket.name}/cors`, { method: "DELETE" });
+            alert("CORS configuration reset.");
         }
 
         async function toggleKeyPause(keyId, pause) {
