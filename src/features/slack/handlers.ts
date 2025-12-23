@@ -141,6 +141,11 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 
 	if (user.length === 0) return; // Should not happen if they are interacting
 
+	if (user[0].isLocked) {
+		await handleAppHomeOpened({ user: payload.user.id });
+		return;
+	}
+
 	const action = payload.actions?.[0];
 	let actionId = action?.action_id;
 	let actionValue = action?.value;
