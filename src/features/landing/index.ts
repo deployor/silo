@@ -3,7 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { config } from "../../config";
 import { db } from "../../db";
-import { bucketKeys, buckets, users } from "../../db/schema";
+import { bucketKeys, buckets, requestLogs, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 import { deleteBucketContents, getInternalPath } from "../s3-api/utils";
 
@@ -21,6 +21,9 @@ const docsTemplate = await Bun.file(
 ).text();
 const lockedTemplate = await Bun.file(
 	"src/features/landing/templates/locked.html",
+).text();
+const cdnTemplate = await Bun.file(
+	"src/features/landing/templates/cdn.html",
 ).text();
 
 async function getCurrentUser(req: Request) {
@@ -156,6 +159,137 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			);
 			headers.set("Location", "/");
 			return new Response(null, { status: 302, headers });
+		}
+	}
+
+	if (path === "/cdn" || path === "/cdn/") {
+		const user = await getCurrentUser(req);
+		if (!user) {
+			return Response.redirect("/auth/login");
+		}
+		if (user.isLocked) {
+			return new Response("Account Locked", { status: 403 });
+		}
+		if (!user.slackId) {
+			return new Response(
+				"You must link your Slack account to use the CDN feature.",
+				{ status: 403 },
+			);
+		}
+
+		return new Response(cdnTemplate, {
+			headers: { "Content-Type": "text/html" },
+		});
+	}
+
+	if (path === "/api/cdn/upload" && req.method === "POST") {
+		const user = await getCurrentUser(req);
+		if (!user) return new Response("Unauthorized", { status: 401 });
+		if (user.isLocked) return new Response("Account Locked", { status: 403 });
+		if (!user.slackId)
+			return new Response("Slack account required", { status: 403 });
+
+		try {
+			const formData = await req.formData();
+			const file = formData.get("file");
+
+			if (!file || !(file instanceof File)) {
+				return new Response("No file uploaded", { status: 400 });
+			}
+
+			// Get/Create CDN Bucket
+			const bucketName = user.slackId.toLowerCase();
+			let bucket = await db
+				.select()
+				.from(buckets)
+				.where(eq(buckets.name, bucketName))
+				.limit(1);
+
+			if (bucket.length === 0) {
+				const newBucket = await db
+					.insert(buckets)
+					.values({
+						name: bucketName,
+						userId: user.id,
+						isPublic: true,
+						isCdn: true,
+						region: "auto",
+					})
+					.returning();
+				bucket = newBucket;
+			}
+			const targetBucket = bucket[0];
+
+			if (targetBucket.isPaused) {
+				return new Response(`Bucket paused: ${targetBucket.pauseReason}`, {
+					status: 403,
+				});
+			}
+
+			// Check Quota
+			const usageResult = await db
+				.select({ total: sql<number>`sum(${buckets.totalBytes})` })
+				.from(buckets)
+				.where(eq(buckets.userId, user.id));
+			const currentUsage = Number(usageResult[0]?.total) || 0;
+			const limit = user.storageLimitBytes || 1073741824; // Default 1GB
+
+			if (currentUsage + file.size > limit) {
+				return new Response("Quota exceeded", { status: 403 });
+			}
+
+			// Upload
+			const ext = file.name.split(".").pop();
+			const hash = crypto.randomUUID();
+			const fileName = `${hash}.${ext}`;
+			const internalPath = getInternalPath(fileName, user, targetBucket);
+			const fileBuffer = await file.arrayBuffer();
+
+			const s3Res = await s3Client.fetch(internalPath, {
+				method: "PUT",
+				body: fileBuffer,
+				headers: {
+					"Content-Type": file.type || "application/octet-stream",
+					"Content-Length": file.size.toString(),
+				},
+			});
+
+			if (!s3Res.ok) {
+				throw new Error(`S3 Upload Failed: ${s3Res.status}`);
+			}
+
+			// Update Stats
+			await db
+				.update(buckets)
+				.set({
+					totalBytes: sql`${buckets.totalBytes} + ${file.size}`,
+					totalRequests: sql`${buckets.totalRequests} + 1`,
+				})
+				.where(eq(buckets.id, targetBucket.id));
+
+			// Log Request
+			await db.insert(requestLogs).values({
+				bucketId: targetBucket.id,
+				bucketName: targetBucket.name,
+				ownerId: user.id,
+				requesterId: user.id,
+				method: "PUT",
+				path: fileName,
+				statusCode: 200,
+				ingressBytes: file.size,
+				egressBytes: 0,
+				ipAddress: req.headers.get("x-forwarded-for") || "127.0.0.1",
+				userAgent: req.headers.get("user-agent") || "Web/CDN",
+				latencyMs: 0,
+			});
+
+			const publicUrl = `https://${config.s3Domain}/${bucketName}/${fileName}`;
+			return new Response(JSON.stringify({ url: publicUrl }), {
+				headers: { "Content-Type": "application/json" },
+			});
+		} catch (e) {
+			console.error("CDN Upload Error:", e);
+			return new Response("Upload failed", { status: 500 });
 		}
 	}
 
