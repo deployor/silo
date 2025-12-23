@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { config } from "../../config";
 import { db } from "../../db";
-import { buckets, users } from "../../db/schema";
+import { buckets, requestLogs, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 import { getInternalPath } from "../s3-api/utils";
 
@@ -146,6 +146,22 @@ export async function handleMessage(event: any) {
 					totalRequests: sql`${buckets.totalRequests} + 1`,
 				})
 				.where(eq(buckets.id, targetBucket.id));
+
+			// Log Request
+			await db.insert(requestLogs).values({
+				bucketId: targetBucket.id,
+				bucketName: targetBucket.name,
+				ownerId: user.id,
+				requesterId: user.id,
+				method: "PUT",
+				path: fileName,
+				statusCode: 200,
+				ingressBytes: file.size,
+				egressBytes: 0,
+				ipAddress: "127.0.0.1", // Internal
+				userAgent: "SlackBot/1.0",
+				latencyMs: 0,
+			});
 
 			// Reply
 			const publicUrl = `https://${config.s3Domain}/${bucketName}/${fileName}`;
