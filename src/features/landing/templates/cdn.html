@@ -42,9 +42,15 @@
         <h1 class="text-6xl md:text-9xl font-black text-white mb-6 tracking-tighter italic">
           CDN
         </h1>
-        <p class="text-text-muted text-xl max-w-2xl mx-auto font-medium">
+        <p class="text-text-muted text-xl max-w-2xl mx-auto font-medium mb-6">
           Drag and drop any file to upload.
         </p>
+        <div class="inline-flex items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/10">
+            <div class="w-32 h-2 bg-white/10 rounded-full overflow-hidden">
+                <div id="storage-bar" class="h-full bg-hc-red rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <span id="storage-text" class="text-xs font-mono text-text-muted">Loading usage...</span>
+        </div>
       </div>
 
       <!-- Upload Zone -->
@@ -67,6 +73,7 @@
           </div>
           <h3 class="text-2xl font-bold text-white mb-2">Drop files here</h3>
           <p class="text-text-muted font-mono text-sm">or click to browse</p>
+          <p class="text-white/20 font-mono text-xs mt-4">Max 1GB per file</p>
         </div>
 
         <!-- Uploading State -->
@@ -148,24 +155,33 @@
         const results = [];
 
         for (const file of files) {
-            const formData = new FormData();
-            formData.append('file', file);
+            if (file.size > 1024 * 1024 * 1024) {
+                results.push({ success: false, name: file.name, error: "File too large (>1GB)" });
+            } else {
+                const formData = new FormData();
+                formData.append('file', file);
 
-            try {
-                const res = await fetch('/api/cdn/upload', {
-                    method: 'POST',
-                    body: formData
-                });
+                try {
+                    const res = await fetch('/api/cdn/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
 
-                if (res.ok) {
-                    const data = await res.json();
-                    results.push({ success: true, name: file.name, url: data.url, size: file.size });
-                } else {
-                    const err = await res.text();
-                    results.push({ success: false, name: file.name, error: err });
+                    if (res.ok) {
+                        const data = await res.json();
+                        results.push({ success: true, name: file.name, url: data.url, size: file.size });
+                    } else {
+                        if (res.status === 413) {
+                            results.push({ success: false, name: file.name, error: "File too large" });
+                        } else {
+                            const err = await res.text();
+                            const errorMsg = err.trim().startsWith('<') ? `Error ${res.status}` : err;
+                            results.push({ success: false, name: file.name, error: errorMsg });
+                        }
+                    }
+                } catch (e) {
+                    results.push({ success: false, name: file.name, error: "Network error (likely too large)" });
                 }
-            } catch (e) {
-                results.push({ success: false, name: file.name, error: "Network error" });
             }
 
             completed++;
@@ -270,6 +286,19 @@
             const avatar = document.getElementById("user-avatar");
             avatar.src = `https://cachet.dunkirk.sh/users/${data.user.slackId}/r`;
             avatar.classList.remove("hidden");
+        }
+
+        // Update Storage Bar
+        const usage = data.user.storageUsage || 0;
+        const limit = data.user.storageLimit || 1073741824; // 1GB default
+        const percent = Math.min((usage / limit) * 100, 100);
+        
+        document.getElementById('storage-bar').style.width = `${percent}%`;
+        document.getElementById('storage-text').textContent = `${formatBytes(usage)} / ${formatBytes(limit)}`;
+        
+        if (percent > 90) {
+            document.getElementById('storage-bar').classList.remove('bg-hc-red');
+            document.getElementById('storage-bar').classList.add('bg-red-500');
         }
       }).catch(() => {
         window.location.href = '/auth/login';

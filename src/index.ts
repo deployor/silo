@@ -10,6 +10,7 @@ const S3_DOMAIN = config.s3Domain;
 
 Bun.serve({
 	port: process.env.PORT || 3000,
+	maxRequestBodySize: 1024 * 1024 * 1024, // 1GB
 	async fetch(req) {
 		const url = new URL(req.url);
 		const host = req.headers.get("host") || "";
