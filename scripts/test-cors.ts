@@ -207,10 +207,7 @@ test("CORS: OPTIONS Preflight check", async () => {
 		},
 	});
 
-	const res = await handleS3Request(req, user, updatedBucket, "public"); // OPTIONS is public usually or handled before auth fully
-	// Wait, our OPTIONS handling is inside handleS3Request but auth middleware handles it too?
-	// In middleware/auth.ts we added OPTIONS handling to return "public" mode if bucket exists.
-	// So handleS3Request receives mode="public".
+	const res = await handleS3Request(req, user, updatedBucket, "public"); 
 
 	expect(res.status).toBe(200);
 	expect(res.headers.get("Access-Control-Allow-Origin")).toBe(
@@ -239,6 +236,56 @@ test("CORS: OPTIONS Preflight check", async () => {
 		"public",
 	);
 	expect(resInvalid.status).toBe(403);
+
+	// Invalid Method
+	const reqInvalidMethod = new Request(
+		`https://cargo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`,
+		{
+			method: "OPTIONS",
+			headers: {
+				Origin: "http://example.com",
+				"Access-Control-Request-Method": "DELETE", // Not allowed
+			},
+		},
+	);
+	const resInvalidMethod = await handleS3Request(
+		reqInvalidMethod,
+		user,
+		updatedBucket,
+		"public",
+	);
+	expect(resInvalidMethod.status).toBe(403);
+
+	await teardown();
+});
+
+test("CORS: Security - No Config returns 403 for OPTIONS", async () => {
+	const bucket = await setup();
+	const user = (
+		await db.select().from(users).where(eq(users.id, TEST_USER_ID))
+	)[0];
+
+	// Ensure no config
+	await db
+		.update(buckets)
+		.set({ corsConfig: null })
+		.where(eq(buckets.id, bucket.id));
+	
+	const [updatedBucket] = await db
+		.select()
+		.from(buckets)
+		.where(eq(buckets.id, bucket.id));
+
+	const req = new Request(`https://cargo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`, {
+		method: "OPTIONS",
+		headers: {
+			Origin: "http://example.com",
+			"Access-Control-Request-Method": "GET",
+		},
+	});
+
+	const res = await handleS3Request(req, user, updatedBucket, "public");
+	expect(res.status).toBe(403);
 
 	await teardown();
 });
