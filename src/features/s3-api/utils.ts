@@ -182,6 +182,7 @@ const FLUSH_INTERVAL_MS = 5000;
 
 interface LogEntry {
 	bucketId: string;
+	bucketName: string;
 	ownerId: string;
 	requesterId: string | null;
 	method: string;
@@ -268,6 +269,7 @@ export async function updateStats(
 	// 2. Queue detailed log for batch insertion
 	logQueue.push({
 		bucketId: bucket.id,
+		bucketName: bucket.name,
 		ownerId: user.id,
 		// If authenticated, the requester is the user.
 		// BUT, if the user is the owner, we can just store it.

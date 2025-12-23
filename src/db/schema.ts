@@ -89,6 +89,7 @@ export const requestLogs = pgTable(
 		bucketId: uuid("bucket_id").references(() => buckets.id, {
 			onDelete: "set null",
 		}),
+		bucketName: text("bucket_name"),
 		// The owner of the bucket (for billing/quota)
 		ownerId: text("owner_id").references(() => users.id, {
 			onDelete: "set null",
