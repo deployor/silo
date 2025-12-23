@@ -321,13 +321,13 @@
         loadFiles(prefix, null, true);
       }
 
-      function _loadMore() {
+      function loadMore() {
         if (continuationToken) {
             loadFiles(currentPrefix, continuationToken, false);
         }
       }
 
-      function _searchFiles() {
+      function searchFiles() {
         const query = document.getElementById('search-input').value;
         // For now, search is just filtering by prefix if we wanted, but S3 doesn't support full text search easily.
         // We can treat the search query as a prefix search?
@@ -345,7 +345,7 @@
         loadFiles(query, null, true);
       }
 
-      function _deleteFile(key) {
+      function deleteFile(key) {
         openConfirmModal(
             "Delete File",
             `Are you sure you want to delete "${key}"? This cannot be undone.`,
@@ -364,7 +364,7 @@
         );
       }
 
-      async function _previewFile(key, url) {
+      async function previewFile(key, url) {
         const modal = document.getElementById('preview-modal');
         const content = document.getElementById('preview-content');
         const filename = document.getElementById('preview-filename');
@@ -430,7 +430,7 @@
         }
       }
 
-      function _closePreview() {
+      function closePreview() {
         document.getElementById('preview-modal').classList.add('hidden');
         document.getElementById('preview-modal').classList.remove('flex');
         document.getElementById('preview-content').innerHTML = '';
