@@ -331,6 +331,14 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					.where(eq(users.id, bucket[0].userId))
 					.limit(1);
 				if (owner.length > 0) {
+					// Prevent deletion of CDN buckets (Slack integration)
+					if (
+						owner[0].slackId &&
+						bucketName === owner[0].slackId.toLowerCase()
+					) {
+						return new Response("Cannot delete CDN bucket", { status: 403 });
+					}
+
 					const internalPrefix = getInternalPath("", owner[0], bucket[0]);
 					try {
 						await deleteBucketContents(internalPrefix);

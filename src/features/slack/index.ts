@@ -1,4 +1,5 @@
 import { handleAppHomeOpened, handleInteraction } from "./handlers";
+import { handleMessage } from "./message-handler";
 import { verifySlackRequest } from "./verify";
 
 export async function handleSlackRequest(req: Request): Promise<Response> {
@@ -32,6 +33,10 @@ export async function handleSlackRequest(req: Request): Promise<Response> {
 				// Handle App Home Opened
 				// We don't await this to return 200 OK quickly to Slack
 				handleAppHomeOpened(event).catch(console.error);
+			}
+			if (event.type === "message") {
+				// Handle Message (File Upload)
+				handleMessage(event).catch(console.error);
 			}
 		}
 
