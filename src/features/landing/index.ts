@@ -186,6 +186,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 						slackId: user.slackId,
 						storageUsage: user.storageUsageBytes,
 						storageLimit: user.storageLimitBytes,
+						egressLimit: user.egressLimitBytes,
 						ingressBytes: user.ingressBytes,
 						egressBytes: user.egressBytes,
 						totalBytes: user.ingressBytes + user.egressBytes,
