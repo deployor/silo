@@ -83,7 +83,7 @@ Bun.serve({
 		const forbiddenParams = [
 			"policy",
 			"acl",
-			"cors",
+			// "cors", // Allowed
 			"lifecycle",
 			"replication",
 			"tagging",
