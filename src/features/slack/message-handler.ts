@@ -31,6 +31,7 @@ export async function handleMessage(event: any) {
 			`I don't know who you are! Please <https://${config.s3Domain}/auth/login|login to the dashboard> first to link your account.`,
 			threadTs,
 		);
+		await removeReaction(channelId, event.ts, "eyes");
 		await addReaction(channelId, event.ts, "x");
 		return;
 	}
@@ -43,6 +44,7 @@ export async function handleMessage(event: any) {
 			`Your account is locked. Reason: ${user.lockReason || "No reason provided."}`,
 			threadTs,
 		);
+		await removeReaction(channelId, event.ts, "eyes");
 		await addReaction(channelId, event.ts, "x");
 		return;
 	}
@@ -81,6 +83,7 @@ export async function handleMessage(event: any) {
 			`Your CDN bucket is paused. Reason: ${targetBucket.pauseReason || "No reason provided."}`,
 			threadTs,
 		);
+		await removeReaction(channelId, event.ts, "eyes");
 		await addReaction(channelId, event.ts, "x");
 		return;
 	}
@@ -194,6 +197,7 @@ export async function handleMessage(event: any) {
 
 	// Header
 	let headerText = "";
+	await removeReaction(channelId, event.ts, "eyes");
 	if (successCount === 0) {
 		headerText = "❌ *Failed to upload files*";
 		await addReaction(channelId, event.ts, "x");
@@ -323,6 +327,17 @@ async function postBlocks(channel: string, blocks: any[], threadTs?: string) {
 
 async function addReaction(channel: string, timestamp: string, name: string) {
 	await fetch("https://slack.com/api/reactions.add", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${config.slack.botToken}`,
+		},
+		body: JSON.stringify({ channel, timestamp, name }),
+	});
+}
+
+async function removeReaction(channel: string, timestamp: string, name: string) {
+	await fetch("https://slack.com/api/reactions.remove", {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
