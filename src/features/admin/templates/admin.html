@@ -156,16 +156,16 @@
     <!-- Log Details Modal -->
     <div
       id="log-modal"
-      class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50"
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4"
     >
       <div
-        class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-2xl card-shadow transform transition-all"
+        class="bg-hc-dark rounded-3xl border border-white/10 w-full max-w-3xl card-shadow transform transition-all flex flex-col max-h-[90vh]"
       >
-        <div class="flex justify-between items-center mb-6">
-            <h3 class="text-2xl font-bold text-white">Log Details</h3>
+        <div class="p-6 border-b border-white/10 flex justify-between items-center shrink-0">
+            <h3 class="text-xl font-bold text-white">Log Details</h3>
             <button
               onclick="closeLogModal()"
-              class="text-text-muted hover:text-white transition-colors"
+              class="text-text-muted hover:text-white transition-colors p-1"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -173,24 +173,24 @@
             </button>
         </div>
 
-        <div class="space-y-4">
-            <div class="grid grid-cols-2 gap-4">
+        <div class="p-6 overflow-y-auto custom-scrollbar">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div class="bg-black/30 p-4 rounded-xl border border-white/10">
                     <div class="text-xs text-text-muted uppercase font-bold mb-1">Method</div>
-                    <div class="text-white font-mono" id="modal-log-method"></div>
+                    <div class="text-white font-mono text-lg" id="modal-log-method"></div>
                 </div>
                 <div class="bg-black/30 p-4 rounded-xl border border-white/10">
                     <div class="text-xs text-text-muted uppercase font-bold mb-1">Status Code</div>
-                    <div class="text-white font-mono" id="modal-log-status"></div>
+                    <div class="text-white font-mono text-lg" id="modal-log-status"></div>
                 </div>
             </div>
 
-            <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+            <div class="bg-black/30 p-4 rounded-xl border border-white/10 mb-4">
                 <div class="text-xs text-text-muted uppercase font-bold mb-1">Path</div>
-                <div class="text-white font-mono break-all" id="modal-log-path"></div>
+                <div class="text-white font-mono break-all text-sm" id="modal-log-path"></div>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div class="bg-black/30 p-4 rounded-xl border border-white/10">
                     <div class="text-xs text-text-muted uppercase font-bold mb-1">Bucket</div>
                     <div class="text-white font-mono" id="modal-log-bucket"></div>
@@ -201,7 +201,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div class="bg-black/30 p-4 rounded-xl border border-white/10">
                     <div class="text-xs text-text-muted uppercase font-bold mb-1">Ingress</div>
                     <div class="text-white font-mono" id="modal-log-ingress"></div>
@@ -212,12 +212,12 @@
                 </div>
             </div>
 
-            <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+            <div class="bg-black/30 p-4 rounded-xl border border-white/10 mb-4">
                 <div class="text-xs text-text-muted uppercase font-bold mb-1">User Agent</div>
-                <div class="text-white font-mono text-xs break-all" id="modal-log-ua"></div>
+                <div class="text-white font-mono text-xs break-all max-h-32 overflow-y-auto custom-scrollbar" id="modal-log-ua"></div>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div class="bg-black/30 p-4 rounded-xl border border-white/10">
                     <div class="text-xs text-text-muted uppercase font-bold mb-1">IP Address</div>
                     <div class="text-white font-mono" id="modal-log-ip"></div>
@@ -227,14 +227,21 @@
                     <div class="text-white font-mono" id="modal-log-latency"></div>
                 </div>
             </div>
-             <div class="bg-black/30 p-4 rounded-xl border border-white/10">
-                <div class="text-xs text-text-muted uppercase font-bold mb-1">Requester ID</div>
-                <div class="text-white font-mono text-xs" id="modal-log-requester"></div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                    <div class="text-xs text-text-muted uppercase font-bold mb-1">Requester ID</div>
+                    <div class="text-white font-mono text-xs break-all" id="modal-log-requester"></div>
+                </div>
+                 <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                    <div class="text-xs text-text-muted uppercase font-bold mb-1">Timestamp</div>
+                    <div class="text-white font-mono text-xs" id="modal-log-time"></div>
+                </div>
             </div>
-             <div class="bg-black/30 p-4 rounded-xl border border-white/10">
-                <div class="text-xs text-text-muted uppercase font-bold mb-1">Timestamp</div>
-                <div class="text-white font-mono text-xs" id="modal-log-time"></div>
-            </div>
+        </div>
+        
+        <div class="p-6 border-t border-white/10 shrink-0 flex justify-end">
+            <button onclick="closeLogModal()" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">Close</button>
         </div>
       </div>
     </div>
