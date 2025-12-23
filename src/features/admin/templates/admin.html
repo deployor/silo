@@ -363,7 +363,7 @@
         const usersLimit = 50;
         let usersLoading = false;
 
-        function switchTab(tab) {
+        window.switchTab = function(tab) {
             document.getElementById("section-users").classList.add("hidden");
             document.getElementById("section-logs").classList.add("hidden");
             document.getElementById("tab-users").classList.remove("bg-white/10", "text-white");
