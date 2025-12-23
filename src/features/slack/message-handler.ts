@@ -85,7 +85,12 @@ export async function handleMessage(event: any) {
 		return;
 	}
 
-	const results: { name: string; url?: string; error?: string }[] = [];
+	const results: {
+		name: string;
+		url?: string;
+		key?: string;
+		error?: string;
+	}[] = [];
 	let successCount = 0;
 
 	// 5. Process Files
@@ -172,7 +177,7 @@ export async function handleMessage(event: any) {
 
 			// Reply
 			const publicUrl = `https://${config.s3Domain}/${bucketName}/${fileName}`;
-			results.push({ name: file.name, url: publicUrl });
+			results.push({ name: file.name, url: publicUrl, key: fileName });
 			successCount++;
 		} catch (e) {
 			console.error(e);
@@ -180,31 +185,113 @@ export async function handleMessage(event: any) {
 		}
 	}
 
-	// 6. Send Summary
-	let messageText = "";
+	// 6. Send Summary using Block Kit
+	// We need to chunk blocks because Slack has a limit of 50 blocks per message
+	// Each file takes 2 blocks (Section + Context) or 1 block (Section with error)
+	// Let's say 2 blocks per file. So max 20 files per message.
+
+	const blocks: any[] = [];
+
+	// Header
+	let headerText = "";
 	if (successCount === 0) {
-		messageText = "❌ *Failed to upload files*";
+		headerText = "❌ *Failed to upload files*";
 		await addReaction(channelId, event.ts, "x");
 	} else if (successCount === event.files.length) {
-		messageText = `🚀 *Uploaded ${successCount} file${successCount > 1 ? "s" : ""}!*`;
+		headerText = `🚀 *Uploaded ${successCount} file${successCount > 1 ? "s" : ""}!*`;
 		await addReaction(channelId, event.ts, "white_check_mark");
 	} else {
-		messageText = `⚠️ *Uploaded ${successCount}/${event.files.length} files*`;
+		headerText = `⚠️ *Uploaded ${successCount}/${event.files.length} files*`;
 		await addReaction(channelId, event.ts, "warning");
 	}
 
-	// Build details
-	const details = results
-		.map((r) => {
-			if (r.url) {
-				return `• <${r.url}|${r.name}>`;
-			} else {
-				return `• ~${r.name}~ (${r.error})`;
-			}
-		})
-		.join("\n");
+	blocks.push({
+		type: "section",
+		text: {
+			type: "mrkdwn",
+			text: headerText,
+		},
+	});
 
-	await postMessage(channelId, `${messageText}\n\n${details}`, threadTs);
+	blocks.push({
+		type: "divider",
+	});
+
+	// File Blocks
+	for (const r of results) {
+		if (r.url) {
+			blocks.push({
+				type: "section",
+				text: {
+					type: "mrkdwn",
+					text: `*${r.name}*\n<${r.url}|${r.url}>`,
+				},
+				accessory: {
+					type: "button",
+					text: {
+						type: "plain_text",
+						text: "Delete",
+						emoji: true,
+					},
+					style: "danger",
+					value: `delete_cdn_file:${targetBucket.id}:${r.key}`,
+					action_id: "delete_cdn_file",
+					confirm: {
+						title: {
+							type: "plain_text",
+							text: "Delete File",
+						},
+						text: {
+							type: "mrkdwn",
+							text: `Are you sure you want to delete *${r.name}*? This cannot be undone.`,
+						},
+						confirm: {
+							type: "plain_text",
+							text: "Yes, delete it",
+						},
+						deny: {
+							type: "plain_text",
+							text: "Cancel",
+						},
+					},
+				},
+			});
+		} else {
+			blocks.push({
+				type: "section",
+				text: {
+					type: "mrkdwn",
+					text: `~${r.name}~\n_Error: ${r.error}_`,
+				},
+			});
+		}
+	}
+
+	// Chunk and Send
+	const CHUNK_SIZE = 40; // Safe limit
+	// First chunk includes header (2 blocks)
+	// Subsequent chunks are just files
+
+	// Actually, let's just send multiple messages if needed.
+	// But we want the header in the first one.
+
+	let currentBlocks = [];
+	// Add header blocks
+	currentBlocks.push(blocks[0]);
+	currentBlocks.push(blocks[1]);
+
+	for (let i = 2; i < blocks.length; i++) {
+		currentBlocks.push(blocks[i]);
+
+		if (currentBlocks.length >= CHUNK_SIZE) {
+			await postBlocks(channelId, currentBlocks, threadTs);
+			currentBlocks = [];
+		}
+	}
+
+	if (currentBlocks.length > 0) {
+		await postBlocks(channelId, currentBlocks, threadTs);
+	}
 }
 
 async function postMessage(channel: string, text: string, threadTs?: string) {
@@ -215,6 +302,22 @@ async function postMessage(channel: string, text: string, threadTs?: string) {
 			Authorization: `Bearer ${config.slack.botToken}`,
 		},
 		body: JSON.stringify({ channel, text, thread_ts: threadTs }),
+	});
+}
+
+async function postBlocks(channel: string, blocks: any[], threadTs?: string) {
+	await fetch("https://slack.com/api/chat.postMessage", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${config.slack.botToken}`,
+		},
+		body: JSON.stringify({
+			channel,
+			blocks,
+			thread_ts: threadTs,
+			text: "File Upload Summary", // Fallback text
+		}),
 	});
 }
 
