@@ -103,6 +103,8 @@ export async function rewriteCopySourceHeader(
 
 	const sourceBucket = bucketResult[0];
 
+	if (sourceBucket.isCdn) return null;
+
 	if (!currentUser || sourceBucket.userId !== currentUser.id) {
 		return null;
 	}

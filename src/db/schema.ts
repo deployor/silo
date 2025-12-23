@@ -43,6 +43,7 @@ export const buckets = pgTable(
 			.notNull(),
 		region: text("region").default("auto"),
 		isPublic: boolean("is_public").default(false).notNull(),
+		isCdn: boolean("is_cdn").default(false).notNull(),
 		isPaused: boolean("is_paused").default(false).notNull(),
 		pauseReason: text("pause_reason"),
 		corsConfig: text("cors_config"), // JSON string of CORS rules

@@ -305,6 +305,18 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		);
 		if (bucketCorsMatch && req.method === "DELETE") {
 			const bucketName = bucketCorsMatch[1];
+			
+			// Check if CDN
+			const bucket = await db
+				.select()
+				.from(buckets)
+				.where(eq(buckets.name, bucketName))
+				.limit(1);
+				
+			if (bucket.length > 0 && bucket[0].isCdn) {
+				return new Response("Cannot change CORS of CDN bucket", { status: 403 });
+			}
+
 			await db
 				.update(buckets)
 				.set({ corsConfig: null })
@@ -332,10 +344,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					.limit(1);
 				if (owner.length > 0) {
 					// Prevent deletion of CDN buckets (Slack integration)
-					if (
-						owner[0].slackId &&
-						bucketName === owner[0].slackId.toLowerCase()
-					) {
+					if (bucket[0].isCdn) {
 						return new Response("Cannot delete CDN bucket", { status: 403 });
 					}
 

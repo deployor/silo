@@ -36,6 +36,13 @@
       "when": 1766502175064,
       "tag": "0004_abnormal_gamma_corps",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1766521158614,
+      "tag": "0005_majestic_synch",
+      "breakpoints": true
     }
   ]
 }
