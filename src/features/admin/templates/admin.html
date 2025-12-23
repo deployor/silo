@@ -87,6 +87,60 @@
           </table>
         </div>
       </div>
+
+      <!-- Logs Section -->
+      <div
+        class="bg-hc-dark rounded-3xl border border-white/10 overflow-hidden card-shadow mb-8"
+      >
+        <div
+          class="p-6 border-b border-white/10 flex justify-between items-center"
+        >
+          <div>
+            <h2 class="text-xl font-bold text-white">Request Logs</h2>
+            <p class="text-text-muted text-sm mt-1">
+              View all request logs across all buckets.
+            </p>
+          </div>
+          <div class="flex items-center gap-4">
+             <div class="text-xs text-text-muted font-mono" id="logs-stats">
+                Showing 0 logs
+             </div>
+             <div class="relative">
+                <input type="text" id="logs-search" placeholder="Search logs..." class="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red font-mono placeholder-white/20 transition-colors text-sm w-64" onkeydown="if(event.key === 'Enter') loadLogs(true)">
+             </div>
+             <button onclick="loadLogs(true)" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors">
+                Search
+             </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead
+              class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider"
+            >
+              <tr>
+                <th class="px-6 py-4">Time</th>
+                <th class="px-6 py-4">Method</th>
+                <th class="px-6 py-4">Status</th>
+                <th class="px-6 py-4">Path</th>
+                <th class="px-6 py-4">Bucket</th>
+                <th class="px-6 py-4">User</th>
+                <th class="px-6 py-4">IP</th>
+                <th class="px-6 py-4 text-right">Latency</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-white/5" id="logs-table">
+              <!-- Logs will be inserted here -->
+            </tbody>
+          </table>
+        </div>
+        <div class="p-4 border-t border-white/10 flex justify-center">
+            <button id="load-more-logs-btn" onclick="loadMoreLogs()" class="text-text-muted hover:text-white text-sm font-bold transition-colors hidden">
+                Load More
+            </button>
+        </div>
+      </div>
     </main>
 
     <!-- User Details Modal -->
@@ -292,6 +346,9 @@
         let allUsers = [];
         let currentUser = null;
         let currentBucket = null;
+        let logsOffset = 0;
+        const logsLimit = 50;
+        let logsLoading = false;
 
         async function loadUsers() {
             try {
@@ -315,6 +372,99 @@
                     window.location.href = "/";
                 }
             }
+        }
+
+        async function loadLogs(reset = false) {
+            if (logsLoading) return;
+            logsLoading = true;
+
+            if (reset) {
+                logsOffset = 0;
+                document.getElementById("logs-table").innerHTML = "";
+            }
+
+            const search = document.getElementById("logs-search").value;
+            const query = new URLSearchParams({
+                limit: logsLimit,
+                offset: logsOffset,
+                search: search
+            });
+
+            try {
+                const res = await fetch(`/api/admin/logs?${query.toString()}`);
+                if (!res.ok) throw new Error("Failed to load logs");
+                const data = await res.json();
+                
+                renderLogs(data.logs);
+                
+                logsOffset += data.logs.length;
+                
+                // Update stats
+                const total = data.total;
+                document.getElementById("logs-stats").textContent = `Showing ${logsOffset} of ${total} logs`;
+
+                // Show/hide load more button
+                const loadMoreBtn = document.getElementById("load-more-logs-btn");
+                if (logsOffset < total) {
+                    loadMoreBtn.classList.remove("hidden");
+                } else {
+                    loadMoreBtn.classList.add("hidden");
+                }
+
+            } catch (e) {
+                console.error("Failed to load logs", e);
+            } finally {
+                logsLoading = false;
+            }
+        }
+
+        function loadMoreLogs() {
+            loadLogs(false);
+        }
+
+        function renderLogs(logs) {
+            const tbody = document.getElementById("logs-table");
+            const html = logs.map(log => {
+                let methodColor = "text-white";
+                if (log.method === "GET") methodColor = "text-blue-400";
+                if (log.method === "PUT") methodColor = "text-yellow-400";
+                if (log.method === "DELETE") methodColor = "text-red-400";
+
+                let statusColor = "text-emerald-400";
+                if (log.statusCode >= 400) statusColor = "text-yellow-400";
+                if (log.statusCode >= 500) statusColor = "text-red-400";
+
+                return `
+                <tr class="hover:bg-white/5 transition-colors">
+                    <td class="px-6 py-4 font-mono text-xs text-text-muted whitespace-nowrap">
+                        ${new Date(log.createdAt).toLocaleString()}
+                    </td>
+                    <td class="px-6 py-4 font-bold text-xs ${methodColor}">
+                        ${log.method}
+                    </td>
+                    <td class="px-6 py-4 font-bold text-xs ${statusColor}">
+                        ${log.statusCode}
+                    </td>
+                    <td class="px-6 py-4 font-mono text-xs text-white truncate max-w-xs" title="${log.path}">
+                        ${log.path}
+                    </td>
+                    <td class="px-6 py-4 font-mono text-xs text-text-muted">
+                        ${log.bucketName || '-'}
+                    </td>
+                    <td class="px-6 py-4 font-mono text-xs text-text-muted truncate max-w-[150px]" title="${log.ownerEmail}">
+                        ${log.ownerEmail || '-'}
+                    </td>
+                    <td class="px-6 py-4 font-mono text-xs text-text-muted">
+                        ${log.ipAddress || '-'}
+                    </td>
+                    <td class="px-6 py-4 text-right font-mono text-xs text-text-muted">
+                        ${log.latencyMs ? log.latencyMs + 'ms' : '-'}
+                    </td>
+                </tr>
+                `;
+            }).join("");
+            
+            tbody.insertAdjacentHTML('beforeend', html);
         }
 
         function renderUsers(users) {
@@ -669,6 +819,7 @@
         }
 
         loadUsers();
+        loadLogs(true);
     </script>
   </body>
 </html>
