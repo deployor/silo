@@ -15,8 +15,8 @@ export async function handleMessage(event: any) {
 	const channelId = event.channel;
 	const threadTs = event.thread_ts || event.ts;
 
-	// 0. Add Eyes Reaction
-	await addReaction(channelId, event.ts, "eyes");
+	// 0. Add Loading Reaction
+	await addReaction(channelId, event.ts, "homer-load-2");
 
 	// 1. Find User
 	const userResult = await db
@@ -31,8 +31,8 @@ export async function handleMessage(event: any) {
 			`I don't know who you are! Please <https://${config.s3Domain}/auth/login|login to the dashboard> first to link your account.`,
 			threadTs,
 		);
-		await removeReaction(channelId, event.ts, "eyes");
-		await addReaction(channelId, event.ts, "x");
+		await removeReaction(channelId, event.ts, "homer-load-2");
+		await addReaction(channelId, event.ts, "ms-no");
 		return;
 	}
 	const user = userResult[0];
@@ -44,8 +44,8 @@ export async function handleMessage(event: any) {
 			`Your account is locked. Reason: ${user.lockReason || "No reason provided."}`,
 			threadTs,
 		);
-		await removeReaction(channelId, event.ts, "eyes");
-		await addReaction(channelId, event.ts, "x");
+		await removeReaction(channelId, event.ts, "homer-load-2");
+		await addReaction(channelId, event.ts, "ms-no");
 		return;
 	}
 
@@ -83,8 +83,8 @@ export async function handleMessage(event: any) {
 			`Your CDN bucket is paused. Reason: ${targetBucket.pauseReason || "No reason provided."}`,
 			threadTs,
 		);
-		await removeReaction(channelId, event.ts, "eyes");
-		await addReaction(channelId, event.ts, "x");
+		await removeReaction(channelId, event.ts, "homer-load-2");
+		await addReaction(channelId, event.ts, "ms-no");
 		return;
 	}
 
@@ -197,16 +197,16 @@ export async function handleMessage(event: any) {
 
 	// Header
 	let headerText = "";
-	await removeReaction(channelId, event.ts, "eyes");
+	await removeReaction(channelId, event.ts, "homer-load-2");
 	if (successCount === 0) {
 		headerText = "❌ *Failed to upload files*";
-		await addReaction(channelId, event.ts, "x");
+		await addReaction(channelId, event.ts, "ms-no");
 	} else if (successCount === event.files.length) {
-		headerText = `🚀 *Uploaded ${successCount} file${successCount > 1 ? "s" : ""}!*`;
-		await addReaction(channelId, event.ts, "white_check_mark");
+		headerText = `:dinowow: *Uploaded ${successCount} file${successCount > 1 ? "s" : ""}!*`;
+		await addReaction(channelId, event.ts, "ms-green-tick");
 	} else {
 		headerText = `⚠️ *Uploaded ${successCount}/${event.files.length} files*`;
-		await addReaction(channelId, event.ts, "warning");
+		await addReaction(channelId, event.ts, "ms-worried");
 	}
 
 	blocks.push({
