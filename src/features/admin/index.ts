@@ -58,11 +58,57 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	if (path.startsWith("/api/admin/")) {
 		// List Users
 		if (path === "/api/admin/users" && req.method === "GET") {
-			const allUsers = await db.select().from(users);
+			const limit = Number.parseInt(url.searchParams.get("limit") || "50");
+			const offset = Number.parseInt(url.searchParams.get("offset") || "0");
+			const search = url.searchParams.get("search");
+			const adminsOnly = url.searchParams.get("adminsOnly") === "true";
+
+			const filters = [];
+			if (search) {
+				filters.push(
+					or(
+						ilike(users.email, `%${search}%`),
+						ilike(users.id, `%${search}%`),
+						ilike(users.slackId, `%${search}%`),
+					),
+				);
+			}
+			if (adminsOnly) {
+				filters.push(eq(users.isAdmin, true));
+			}
+
+			const conditions = filters.length > 0 ? and(...filters) : undefined;
+
+			const usersQuery = db.select().from(users).limit(limit).offset(offset);
+
+			if (conditions) {
+				usersQuery.where(conditions);
+			}
+
+			const allUsers = await usersQuery;
+
+			// Count
+			let total = 0;
+			if (conditions) {
+				const countRes = await db
+					.select({ count: sql<number>`count(*)` })
+					.from(users)
+					.where(conditions);
+				total = Number(countRes[0].count);
+			} else {
+				const countRes = await db
+					.select({ count: sql<number>`count(*)` })
+					.from(users);
+				total = Number(countRes[0].count);
+			}
+
 			return new Response(
 				JSON.stringify({
 					admin: { id: user.id, slackId: user.slackId },
 					users: allUsers,
+					total,
+					limit,
+					offset,
 				}),
 				{ headers: { "Content-Type": "application/json" } },
 			);
