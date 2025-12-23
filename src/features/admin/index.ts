@@ -399,6 +399,8 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					ipAddress: requestLogs.ipAddress,
 					ingressBytes: requestLogs.ingressBytes,
 					egressBytes: requestLogs.egressBytes,
+					userAgent: requestLogs.userAgent,
+					requesterId: requestLogs.requesterId,
 				})
 				.from(requestLogs)
 				.leftJoin(users, eq(requestLogs.ownerId, users.id))
