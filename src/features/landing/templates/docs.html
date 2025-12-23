@@ -314,11 +314,11 @@
                     <p class="text-xs text-text-muted mb-3 italic">
                         Bucket creation and deletion must be done via the Cargo Dashboard to ensure proper user quotas and ownership tracking.
                     </p>
-                    <div class="flex flex-wrap gap-2 font-mono text-xs text-red-400">
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">CreateBucket</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeleteBucket</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">ListDirectoryBuckets</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">CreateSession</span>
+                    <div class="flex flex-wrap gap-2 font-mono text-xs">
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">CreateBucket</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">DeleteBucket</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">ListDirectoryBuckets</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">CreateSession</span>
                     </div>
                   </div>
 
@@ -326,25 +326,25 @@
                   <div>
                     <h4 class="font-bold text-white mb-2 uppercase tracking-wider text-xs">Access Control & Policy</h4>
                     <p class="text-xs text-text-muted mb-3 italic">
-                        We use a simplified permissions model. Buckets are either private (owner-only) or public (read-only for everyone). Complex policies, ACLs, and CORS configurations are not supported.
+                        We use a simplified permissions model. Buckets are either private (owner-only) or public (read-only for everyone). Complex policies and ACLs are not supported.
                     </p>
-                    <div class="flex flex-wrap gap-2 font-mono text-xs text-red-400">
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketAcl</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketAcl</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutObjectAcl</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetObjectAcl</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketPolicy</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketPolicy</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeleteBucketPolicy</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketPolicyStatus</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutPublicAccessBlock</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetPublicAccessBlock</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeletePublicAccessBlock</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketOwnershipControls</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketOwnershipControls</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeleteBucketOwnershipControls</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketAbac</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketAbac</span>
+                    <div class="flex flex-wrap gap-2 font-mono text-xs">
+                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20 text-red-400" title="Legacy / Deprecated">PutBucketAcl</span>
+                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20 text-red-400" title="Legacy / Deprecated">GetBucketAcl</span>
+                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20 text-red-400" title="Legacy / Deprecated">PutObjectAcl</span>
+                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20 text-red-400" title="Legacy / Deprecated">GetObjectAcl</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketPolicy</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketPolicy</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">DeleteBucketPolicy</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketPolicyStatus</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutPublicAccessBlock</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetPublicAccessBlock</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">DeletePublicAccessBlock</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketOwnershipControls</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketOwnershipControls</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">DeleteBucketOwnershipControls</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketAbac</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketAbac</span>
                     </div>
                   </div>
 
@@ -354,35 +354,35 @@
                     <p class="text-xs text-text-muted mb-3 italic">
                         Features like versioning, lifecycle rules, replication, and encryption are handled at the infrastructure level or omitted to keep the service simple and performant.
                     </p>
-                    <div class="flex flex-wrap gap-2 font-mono text-xs text-red-400">
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketVersioning</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketVersioning</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketLifecycle</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketLifecycle</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeleteBucketLifecycle</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketLifecycleConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketLifecycleConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketReplication</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketReplication</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeleteBucketReplication</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketEncryption</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketEncryption</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeleteBucketEncryption</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketWebsite</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketWebsite</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeleteBucketWebsite</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketLogging</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketLogging</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketNotificationConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketNotificationConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketRequestPayment</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketRequestPayment</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketAccelerateConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketAccelerateConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketIntelligentTieringConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketIntelligentTieringConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeleteBucketIntelligentTieringConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">ListBucketIntelligentTieringConfigurations</span>
+                    <div class="flex flex-wrap gap-2 font-mono text-xs">
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketVersioning</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketVersioning</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketLifecycle</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketLifecycle</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">DeleteBucketLifecycle</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketLifecycleConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketLifecycleConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketReplication</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketReplication</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">DeleteBucketReplication</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketEncryption</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketEncryption</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">DeleteBucketEncryption</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketWebsite</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketWebsite</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">DeleteBucketWebsite</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketLogging</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketLogging</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketNotificationConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketNotificationConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketRequestPayment</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketRequestPayment</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketAccelerateConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketAccelerateConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketIntelligentTieringConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketIntelligentTieringConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">DeleteBucketIntelligentTieringConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">ListBucketIntelligentTieringConfigurations</span>
                     </div>
                   </div>
 
@@ -392,19 +392,19 @@
                     <p class="text-xs text-text-muted mb-3 italic">
                         Detailed analytics and inventory reports are not supported. Basic usage stats are available in the dashboard.
                     </p>
-                    <div class="flex flex-wrap gap-2 font-mono text-xs text-red-400">
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketAnalyticsConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketAnalyticsConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeleteBucketAnalyticsConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">ListBucketAnalyticsConfigurations</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketInventoryConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketInventoryConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeleteBucketInventoryConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">ListBucketInventoryConfigurations</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutBucketMetricsConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketMetricsConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeleteBucketMetricsConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">ListBucketMetricsConfigurations</span>
+                    <div class="flex flex-wrap gap-2 font-mono text-xs">
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketAnalyticsConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketAnalyticsConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">DeleteBucketAnalyticsConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">ListBucketAnalyticsConfigurations</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketInventoryConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketInventoryConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">DeleteBucketInventoryConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">ListBucketInventoryConfigurations</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutBucketMetricsConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketMetricsConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">DeleteBucketMetricsConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">ListBucketMetricsConfigurations</span>
                     </div>
                   </div>
 
@@ -414,27 +414,27 @@
                     <p class="text-xs text-text-muted mb-3 italic">
                         We support standard object operations. Legacy methods (v1 List), tagging, and object locking are not supported.
                     </p>
-                    <div class="flex flex-wrap gap-2 font-mono text-xs text-red-400">
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">ListObjects (v1)</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">ListObjectVersions</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">RenameObject</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">RestoreObject</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">SelectObjectContent</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetObjectTorrent</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetObjectAttributes</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutObjectTagging</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetObjectTagging</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeleteObjectTagging</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutObjectLegalHold</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetObjectLegalHold</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutObjectRetention</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetObjectRetention</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">PutObjectLockConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetObjectLockConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">UploadPartCopy</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">GetBucketMetadataTableConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">UpdateBucketMetadataTableConfiguration</span>
-                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20">DeleteBucketMetadataTableConfiguration</span>
+                    <div class="flex flex-wrap gap-2 font-mono text-xs">
+                        <span class="bg-red-500/10 px-2 py-1 rounded border border-red-500/20 text-red-400" title="Legacy / Deprecated">ListObjects (v1)</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">ListObjectVersions</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">RenameObject</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">RestoreObject</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">SelectObjectContent</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetObjectTorrent</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetObjectAttributes</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutObjectTagging</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetObjectTagging</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">DeleteObjectTagging</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutObjectLegalHold</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetObjectLegalHold</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutObjectRetention</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetObjectRetention</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">PutObjectLockConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetObjectLockConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">UploadPartCopy</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">GetBucketMetadataTableConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">UpdateBucketMetadataTableConfiguration</span>
+                        <span class="bg-white/5 px-2 py-1 rounded border border-white/10 text-text-muted">DeleteBucketMetadataTableConfiguration</span>
                     </div>
                   </div>
 
