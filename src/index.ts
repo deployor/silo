@@ -43,7 +43,9 @@ Bun.serve({
 					path.startsWith("/admin") ||
 					path.startsWith("/api/admin") ||
 					path.startsWith("/cdn") ||
-					path.startsWith("/api/cdn/")
+					path.startsWith("/api/cdn/") ||
+					path.startsWith("/onboarding") ||
+					path.startsWith("/api/onboarding/")
 				) {
 					isDashboard = true;
 				} else {
