@@ -21,45 +21,39 @@
       </div>
     </nav>
 
-    <main class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-5xl mx-auto">
+    <main class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto">
       
-      <div class="text-center mb-16">
-        <h1 class="text-6xl md:text-9xl font-black text-white mb-6 tracking-tighter italic">
+      <div class="text-center">
+        <h1 class="text-6xl md:text-9xl font-black text-white mb-8 tracking-tighter italic">
           You're all set!
         </h1>
-        <p class="text-text-muted text-xl max-w-2xl mx-auto font-medium">
-          Your account has been successfully linked. You now have <span class="text-white font-bold">1GB</span> of storage quota available.
+        
+        <p class="text-text-muted text-2xl max-w-2xl mx-auto font-medium mb-12 leading-relaxed">
+          Your account is linked and you now have <span class="text-white font-bold">1GB</span> of storage quota.
         </p>
-      </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
-          <!-- Option 1: Back to Slack -->
-          <a href="slack://open" class="bg-hc-dark border border-white/10 rounded-3xl p-10 card-shadow hover:border-hc-blue hover:bg-hc-blue/5 transition-all group flex flex-col items-center text-center">
-              <div class="w-16 h-16 bg-hc-blue/10 rounded-2xl flex items-center justify-center mb-6 text-hc-blue border border-hc-blue/20 group-hover:scale-110 transition-transform">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
-              </div>
-              <h3 class="text-3xl font-bold text-white mb-3 group-hover:text-hc-blue transition-colors">Back to Slack</h3>
-              <p class="text-text-muted text-lg">Return to Slack and try uploading your file again.</p>
-          </a>
+        <div class="flex flex-col md:flex-row items-center justify-center gap-6">
+            <a href="slack://open" class="w-full md:w-auto bg-hc-blue hover:bg-blue-600 text-white px-8 py-4 rounded-xl text-lg font-bold transition-all hover:scale-105 card-shadow flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.52v-6.315zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.52v2.522h-2.52zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.522 2.521 2.527 2.527 0 0 1-2.522-2.521V2.522A2.527 2.527 0 0 1 15.166 0a2.528 2.528 0 0 1 2.522 2.522v6.312zM15.166 18.956a2.528 2.528 0 0 1 2.522 2.521A2.528 2.528 0 0 1 15.166 24a2.527 2.527 0 0 1-2.522-2.521v-2.522h2.522zM15.166 17.688a2.527 2.527 0 0 1-2.522-2.521 2.527 2.527 0 0 1 2.522-2.521h6.312A2.527 2.527 0 0 1 24 15.166a2.528 2.528 0 0 1-2.522 2.522h-6.312z"/>
+                </svg>
+                Back to Slack
+            </a>
+            
+            <a href="/cdn" class="w-full md:w-auto bg-hc-red hover:bg-red-600 text-white px-8 py-4 rounded-xl text-lg font-bold transition-all hover:scale-105 card-shadow flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                Use Web CDN
+            </a>
 
-          <!-- Option 2: Web CDN -->
-          <a href="/cdn" class="bg-hc-dark border border-white/10 rounded-3xl p-10 card-shadow hover:border-hc-red hover:bg-hc-red/5 transition-all group flex flex-col items-center text-center">
-              <div class="w-16 h-16 bg-hc-red/10 rounded-2xl flex items-center justify-center mb-6 text-hc-red border border-hc-red/20 group-hover:scale-110 transition-transform">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-              </div>
-              <h3 class="text-3xl font-bold text-white mb-3 group-hover:text-hc-red transition-colors">Use Web CDN</h3>
-              <p class="text-text-muted text-lg">Upload files directly from your browser.</p>
-          </a>
-      </div>
-
-      <div class="mt-16">
-          <a href="/" class="text-text-muted hover:text-white text-sm font-bold uppercase tracking-wider transition-colors border-b border-transparent hover:border-white pb-0.5">
-              Go to Dashboard
-          </a>
+            <a href="/" class="w-full md:w-auto bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-xl text-lg font-bold transition-all hover:scale-105 card-shadow border border-white/10 flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+                Go to Dashboard
+            </a>
+        </div>
       </div>
 
     </main>
