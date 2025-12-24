@@ -171,7 +171,7 @@ export const homeView = (user: User, buckets: Bucket[], page = 0) => {
 				type: "header",
 				text: {
 					type: "plain_text",
-					text: "Silo (no clue what to call this still) Dashboard",
+					text: "Silo Dashboard",
 					emoji: true,
 				},
 			},
