@@ -1,72 +1,56 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Silo - Account Linked</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['"Space Grotesk"', 'sans-serif'],
-                        mono: ['"JetBrains Mono"', 'monospace'],
-                    },
-                    colors: {
-                        background: '#0a0a0a',
-                        surface: '#111111',
-                        primary: '#3b82f6',
-                        'text-muted': '#a1a1aa',
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        body {
-            background-color: #0a0a0a;
-            color: #ffffff;
-        }
-    </style>
+    <link rel="stylesheet" href="/assets/styles.css" />
 </head>
-<body class="min-h-screen flex flex-col items-center justify-center p-4">
-    <div class="w-full max-w-md text-center space-y-8">
+<body class="min-h-screen flex flex-col items-center justify-center p-6 font-sans bg-hc-darker selection:bg-hc-red selection:text-white">
+    <div class="w-full max-w-lg text-center">
         <!-- Logo -->
-        <div class="flex justify-center mb-8">
-            <div class="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center border border-white/10">
-                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="flex justify-center mb-12">
+            <div class="w-24 h-24 bg-hc-dark rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl shadow-hc-red/10 animate-fade-in">
+                <svg class="w-12 h-12 text-hc-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>
             </div>
         </div>
 
-        <h1 class="text-3xl font-bold tracking-tight">You're all set!</h1>
+        <h1 class="text-5xl md:text-6xl font-black tracking-tighter italic text-white mb-6 animate-fade-in" style="animation-delay: 100ms">
+            You're all set!
+        </h1>
         
-        <p class="text-text-muted text-lg leading-relaxed">
-            Your account has been successfully linked. You now have <span class="text-white font-medium">1GB</span> of storage quota available.
+        <p class="text-text-muted text-xl leading-relaxed mb-12 animate-fade-in" style="animation-delay: 200ms">
+            Your account has been successfully linked. You now have <span class="text-white font-bold bg-white/10 px-2 py-0.5 rounded">1GB</span> of storage quota available.
         </p>
 
-        <div class="bg-surface border border-white/10 rounded-xl p-6 text-left space-y-4">
-            <div class="flex items-start gap-3">
-                <div class="mt-1 w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                    <span class="text-blue-400 text-xs">1</span>
+        <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 text-left space-y-6 animate-fade-in card-shadow" style="animation-delay: 300ms">
+            <div class="flex items-start gap-4 group">
+                <div class="mt-1 w-8 h-8 rounded-full bg-hc-red/10 flex items-center justify-center flex-shrink-0 border border-hc-red/20 group-hover:bg-hc-red/20 transition-colors">
+                    <span class="text-hc-red font-bold font-mono">1</span>
                 </div>
-                <p class="text-sm text-text-muted">Go back to Slack and try uploading your file again.</p>
+                <div>
+                    <h3 class="text-white font-bold text-lg mb-1">Back to Slack</h3>
+                    <p class="text-text-muted">Return to Slack and try uploading your file again. It should work instantly.</p>
+                </div>
             </div>
-            <div class="flex items-start gap-3">
-                <div class="mt-1 w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                    <span class="text-blue-400 text-xs">2</span>
+            
+            <div class="w-full h-px bg-white/5"></div>
+
+            <div class="flex items-start gap-4 group">
+                <div class="mt-1 w-8 h-8 rounded-full bg-hc-red/10 flex items-center justify-center flex-shrink-0 border border-hc-red/20 group-hover:bg-hc-red/20 transition-colors">
+                    <span class="text-hc-red font-bold font-mono">2</span>
                 </div>
-                <p class="text-sm text-text-muted">Or use the <a href="/cdn" class="text-primary hover:underline">Web CDN</a> to upload files directly from your browser.</p>
+                <div>
+                    <h3 class="text-white font-bold text-lg mb-1">Use the Web CDN</h3>
+                    <p class="text-text-muted">You can also upload files directly from your browser using the <a href="/cdn" class="text-hc-red hover:underline font-bold">Web CDN</a> interface.</p>
+                </div>
             </div>
         </div>
 
-        <div class="pt-4">
-            <a href="/" class="inline-flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-white/10 hover:bg-white/20 border border-white/10 rounded-lg transition-colors w-full">
+        <div class="pt-12 animate-fade-in" style="animation-delay: 400ms">
+            <a href="/" class="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all hover:scale-105 w-full md:w-auto">
                 Go to Dashboard
             </a>
         </div>
