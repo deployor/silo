@@ -974,7 +974,7 @@
             const pauseLabel = document.getElementById("admin-bucket-pause-label");
 
             if (data.isCdn) {
-                deleteBtn.textContent = "Reset CDN";
+                deleteBtn.textContent = "Empty Bucket";
                 deleteBtn.onclick = resetCdnAdmin;
                 corsBtn.classList.add("hidden");
                 pauseLabel.textContent = "Suspend CDN";
@@ -1068,13 +1068,7 @@
         }
 
         async function resetCdnAdmin() {
-            if (!currentBucket || !confirm("Reset this CDN bucket? This will delete ALL files in it.")) return;
-            // We use the same delete endpoint, but the backend handles it differently for CDN buckets (empties instead of deletes)
-            // Wait, the backend currently blocks deletion of CDN buckets.
-            // We need to update the backend to allow "resetting" (emptying) CDN buckets.
-            // For now, let's just call delete and see if we can modify the backend to handle "reset" via a query param or just allow DELETE to empty if it's CDN?
-            // The user said "delete is called reset and just deletes everything in it".
-            // So we should probably add a query param ?reset=true or just handle DELETE on CDN as empty.
+            if (!currentBucket || !confirm("Empty this CDN bucket? This will delete ALL files in it.")) return;
             
             await fetch(`/api/admin/buckets/${currentBucket.name}?reset=true`, { method: "DELETE" });
             closeAdminBucketModal();

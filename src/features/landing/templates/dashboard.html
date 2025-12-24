@@ -748,7 +748,10 @@
                                 </svg>
                                 Files
                             </a>
-                            ${!isCdn && bucket.name !== data.user.slackId?.toLowerCase() ? `<button onclick="deleteBucket('${bucket.name}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all ${disabledClass}" ${disabledAttr}>Delete</button>` : ''}
+                            ${isCdn ?
+                                `<button onclick="emptyBucket('${bucket.name}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all ${disabledClass}" ${disabledAttr}>Empty</button>`
+                                : (bucket.name !== data.user.slackId?.toLowerCase() ? `<button onclick="deleteBucket('${bucket.name}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all ${disabledClass}" ${disabledAttr}>Delete</button>` : '')
+                            }
                         </td>
                     </tr>
                 `;
@@ -834,6 +837,25 @@
         openConfirmModal(
             "Delete Bucket",
             `Are you sure you want to delete bucket "${name}"? This action cannot be undone and all data will be permanently lost.`,
+            async () => {
+                const res = await fetch(`/api/dashboard/buckets/${name}`, {
+                    method: "DELETE",
+                });
+
+                if (!res.ok) {
+                    const err = await res.text();
+                    throw new Error(err);
+                }
+
+                await loadDashboard();
+            }
+        );
+      }
+
+      function emptyBucket(name) {
+        openConfirmModal(
+            "Empty Bucket",
+            `Are you sure you want to empty bucket "${name}"? This will delete ALL files in it. This action cannot be undone.`,
             async () => {
                 const res = await fetch(`/api/dashboard/buckets/${name}`, {
                     method: "DELETE",
