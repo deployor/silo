@@ -41,6 +41,17 @@ export async function deleteBucketContents(prefix: string) {
 		const deleteBody = `<Delete xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Quiet>true</Quiet>${objects}</Delete>`;
 		const md5 = createHash("md5").update(deleteBody).digest("base64");
 
+		// Use the bucket URL directly for the delete request if possible, or ensure the client handles it.
+		// The s3Client.fetch uses the base URL which might be the root.
+		// If we are deleting objects, we need to be in the bucket context if using path style?
+		// But `deleteBucketContents` takes a prefix which is the internal path `users/id/bucket/`.
+		// Wait, `s3Client` is configured with the bucket in `src/lib/s3-client.ts`?
+		// Let's check `src/lib/s3-client.ts`.
+		// Assuming s3Client points to the bucket root or we need to pass the bucket in the path?
+		// The `prefix` passed here is `users/userid/bucketname/`.
+		// So we are listing from the root of the configured S3 bucket (the "system" bucket).
+		// So `?delete` on the root of the system bucket is correct.
+		
 		const deleteRes = await s3Client.fetch("?delete", {
 			method: "POST",
 			headers: {

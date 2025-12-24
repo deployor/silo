@@ -504,6 +504,8 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			if (bucket[0].isPaused && !user.isAdmin)
 				return new Response("Bucket is paused", { status: 403 });
 
+			const isEmptyOnly = url.searchParams.get("empty") === "true";
+
 			// Prevent deletion of CDN buckets
 			if (bucket[0].isCdn) {
 				// Allow emptying CDN bucket but not deleting it
@@ -521,6 +523,24 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				} catch (e) {
 					console.error("Failed to empty CDN bucket:", e);
 					return new Response("Failed to empty CDN bucket", { status: 500 });
+				}
+			}
+
+			if (isEmptyOnly) {
+				try {
+					const internalPrefix = getInternalPath("", user, bucket[0]);
+					await deleteBucketContents(internalPrefix);
+					
+					// Reset usage stats
+					await db
+						.update(buckets)
+						.set({ totalBytes: 0 }) // Keep requests count for history? Or reset? Usually empty means files.
+						.where(eq(buckets.id, bucket[0].id));
+						
+					return new Response("Bucket Emptied", { status: 200 });
+				} catch (e) {
+					console.error("Failed to empty bucket:", e);
+					return new Response("Failed to empty bucket", { status: 500 });
 				}
 			}
 

@@ -750,7 +750,11 @@
                             </a>
                             ${isCdn ?
                                 `<button onclick="emptyBucket('${bucket.name}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all ${disabledClass}" ${disabledAttr}>Empty</button>`
-                                : (bucket.name !== data.user.slackId?.toLowerCase() ? `<button onclick="deleteBucket('${bucket.name}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all ${disabledClass}" ${disabledAttr}>Delete</button>` : '')
+                                : (bucket.name !== data.user.slackId?.toLowerCase() ? `
+                                <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                    <button onclick="emptyBucket('${bucket.name}')" class="text-yellow-400 hover:text-yellow-300 text-xs font-bold uppercase tracking-wider ${disabledClass}" ${disabledAttr}>Empty</button>
+                                    <button onclick="deleteBucket('${bucket.name}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider ${disabledClass}" ${disabledAttr}>Delete</button>
+                                </div>` : '')
                             }
                         </td>
                     </tr>
@@ -857,7 +861,7 @@
             "Empty Bucket",
             `Are you sure you want to empty bucket "${name}"? This will delete ALL files in it. This action cannot be undone.`,
             async () => {
-                const res = await fetch(`/api/dashboard/buckets/${name}`, {
+                const res = await fetch(`/api/dashboard/buckets/${name}?empty=true`, {
                     method: "DELETE",
                 });
 

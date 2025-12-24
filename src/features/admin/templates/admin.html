@@ -981,6 +981,14 @@
             } else {
                 deleteBtn.textContent = "Delete Bucket";
                 deleteBtn.onclick = deleteBucketAdmin;
+                
+                // Add Empty Bucket button for normal buckets too
+                const emptyBtn = document.createElement("button");
+                emptyBtn.textContent = "Empty Bucket";
+                emptyBtn.className = "bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 px-4 py-2 rounded-lg text-sm font-bold transition-colors border border-yellow-500/10 ml-2";
+                emptyBtn.onclick = emptyBucketAdmin;
+                deleteBtn.parentNode.insertBefore(emptyBtn, deleteBtn);
+
                 corsBtn.classList.remove("hidden");
                 pauseLabel.textContent = "Pause Bucket";
             }
@@ -1065,6 +1073,13 @@
             await fetch(`/api/admin/buckets/${currentBucket.name}`, { method: "DELETE" });
             closeAdminBucketModal();
             if (currentUser) openUserModal(currentUser.id); // Refresh user modal
+        }
+
+        async function emptyBucketAdmin() {
+            if (!currentBucket || !confirm("Empty this bucket? This will delete ALL files in it.")) return;
+            await fetch(`/api/admin/buckets/${currentBucket.name}?reset=true`, { method: "DELETE" });
+            closeAdminBucketModal();
+            if (currentUser) openUserModal(currentUser.id);
         }
 
         async function resetCdnAdmin() {
