@@ -25,6 +25,9 @@ const lockedTemplate = await Bun.file(
 const cdnTemplate = await Bun.file(
 	"src/features/landing/templates/cdn.html",
 ).text();
+export const slackSuccessTemplate = await Bun.file(
+	"src/features/landing/templates/slack-success.html",
+).text();
 
 async function getCurrentUser(req: Request) {
 	const cookieHeader = req.headers.get("Cookie");
@@ -84,12 +87,18 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 	if (path.startsWith("/auth/")) {
 		if (path === "/auth/login") {
-			const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${config.hcAuth.clientId}&redirect_uri=${encodeURIComponent(config.hcAuth.redirectUri)}&response_type=code&scope=openid%20profile%20email%20slack_id%20verification_status`;
+			const source = url.searchParams.get("source");
+			const redirectUri = source === "slack"
+				? `${config.hcAuth.redirectUri}?source=slack`
+				: config.hcAuth.redirectUri;
+
+			const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${config.hcAuth.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20profile%20email%20slack_id%20verification_status`;
 			return Response.redirect(authUrl);
 		}
 
 		if (path === "/auth/callback") {
 			const code = url.searchParams.get("code");
+			const source = url.searchParams.get("source");
 			if (!code) return new Response("Missing code", { status: 400 });
 
 			try {
@@ -98,7 +107,11 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				params.append("client_secret", config.hcAuth.clientSecret);
 				params.append("code", code);
 				params.append("grant_type", "authorization_code");
-				params.append("redirect_uri", config.hcAuth.redirectUri);
+				
+				const redirectUri = source === "slack"
+					? `${config.hcAuth.redirectUri}?source=slack`
+					: config.hcAuth.redirectUri;
+				params.append("redirect_uri", redirectUri);
 
 				const tokenRes = await fetch("https://auth.hackclub.com/oauth/token", {
 					method: "POST",
@@ -149,6 +162,12 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 					"Set-Cookie",
 					`silo_user_id=${userId}; Path=/; HttpOnly; SameSite=Lax`,
 				);
+				
+				if (source === "slack") {
+					headers.set("Content-Type", "text/html");
+					return new Response(slackSuccessTemplate, { headers });
+				}
+
 				headers.set("Location", "/");
 
 				return new Response(null, { status: 302, headers });

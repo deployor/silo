@@ -60,7 +60,7 @@ export const homeView = (user: User, buckets: Bucket[], page = 0) => {
 								text: ":angry-dino: Delete Bucket",
 								emoji: true,
 							},
-							value: `delete_bucket:${bucket.name}`,
+							value: `delete_bucket:${bucket.id}`,
 						});
 					} else {
 						options.push({
