@@ -169,7 +169,11 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 							)
 						: {};
 
-					if (cookies.silo_wip_bypass !== "true") {
+					const expectedBypass = createHmac("sha256", config.hcAuth.clientSecret)
+						.update("wip_bypass")
+						.digest("hex");
+
+					if (cookies.silo_wip_bypass !== expectedBypass) {
 						return new Response(wipTemplate, {
 							headers: { "Content-Type": "text/html" },
 						});
@@ -226,12 +230,16 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			const code = formData.get("code");
 
 			if (code === "1beans") {
+				const bypassValue = createHmac("sha256", config.hcAuth.clientSecret)
+					.update("wip_bypass")
+					.digest("hex");
+
 				const headers = new Headers();
 				headers.set(
 					"Set-Cookie",
-					"silo_wip_bypass=true; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000",
+					`silo_wip_bypass=${bypassValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`,
 				);
-				headers.set("Location", "/");
+				headers.set("Location", "/auth/login");
 				return new Response(null, { status: 302, headers });
 			}
 
