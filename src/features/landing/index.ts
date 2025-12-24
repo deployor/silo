@@ -506,7 +506,22 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 			// Prevent deletion of CDN buckets
 			if (bucket[0].isCdn) {
-				return new Response("Cannot delete CDN bucket", { status: 403 });
+				// Allow emptying CDN bucket but not deleting it
+				try {
+					const internalPrefix = getInternalPath("", user, bucket[0]);
+					await deleteBucketContents(internalPrefix);
+					
+					// Reset usage stats
+					await db
+						.update(buckets)
+						.set({ totalBytes: 0, totalRequests: 0 })
+						.where(eq(buckets.id, bucket[0].id));
+						
+					return new Response("CDN Bucket Emptied", { status: 200 });
+				} catch (e) {
+					console.error("Failed to empty CDN bucket:", e);
+					return new Response("Failed to empty CDN bucket", { status: 500 });
+				}
 			}
 
 			try {

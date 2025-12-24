@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { config } from "../../config";
@@ -37,10 +38,15 @@ export async function deleteBucketContents(prefix: string) {
 			.map((item: { Key: string }) => `<Object><Key>${item.Key}</Key></Object>`)
 			.join("");
 
-		const deleteBody = `<Delete><Quiet>true</Quiet>${objects}</Delete>`;
+		const deleteBody = `<Delete xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Quiet>true</Quiet>${objects}</Delete>`;
+		const md5 = createHash("md5").update(deleteBody).digest("base64");
 
 		const deleteRes = await s3Client.fetch("?delete", {
 			method: "POST",
+			headers: {
+				"Content-Type": "application/xml",
+				"Content-MD5": md5,
+			},
 			body: deleteBody,
 		});
 
