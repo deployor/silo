@@ -28,7 +28,7 @@ export async function handleMessage(event: any) {
 	if (userResult.length === 0) {
 		await postMessage(
 			channelId,
-			`I don't know who you are! Please <https://${config.s3Domain}/auth/login|login to the dashboard> first to link your account.`,
+			`I don't know who you are! Please <https://${config.s3Domain}/auth/login?source=slack|login to the dashboard> first to link your account.`,
 			threadTs,
 		);
 		await removeReaction(channelId, event.ts, "homer-load-2");

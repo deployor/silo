@@ -1,6 +1,6 @@
 import { config } from "./config";
 import { handleAdminRequest } from "./features/admin";
-import { handleDashboardRequest } from "./features/landing";
+import { handleDashboardRequest, slackSuccessTemplate } from "./features/landing";
 import { handleS3Request } from "./features/s3-api";
 import { updateStats } from "./features/s3-api/utils";
 import { handleSlackRequest } from "./features/slack";
@@ -79,6 +79,11 @@ Bun.serve({
 						},
 					});
 				}
+			}
+			if (url.pathname === "/slack-success") {
+				return new Response(slackSuccessTemplate, {
+					headers: { "Content-Type": "text/html" },
+				});
 			}
 			return handleDashboardRequest(req);
 		}
