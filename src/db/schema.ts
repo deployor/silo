@@ -31,6 +31,7 @@ export const users = pgTable("users", {
 	isAdmin: boolean("is_admin").default(false).notNull(),
 	isLocked: boolean("is_locked").default(false).notNull(),
 	lockReason: text("lock_reason"),
+	onboarded: boolean("onboarded").default(false).notNull(),
 });
 
 export const buckets = pgTable(

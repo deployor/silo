@@ -25,6 +25,9 @@ const lockedTemplate = await Bun.file(
 const cdnTemplate = await Bun.file(
 	"src/features/landing/templates/cdn.html",
 ).text();
+const onboardingTemplate = await Bun.file(
+	"src/features/landing/templates/onboarding.html",
+).text();
 export const slackSuccessTemplate = await Bun.file(
 	"src/features/landing/templates/slack-success.html",
 ).text();
@@ -188,6 +191,33 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		}
 	}
 
+	if (path === "/onboarding" || path === "/onboarding/") {
+		const user = await getCurrentUser(req);
+		if (!user) {
+			return Response.redirect("/auth/login");
+		}
+		if (user.onboarded) {
+			return Response.redirect("/");
+		}
+		return new Response(onboardingTemplate, {
+			headers: { "Content-Type": "text/html" },
+		});
+	}
+
+	if (path === "/api/onboarding/complete" && req.method === "POST") {
+		const user = await getCurrentUser(req);
+		if (!user) return new Response("Unauthorized", { status: 401 });
+
+		await db
+			.update(users)
+			.set({ onboarded: true })
+			.where(eq(users.id, user.id));
+
+		const headers = new Headers();
+		headers.set("Location", "/");
+		return new Response(null, { status: 302, headers });
+	}
+
 	if (path === "/cdn" || path === "/cdn/") {
 		const user = await getCurrentUser(req);
 		if (!user) {
@@ -195,6 +225,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		}
 		if (user.isLocked) {
 			return new Response("Account Locked", { status: 403 });
+		}
+		if (!user.onboarded) {
+			return Response.redirect("/onboarding");
 		}
 		if (!user.slackId) {
 			return new Response(
@@ -990,6 +1023,10 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		return new Response(landingTemplate, {
 			headers: { "Content-Type": "text/html" },
 		});
+	}
+
+	if (!user.onboarded) {
+		return Response.redirect("/onboarding");
 	}
 
 	if (user.isLocked) {
