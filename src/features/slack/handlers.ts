@@ -48,7 +48,7 @@ export async function handleAppHomeOpened(event: { user: string }) {
 					type: "section",
 					text: {
 						type: "mrkdwn",
-						text: `Your account has been temporarily locked by an administrator. You cannot perform any actions at this time.${user[0].lockReason ? `\n\n*Reason:* ${user[0].lockReason}` : ""}`,
+						text: `Your account has been temporarily locked. You cannot perform any actions at this time.${user[0].lockReason ? `\n\n*Reason:* ${user[0].lockReason}` : ""}`,
 					},
 				},
 				{
@@ -82,7 +82,7 @@ export async function handleAppHomeOpened(event: { user: string }) {
 					type: "section",
 					text: {
 						type: "mrkdwn",
-						text: `*Hold up!* :ms-stop-sign:\n\nWe don't recognize this Slack account yet. To get started, you need to log in to the web dashboard at least once to link your account.\n\n *<https://${config.s3Domain}/auth/login|Log in to Silo Dashboard>*`,
+						text: `*Hold up!* :ms-stop-sign:\n\nWe don't recognize this Slack account yet. To get started, you need to log in to the web dashboard at least once to link your account.\n\n *<https://${config.s3Domain}/auth/login?source=slack|Log in to Silo Dashboard>*`,
 					},
 				},
 				{
@@ -101,7 +101,7 @@ export async function handleAppHomeOpened(event: { user: string }) {
 							type: "button",
 							text: {
 								type: "plain_text",
-								text: "🔄 Refresh",
+								text: ":ms-arrows-clockwise: Refresh",
 								emoji: true,
 							},
 							action_id: "refresh_home",
