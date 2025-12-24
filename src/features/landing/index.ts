@@ -226,6 +226,31 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		}
 
 		if (path === "/auth/wip" && req.method === "POST") {
+			const cookieHeader = req.headers.get("Cookie");
+			const cookies = cookieHeader
+				? cookieHeader.split(";").reduce(
+						(acc, cookie) => {
+							const [key, value] = cookie.trim().split("=");
+							acc[key] = value;
+							return acc;
+						},
+						{} as Record<string, string>,
+					)
+				: {};
+
+			const lastAttempt = parseInt(cookies.silo_wip_attempt || "0", 10);
+			const now = Date.now();
+
+			if (now - lastAttempt < 3000) {
+				const errorHtml = wipTemplate.replace(
+					"<!-- ERROR_PLACEHOLDER -->",
+					'<div class="bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-3 rounded-lg mb-6 text-sm">Please wait a few seconds before trying again.</div>',
+				);
+				return new Response(errorHtml, {
+					headers: { "Content-Type": "text/html" },
+				});
+			}
+
 			const formData = await req.formData();
 			const code = formData.get("code");
 
@@ -235,15 +260,37 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 					.digest("hex");
 
 				const headers = new Headers();
-				headers.set(
+				headers.append(
 					"Set-Cookie",
 					`silo_wip_bypass=${bypassValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`,
+				);
+				// Clear attempt cookie
+				headers.append(
+					"Set-Cookie",
+					`silo_wip_attempt=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
 				);
 				headers.set("Location", "/auth/login");
 				return new Response(null, { status: 302, headers });
 			}
 
-			return Response.redirect("/");
+			const headers = new Headers();
+			headers.set(
+				"Set-Cookie",
+				`silo_wip_attempt=${now}; Path=/; HttpOnly; SameSite=Lax`,
+			);
+
+			const errorHtml = wipTemplate.replace(
+				"<!-- ERROR_PLACEHOLDER -->",
+				'<div class="bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-3 rounded-lg mb-6 text-sm">Invalid access code. Please try again.</div>',
+			);
+
+			return new Response(errorHtml, {
+				status: 401,
+				headers: {
+					"Content-Type": "text/html",
+					...Object.fromEntries(headers.entries()),
+				},
+			});
 		}
 	}
 
