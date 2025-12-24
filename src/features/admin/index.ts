@@ -367,7 +367,26 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 						}
 					}
 
-					// Normal Bucket Deletion
+					// Normal Bucket Deletion or Emptying
+					if (isReset) {
+						// Just empty, don't delete
+						const internalPrefix = getInternalPath("", owner[0], bucket[0]);
+						try {
+							await deleteBucketContents(internalPrefix);
+							
+							// Reset usage stats (bytes only, keep requests?)
+							await db
+								.update(buckets)
+								.set({ totalBytes: 0 })
+								.where(eq(buckets.id, bucket[0].id));
+								
+							return new Response("Emptied", { status: 200 });
+						} catch (e) {
+							console.error("Failed to empty bucket:", e);
+							return new Response("Failed to empty bucket", { status: 500 });
+						}
+					}
+
 					const internalPrefix = getInternalPath("", owner[0], bucket[0]);
 					try {
 						await deleteBucketContents(internalPrefix);
