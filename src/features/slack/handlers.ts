@@ -3,7 +3,7 @@ import { config } from "../../config";
 import { db } from "../../db";
 import { bucketKeys, buckets, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
-import { getInternalPath } from "../s3-api/utils";
+import { getInternalPath, isReservedBucketName } from "../s3-api/utils";
 import { openModal, publishView } from "./client";
 import {
 	createBucketModal,
@@ -197,6 +197,15 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 				errors: {
 					bucket_name_block:
 						"Invalid name. Use lowercase letters, numbers, and hyphens.",
+				},
+			};
+		}
+
+		if (isReservedBucketName(bucketName)) {
+			return {
+				response_action: "errors",
+				errors: {
+					bucket_name_block: "This name is reserved for system use.",
 				},
 			};
 		}

@@ -12,6 +12,7 @@ import {
 	filterUpstreamHeaders,
 	getInternalPath,
 	getKeyFromRequest,
+	isReservedBucketName,
 	rewriteCopySourceHeader,
 	stripAuthQueryParams,
 } from "./utils";
@@ -487,6 +488,23 @@ ${rulesXml}
 	}
 
 	if (method === "PUT") {
+		if (key === "" && !url.searchParams.has("cors") && !url.searchParams.has("uploadId")) {
+			// Bucket Creation
+			// Check if bucket name is reserved
+			if (isReservedBucketName(bucket.name)) {
+				return new Response(
+					`<?xml version="1.0" encoding="UTF-8"?>
+<Error>
+	   <Code>AccessDenied</Code>
+	   <Message>Bucket name is reserved for system use.</Message>
+	   <Resource>/${bucket.name}</Resource>
+	   <RequestId>0000000000000000</RequestId>
+</Error>`,
+					{ status: 403, headers: { "Content-Type": "application/xml" } },
+				);
+			}
+		}
+
 		if (key === "" && url.searchParams.has("cors")) {
 			const bodyText = await req.text();
 			// Simple XML parsing to JSON

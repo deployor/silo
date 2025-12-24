@@ -240,6 +240,14 @@ function scheduleFlush() {
 	}
 }
 
+export function isReservedBucketName(name: string): boolean {
+	// Slack IDs start with U or W and are followed by alphanumeric characters.
+	// They are typically 9-11 characters long.
+	// We want to reserve this namespace to prevent confusion with CDN buckets.
+	// We check for start with u/w, followed by alphanumeric, and length >= 8.
+	return /^[uw][a-z0-9]{7,}$/.test(name);
+}
+
 export async function updateStats(
 	user: typeof users.$inferSelect,
 	bucket: typeof buckets.$inferSelect,
