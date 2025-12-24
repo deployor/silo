@@ -31,6 +31,9 @@ const onboardingTemplate = await Bun.file(
 export const slackSuccessTemplate = await Bun.file(
 	"src/features/landing/templates/slack-success.html",
 ).text();
+const wipTemplate = await Bun.file(
+	"src/features/landing/templates/wip.html",
+).text();
 
 async function getCurrentUser(req: Request) {
 	const cookieHeader = req.headers.get("Cookie");
@@ -145,6 +148,34 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				const userId = userData.sub;
 				const slackId = userData.slack_id;
 
+				// Check if user exists
+				const existingUser = await db
+					.select()
+					.from(users)
+					.where(eq(users.id, userId))
+					.limit(1);
+
+				if (existingUser.length === 0) {
+					// Check for bypass cookie
+					const cookieHeader = req.headers.get("Cookie");
+					const cookies = cookieHeader
+						? cookieHeader.split(";").reduce(
+								(acc, cookie) => {
+									const [key, value] = cookie.trim().split("=");
+									acc[key] = value;
+									return acc;
+								},
+								{} as Record<string, string>,
+							)
+						: {};
+
+					if (cookies.silo_wip_bypass !== "true") {
+						return new Response(wipTemplate, {
+							headers: { "Content-Type": "text/html" },
+						});
+					}
+				}
+
 				await db
 					.insert(users)
 					.values({
@@ -188,6 +219,23 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			);
 			headers.set("Location", "/");
 			return new Response(null, { status: 302, headers });
+		}
+
+		if (path === "/auth/wip" && req.method === "POST") {
+			const formData = await req.formData();
+			const code = formData.get("code");
+
+			if (code === "1beans") {
+				const headers = new Headers();
+				headers.set(
+					"Set-Cookie",
+					"silo_wip_bypass=true; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000",
+				);
+				headers.set("Location", "/");
+				return new Response(null, { status: 302, headers });
+			}
+
+			return Response.redirect("/");
 		}
 	}
 
