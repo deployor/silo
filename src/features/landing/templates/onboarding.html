@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="/assets/styles.css" />
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
   </head>
   <body
     class="min-h-screen selection:bg-hc-red selection:text-white flex flex-col font-sans bg-hc-darker"
@@ -27,8 +29,13 @@
     <main class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto">
       
       <!-- Step 1: Welcome -->
-      <div x-show="step === 1" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" class="text-center max-w-3xl mx-auto">
-        <h1 class="text-6xl md:text-9xl font-black text-white mb-8 tracking-tighter italic">
+      <div x-show="step === 1" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" class="text-center max-w-3xl mx-auto w-full">
+        <div class="mb-8 flex justify-center">
+            <div class="w-24 h-24 bg-hc-red/10 rounded-full flex items-center justify-center text-hc-red">
+                <i class="ph-bold ph-hand-waving text-5xl"></i>
+            </div>
+        </div>
+        <h1 class="text-6xl md:text-8xl font-black text-white mb-8 tracking-tighter italic">
           Welcome to Cargo!
         </h1>
         
@@ -36,42 +43,58 @@
           Cargo is an S3 Gateway and the new Hack Club CDN. We are moving away from traditional CDNs to give you more power and flexibility.
         </p>
 
-        <div class="flex items-center justify-center gap-6 text-sm font-bold uppercase tracking-wider">
-            <button @click="step = 2" class="text-white hover:text-hc-red transition-colors border-b border-transparent hover:border-hc-red pb-0.5">
-                Next: Your Storage &rarr;
+        <div class="flex items-center justify-center gap-6">
+            <button @click="step = 2" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-red-600 transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20 hover:shadow-hc-red/40 hover:-translate-y-1">
+                <span>Next: Your Storage</span>
+                <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
             </button>
         </div>
       </div>
 
       <!-- Step 2: Storage -->
-      <div x-show="step === 2" style="display: none;" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" class="text-center max-w-3xl mx-auto">
-        <h1 class="text-6xl md:text-9xl font-black text-white mb-8 tracking-tighter italic">
+      <div x-show="step === 2" style="display: none;" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" class="text-center max-w-3xl mx-auto w-full">
+        <div class="mb-8 flex justify-center">
+            <div class="w-24 h-24 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-500">
+                <i class="ph-bold ph-hard-drives text-5xl"></i>
+            </div>
+        </div>
+        <h1 class="text-6xl md:text-8xl font-black text-white mb-8 tracking-tighter italic">
           1GB Free Storage
         </h1>
         
-        <p class="text-text-muted text-2xl max-w-3xl mx-auto font-medium mb-12 leading-relaxed">
+        <p class="text-text-muted text-2xl max-w-3xl mx-auto font-medium mb-8 leading-relaxed">
           Every Hack Clubber on Slack gets <span class="text-white font-bold">1 GB for free</span>. 
-          <br><br>
-          Need more? Ship projects! Storage can be used for public CDN hosting or private S3 buckets for your projects.
+          <br>
+          Need more? Ship projects! Storage can be used for public CDN hosting or private S3 buckets.
         </p>
         
-        <p class="text-text-muted/50 text-lg max-w-2xl mx-auto font-medium mb-12 leading-relaxed">
-            When you turn 18, we'll archive your data and send you a download link before deleting it. But that's a problem for future you!
-        </p>
+        <div class="bg-white/5 rounded-xl p-4 mb-12 max-w-2xl mx-auto border border-white/10 flex items-start gap-4 text-left">
+            <i class="ph-fill ph-info text-text-muted text-xl mt-1"></i>
+            <p class="text-text-muted/70 text-sm font-medium leading-relaxed">
+                When you turn 18, we'll archive your data and send you a download link before deleting it. But that's a problem for future you!
+            </p>
+        </div>
 
-        <div class="flex items-center justify-center gap-8 text-sm font-bold uppercase tracking-wider">
-            <button @click="step = 1" class="text-text-muted hover:text-white transition-colors">
-                &larr; Back
+        <div class="flex items-center justify-between w-full max-w-md mx-auto">
+            <button @click="step = 1" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
+                <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
+                <span>Back</span>
             </button>
-            <button @click="step = 3" class="text-white hover:text-hc-red transition-colors border-b border-transparent hover:border-hc-red pb-0.5">
-                Next: How it Works &rarr;
+            <button @click="step = 3" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-red-600 transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20 hover:shadow-hc-red/40 hover:-translate-y-1">
+                <span>Next: How it Works</span>
+                <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
             </button>
         </div>
       </div>
 
       <!-- Step 3: How it Works -->
-      <div x-show="step === 3" style="display: none;" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" class="text-center max-w-3xl mx-auto">
-        <h1 class="text-6xl md:text-9xl font-black text-white mb-8 tracking-tighter italic">
+      <div x-show="step === 3" style="display: none;" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" class="text-center max-w-3xl mx-auto w-full">
+        <div class="mb-8 flex justify-center">
+            <div class="w-24 h-24 bg-green-500/10 rounded-full flex items-center justify-center text-green-500">
+                <i class="ph-bold ph-cloud-check text-5xl"></i>
+            </div>
+        </div>
+        <h1 class="text-6xl md:text-8xl font-black text-white mb-8 tracking-tighter italic">
           It's Just S3
         </h1>
         
@@ -81,13 +104,15 @@
           You're using a gateway, but you'll never notice the difference. Just create buckets and ship code!
         </p>
 
-        <div class="flex items-center justify-center gap-8 text-sm font-bold uppercase tracking-wider">
-            <button @click="step = 2" class="text-text-muted hover:text-white transition-colors">
-                &larr; Back
+        <div class="flex items-center justify-between w-full max-w-md mx-auto">
+            <button @click="step = 2" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
+                <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
+                <span>Back</span>
             </button>
-            <form hx-post="/api/onboarding/complete" hx-swap="none" class="inline-block">
-                <button type="submit" class="text-hc-red hover:text-white transition-colors border-b border-hc-red hover:border-white pb-0.5">
-                    Get Started &rarr;
+            <form action="/api/onboarding/complete" method="POST" class="inline-block">
+                <button type="submit" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-red-600 transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20 hover:shadow-hc-red/40 hover:-translate-y-1">
+                    <span>Get Started</span>
+                    <i class="ph-bold ph-rocket-launch group-hover:translate-x-1 transition-transform"></i>
                 </button>
             </form>
         </div>
