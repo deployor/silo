@@ -6,54 +6,68 @@
     <title>Silo - Account Linked</title>
     <link rel="stylesheet" href="/assets/styles.css" />
 </head>
-<body class="min-h-screen flex flex-col items-center justify-center p-6 font-sans bg-hc-darker selection:bg-hc-red selection:text-white">
-    <div class="w-full max-w-lg text-center">
-        <!-- Logo -->
-        <div class="flex justify-center mb-12">
-            <div class="w-24 h-24 bg-hc-dark rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl shadow-hc-red/10 animate-fade-in">
-                <svg class="w-12 h-12 text-hc-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-            </div>
+<body class="min-h-screen flex flex-col font-sans bg-hc-darker selection:bg-hc-red selection:text-white">
+    <!-- Nav -->
+    <nav class="w-full bg-hc-darker border-b border-white/10 px-6 py-4 sticky top-0 z-50 flex justify-between items-center">
+        <div class="flex items-center gap-4">
+            <a href="/" class="font-bold text-2xl tracking-tighter italic text-white hover:text-hc-red transition-colors">SILO</a>
+            <span class="bg-hc-red/20 text-hc-red px-2 py-0.5 rounded text-sm font-mono border border-hc-red/30">SUCCESS</span>
         </div>
+    </nav>
 
-        <h1 class="text-5xl md:text-6xl font-black tracking-tighter italic text-white mb-6 animate-fade-in" style="animation-delay: 100ms">
-            You're all set!
-        </h1>
-        
-        <p class="text-text-muted text-xl leading-relaxed mb-12 animate-fade-in" style="animation-delay: 200ms">
-            Your account has been successfully linked. You now have <span class="text-white font-bold bg-white/10 px-2 py-0.5 rounded">1GB</span> of storage quota available.
-        </p>
-
-        <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 text-left space-y-6 animate-fade-in card-shadow" style="animation-delay: 300ms">
-            <div class="flex items-start gap-4 group">
-                <div class="mt-1 w-8 h-8 rounded-full bg-hc-red/10 flex items-center justify-center flex-shrink-0 border border-hc-red/20 group-hover:bg-hc-red/20 transition-colors">
-                    <span class="text-hc-red font-bold font-mono">1</span>
-                </div>
-                <div>
-                    <h3 class="text-white font-bold text-lg mb-1">Back to Slack</h3>
-                    <p class="text-text-muted">Return to Slack and try uploading your file again. It should work instantly.</p>
+    <main class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-5xl mx-auto">
+        <div class="w-full max-w-lg text-center">
+            <!-- Success Icon -->
+            <div class="flex justify-center mb-12">
+                <div class="w-24 h-24 bg-hc-dark rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl shadow-hc-red/10 animate-fade-in relative group">
+                    <div class="absolute inset-0 bg-hc-red/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    <svg class="w-12 h-12 text-hc-red relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
                 </div>
             </div>
+
+            <h1 class="text-5xl md:text-6xl font-black tracking-tighter italic text-white mb-6 animate-fade-in" style="animation-delay: 100ms">
+                You're all set!
+            </h1>
             
-            <div class="w-full h-px bg-white/5"></div>
+            <p class="text-text-muted text-xl leading-relaxed mb-12 animate-fade-in" style="animation-delay: 200ms">
+                Your account has been successfully linked. You now have <span class="text-white font-bold bg-white/10 px-2 py-0.5 rounded font-mono">1GB</span> of storage quota available.
+            </p>
 
-            <div class="flex items-start gap-4 group">
-                <div class="mt-1 w-8 h-8 rounded-full bg-hc-red/10 flex items-center justify-center flex-shrink-0 border border-hc-red/20 group-hover:bg-hc-red/20 transition-colors">
-                    <span class="text-hc-red font-bold font-mono">2</span>
+            <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 text-left space-y-6 animate-fade-in card-shadow hover:border-white/20 transition-colors" style="animation-delay: 300ms">
+                <div class="flex items-start gap-4 group cursor-default">
+                    <div class="mt-1 w-8 h-8 rounded-full bg-hc-red/10 flex items-center justify-center flex-shrink-0 border border-hc-red/20 group-hover:bg-hc-red/20 transition-colors">
+                        <span class="text-hc-red font-bold font-mono">1</span>
+                    </div>
+                    <div>
+                        <h3 class="text-white font-bold text-lg mb-1 group-hover:text-hc-red transition-colors">Back to Slack</h3>
+                        <p class="text-text-muted">Return to Slack and try uploading your file again. It should work instantly.</p>
+                    </div>
                 </div>
-                <div>
-                    <h3 class="text-white font-bold text-lg mb-1">Use the Web CDN</h3>
-                    <p class="text-text-muted">You can also upload files directly from your browser using the <a href="/cdn" class="text-hc-red hover:underline font-bold">Web CDN</a> interface.</p>
+                
+                <div class="w-full h-px bg-white/5"></div>
+
+                <div class="flex items-start gap-4 group cursor-pointer" onclick="window.location.href='/cdn'">
+                    <div class="mt-1 w-8 h-8 rounded-full bg-hc-red/10 flex items-center justify-center flex-shrink-0 border border-hc-red/20 group-hover:bg-hc-red/20 transition-colors">
+                        <span class="text-hc-red font-bold font-mono">2</span>
+                    </div>
+                    <div>
+                        <h3 class="text-white font-bold text-lg mb-1 group-hover:text-hc-red transition-colors">Use the Web CDN</h3>
+                        <p class="text-text-muted">You can also upload files directly from your browser using the <span class="text-white font-bold underline decoration-hc-red decoration-2 underline-offset-2">Web CDN</span> interface.</p>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="pt-12 animate-fade-in" style="animation-delay: 400ms">
-            <a href="/" class="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all hover:scale-105 w-full md:w-auto">
-                Go to Dashboard
-            </a>
+            <div class="pt-12 animate-fade-in" style="animation-delay: 400ms">
+                <a href="/" class="inline-flex items-center justify-center px-8 py-4 text-base font-bold text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all hover:scale-105 w-full md:w-auto group">
+                    <span>Go to Dashboard</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-2 text-text-muted group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                </a>
+            </div>
         </div>
-    </div>
+    </main>
 </body>
 </html>
