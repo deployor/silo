@@ -5,7 +5,7 @@ import { config } from "../../config";
 import { db } from "../../db";
 import { bucketKeys, buckets, requestLogs, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
-import { deleteBucketContents, getInternalPath } from "../s3-api/utils";
+import { deleteBucketContents, getInternalPath, isReservedBucketName } from "../s3-api/utils";
 
 const landingTemplate = await Bun.file(
 	"src/features/landing/templates/landing.html",
@@ -523,6 +523,12 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 				if (!name || !/^[a-z0-9-]+$/.test(name)) {
 					return new Response("Invalid bucket name", { status: 400 });
+				}
+
+				if (isReservedBucketName(name)) {
+					return new Response("Bucket name is reserved for system use", {
+						status: 403,
+					});
 				}
 
 				const userBuckets = await db
