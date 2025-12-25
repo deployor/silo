@@ -15,6 +15,7 @@ import {
 export async function handleApiRequest(req: Request): Promise<Response> {
 	const url = new URL(req.url);
 	const path = url.pathname;
+	console.log(`[API] Handling request: ${path}`);
 
 	if (path === "/api/onboarding/complete" && req.method === "POST") {
 		const user = await getCurrentUser(req);
