@@ -4,6 +4,7 @@ import { db } from "../../db";
 import { buckets, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
+import type { CORSConfiguration, CORSRule } from "./types";
 import {
 	filterUpstreamHeaders,
 	isReservedBucketName,
@@ -62,7 +63,7 @@ export async function handlePutRequest(
 				? parsed.CORSConfiguration.CORSRule
 				: [parsed.CORSConfiguration.CORSRule];
 
-			const rules = rulesArray.map((r: any) => {
+			const rules: CORSRule[] = rulesArray.map((r: any) => {
 				// Ensure arrays for single values
 				const allowedOrigins = r.AllowedOrigin
 					? Array.isArray(r.AllowedOrigin)
@@ -98,7 +99,7 @@ export async function handlePutRequest(
 				};
 			});
 
-			const corsConfig = {
+			const corsConfig: CORSConfiguration = {
 				CORSRules: rules,
 			};
 
