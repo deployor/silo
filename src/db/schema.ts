@@ -34,6 +34,15 @@ export const users = pgTable("users", {
 	onboarded: boolean("onboarded").default(false).notNull(),
 });
 
+export const sessions = pgTable("sessions", {
+	id: text("id").primaryKey(),
+	userId: text("user_id")
+		.references(() => users.id, { onDelete: "cascade" })
+		.notNull(),
+	expiresAt: timestamp("expires_at").notNull(),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const buckets = pgTable(
 	"buckets",
 	{

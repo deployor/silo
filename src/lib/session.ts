@@ -1,6 +1,6 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { db } from "../db";
-import { buckets, users } from "../db/schema";
+import { buckets, sessions, users } from "../db/schema";
 
 export async function getCurrentUser(req: Request) {
 	const cookieHeader = req.headers.get("Cookie");
@@ -14,14 +14,24 @@ export async function getCurrentUser(req: Request) {
 			{} as Record<string, string>,
 		);
 
-		if (cookies.silo_user_id) {
-			const user = await db
-				.select()
-				.from(users)
-				.where(eq(users.id, cookies.silo_user_id))
+		if (cookies.silo_session) {
+			const sessionResult = await db
+				.select({
+					user: users,
+					session: sessions,
+				})
+				.from(sessions)
+				.innerJoin(users, eq(sessions.userId, users.id))
+				.where(
+					and(
+						eq(sessions.id, cookies.silo_session),
+						gt(sessions.expiresAt, new Date()),
+					),
+				)
 				.limit(1);
-			if (user.length > 0) {
-				const u = user[0];
+
+			if (sessionResult.length > 0) {
+				const { user: u } = sessionResult[0];
 				// Calculate storage usage from all buckets
 				const usageResult = await db
 					.select({ total: sql<number>`sum(${buckets.totalBytes})` })
