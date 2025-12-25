@@ -28,57 +28,55 @@ export async function handleGetRequest(
 		}
 
 		const config = JSON.parse(bucket.corsConfig);
-		const rulesXml = config.CORSRules.map((r: any) => {
-			let rule = "<CORSRule>";
-			if (r.ID) rule += `<ID>${r.ID}</ID>`;
+		const builder = new XMLBuilder({
+			ignoreAttributes: false,
+			format: true,
+		});
 
-			const allowedOrigins = Array.isArray(r.AllowedOrigins)
-				? r.AllowedOrigins
-				: [r.AllowedOrigins];
-			for (const o of allowedOrigins) {
-				rule += `<AllowedOrigin>${o}</AllowedOrigin>`;
-			}
+		const corsConfiguration = {
+			CORSConfiguration: {
+				"@_xmlns": "http://s3.amazonaws.com/doc/2006-03-01/",
+				CORSRule: config.CORSRules.map((r: any) => {
+					const rule: any = {};
+					if (r.ID) rule.ID = r.ID;
 
-			const allowedMethods = Array.isArray(r.AllowedMethods)
-				? r.AllowedMethods
-				: [r.AllowedMethods];
-			for (const m of allowedMethods) {
-				rule += `<AllowedMethod>${m}</AllowedMethod>`;
-			}
+					const allowedOrigins = Array.isArray(r.AllowedOrigins)
+						? r.AllowedOrigins
+						: [r.AllowedOrigins];
+					rule.AllowedOrigin = allowedOrigins;
 
-			if (r.AllowedHeaders) {
-				const allowedHeaders = Array.isArray(r.AllowedHeaders)
-					? r.AllowedHeaders
-					: [r.AllowedHeaders];
-				for (const h of allowedHeaders) {
-					rule += `<AllowedHeader>${h}</AllowedHeader>`;
-				}
-			}
+					const allowedMethods = Array.isArray(r.AllowedMethods)
+						? r.AllowedMethods
+						: [r.AllowedMethods];
+					rule.AllowedMethod = allowedMethods;
 
-			if (r.ExposeHeaders) {
-				const exposeHeaders = Array.isArray(r.ExposeHeaders)
-					? r.ExposeHeaders
-					: [r.ExposeHeaders];
-				for (const h of exposeHeaders) {
-					rule += `<ExposeHeader>${h}</ExposeHeader>`;
-				}
-			}
+					if (r.AllowedHeaders) {
+						const allowedHeaders = Array.isArray(r.AllowedHeaders)
+							? r.AllowedHeaders
+							: [r.AllowedHeaders];
+						rule.AllowedHeader = allowedHeaders;
+					}
 
-			if (r.MaxAgeSeconds) {
-				rule += `<MaxAgeSeconds>${r.MaxAgeSeconds}</MaxAgeSeconds>`;
-			}
+					if (r.ExposeHeaders) {
+						const exposeHeaders = Array.isArray(r.ExposeHeaders)
+							? r.ExposeHeaders
+							: [r.ExposeHeaders];
+						rule.ExposeHeader = exposeHeaders;
+					}
 
-			rule += "</CORSRule>";
-			return rule;
-		}).join("");
+					if (r.MaxAgeSeconds) {
+						rule.MaxAgeSeconds = r.MaxAgeSeconds;
+					}
+					return rule;
+				}),
+			},
+		};
 
-		return new Response(
-			`<?xml version="1.0" encoding="UTF-8"?>
-<CORSConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-${rulesXml}
-</CORSConfiguration>`,
-			{ headers: { "Content-Type": "application/xml" } },
-		);
+		const xml = `<?xml version="1.0" encoding="UTF-8"?>\n${builder.build(corsConfiguration)}`;
+
+		return new Response(xml, {
+			headers: { "Content-Type": "application/xml" },
+		});
 	}
 
 	// Egress Limit Check
@@ -104,11 +102,19 @@ ${rulesXml}
 	}
 
 	if (key === "" && url.searchParams.has("location")) {
-		return new Response(
-			`<?xml version="1.0" encoding="UTF-8"?>
-<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">${config.s3.region}</LocationConstraint>`,
-			{ headers: { "Content-Type": "application/xml" } },
-		);
+		const builder = new XMLBuilder({
+			ignoreAttributes: false,
+		});
+		const xml = `<?xml version="1.0" encoding="UTF-8"?>\n${builder.build({
+			LocationConstraint: {
+				"#text": config.s3.region,
+				"@_xmlns": "http://s3.amazonaws.com/doc/2006-03-01/",
+			},
+		})}`;
+
+		return new Response(xml, {
+			headers: { "Content-Type": "application/xml" },
+		});
 	}
 
 	const listType = url.searchParams.get("list-type");
