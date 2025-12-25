@@ -7,6 +7,8 @@ import { handleDashboardRequest } from "./web/dashboard";
 import { S3Errors } from "./lib/s3-errors";
 import { authenticate } from "./middleware/auth";
 import { render } from "./lib/view-engine";
+import { validateOrigin } from "./lib/security";
+import { errorResponse } from "./lib/api-utils";
 
 const S3_DOMAIN = config.s3Domain;
 
@@ -78,6 +80,19 @@ Bun.serve({
 
 		if (isDashboardRequest(req, url)) {
 			console.log(`[Routing] Routing to Dashboard: ${url.pathname}`);
+
+			// Global Security Check for API routes (except Slack events which are verified by signature)
+			if (
+				url.pathname.startsWith("/api/") &&
+				!url.pathname.startsWith("/api/slack/") &&
+				req.method !== "GET" &&
+				req.method !== "HEAD"
+			) {
+				if (!validateOrigin(req)) {
+					return errorResponse("Invalid Origin", 403);
+				}
+			}
+
 			if (
 				url.pathname.startsWith("/admin") ||
 				url.pathname.startsWith("/api/admin")
