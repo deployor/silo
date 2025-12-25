@@ -172,16 +172,10 @@ async function runTests() {
 		);
 		// The order of methods might vary or be normalized, so we check if GET is present
 		const allowedMethods = cors.CORSRules?.[0]?.AllowedMethods || [];
-		// AWS SDK might return methods as array or single string depending on XML parsing
-		// Our new XML builder ensures arrays, but let's be robust
-		const methods = Array.isArray(allowedMethods)
-			? allowedMethods
-			: [allowedMethods];
-
-		if (!methods.includes("GET"))
+		if (!allowedMethods.includes("GET"))
 			throw new Error(
 				"CORS mismatch: GET not found in allowed methods. Got: " +
-					JSON.stringify(methods),
+					JSON.stringify(allowedMethods),
 			);
 		console.log("✅ GetBucketCors success");
 

@@ -1,5 +1,4 @@
 import { eq } from "drizzle-orm";
-import { XMLBuilder } from "fast-xml-parser";
 import { config } from "../../config";
 import { db } from "../../db";
 import { buckets, users } from "../../db/schema";
@@ -55,34 +54,31 @@ export async function handleS3Request(
 					.from(buckets)
 					.where(eq(buckets.userId, user.id));
 
-				const builder = new XMLBuilder({
-					ignoreAttributes: false,
-					format: true,
-				});
+				const bucketsXml = userBuckets
+					.map(
+						(b) => `
+    <Bucket>
+      <Name>${b.name}</Name>
+      <CreationDate>${b.createdAt ? new Date(b.createdAt).toISOString() : new Date().toISOString()}</CreationDate>
+    </Bucket>`,
+					)
+					.join("");
 
-				const listBucketsResult = {
-					ListAllMyBucketsResult: {
-						"@_xmlns": "http://s3.amazonaws.com/doc/2006-03-01/",
-						Owner: {
-							ID: user.id,
-							DisplayName: user.id,
-						},
-						Buckets: {
-							Bucket: userBuckets.map((b) => ({
-								Name: b.name,
-								CreationDate: b.createdAt
-									? new Date(b.createdAt).toISOString()
-									: new Date().toISOString(),
-							})),
-						},
+				return new Response(
+					`
+<?xml version="1.0" encoding="UTF-8"?>
+<ListAllMyBucketsResult>
+  <Owner>
+    <ID>${user.id}</ID>
+    <DisplayName>${user.id}</DisplayName>
+  </Owner>
+  <Buckets>${bucketsXml}
+  </Buckets>
+</ListAllMyBucketsResult>`.trim(),
+					{
+						headers: { "Content-Type": "application/xml" },
 					},
-				};
-
-				const xml = `<?xml version="1.0" encoding="UTF-8"?>\n${builder.build(listBucketsResult)}`;
-
-				return new Response(xml, {
-					headers: { "Content-Type": "application/xml" },
-				});
+				);
 			}
 			return S3Errors.MethodNotAllowed().toResponse();
 		}

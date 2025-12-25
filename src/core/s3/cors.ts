@@ -1,39 +1,41 @@
 import { buckets } from "../../db/schema";
 import type { CORSConfiguration, CORSRule } from "./types";
 
-// Simple in-memory cache for parsed CORS configs
-// Key: bucket.id + bucket.updatedAt timestamp (to invalidate on updates)
-// Value: Parsed CORSConfiguration
-const corsCache = new Map<string, CORSConfiguration>();
+// Helper to match origin against allowed origins (supports wildcards)
+function matchOrigin(origin: string, allowedOrigins: string[]): boolean {
+	return allowedOrigins.some((allowed) => {
+		if (allowed === "*") return true;
+		return allowed === origin;
+	});
+}
 
-function getParsedCorsConfig(
-	bucket: typeof buckets.$inferSelect,
-): CORSConfiguration | null {
-	if (!bucket.corsConfig) return null;
+// Helper to match method against allowed methods
+function matchMethod(method: string, allowedMethods: string[]): boolean {
+	return allowedMethods.some((allowed) => {
+		if (allowed === "*") return true;
+		return allowed === method;
+	});
+}
 
-	const cacheKey = `${bucket.id}-${bucket.updatedAt?.getTime() || 0}`;
-	if (corsCache.has(cacheKey)) {
-		return corsCache.get(cacheKey)!;
-	}
+// Helper to match headers against allowed headers
+function matchHeaders(
+	requestHeaders: string | null,
+	allowedHeaders: string[] | undefined,
+): boolean {
+	if (!requestHeaders) return true; // No headers requested, so it's fine
+	if (!allowedHeaders) return false; // Headers requested but none allowed
 
-	try {
-		const config = JSON.parse(bucket.corsConfig) as CORSConfiguration;
-		// Basic validation
-		if (!config || !Array.isArray(config.CORSRules)) {
-			return null;
-		}
-		
-		// Prune cache if it gets too big (simple LRU-ish behavior could be added, but this is a quick fix)
-		if (corsCache.size > 1000) {
-			corsCache.clear();
-		}
-		
-		corsCache.set(cacheKey, config);
-		return config;
-	} catch (e) {
-		console.error("Failed to parse CORS config for bucket", bucket.id, e);
-		return null;
-	}
+	const requested = requestHeaders
+		.split(",")
+		.map((h) => h.trim().toLowerCase());
+	const allowed = allowedHeaders.map((h) => h.toLowerCase());
+
+	return requested.every((reqHeader) => {
+		return allowed.some((allowedHeader) => {
+			if (allowedHeader === "*") return true;
+			return allowedHeader === reqHeader;
+		});
+	});
 }
 
 // Helper to handle CORS preflight
@@ -41,9 +43,11 @@ export async function handleCorsPreflight(
 	req: Request,
 	bucket: typeof buckets.$inferSelect,
 ) {
-	const corsConfig = getParsedCorsConfig(bucket);
+	const corsConfig = bucket.corsConfig
+		? (JSON.parse(bucket.corsConfig) as CORSConfiguration)
+		: null;
 
-	if (!corsConfig) {
+	if (!corsConfig || !Array.isArray(corsConfig.CORSRules)) {
 		return new Response(null, { status: 403 });
 	}
 
@@ -55,21 +59,13 @@ export async function handleCorsPreflight(
 		return new Response(null, { status: 403 });
 	}
 
-	const rule = corsConfig.CORSRules.find((r: CORSRule) => {
-		const allowedOrigins = r.AllowedOrigins || [];
-		const allowedMethods = r.AllowedMethods || [];
+	// Find the first matching rule
+	const rule = corsConfig.CORSRules.find((r) => {
+		const originMatch = matchOrigin(origin, r.AllowedOrigins);
+		const methodMatch = matchMethod(requestMethod, r.AllowedMethods);
+		const headerMatch = matchHeaders(requestHeaders, r.AllowedHeaders);
 
-		const originMatch = allowedOrigins.some((o: string) => {
-			if (o === "*") return true;
-			return o === origin;
-		});
-
-		// For preflight, we check if the requested method is allowed
-		const methodMatch = allowedMethods.some(
-			(m: string) => m === "*" || m === requestMethod,
-		);
-
-		return originMatch && methodMatch;
+		return originMatch && methodMatch && headerMatch;
 	});
 
 	if (!rule) {
@@ -77,22 +73,31 @@ export async function handleCorsPreflight(
 	}
 
 	const headers = new Headers();
+	// S3 returns the specific origin, or "*" if the rule allows "*" and the client didn't send credentials
+	// But typically for S3, it echoes the origin if it matches.
+	// If AllowedOrigins contains "*", we can return "*" OR the origin.
+	// Safest is to return the Origin if it matches.
 	headers.set("Access-Control-Allow-Origin", origin);
 
-	// Return ALL allowed methods for this rule, not just the requested one
-	const allowedMethods = rule.AllowedMethods || [];
-	headers.set("Access-Control-Allow-Methods", allowedMethods.join(", "));
+	headers.set("Access-Control-Allow-Methods", rule.AllowedMethods.join(", "));
 
-	if (rule.AllowedHeaders) {
-		const allowedHeaders = rule.AllowedHeaders || [];
-		headers.set("Access-Control-Allow-Headers", allowedHeaders.join(", "));
-	} else if (requestHeaders) {
-		// Default deny if not explicitly allowed
+	if (rule.AllowedHeaders && rule.AllowedHeaders.length > 0) {
+		// If the rule has wildcards, we might want to echo the requested headers
+		// But standard S3 often returns the allowed headers list.
+		// However, if the request had Access-Control-Request-Headers, we should probably return what was requested if allowed.
+		// For simplicity and compatibility, let's return the allowed headers from the rule, or if it's *, return requested.
+		if (rule.AllowedHeaders.includes("*") && requestHeaders) {
+			headers.set("Access-Control-Allow-Headers", requestHeaders);
+		} else {
+			headers.set(
+				"Access-Control-Allow-Headers",
+				rule.AllowedHeaders.join(", "),
+			);
+		}
 	}
 
-	if (rule.ExposeHeaders) {
-		const exposeHeaders = rule.ExposeHeaders || [];
-		headers.set("Access-Control-Expose-Headers", exposeHeaders.join(", "));
+	if (rule.ExposeHeaders && rule.ExposeHeaders.length > 0) {
+		headers.set("Access-Control-Expose-Headers", rule.ExposeHeaders.join(", "));
 	}
 
 	if (rule.MaxAgeSeconds) {
@@ -116,34 +121,29 @@ export function getCorsHeaders(
 	const corsHeaders = new Headers();
 
 	if (origin && bucket.corsConfig) {
-		const corsConfig = getParsedCorsConfig(bucket);
-		if (corsConfig && Array.isArray(corsConfig.CORSRules)) {
-			const rule = corsConfig.CORSRules.find((r: CORSRule) => {
-				const allowedOrigins = r.AllowedOrigins || [];
-				const allowedMethods = r.AllowedMethods || [];
+		try {
+			const corsConfig = JSON.parse(bucket.corsConfig) as CORSConfiguration;
+			if (Array.isArray(corsConfig.CORSRules)) {
+				const rule = corsConfig.CORSRules.find((r) => {
+					const originMatch = matchOrigin(origin, r.AllowedOrigins);
+					// For actual requests, we check the method of the request itself
+					const methodMatch = matchMethod(req.method, r.AllowedMethods);
+					return originMatch && methodMatch;
+				});
 
-				const originMatch = allowedOrigins.some(
-					(o: string) => o === "*" || o === origin,
-				);
-				// Check if the method is allowed (exact match or wildcard)
-				const methodMatch = allowedMethods.some(
-					(m: string) => m === "*" || m === req.method,
-				);
-
-				return originMatch && methodMatch;
-			});
-
-			if (rule) {
-				corsHeaders.set("Access-Control-Allow-Origin", origin);
-				if (rule.ExposeHeaders) {
-					const exposeHeaders = rule.ExposeHeaders || [];
-					corsHeaders.set(
-						"Access-Control-Expose-Headers",
-						exposeHeaders.join(", "),
-					);
+				if (rule) {
+					corsHeaders.set("Access-Control-Allow-Origin", origin);
+					if (rule.ExposeHeaders && rule.ExposeHeaders.length > 0) {
+						corsHeaders.set(
+							"Access-Control-Expose-Headers",
+							rule.ExposeHeaders.join(", "),
+						);
+					}
+					corsHeaders.set("Vary", "Origin");
 				}
-				corsHeaders.set("Vary", "Origin");
 			}
+		} catch (e) {
+			console.error("Failed to parse CORS config", e);
 		}
 	}
 	return corsHeaders;
