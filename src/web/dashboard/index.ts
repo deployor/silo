@@ -126,11 +126,12 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		const csrfToken = generateCsrfToken(user.sessionId);
 		const html = await render("files", {
 			title: "File Explorer - Silo",
-			layout: "blank",
+			layout: "main",
 			bucketName,
 			user,
 			csrfToken,
 			isAdmin: user.isAdmin,
+			breadcrumbs: `<span class="text-text-muted">/</span> <span class="bg-hc-blue/20 text-hc-blue px-2 py-0.5 rounded text-sm font-mono border border-hc-blue/30">${bucketName}</span>`,
 		});
 
 		return new Response(html, {
