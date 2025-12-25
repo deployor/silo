@@ -40,20 +40,35 @@ export function getKeyFromRequest(req: Request, bucketName: string): string {
 	const host = url.host;
 	const S3_DOMAIN = config.s3Domain;
 
+	let key = "";
+
 	if (host.endsWith(`.${S3_DOMAIN}`) && host !== S3_DOMAIN) {
-		return url.pathname.slice(1);
+		key = url.pathname.slice(1);
+	} else {
+		const path = url.pathname;
+		const prefix = `/${bucketName}/`;
+
+		if (path.startsWith(prefix)) {
+			key = path.slice(prefix.length);
+		} else if (path === "/" || path === `/${bucketName}`) {
+			key = "";
+		} else {
+			key = path.startsWith("/") ? path.slice(1) : path;
+		}
 	}
 
-	const path = url.pathname;
-	const prefix = `/${bucketName}/`;
-
-	if (path.startsWith(prefix)) {
-		return path.slice(prefix.length);
+	// Path Traversal Protection
+	// Decode key to check for traversal attempts like %2e%2e/
+	const decodedKey = decodeURIComponent(key);
+	if (decodedKey.includes("..")) {
+		// Simple check for ".." segments
+		const parts = decodedKey.split("/");
+		if (parts.includes("..")) {
+			throw new Error("Invalid Key: Path traversal detected");
+		}
 	}
 
-	if (path === "/" || path === `/${bucketName}`) return "";
-
-	return path.startsWith("/") ? path.slice(1) : path;
+	return key;
 }
 
 export function getInternalPath(
@@ -61,6 +76,15 @@ export function getInternalPath(
 	user: typeof users.$inferSelect,
 	bucket: typeof buckets.$inferSelect,
 ): string {
+	// Double check for path traversal before constructing internal path
+	if (key.includes("..")) {
+		const decodedKey = decodeURIComponent(key);
+		const parts = decodedKey.split("/");
+		if (parts.includes("..")) {
+			throw new Error("Invalid Key: Path traversal detected");
+		}
+	}
+
 	const cleanKey = key.startsWith("/") ? key.slice(1) : key;
 	const sanitizedUserId = user.id.replace(/[^a-zA-Z0-9-]/g, "_");
 	return `users/${sanitizedUserId}/${bucket.name}/${cleanKey}`;

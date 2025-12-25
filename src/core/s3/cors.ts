@@ -77,7 +77,15 @@ export async function handleCorsPreflight(
 	// But typically for S3, it echoes the origin if it matches.
 	// If AllowedOrigins contains "*", we can return "*" OR the origin.
 	// Safest is to return the Origin if it matches.
-	headers.set("Access-Control-Allow-Origin", origin);
+	// Security: If the rule allows "*", we should return "*" unless credentials are required.
+	// However, S3 behavior is often to echo the origin.
+	// We must ensure we don't return "*" if Access-Control-Allow-Credentials is true (not supported here yet but good practice).
+	
+	if (rule.AllowedOrigins.includes("*") && rule.AllowedOrigins.length === 1) {
+		headers.set("Access-Control-Allow-Origin", "*");
+	} else {
+		headers.set("Access-Control-Allow-Origin", origin);
+	}
 
 	headers.set("Access-Control-Allow-Methods", rule.AllowedMethods.join(", "));
 
@@ -132,7 +140,12 @@ export function getCorsHeaders(
 				});
 
 				if (rule) {
-					corsHeaders.set("Access-Control-Allow-Origin", origin);
+					if (rule.AllowedOrigins.includes("*") && rule.AllowedOrigins.length === 1) {
+						corsHeaders.set("Access-Control-Allow-Origin", "*");
+					} else {
+						corsHeaders.set("Access-Control-Allow-Origin", origin);
+					}
+					
 					if (rule.ExposeHeaders && rule.ExposeHeaders.length > 0) {
 						corsHeaders.set(
 							"Access-Control-Expose-Headers",
