@@ -91,7 +91,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	if (!user) {
 		const html = await render("landing", {
 			title: "Silo S3 Gateway",
-			layout: "blank",
+			layout: "main",
+			hideNavLinks: true,
+			mainClass: "flex flex-col items-center justify-center",
 		});
 		return new Response(html, {
 			headers: { "Content-Type": "text/html" },
@@ -105,7 +107,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	if (user.isLocked) {
 		const html = await render("locked", {
 			title: "Account Locked - Silo",
-			layout: "blank",
+			layout: "main",
+			hideNavLinks: true,
+			mainClass: "flex items-center justify-center",
 			reason: user.lockReason,
 		});
 
