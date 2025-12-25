@@ -14,8 +14,8 @@ import { rateLimit } from "./middleware/rate-limit";
 const S3_DOMAIN = config.s3Domain;
 
 // Rate Limiters
-const apiLimiter = rateLimit({ limit: 100, windowMs: 60000 }); // 100 req/min for API
-const authLimiter = rateLimit({ limit: 20, windowMs: 60000 }); // 20 req/min for Auth
+const apiLimiter = rateLimit({ limit: 300, windowMs: 60000 }); // 300 req/min for API
+const authLimiter = rateLimit({ limit: 60, windowMs: 60000 }); // 60 req/min for Auth
 
 // Helper to determine if a request is for the dashboard or S3
 function isDashboardRequest(req: Request, url: URL): boolean {
