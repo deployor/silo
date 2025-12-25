@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{title}} - Silo</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+    {{#if extraStyles}}
+      {{{extraStyles}}}
+    {{/if}}
+  </head>
+  <body class="min-h-screen selection:bg-hc-red selection:text-white flex flex-col font-sans {{bodyClass}}">
+    <nav class="w-full bg-hc-darker border-b border-white/10 px-6 py-4 sticky top-0 z-50 flex justify-between items-center">
+      <div class="flex items-center gap-4">
+        <a href="/" class="font-bold text-2xl tracking-tighter italic text-white hover:text-hc-red transition-colors">SILO</a>
+        {{#if pageTitle}}
+        <span class="bg-hc-red/20 text-hc-red px-2 py-0.5 rounded text-sm font-mono border border-hc-red/30">{{pageTitle}}</span>
+        {{/if}}
+        {{#if breadcrumbs}}
+          {{{breadcrumbs}}}
+        {{/if}}
+      </div>
+      <div class="flex items-center gap-6 font-bold text-sm">
+        {{#if user}}
+          {{#unless hideNavLinks}}
+            <a href="/cdn" class="text-text-muted hover:text-white transition-colors">CDN</a>
+            <a href="/docs" class="text-text-muted hover:text-white transition-colors">Docs</a>
+            <div class="flex items-center gap-2">
+              <img id="user-avatar" src="{{user.avatarUrl}}" alt="User Avatar" class="w-6 h-6 rounded-full {{#unless user.avatarUrl}}hidden{{/unless}}" />
+              <span class="text-text-muted font-mono" id="user-id">{{user.id}}</span>
+            </div>
+            {{#if user.isAdmin}}
+              <a href="/admin" id="admin-link" class="text-text-muted hover:text-white transition-colors">Admin</a>
+            {{/if}}
+            <a href="/auth/logout" class="text-hc-red hover:text-white transition-colors">Logout</a>
+          {{/unless}}
+        {{else}}
+           <a href="/auth/login" class="text-hc-red hover:text-white transition-colors">Login</a>
+        {{/if}}
+      </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto w-full px-6 py-8 {{mainClass}}">
+      {{{body}}}
+    </main>
+
+    {{#if modals}}
+      {{{modals}}}
+    {{/if}}
+
+    {{#if extraScripts}}
+      {{{extraScripts}}}
+    {{/if}}
+  </body>
+</html>
