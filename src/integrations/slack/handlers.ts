@@ -1,4 +1,13 @@
 import { and, eq } from "drizzle-orm";
+import {
+	Actions,
+	Button,
+	Context,
+	Header,
+	HomeTab,
+	Modal,
+	Section,
+} from "slack-block-builder";
 import { config } from "../../config";
 import { getInternalPath, isReservedBucketName } from "../../core/s3/utils";
 import { db } from "../../db";
@@ -25,83 +34,43 @@ export async function handleAppHomeOpened(event: { user: string }) {
 	}
 
 	if (user?.isLocked) {
-		await publishView(slackId, {
-			type: "home",
-			blocks: [
-				{
-					type: "header",
-					text: {
-						type: "plain_text",
-						text: "Account Locked 🔒",
-						emoji: true,
-					},
-				},
-				{
-					type: "section",
-					text: {
-						type: "mrkdwn",
+		await publishView(
+			slackId,
+			HomeTab()
+				.blocks(
+					Header({ text: "Account Locked 🔒" }),
+					Section({
 						text: `Your account has been temporarily locked. You cannot perform any actions at this time.${user.lockReason ? `\n\n*Reason:* ${user.lockReason}` : ""}`,
-					},
-				},
-				{
-					type: "context",
-					elements: [
-						{
-							type: "mrkdwn",
-							text: "Please contact an administrator for assistance.",
-						},
-					],
-				},
-			],
-		});
+					}),
+					Context().elements("Please contact an administrator for assistance."),
+				)
+				.buildToObject(),
+		);
 		return;
 	}
 
 	if (!user) {
 		// User not found, show welcome/login message
-		await publishView(slackId, {
-			type: "home",
-			blocks: [
-				{
-					type: "header",
-					text: {
-						type: "plain_text",
-						text: "Welcome to Silo! :wave:",
-						emoji: true,
-					},
-				},
-				{
-					type: "section",
-					text: {
-						type: "mrkdwn",
+		await publishView(
+			slackId,
+			HomeTab()
+				.blocks(
+					Header({ text: "Welcome to Silo! :wave:" }),
+					Section({
 						text: `*Hold up!* :ms-stop-sign:\n\nWe don't recognize this Slack account yet. To get started, you need to log in to the web dashboard at least once to link your account.\n\n *<https://${config.s3Domain}/auth/login?source=slack|Log in to Silo Dashboard>*`,
-					},
-				},
-				{
-					type: "context",
-					elements: [
-						{
-							type: "mrkdwn",
-							text: "Once you've logged in, come back here and click 'Refresh'!",
-						},
-					],
-				},
-				{
-					type: "actions",
-					elements: [
-						{
-							type: "button",
-							text: {
-								type: "plain_text",
-								text: ":ms-arrows-clockwise: Refresh",
-								emoji: true,
-							},
-							action_id: "refresh_home",
-						},
-					],
-				},
-			],
-		});
+					}),
+					Context().elements(
+						"Once you've logged in, come back here and click 'Refresh'!",
+					),
+					Actions().elements(
+						Button({
+							text: ":ms-arrows-clockwise: Refresh",
+							actionId: "refresh_home",
+						}),
+					),
+				)
+				.buildToObject(),
+		);
 		return;
 	}
 
@@ -396,23 +365,18 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 
 			if (bucket.length > 0 && bucket[0].isCdn) {
 				// Show error modal or message
-				await openModal(payload.trigger_id, {
-					type: "modal",
-					title: {
-						type: "plain_text",
-						text: "Cannot Delete",
-						emoji: true,
-					},
-					blocks: [
-						{
-							type: "section",
-							text: {
-								type: "mrkdwn",
+				await openModal(
+					payload.trigger_id,
+					Modal({
+						title: "Cannot Delete",
+					})
+						.blocks(
+							Section({
 								text: "This is your Slack CDN bucket. It cannot be deleted manually. It is managed automatically by your Slack uploads.",
-							},
-						},
-					],
-				});
+							}),
+						)
+						.buildToObject(),
+				);
 				return;
 			}
 		}
@@ -495,6 +459,15 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 						block.accessory.value === actionValue
 					) {
 						// This is the block. Replace it.
+						// We need to return a raw block object here because we are mapping over existing blocks
+						// and replacing one. slack-block-builder builders return builders, not objects until build() is called.
+						// However, Section().buildToObject() returns a block object directly if it's a single block?
+						// No, Section() returns a SectionBuilder.
+						// We can use HomeTab().blocks(Section(...)).buildToObject().blocks[0] but that's hacky.
+						// Or just construct the object manually for this one replacement since it's simple.
+						// Or use the builder and call buildToObject() but SectionBuilder doesn't have buildToObject directly exposed in the same way as surfaces?
+						// Actually, in slack-block-builder v2, blocks have buildToObject().
+
 						return {
 							type: "section",
 							text: {
