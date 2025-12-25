@@ -150,6 +150,7 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 		}
 
 		if (path === "/api/dashboard/stats") {
+			console.log(`[DEBUG] Fetching stats for user: ${user.id}`);
 			const userBuckets = await db
 				.select()
 				.from(buckets)
@@ -171,37 +172,40 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 				}),
 			);
 
+			const responseData = {
+				user: {
+					id: user.id,
+					slackId: user.slackId,
+					storageUsage: Number(user.storageUsageBytes) || 0,
+					storageLimit: Number(user.storageLimitBytes) || 1073741824,
+					egressLimit:
+						user.egressLimitBytes !== null
+							? Number(user.egressLimitBytes)
+							: null,
+					ingressBytes: Number(user.ingressBytes) || 0,
+					egressBytes: Number(user.egressBytes) || 0,
+					totalBytes:
+						(Number(user.ingressBytes) || 0) + (Number(user.egressBytes) || 0),
+					totalRequests: Number(user.totalRequests) || 0,
+					isAdmin: user.isAdmin,
+				},
+				buckets: bucketsWithKeys.map((b) => ({
+					name: b.name,
+					keys: b.keys,
+					createdAt: b.createdAt,
+					totalBytes: Number(b.totalBytes) || 0,
+					totalRequests: Number(b.totalRequests) || 0,
+					isPublic: b.isPublic,
+					isPaused: b.isPaused,
+					pauseReason: b.pauseReason,
+					corsConfig: b.corsConfig,
+					isCdn: b.isCdn,
+				})),
+			};
+			console.log(`[DEBUG] Stats response:`, JSON.stringify(responseData, null, 2));
+
 			return new Response(
-				JSON.stringify({
-					user: {
-						id: user.id,
-						slackId: user.slackId,
-						storageUsage: Number(user.storageUsageBytes) || 0,
-						storageLimit: Number(user.storageLimitBytes) || 1073741824,
-						egressLimit:
-							user.egressLimitBytes !== null
-								? Number(user.egressLimitBytes)
-								: null,
-						ingressBytes: Number(user.ingressBytes) || 0,
-						egressBytes: Number(user.egressBytes) || 0,
-						totalBytes:
-							(Number(user.ingressBytes) || 0) + (Number(user.egressBytes) || 0),
-						totalRequests: Number(user.totalRequests) || 0,
-						isAdmin: user.isAdmin,
-					},
-					buckets: bucketsWithKeys.map((b) => ({
-						name: b.name,
-						keys: b.keys,
-						createdAt: b.createdAt,
-						totalBytes: Number(b.totalBytes) || 0,
-						totalRequests: Number(b.totalRequests) || 0,
-						isPublic: b.isPublic,
-						isPaused: b.isPaused,
-						pauseReason: b.pauseReason,
-						corsConfig: b.corsConfig,
-						isCdn: b.isCdn,
-					})),
-				}),
+				JSON.stringify(responseData),
 				{ headers: { "Content-Type": "application/json" } },
 			);
 		}
