@@ -8,7 +8,7 @@ interface RenderOptions {
 }
 
 export async function render(
-	templatePath: string,
+	templateName: string,
 	data: any = {},
 	options: RenderOptions = { layout: "main" },
 ): Promise<string> {
@@ -35,6 +35,8 @@ export async function render(
 
 	try {
 		// 1. Render the view
+		// Assume templates are in src/views/
+		const templatePath = `src/views/${templateName}.hbs`;
 		const viewTemplate = await compile(templatePath);
 		const body = viewTemplate({ ...data, config });
 
@@ -44,7 +46,8 @@ export async function render(
 		}
 
 		// 3. Render the layout
-		const layoutName = typeof options.layout === "string" ? options.layout : "main";
+		const layoutName =
+			typeof options.layout === "string" ? options.layout : "main";
 		const layoutPath = `src/views/layouts/${layoutName}.hbs`;
 		const layoutTemplate = await compile(layoutPath);
 
@@ -54,7 +57,7 @@ export async function render(
 			body,
 		});
 	} catch (e) {
-		console.error(`Failed to render template: ${templatePath}`, e);
+		console.error(`Failed to render template: ${templateName}`, e);
 		throw e;
 	}
 }
