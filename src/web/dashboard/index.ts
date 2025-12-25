@@ -68,8 +68,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 		const html = await render("cdn", {
 			title: "Silo CDN",
-			layout: "blank",
+			layout: "main",
 			user,
+			pageTitle: "CDN",
 		});
 
 		return new Response(html, {
