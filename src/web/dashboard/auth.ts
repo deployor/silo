@@ -92,7 +92,9 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 				if (cookies.silo_wip_bypass !== expectedBypass) {
 					const html = await render("wip", {
 						title: "Work In Progress - Silo",
-						layout: "blank",
+						layout: "main",
+						hideNavLinks: true,
+						mainClass: "flex items-center justify-center",
 					});
 					return new Response(html, {
 						headers: { "Content-Type": "text/html" },
@@ -197,7 +199,9 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 		if (now - lastAttempt < 3000) {
 			const html = await render("wip", {
 				title: "Work In Progress - Silo",
-				layout: "blank",
+				layout: "main",
+				hideNavLinks: true,
+				mainClass: "flex items-center justify-center",
 				error: "Please wait a few seconds before trying again.",
 			});
 			return new Response(html, {
@@ -235,7 +239,9 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 
 		const html = await render("wip", {
 			title: "Work In Progress - Silo",
-			layout: "blank",
+			layout: "main",
+			hideNavLinks: true,
+			mainClass: "flex items-center justify-center",
 			error: "Invalid access code. Please try again.",
 		});
 
