@@ -226,8 +226,6 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 		});
 
 		// Refresh Home
-		// We can't await this because we need to return the ack immediately for the modal to close
-		// But we can fire and forget
 		handleAppHomeOpened({ user: payload.user.id });
 
 		// Show the keys immediately
@@ -296,12 +294,6 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 				.from(bucketKeys)
 				.where(eq(bucketKeys.bucketId, bucketId));
 			const newKeyObj = { accessKey, secretKey };
-
-			// We need to update the view using response_action or views.update
-			// Since this is a button click, we should use views.update
-			// But we don't have the view_id easily here unless we pass it or use the payload
-			// Actually, for button clicks in modals, we can return a "update" action? No, that's for block actions.
-			// We should call views.update
 
 			const _response = await fetch(`https://slack.com/api/views.update`, {
 				method: "POST",
@@ -441,16 +433,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			const internalPath = getInternalPath(key, user, bucket[0]);
 			await s3Client.fetch(internalPath, { method: "DELETE" });
 
-			// Update DB Stats (approximate, we don't know exact size here easily without querying first)
-			// For now, we just decrement file count if we tracked it, but we only track bytes.
-			// We could query S3 head to get size before delete, but that's slow.
-			// Let's just delete.
-
 			// Update the message to show "Deleted"
-			// We need to find the block that contained this button and update it.
-			// This is tricky because we don't have the block ID easily.
-			// But we have the message blocks in the payload if it's a block action.
-
 			if (payload.message?.blocks) {
 				const newBlocks = payload.message.blocks.map((block: any) => {
 					if (
@@ -459,15 +442,6 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 						block.accessory.value === actionValue
 					) {
 						// This is the block. Replace it.
-						// We need to return a raw block object here because we are mapping over existing blocks
-						// and replacing one. slack-block-builder builders return builders, not objects until build() is called.
-						// However, Section().buildToObject() returns a block object directly if it's a single block?
-						// No, Section() returns a SectionBuilder.
-						// We can use HomeTab().blocks(Section(...)).buildToObject().blocks[0] but that's hacky.
-						// Or just construct the object manually for this one replacement since it's simple.
-						// Or use the builder and call buildToObject() but SectionBuilder doesn't have buildToObject directly exposed in the same way as surfaces?
-						// Actually, in slack-block-builder v2, blocks have buildToObject().
-
 						return {
 							type: "section",
 							text: {
