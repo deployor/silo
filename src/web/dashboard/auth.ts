@@ -133,7 +133,7 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 			const headers = new Headers();
 			headers.set(
 				"Set-Cookie",
-				`silo_session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Expires=${expiresAt.toUTCString()}`,
+				`silo_session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Secure; Expires=${expiresAt.toUTCString()}`,
 			);
 
 			if (source === "slack") {
@@ -174,7 +174,7 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 		const headers = new Headers();
 		headers.set(
 			"Set-Cookie",
-			`silo_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
+			`silo_session=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0`,
 		);
 		headers.set("Location", "/");
 		return new Response(null, { status: 302, headers });
@@ -220,12 +220,12 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 			const headers = new Headers();
 			headers.append(
 				"Set-Cookie",
-				`silo_wip_bypass=${bypassValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`,
+				`silo_wip_bypass=${bypassValue}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=31536000`,
 			);
 			// Clear attempt cookie
 			headers.append(
 				"Set-Cookie",
-				`silo_wip_attempt=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
+				`silo_wip_attempt=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0`,
 			);
 			headers.set("Location", "/auth/login");
 			return new Response(null, { status: 302, headers });
@@ -234,7 +234,7 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 		const headers = new Headers();
 		headers.set(
 			"Set-Cookie",
-			`silo_wip_attempt=${now}; Path=/; HttpOnly; SameSite=Lax`,
+			`silo_wip_attempt=${now}; Path=/; HttpOnly; SameSite=Lax; Secure`,
 		);
 
 		const html = await render("wip", {
