@@ -7,6 +7,7 @@ import { handleAuthRequest } from "./auth";
 export async function handleDashboardRequest(req: Request): Promise<Response> {
 	const url = new URL(req.url);
 	const path = url.pathname;
+	console.log(`[Dashboard] Handling request: ${path}`);
 
 	// Delegate to Auth Handler
 	if (path.startsWith("/auth/")) {
