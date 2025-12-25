@@ -51,23 +51,32 @@ export async function handlePutRequest(
 
 		try {
 			const parsed = parser.parse(bodyText);
+			console.log("[CORS] Parsed Body:", JSON.stringify(parsed, null, 2));
+
 			if (!parsed.CORSConfiguration || !parsed.CORSConfiguration.CORSRule) {
 				throw new Error("Invalid CORS Configuration");
 			}
 
 			const rules = parsed.CORSConfiguration.CORSRule.map((r: any) => {
 				// Ensure arrays for single values
-				const allowedOrigins = Array.isArray(r.AllowedOrigin)
-					? r.AllowedOrigin
-					: [r.AllowedOrigin];
-				const allowedMethods = Array.isArray(r.AllowedMethod)
-					? r.AllowedMethod
-					: [r.AllowedMethod];
+				const allowedOrigins = r.AllowedOrigin
+					? Array.isArray(r.AllowedOrigin)
+						? r.AllowedOrigin
+						: [r.AllowedOrigin]
+					: [];
+
+				const allowedMethods = r.AllowedMethod
+					? Array.isArray(r.AllowedMethod)
+						? r.AllowedMethod
+						: [r.AllowedMethod]
+					: [];
+
 				const allowedHeaders = r.AllowedHeader
 					? Array.isArray(r.AllowedHeader)
 						? r.AllowedHeader
 						: [r.AllowedHeader]
 					: undefined;
+
 				const exposeHeaders = r.ExposeHeader
 					? Array.isArray(r.ExposeHeader)
 						? r.ExposeHeader
