@@ -52,9 +52,18 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 			"/api/onboarding/",
 		];
 
-		if (dashboardPaths.some((p) => path.startsWith(p))) {
+		// Exact match for root
+		if (path === "/") return true;
+
+		// Prefix match for others
+		if (dashboardPaths.some((p) => p !== "/" && path.startsWith(p))) {
 			return true;
 		}
+
+		// If it's not a known dashboard path and not an S3 auth request,
+		// it might be a public bucket access (e.g. /bucket/key).
+		// We should treat this as an S3 request.
+		return false;
 	}
 
 	return false;
