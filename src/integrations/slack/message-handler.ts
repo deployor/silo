@@ -1,11 +1,10 @@
 import { eq, sql } from "drizzle-orm";
 import { config } from "../../config";
-import { db } from "../../db";
-import { buckets, requestLogs, users } from "../../db/schema";
-import { s3Client } from "../../lib/s3-client";
 import { getInternalPath } from "../../core/s3/utils";
+import { db } from "../../db";
+import { buckets, requestLogs } from "../../db/schema";
+import { s3Client } from "../../lib/s3-client";
 import { UserService } from "../../services/user-service";
-import { BucketService } from "../../services/bucket-service";
 
 export async function handleMessage(event: any) {
 	// Ignore bot messages and messages without files
@@ -50,7 +49,7 @@ export async function handleMessage(event: any) {
 
 	// 3. Get/Create CDN Bucket
 	// Bucket name is the lowercase Slack ID
-	const bucketName = user.slackId!.toLowerCase();
+	const bucketName = user.slackId?.toLowerCase();
 
 	let bucket = await db
 		.select()
@@ -114,7 +113,7 @@ export async function handleMessage(event: any) {
 
 		// Download
 		const downloadUrl = file.url_private_download;
-		
+
 		// Security: Validate URL scheme
 		if (!downloadUrl.startsWith("https://files.slack.com/")) {
 			results.push({ name: file.name, error: "Invalid file source" });
@@ -136,7 +135,11 @@ export async function handleMessage(event: any) {
 
 		// Upload to S3
 		// Security: Sanitize file extension
-		const ext = file.name.split(".").pop()?.replace(/[^a-z0-9]/gi, "") || "bin";
+		const ext =
+			file.name
+				.split(".")
+				.pop()
+				?.replace(/[^a-z0-9]/gi, "") || "bin";
 		const hash = crypto.randomUUID();
 		const fileName = `${hash}.${ext}`;
 
@@ -339,7 +342,11 @@ async function addReaction(channel: string, timestamp: string, name: string) {
 	});
 }
 
-async function removeReaction(channel: string, timestamp: string, name: string) {
+async function removeReaction(
+	channel: string,
+	timestamp: string,
+	name: string,
+) {
 	await fetch("https://slack.com/api/reactions.remove", {
 		method: "POST",
 		headers: {

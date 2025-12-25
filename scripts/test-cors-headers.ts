@@ -45,7 +45,9 @@ async function teardown() {
 
 test("CORS: GET request includes CORS headers", async () => {
 	const bucket = await setup();
-	const user = (await db.select().from(users).where(eq(users.id, TEST_USER_ID)))[0];
+	const user = (
+		await db.select().from(users).where(eq(users.id, TEST_USER_ID))
+	)[0];
 
 	// Set CORS config
 	const config = {
@@ -69,21 +71,28 @@ test("CORS: GET request includes CORS headers", async () => {
 		.from(buckets)
 		.where(eq(buckets.id, bucket.id));
 
-	const req = new Request(`https://silo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`, {
-		method: "GET",
-		headers: {
-			Origin: "http://example.com",
+	const req = new Request(
+		`https://silo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`,
+		{
+			method: "GET",
+			headers: {
+				Origin: "http://example.com",
+			},
 		},
-	});
+	);
 
 	const res = await handleS3Request(req, user, updatedBucket, "public");
 
 	expect(res.status).toBe(404); // 404 is fine, we just want headers (upstream 404)
-    // Note: If upstream returns 404, we still want CORS headers so the browser can see the 404!
-    
-	expect(res.headers.get("Access-Control-Allow-Origin")).toBe("http://example.com");
-	expect(res.headers.get("Access-Control-Expose-Headers")).toContain("x-amz-meta-custom");
-    expect(res.headers.get("Vary")).toContain("Origin");
+	// Note: If upstream returns 404, we still want CORS headers so the browser can see the 404!
+
+	expect(res.headers.get("Access-Control-Allow-Origin")).toBe(
+		"http://example.com",
+	);
+	expect(res.headers.get("Access-Control-Expose-Headers")).toContain(
+		"x-amz-meta-custom",
+	);
+	expect(res.headers.get("Vary")).toContain("Origin");
 
 	await teardown();
 });

@@ -83,7 +83,7 @@ export async function verifyAwsV4Signature(
 		.split("/")
 		.map((segment) => awsUriEncode(segment))
 		.join("/");
-	
+
 	if (canonicalUri.startsWith("//") && !url.pathname.startsWith("//")) {
 		canonicalUri = canonicalUri.slice(1);
 	}

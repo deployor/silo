@@ -4,7 +4,7 @@ import { buckets, users } from "../src/db/schema";
 import { handleMessage } from "../src/features/slack/message-handler";
 
 // Mock config
-const mockConfig = {
+const _mockConfig = {
 	s3Domain: "localhost:3000",
 	slack: {
 		botToken: "mock-token",
@@ -13,7 +13,7 @@ const mockConfig = {
 
 // Mock fetch
 const originalFetch = global.fetch;
-// @ts-ignore
+// @ts-expect-error
 global.fetch = async (url: string | Request | URL, init?: RequestInit) => {
 	const urlStr = url.toString();
 	if (urlStr.includes("slack.com/api/chat.postMessage")) {
@@ -37,7 +37,8 @@ const mockS3Client = {
 
 // Monkey patch s3Client
 import { s3Client } from "../src/lib/s3-client";
-// @ts-ignore
+
+// @ts-expect-error
 s3Client.fetch = mockS3Client.fetch;
 
 async function runTest() {

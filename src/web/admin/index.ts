@@ -1,11 +1,10 @@
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
-import { config } from "../../config";
+import { deleteBucketContents, getInternalPath } from "../../core/s3/utils";
 import { db } from "../../db";
 import { bucketKeys, buckets, requestLogs, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 import { getCurrentUser } from "../../lib/session";
-import { deleteBucketContents, getInternalPath } from "../../core/s3/utils";
 import { render } from "../../lib/view-engine";
 
 // --- Handlers ---
@@ -23,8 +22,8 @@ async function serveAdminDashboard(req: Request) {
 }
 
 async function listUsers(url: URL, user: typeof users.$inferSelect) {
-	const limit = Number.parseInt(url.searchParams.get("limit") || "50");
-	const offset = Number.parseInt(url.searchParams.get("offset") || "0");
+	const limit = Number.parseInt(url.searchParams.get("limit") || "50", 10);
+	const offset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
 	const search = url.searchParams.get("search");
 	const adminsOnly = url.searchParams.get("adminsOnly") === "true";
 
@@ -50,9 +49,8 @@ async function listUsers(url: URL, user: typeof users.$inferSelect) {
 			email: users.email,
 			slackId: users.slackId,
 			storageLimitBytes: users.storageLimitBytes,
-			storageUsageBytes: sql<number>`COALESCE(sum(${buckets.totalBytes}), 0)`.mapWith(
-				Number,
-			),
+			storageUsageBytes:
+				sql<number>`COALESCE(sum(${buckets.totalBytes}), 0)`.mapWith(Number),
 			egressLimitBytes: users.egressLimitBytes,
 			ingressBytes: users.ingressBytes,
 			egressBytes: users.egressBytes,
@@ -226,7 +224,7 @@ async function previewFile(bucketName: string, url: URL) {
 			status: s3Res.status,
 			headers,
 		});
-	} catch (e) {
+	} catch (_e) {
 		return new Response("Error fetching file", { status: 500 });
 	}
 }
@@ -391,8 +389,8 @@ async function deleteFile(bucketName: string, url: URL) {
 }
 
 async function listLogs(url: URL) {
-	const limit = Number.parseInt(url.searchParams.get("limit") || "50");
-	const offset = Number.parseInt(url.searchParams.get("offset") || "0");
+	const limit = Number.parseInt(url.searchParams.get("limit") || "50", 10);
+	const offset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
 	const search = url.searchParams.get("search");
 	const bucketFilter = url.searchParams.get("bucket");
 	const methodFilter = url.searchParams.get("method");
@@ -426,7 +424,7 @@ async function listLogs(url: URL) {
 		filters.push(eq(requestLogs.method, methodFilter));
 	}
 	if (statusFilter) {
-		filters.push(eq(requestLogs.statusCode, Number.parseInt(statusFilter)));
+		filters.push(eq(requestLogs.statusCode, Number.parseInt(statusFilter, 10)));
 	}
 	if (ipFilter) {
 		filters.push(eq(requestLogs.ipAddress, ipFilter));
@@ -460,7 +458,6 @@ async function listLogs(url: URL) {
 					? asc(requestLogs.statusCode)
 					: desc(requestLogs.statusCode);
 			break;
-		case "createdAt":
 		default:
 			orderBy =
 				sortOrder === "asc"

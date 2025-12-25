@@ -89,7 +89,9 @@ test("CORS: PutBucketCors sets configuration", async () => {
 	expect(updatedBucket.corsConfig).toBeTruthy();
 	const parsed = JSON.parse(updatedBucket.corsConfig!);
 	expect(parsed.CORSRules.length).toBe(2);
-	expect(parsed.CORSRules[0].AllowedOrigins).toEqual(["http://www.example.com"]);
+	expect(parsed.CORSRules[0].AllowedOrigins).toEqual([
+		"http://www.example.com",
+	]);
 
 	await teardown();
 });
@@ -198,16 +200,19 @@ test("CORS: OPTIONS Preflight check", async () => {
 		.where(eq(buckets.id, bucket.id));
 
 	// Valid Preflight
-	const req = new Request(`https://silo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`, {
-		method: "OPTIONS",
-		headers: {
-			Origin: "http://example.com",
-			"Access-Control-Request-Method": "PUT",
-			"Access-Control-Request-Headers": "x-custom-header",
+	const req = new Request(
+		`https://silo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`,
+		{
+			method: "OPTIONS",
+			headers: {
+				Origin: "http://example.com",
+				"Access-Control-Request-Method": "PUT",
+				"Access-Control-Request-Headers": "x-custom-header",
+			},
 		},
-	});
+	);
 
-	const res = await handleS3Request(req, user, updatedBucket, "public"); 
+	const res = await handleS3Request(req, user, updatedBucket, "public");
 
 	expect(res.status).toBe(200);
 	expect(res.headers.get("Access-Control-Allow-Origin")).toBe(
@@ -270,19 +275,22 @@ test("CORS: Security - No Config returns 403 for OPTIONS", async () => {
 		.update(buckets)
 		.set({ corsConfig: null })
 		.where(eq(buckets.id, bucket.id));
-	
+
 	const [updatedBucket] = await db
 		.select()
 		.from(buckets)
 		.where(eq(buckets.id, bucket.id));
 
-	const req = new Request(`https://silo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`, {
-		method: "OPTIONS",
-		headers: {
-			Origin: "http://example.com",
-			"Access-Control-Request-Method": "GET",
+	const req = new Request(
+		`https://silo.deployor.dev/${TEST_BUCKET_NAME}/file.txt`,
+		{
+			method: "OPTIONS",
+			headers: {
+				Origin: "http://example.com",
+				"Access-Control-Request-Method": "GET",
+			},
 		},
-	});
+	);
 
 	const res = await handleS3Request(req, user, updatedBucket, "public");
 	expect(res.status).toBe(403);

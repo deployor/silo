@@ -1,21 +1,20 @@
-import { handleBuckets, handleBucketOperations } from "./api/buckets";
-import { handleKeys } from "./api/keys";
-import { handleFiles } from "./api/files";
-import { handleCors } from "./api/cors";
-import { getCurrentUser } from "../../lib/session";
-import { db } from "../../db";
-import { buckets, requestLogs, users } from "../../db/schema";
 import { eq, sql } from "drizzle-orm";
 import { config } from "../../config";
 import { getInternalPath } from "../../core/s3/utils";
+import { db } from "../../db";
+import { buckets, requestLogs, users } from "../../db/schema";
+import { errorResponse, jsonResponse } from "../../lib/api-utils";
 import { s3Client } from "../../lib/s3-client";
+import { getCurrentUser } from "../../lib/session";
 import { BucketService } from "../../services/bucket-service";
-import { jsonResponse, errorResponse } from "../../lib/api-utils";
+import { handleBucketOperations, handleBuckets } from "./api/buckets";
+import { handleCors } from "./api/cors";
+import { handleFiles } from "./api/files";
+import { handleKeys } from "./api/keys";
 
 export async function handleApiRequest(req: Request): Promise<Response> {
 	const url = new URL(req.url);
 	const path = url.pathname;
-	console.log(`[API] Handling request: ${path}`);
 
 	if (path === "/api/onboarding/complete" && req.method === "POST") {
 		const user = await getCurrentUser(req);
@@ -35,8 +34,7 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 		const user = await getCurrentUser(req);
 		if (!user) return errorResponse("Unauthorized", 401);
 		if (user.isLocked) return errorResponse("Account Locked", 403);
-		if (!user.slackId)
-			return errorResponse("Slack account required", 403);
+		if (!user.slackId) return errorResponse("Slack account required", 403);
 
 		try {
 			const formData = await req.formData();
@@ -147,7 +145,6 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 		}
 
 		if (path === "/api/dashboard/stats") {
-			console.log(`[DEBUG] Fetching stats for user: ${user.id}`);
 			const bucketsWithKeys = await BucketService.getBucketsForUser(user.id);
 
 			const responseData = {
@@ -180,7 +177,6 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 					isCdn: b.isCdn,
 				})),
 			};
-			console.log(`[DEBUG] Stats response:`, JSON.stringify(responseData, null, 2));
 
 			return jsonResponse(responseData);
 		}

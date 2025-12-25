@@ -47,11 +47,16 @@ export async function getCurrentUser(req: Request) {
 						params.append("grant_type", "refresh_token");
 						params.append("refresh_token", s.refreshToken);
 
-						const tokenRes = await fetch("https://auth.hackclub.com/oauth/token", {
-							method: "POST",
-							headers: { "Content-Type": "application/x-www-form-urlencoded" },
-							body: params,
-						});
+						const tokenRes = await fetch(
+							"https://auth.hackclub.com/oauth/token",
+							{
+								method: "POST",
+								headers: {
+									"Content-Type": "application/x-www-form-urlencoded",
+								},
+								body: params,
+							},
+						);
 
 						if (tokenRes.ok) {
 							const tokenData = await tokenRes.json();
@@ -63,8 +68,7 @@ export async function getCurrentUser(req: Request) {
 								.update(sessions)
 								.set({
 									accessToken: tokenData.access_token,
-									refreshToken:
-										tokenData.refresh_token || s.refreshToken,
+									refreshToken: tokenData.refresh_token || s.refreshToken,
 									tokenExpiresAt: newExpiresAt,
 								})
 								.where(eq(sessions.id, s.id));
@@ -76,10 +80,7 @@ export async function getCurrentUser(req: Request) {
 							}
 							s.tokenExpiresAt = newExpiresAt;
 						} else {
-							console.error(
-								"Failed to refresh token:",
-								await tokenRes.text(),
-							);
+							console.error("Failed to refresh token:", await tokenRes.text());
 						}
 					} catch (e) {
 						console.error("Error refreshing token:", e);

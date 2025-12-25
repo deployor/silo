@@ -1,9 +1,7 @@
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { isReservedBucketName } from "../core/s3/utils";
 import { db } from "../db";
-import { bucketKeys, buckets, users } from "../db/schema";
-import { config } from "../config";
-import { getInternalPath, isReservedBucketName } from "../core/s3/utils";
-import { s3Client } from "../lib/s3-client";
+import { bucketKeys, buckets } from "../db/schema";
 
 export class BucketService {
 	static async getBucketsForUser(userId: string) {
@@ -78,7 +76,8 @@ export class BucketService {
 			.limit(1);
 
 		if (bucket.length === 0) throw new Error("Bucket not found");
-		if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
+		if (bucket[0].userId !== userId && !isAdmin)
+			throw new Error("Unauthorized");
 		if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
 
 		// We don't actually delete the files here, the caller should handle that or we can add it later
@@ -99,14 +98,12 @@ export class BucketService {
 			.limit(1);
 
 		if (bucket.length === 0) throw new Error("Bucket not found");
-		if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
+		if (bucket[0].userId !== userId && !isAdmin)
+			throw new Error("Unauthorized");
 		if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
 		if (bucket[0].isCdn) throw new Error("Cannot modify CDN bucket");
 
-		await db
-			.update(buckets)
-			.set({ isPublic })
-			.where(eq(buckets.name, name));
+		await db.update(buckets).set({ isPublic }).where(eq(buckets.name, name));
 	}
 
 	static async updateCorsConfig(
@@ -122,7 +119,8 @@ export class BucketService {
 			.limit(1);
 
 		if (bucket.length === 0) throw new Error("Bucket not found");
-		if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
+		if (bucket[0].userId !== userId && !isAdmin)
+			throw new Error("Unauthorized");
 		if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
 		if (bucket[0].isCdn) throw new Error("Cannot modify CDN bucket CORS");
 
@@ -144,7 +142,8 @@ export class BucketService {
 			.limit(1);
 
 		if (bucket.length === 0) throw new Error("Bucket not found");
-		if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
+		if (bucket[0].userId !== userId && !isAdmin)
+			throw new Error("Unauthorized");
 		if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
 		if (bucket[0].isCdn) throw new Error("Cannot modify CDN bucket CORS");
 

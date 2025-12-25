@@ -1,6 +1,6 @@
-import { db } from "../src/db";
-import { users, buckets } from "../src/db/schema";
 import { eq } from "drizzle-orm";
+import { db } from "../src/db";
+import { buckets, users } from "../src/db/schema";
 
 async function main() {
 	console.log("Starting storage usage fix...");

@@ -39,8 +39,10 @@ export class S3Error extends Error {
 export const S3Errors = {
 	AccessDenied: (message = "Access Denied", resource = "/") =>
 		new S3Error("AccessDenied", message, resource, undefined, 403),
-	QuotaExceeded: (message = "You have exceeded your storage quota.", resource = "/") =>
-		new S3Error("QuotaExceeded", message, resource, undefined, 403),
+	QuotaExceeded: (
+		message = "You have exceeded your storage quota.",
+		resource = "/",
+	) => new S3Error("QuotaExceeded", message, resource, undefined, 403),
 	NotImplemented: (
 		message = "A header you provided implies functionality that is not implemented",
 	) => new S3Error("NotImplemented", message, "/", undefined, 501),

@@ -1,24 +1,23 @@
 import {
-	S3Client,
-	ListBucketsCommand,
-	HeadBucketCommand,
-	GetBucketLocationCommand,
-	PutBucketCorsCommand,
-	GetBucketCorsCommand,
-	DeleteBucketCorsCommand,
-	PutObjectCommand,
-	GetObjectCommand,
-	HeadObjectCommand,
-	DeleteObjectCommand,
-	CopyObjectCommand,
-	ListObjectsV2Command,
-	DeleteObjectsCommand,
-	CreateMultipartUploadCommand,
-	UploadPartCommand,
-	CompleteMultipartUploadCommand,
 	AbortMultipartUploadCommand,
-	ListMultipartUploadsCommand,
+	CompleteMultipartUploadCommand,
+	CopyObjectCommand,
+	CreateMultipartUploadCommand,
+	DeleteBucketCorsCommand,
+	DeleteObjectCommand,
+	DeleteObjectsCommand,
+	GetBucketCorsCommand,
+	GetBucketLocationCommand,
+	GetObjectCommand,
+	HeadBucketCommand,
+	HeadObjectCommand,
+	ListBucketsCommand,
+	ListObjectsV2Command,
 	ListPartsCommand,
+	PutBucketCorsCommand,
+	PutObjectCommand,
+	S3Client,
+	UploadPartCommand,
 } from "@aws-sdk/client-s3";
 
 // Configuration
@@ -61,7 +60,7 @@ const client2 = new S3Client({
 });
 
 async function runTests() {
-	console.log("🚀 Starting Comprehensive S3 Tests against " + ENDPOINT);
+	console.log(`🚀 Starting Comprehensive S3 Tests against ${ENDPOINT}`);
 
 	try {
 		// ==========================================
@@ -179,9 +178,7 @@ async function runTests() {
 			);
 		console.log("✅ GetBucketCors success");
 
-		await client1.send(
-			new DeleteBucketCorsCommand({ Bucket: BUCKET_1.name }),
-		);
+		await client1.send(new DeleteBucketCorsCommand({ Bucket: BUCKET_1.name }));
 		console.log("✅ DeleteBucketCors success");
 
 		// ==========================================
@@ -281,12 +278,10 @@ async function runTests() {
 		// 3.1 Cross-Bucket Access (Client 1 trying to access Bucket 2)
 		console.log("Testing Cross-Bucket Access (Should Fail)...");
 		try {
-			await client1.send(
-				new ListObjectsV2Command({ Bucket: BUCKET_2.name }),
-			);
+			await client1.send(new ListObjectsV2Command({ Bucket: BUCKET_2.name }));
 			console.error("❌ Client 1 was able to list Bucket 2!");
 		} catch (e: any) {
-			console.log("✅ Client 1 denied access to Bucket 2 (" + e.name + ")");
+			console.log(`✅ Client 1 denied access to Bucket 2 (${e.name})`);
 		}
 
 		// 3.2 Public Access
@@ -300,16 +295,11 @@ async function runTests() {
 			}),
 		);
 		// Fetch without credentials
-		const publicRes = await fetch(
-			`${ENDPOINT}/${BUCKET_1.name}/public.txt`,
-		);
+		const publicRes = await fetch(`${ENDPOINT}/${BUCKET_1.name}/public.txt`);
 		if (publicRes.status === 200) {
 			console.log("✅ Public bucket file accessible without auth");
 		} else {
-			console.error(
-				"❌ Public bucket file NOT accessible:",
-				publicRes.status,
-			);
+			console.error("❌ Public bucket file NOT accessible:", publicRes.status);
 		}
 
 		// Upload file to private bucket
@@ -321,9 +311,7 @@ async function runTests() {
 			}),
 		);
 		// Fetch without credentials
-		const privateRes = await fetch(
-			`${ENDPOINT}/${BUCKET_2.name}/private.txt`,
-		);
+		const privateRes = await fetch(`${ENDPOINT}/${BUCKET_2.name}/private.txt`);
 		if (privateRes.status === 403) {
 			console.log("✅ Private bucket file denied without auth");
 		} else {
@@ -348,7 +336,7 @@ async function runTests() {
 				new ListObjectsV2Command({ Bucket: "../../../etc/passwd" }),
 			);
 			console.error("❌ Path traversal bucket name accepted!");
-		} catch (e) {
+		} catch (_e) {
 			console.log("✅ Path traversal bucket name rejected");
 		}
 
@@ -367,7 +355,7 @@ async function runTests() {
 			);
 			// If it succeeds, check if header was injected (hard to check with SDK, but server shouldn't crash)
 			console.log("✅ Metadata injection attempt handled (no crash)");
-		} catch (e) {
+		} catch (_e) {
 			console.log("✅ Metadata injection rejected");
 		}
 

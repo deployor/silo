@@ -1,20 +1,20 @@
 import { eq } from "drizzle-orm";
 import { config } from "../../config";
 import { db } from "../../db";
-import { buckets, users } from "../../db/schema";
+import { buckets, type users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
+import { getCorsHeaders, handleCorsPreflight } from "./cors";
+import { handleDeleteRequest } from "./delete";
+import { handleGetRequest } from "./get";
+import { handlePostRequest } from "./post";
+import { handlePutRequest } from "./put";
 import {
 	filterUpstreamHeaders,
 	getInternalPath,
 	getKeyFromRequest,
 	stripAuthQueryParams,
 } from "./utils";
-import { handleCorsPreflight, getCorsHeaders } from "./cors";
-import { handleGetRequest } from "./get";
-import { handlePutRequest } from "./put";
-import { handleDeleteRequest } from "./delete";
-import { handlePostRequest } from "./post";
 
 export async function handleS3Request(
 	req: Request,

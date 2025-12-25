@@ -71,6 +71,12 @@ export function getKeyFromRequest(req: Request, bucketName: string): string {
 	return key;
 }
 
+/**
+	* Constructs the internal S3 path for a given key.
+	* Format: users/{userId}/{bucketName}/{key}
+	*
+	* This ensures isolation between users and buckets.
+	*/
 export function getInternalPath(
 	key: string,
 	user: typeof users.$inferSelect,
@@ -149,7 +155,6 @@ export function isReservedBucketName(name: string): boolean {
 // --- Async Operations ---
 
 export async function deleteBucketContents(prefix: string) {
-	console.log(`[DELETE BUCKET] Emptying prefix: ${prefix}`);
 	let continuationToken: string | undefined;
 	do {
 		const query = new URLSearchParams();
@@ -173,8 +178,6 @@ export async function deleteBucketContents(prefix: string) {
 			: [result.Contents];
 
 		if (contents.length === 0) break;
-
-		console.log(`[DELETE BUCKET] Deleting ${contents.length} objects...`);
 
 		const objects = contents
 			.map((item: { Key: string }) => `<Object><Key>${item.Key}</Key></Object>`)
@@ -204,7 +207,9 @@ export async function rewriteCopySourceHeader(
 	headerValue: string,
 	currentUser: typeof users.$inferSelect,
 ): Promise<string | null> {
-	const clean = headerValue.startsWith("/") ? headerValue.slice(1) : headerValue;
+	const clean = headerValue.startsWith("/")
+		? headerValue.slice(1)
+		: headerValue;
 
 	const firstSlash = clean.indexOf("/");
 	if (firstSlash === -1) return null;

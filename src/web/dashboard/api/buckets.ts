@@ -1,8 +1,8 @@
+import { config } from "../../../config";
+import { errorResponse, jsonResponse } from "../../../lib/api-utils";
+import { getCurrentUser } from "../../../lib/session";
 import { BucketService } from "../../../services/bucket-service";
 import { KeyService } from "../../../services/key-service";
-import { getCurrentUser } from "../../../lib/session";
-import { config } from "../../../config";
-import { jsonResponse, errorResponse } from "../../../lib/api-utils";
 
 export async function handleBuckets(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
