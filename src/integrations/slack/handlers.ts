@@ -11,28 +11,20 @@ import {
 	homeView,
 	manageKeysModal,
 } from "./views";
+import { UserService } from "../../services/user-service";
 
 export async function handleAppHomeOpened(event: { user: string }) {
 	const slackId = event.user;
 
 	// Find user by Slack ID
-	const user = await db
-		.select()
-		.from(users)
-		.where(eq(users.slackId, slackId))
-		.limit(1);
+	const user = await UserService.getUserBySlackId(slackId);
 
-	if (user.length > 0) {
+	if (user) {
 		// Calculate storage usage from all buckets
-		const usageResult = await db
-			.select({ total: sql<number>`sum(${buckets.totalBytes})` })
-			.from(buckets)
-			.where(eq(buckets.userId, user[0].id));
-
-		user[0].storageUsageBytes = Number(usageResult[0]?.total) || 0;
+		user.storageUsageBytes = await UserService.getStorageUsage(user.id);
 	}
 
-	if (user.length > 0 && user[0].isLocked) {
+	if (user && user.isLocked) {
 		await publishView(slackId, {
 			type: "home",
 			blocks: [
@@ -48,7 +40,7 @@ export async function handleAppHomeOpened(event: { user: string }) {
 					type: "section",
 					text: {
 						type: "mrkdwn",
-						text: `Your account has been temporarily locked. You cannot perform any actions at this time.${user[0].lockReason ? `\n\n*Reason:* ${user[0].lockReason}` : ""}`,
+						text: `Your account has been temporarily locked. You cannot perform any actions at this time.${user.lockReason ? `\n\n*Reason:* ${user.lockReason}` : ""}`,
 					},
 				},
 				{
@@ -65,7 +57,7 @@ export async function handleAppHomeOpened(event: { user: string }) {
 		return;
 	}
 
-	if (user.length === 0) {
+	if (!user) {
 		// User not found, show welcome/login message
 		await publishView(slackId, {
 			type: "home",
@@ -116,9 +108,9 @@ export async function handleAppHomeOpened(event: { user: string }) {
 	const userBuckets = await db
 		.select()
 		.from(buckets)
-		.where(eq(buckets.userId, user[0].id));
+		.where(eq(buckets.userId, user.id));
 
-	await publishView(slackId, homeView(user[0], userBuckets));
+	await publishView(slackId, homeView(user, userBuckets));
 }
 
 interface SlackInteractionPayload {
@@ -152,15 +144,11 @@ interface SlackInteractionPayload {
 }
 
 export async function handleInteraction(payload: SlackInteractionPayload) {
-	const user = await db
-		.select()
-		.from(users)
-		.where(eq(users.slackId, payload.user.id))
-		.limit(1);
+	const user = await UserService.getUserBySlackId(payload.user.id);
 
-	if (user.length === 0) return; // Should not happen if they are interacting
+	if (!user) return; // Should not happen if they are interacting
 
-	if (user[0].isLocked) {
+	if (user.isLocked) {
 		await handleAppHomeOpened({ user: payload.user.id });
 		return;
 	}
@@ -214,7 +202,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 		const userBuckets = await db
 			.select()
 			.from(buckets)
-			.where(eq(buckets.userId, user[0].id));
+			.where(eq(buckets.userId, user.id));
 		if (userBuckets.length >= 50) {
 			return {
 				response_action: "errors",
@@ -244,7 +232,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			.insert(buckets)
 			.values({
 				name: bucketName,
-				userId: user[0].id,
+				userId: user.id,
 				isPublic: false,
 			})
 			.returning();
@@ -292,7 +280,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 		const bucket = await db
 			.select()
 			.from(buckets)
-			.where(and(eq(buckets.id, bucketId), eq(buckets.userId, user[0].id)))
+			.where(and(eq(buckets.id, bucketId), eq(buckets.userId, user.id)))
 			.limit(1);
 
 		if (bucket.length > 0) {
@@ -311,7 +299,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 		const bucket = await db
 			.select()
 			.from(buckets)
-			.where(and(eq(buckets.id, bucketId), eq(buckets.userId, user[0].id)))
+			.where(and(eq(buckets.id, bucketId), eq(buckets.userId, user.id)))
 			.limit(1);
 
 		if (bucket.length > 0) {
@@ -369,7 +357,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 		const bucket = await db
 			.select()
 			.from(buckets)
-			.where(and(eq(buckets.id, bucketId), eq(buckets.userId, user[0].id)))
+			.where(and(eq(buckets.id, bucketId), eq(buckets.userId, user.id)))
 			.limit(1);
 
 		if (bucket.length > 0) {
@@ -438,7 +426,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 		const bucket = await db
 			.select()
 			.from(buckets)
-			.where(and(eq(buckets.id, bucketId), eq(buckets.userId, user[0].id)))
+			.where(and(eq(buckets.id, bucketId), eq(buckets.userId, user.id)))
 			.limit(1);
 
 		if (bucket.length > 0) {
@@ -466,9 +454,9 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 		const userBuckets = await db
 			.select()
 			.from(buckets)
-			.where(eq(buckets.userId, user[0].id));
+			.where(eq(buckets.userId, user.id));
 
-		await publishView(payload.user.id, homeView(user[0], userBuckets, page));
+		await publishView(payload.user.id, homeView(user, userBuckets, page));
 	}
 
 	// 10. Delete CDN File
@@ -481,12 +469,12 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 		const bucket = await db
 			.select()
 			.from(buckets)
-			.where(and(eq(buckets.id, bucketId), eq(buckets.userId, user[0].id)))
+			.where(and(eq(buckets.id, bucketId), eq(buckets.userId, user.id)))
 			.limit(1);
 
 		if (bucket.length > 0) {
 			// Delete from S3
-			const internalPath = getInternalPath(key, user[0], bucket[0]);
+			const internalPath = getInternalPath(key, user, bucket[0]);
 			await s3Client.fetch(internalPath, { method: "DELETE" });
 
 			// Update DB Stats (approximate, we don't know exact size here easily without querying first)

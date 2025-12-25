@@ -1,3 +1,5 @@
+import { XMLBuilder } from "fast-xml-parser";
+
 export class S3Error extends Error {
 	constructor(
 		public code: string,
@@ -10,14 +12,22 @@ export class S3Error extends Error {
 	}
 
 	toResponse(): Response {
+		const builder = new XMLBuilder({
+			format: true,
+			ignoreAttributes: false,
+		});
+
+		const xmlContent = builder.build({
+			Error: {
+				Code: this.code,
+				Message: this.message,
+				Resource: this.resource,
+				RequestId: this.requestId,
+			},
+		});
+
 		return new Response(
-			`<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-    <Code>${this.code}</Code>
-    <Message>${this.message}</Message>
-    <Resource>${this.resource}</Resource>
-    <RequestId>${this.requestId}</RequestId>
-</Error>`,
+			`<?xml version="1.0" encoding="UTF-8"?>\n${xmlContent}`,
 			{
 				status: this.status,
 				headers: { "Content-Type": "application/xml" },

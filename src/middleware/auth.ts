@@ -3,6 +3,7 @@ import { config } from "../config";
 import { db } from "../db";
 import { bucketKeys, buckets, users } from "../db/schema";
 import { verifyAwsV4Signature } from "../lib/auth-v4";
+import { S3Errors } from "../lib/s3-errors";
 
 const S3_DOMAIN = config.s3Domain;
 
@@ -96,28 +97,12 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 		}
 
 		if (req.method !== "GET" && req.method !== "HEAD") {
-			return new Response(
-				`<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-	   <Code>AccessDenied</Code>
-	   <Message>Access Denied</Message>
-	   <RequestId>0000000000000000</RequestId>
-</Error>`,
-				{ status: 403, headers: { "Content-Type": "application/xml" } },
-			);
+			return S3Errors.AccessDenied().toResponse();
 		}
 
 		const requestedBucket = getBucketFromRequest(req);
 		if (!requestedBucket) {
-			return new Response(
-				`<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-    <Code>AccessDenied</Code>
-    <Message>Access Denied</Message>
-    <RequestId>0000000000000000</RequestId>
-</Error>`,
-				{ status: 403, headers: { "Content-Type": "application/xml" } },
-			);
+			return S3Errors.AccessDenied().toResponse();
 		}
 
 		const bucketResult = await db
@@ -131,15 +116,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 			.limit(1);
 
 		if (bucketResult.length === 0) {
-			return new Response(
-				`<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-    <Code>AccessDenied</Code>
-    <Message>Access Denied</Message>
-    <RequestId>0000000000000000</RequestId>
-</Error>`,
-				{ status: 403, headers: { "Content-Type": "application/xml" } },
-			);
+			return S3Errors.AccessDenied().toResponse();
 		}
 
 		const { bucket, user } = bucketResult[0];
@@ -153,39 +130,17 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 		user.storageUsageBytes = Number(usageResult[0]?.total) || 0;
 
 		if (user.isLocked) {
-			return new Response(
-				`<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-		  <Code>AccessDenied</Code>
-		  <Message>Account is temporarily locked.</Message>
-		  <RequestId>0000000000000000</RequestId>
-</Error>`,
-				{ status: 403, headers: { "Content-Type": "application/xml" } },
-			);
+			return S3Errors.AccessDenied("Account is temporarily locked.").toResponse();
 		}
 
 		if (bucket.isPaused) {
-			return new Response(
-				`<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-		  <Code>AccessDenied</Code>
-		  <Message>Bucket is temporarily paused.${bucket.pauseReason ? ` Reason: ${bucket.pauseReason}` : ""}</Message>
-		  <RequestId>0000000000000000</RequestId>
-</Error>`,
-				{ status: 403, headers: { "Content-Type": "application/xml" } },
-			);
+			return S3Errors.AccessDenied(
+				`Bucket is temporarily paused.${bucket.pauseReason ? ` Reason: ${bucket.pauseReason}` : ""}`,
+			).toResponse();
 		}
 
 		if (!bucket.isPublic) {
-			return new Response(
-				`<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-		  <Code>AccessDenied</Code>
-		  <Message>Access Denied</Message>
-		  <RequestId>0000000000000000</RequestId>
-</Error>`,
-				{ status: 403, headers: { "Content-Type": "application/xml" } },
-			);
+			return S3Errors.AccessDenied().toResponse();
 		}
 
 		return { user, bucket, mode: "public" };
@@ -195,15 +150,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 		credential.split("/");
 
 	if (service !== "s3") {
-		return new Response(
-			`<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-    <Code>InvalidRequest</Code>
-    <Message>Invalid Service</Message>
-    <RequestId>0000000000000000</RequestId>
-</Error>`,
-			{ status: 400, headers: { "Content-Type": "application/xml" } },
-		);
+		return S3Errors.InvalidRequest("Invalid Service").toResponse();
 	}
 
 	const keyResult = await db
@@ -219,15 +166,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 		.limit(1);
 
 	if (keyResult.length === 0) {
-		return new Response(
-			`<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-    <Code>InvalidAccessKeyId</Code>
-    <Message>The AWS Access Key Id you provided does not exist in our records.</Message>
-    <RequestId>0000000000000000</RequestId>
-</Error>`,
-			{ status: 403, headers: { "Content-Type": "application/xml" } },
-		);
+		return S3Errors.InvalidAccessKeyId().toResponse();
 	}
 
 	const { bucket, user, key } = keyResult[0];
@@ -241,39 +180,19 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 	user.storageUsageBytes = Number(usageResult[0]?.total) || 0;
 
 	if (user.isLocked) {
-		return new Response(
-			`<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-	   <Code>AccessDenied</Code>
-	   <Message>Account is temporarily locked.</Message>
-	   <RequestId>0000000000000000</RequestId>
-</Error>`,
-			{ status: 403, headers: { "Content-Type": "application/xml" } },
-		);
+		return S3Errors.AccessDenied("Account is temporarily locked.").toResponse();
 	}
 
 	if (bucket.isPaused) {
-		return new Response(
-			`<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-	   <Code>AccessDenied</Code>
-	   <Message>Bucket is temporarily paused.${bucket.pauseReason ? ` Reason: ${bucket.pauseReason}` : ""}</Message>
-	   <RequestId>0000000000000000</RequestId>
-</Error>`,
-			{ status: 403, headers: { "Content-Type": "application/xml" } },
-		);
+		return S3Errors.AccessDenied(
+			`Bucket is temporarily paused.${bucket.pauseReason ? ` Reason: ${bucket.pauseReason}` : ""}`,
+		).toResponse();
 	}
 
 	if (key.isPaused) {
-		return new Response(
-			`<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-	   <Code>AccessDenied</Code>
-	   <Message>Access Key is temporarily paused.${key.pauseReason ? ` Reason: ${key.pauseReason}` : ""}</Message>
-	   <RequestId>0000000000000000</RequestId>
-</Error>`,
-			{ status: 403, headers: { "Content-Type": "application/xml" } },
-		);
+		return S3Errors.AccessDenied(
+			`Access Key is temporarily paused.${key.pauseReason ? ` Reason: ${key.pauseReason}` : ""}`,
+		).toResponse();
 	}
 
 	const requestedBucket = getBucketFromRequest(req);
@@ -281,41 +200,16 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 	// If requestedBucket is present (Path-Style or Virtual-Host), it MUST match the key's bucket.
 	// If it is NOT present (Implicit Mode), we allow it and assume the key's bucket.
 	if (requestedBucket && requestedBucket !== bucket.name) {
-		return new Response(
-			`<?xml version="1.0" encoding="UTF-8"?>
-	<Error>
-	    <Code>AccessDenied</Code>
-	    <Message>Access Denied</Message>
-	    <RequestId>0000000000000000</RequestId>
-	</Error>`,
-			{ status: 403, headers: { "Content-Type": "application/xml" } },
-		);
+		return S3Errors.AccessDenied().toResponse();
 	}
 
 	const amzDate = getDate(req);
-	if (!amzDate)
-		return new Response(
-			`<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-    <Code>AccessDenied</Code>
-    <Message>Missing Date Header</Message>
-    <RequestId>0000000000000000</RequestId>
-</Error>`,
-			{ status: 403, headers: { "Content-Type": "application/xml" } },
-		);
+	if (!amzDate) return S3Errors.AccessDenied("Missing Date Header").toResponse();
 
 	// Verify Signature
 	const isValid = await verifyAwsV4Signature(req, key.secretKey);
 	if (!isValid) {
-		return new Response(
-			`<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-    <Code>SignatureDoesNotMatch</Code>
-    <Message>The request signature we calculated does not match the signature you provided.</Message>
-    <RequestId>0000000000000000</RequestId>
-</Error>`,
-			{ status: 403, headers: { "Content-Type": "application/xml" } },
-		);
+		return S3Errors.SignatureDoesNotMatch().toResponse();
 	}
 
 	return { user, bucket, mode: "authenticated" };

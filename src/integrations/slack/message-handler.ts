@@ -4,6 +4,8 @@ import { db } from "../../db";
 import { buckets, requestLogs, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 import { getInternalPath } from "../../core/s3/utils";
+import { UserService } from "../../services/user-service";
+import { BucketService } from "../../services/bucket-service";
 
 export async function handleMessage(event: any) {
 	// Ignore bot messages and messages without files
@@ -19,13 +21,9 @@ export async function handleMessage(event: any) {
 	await addReaction(channelId, event.ts, "homer-load-2");
 
 	// 1. Find User
-	const userResult = await db
-		.select()
-		.from(users)
-		.where(eq(users.slackId, slackId))
-		.limit(1);
+	const user = await UserService.getUserBySlackId(slackId);
 
-	if (userResult.length === 0) {
+	if (!user) {
 		await postMessage(
 			channelId,
 			`I don't know who you are! Please <https://${config.s3Domain}/auth/login?source=slack|login to the dashboard> first to link your account.`,
@@ -35,7 +33,6 @@ export async function handleMessage(event: any) {
 		await addReaction(channelId, event.ts, "ms-no");
 		return;
 	}
-	const user = userResult[0];
 
 	// 2. Check Lock
 	if (user.isLocked) {
@@ -105,11 +102,7 @@ export async function handleMessage(event: any) {
 		}
 
 		// Check Quota
-		const usageResult = await db
-			.select({ total: sql<number>`sum(${buckets.totalBytes})` })
-			.from(buckets)
-			.where(eq(buckets.userId, user.id));
-		const currentUsage = Number(usageResult[0]?.total) || 0;
+		const currentUsage = await UserService.getStorageUsage(user.id);
 		const limit = user.storageLimitBytes || 1073741824; // Default 1GB
 
 		if (currentUsage + file.size > limit) {
