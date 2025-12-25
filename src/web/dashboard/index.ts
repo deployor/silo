@@ -44,11 +44,13 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		if (user.onboarded) {
 			return Response.redirect("/");
 		}
+		const csrfToken = generateCsrfToken(user.sessionId);
 		const html = await render("onboarding", {
 			title: "Silo - Welcome",
 			layout: "main",
 			hideNavLinks: true,
 			mainClass: "flex flex-col items-center justify-center",
+			csrfToken,
 		});
 		return new Response(html, {
 			headers: { "Content-Type": "text/html" },
