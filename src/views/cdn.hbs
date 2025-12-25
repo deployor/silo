@@ -124,7 +124,6 @@
         } else {
             const formData = new FormData();
             formData.append('file', file);
-            formData.append('csrf_token', '{{csrfToken}}');
 
             try {
                 const res = await fetch('/api/cdn/upload', {
