@@ -1,8 +1,8 @@
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { config } from "../../config";
 import { db } from "../../db";
-import { users } from "../../db/schema";
+import { sessions, users } from "../../db/schema";
 import { render } from "../../lib/view-engine";
 
 export async function handleAuthRequest(req: Request): Promise<Response> {
@@ -115,10 +115,19 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 					},
 				});
 
+			const sessionId = randomUUID();
+			const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days
+
+			await db.insert(sessions).values({
+				id: sessionId,
+				userId: userId,
+				expiresAt: expiresAt,
+			});
+
 			const headers = new Headers();
 			headers.set(
 				"Set-Cookie",
-				`silo_user_id=${userId}; Path=/; HttpOnly; SameSite=Lax`,
+				`silo_session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Expires=${expiresAt.toUTCString()}`,
 			);
 
 			if (source === "slack") {
@@ -140,10 +149,26 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 	}
 
 	if (path === "/auth/logout") {
+		const cookieHeader = req.headers.get("Cookie");
+		if (cookieHeader) {
+			const cookies = cookieHeader.split(";").reduce(
+				(acc, cookie) => {
+					const [key, value] = cookie.trim().split("=");
+					acc[key] = value;
+					return acc;
+				},
+				{} as Record<string, string>,
+			);
+
+			if (cookies.silo_session) {
+				await db.delete(sessions).where(eq(sessions.id, cookies.silo_session));
+			}
+		}
+
 		const headers = new Headers();
 		headers.set(
 			"Set-Cookie",
-			`silo_user_id=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
+			`silo_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
 		);
 		headers.set("Location", "/");
 		return new Response(null, { status: 302, headers });
