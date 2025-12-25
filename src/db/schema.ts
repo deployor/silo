@@ -41,6 +41,10 @@ export const sessions = pgTable("sessions", {
 		.notNull(),
 	expiresAt: timestamp("expires_at").notNull(),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
+	accessToken: text("access_token"),
+	refreshToken: text("refresh_token"),
+	tokenExpiresAt: timestamp("token_expires_at"),
+	scope: text("scope"),
 });
 
 export const buckets = pgTable(
