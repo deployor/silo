@@ -53,6 +53,7 @@ export async function render(
 
 		return layoutTemplate({
 			...data,
+			...data.sections, // Flatten sections into the root context for the layout
 			config,
 			body,
 		});
