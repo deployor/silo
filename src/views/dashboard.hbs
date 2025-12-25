@@ -332,8 +332,8 @@
       // }
 
       // Update Storage Stats
-      const storageUsage = data.user.storageUsage || 0;
-      const storageLimit = data.user.storageLimit || 1073741824; // 1GB default
+      const storageUsage = Number(data.user.storageUsage) || 0;
+      const storageLimit = Number(data.user.storageLimit) || 1073741824; // 1GB default
 
       const limitGB = (storageLimit / (1024 * 1024 * 1024)).toFixed(0);
       
@@ -346,8 +346,8 @@
         document.getElementById("storage-bar").classList.add("bg-hc-red");
 
       // Update Traffic Stats
-      const ingressBytes = data.user.ingressBytes || 0;
-      const egressBytes = data.user.egressBytes || 0;
+      const ingressBytes = Number(data.user.ingressBytes) || 0;
+      const egressBytes = Number(data.user.egressBytes) || 0;
 
       document.getElementById("ingress-bytes").textContent = formatBytes(ingressBytes);
       document.getElementById("egress-bytes").textContent = formatBytes(egressBytes);
@@ -368,7 +368,7 @@
          egressLimitText = "/ Unlimited";
       } else {
          // Custom
-         egressLimitBytes = data.user.egressLimit;
+         egressLimitBytes = Number(data.user.egressLimit);
          egressLimitText = `/ ${formatBytes(egressLimitBytes)}`;
       }
 
@@ -383,7 +383,7 @@
       document.getElementById("egress-bar").style.width = `${egressPercent}%`;
       
       document.getElementById("total-bytes").textContent = formatBytes(ingressBytes + egressBytes);
-      document.getElementById("total-requests").textContent = (data.user.totalRequests || 0).toLocaleString();
+      document.getElementById("total-requests").textContent = (Number(data.user.totalRequests) || 0).toLocaleString();
 
       // Update Buckets List
       document.getElementById("bucket-count").textContent = data.buckets ? data.buckets.length : 0;
