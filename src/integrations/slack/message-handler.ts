@@ -3,7 +3,7 @@ import { config } from "../../config";
 import { db } from "../../db";
 import { buckets, requestLogs, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
-import { getInternalPath } from "../s3-api/utils";
+import { getInternalPath } from "../../core/s3/utils";
 
 export async function handleMessage(event: any) {
 	// Ignore bot messages and messages without files
