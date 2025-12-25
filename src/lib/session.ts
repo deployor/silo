@@ -1,4 +1,5 @@
 import { and, eq, gt, sql } from "drizzle-orm";
+import { config } from "../config";
 import { db } from "../db";
 import { buckets, sessions, users } from "../db/schema";
 
@@ -31,7 +32,60 @@ export async function getCurrentUser(req: Request) {
 				.limit(1);
 
 			if (sessionResult.length > 0) {
-				const { user: u } = sessionResult[0];
+				const { user: u, session: s } = sessionResult[0];
+
+				// Token Refresh Logic
+				if (
+					s.refreshToken &&
+					s.tokenExpiresAt &&
+					s.tokenExpiresAt <= new Date(Date.now() + 60000)
+				) {
+					try {
+						const params = new URLSearchParams();
+						params.append("client_id", config.hcAuth.clientId);
+						params.append("client_secret", config.hcAuth.clientSecret);
+						params.append("grant_type", "refresh_token");
+						params.append("refresh_token", s.refreshToken);
+
+						const tokenRes = await fetch("https://auth.hackclub.com/oauth/token", {
+							method: "POST",
+							headers: { "Content-Type": "application/x-www-form-urlencoded" },
+							body: params,
+						});
+
+						if (tokenRes.ok) {
+							const tokenData = await tokenRes.json();
+							const newExpiresAt = new Date(
+								Date.now() + tokenData.expires_in * 1000,
+							);
+
+							await db
+								.update(sessions)
+								.set({
+									accessToken: tokenData.access_token,
+									refreshToken:
+										tokenData.refresh_token || s.refreshToken,
+									tokenExpiresAt: newExpiresAt,
+								})
+								.where(eq(sessions.id, s.id));
+
+							// Update local session object
+							s.accessToken = tokenData.access_token;
+							if (tokenData.refresh_token) {
+								s.refreshToken = tokenData.refresh_token;
+							}
+							s.tokenExpiresAt = newExpiresAt;
+						} else {
+							console.error(
+								"Failed to refresh token:",
+								await tokenRes.text(),
+							);
+						}
+					} catch (e) {
+						console.error("Error refreshing token:", e);
+					}
+				}
+
 				// Calculate storage usage from all buckets
 				const usageResult = await db
 					.select({ total: sql<number>`sum(${buckets.totalBytes})` })
@@ -49,7 +103,13 @@ export async function getCurrentUser(req: Request) {
 					u.egressLimitBytes = Number(u.egressLimitBytes);
 				}
 
-				return u;
+				return {
+					...u,
+					sessionId: s.id,
+					accessToken: s.accessToken,
+					refreshToken: s.refreshToken,
+					tokenExpiresAt: s.tokenExpiresAt,
+				};
 			}
 		}
 	}

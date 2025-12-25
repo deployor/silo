@@ -8,6 +8,7 @@ import { getInternalPath } from "../../../core/s3/utils";
 import { s3Client } from "../../../lib/s3-client";
 import { XMLParser } from "fast-xml-parser";
 import { jsonResponse, errorResponse } from "../../../lib/api-utils";
+import { validateCsrfToken } from "../../../lib/csrf";
 
 export async function handleFiles(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
@@ -19,6 +20,9 @@ export async function handleFiles(req: Request): Promise<Response> {
     // Sign Preview URL
     const signPreviewMatch = path.match(/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/files\/sign$/);
     if (signPreviewMatch && req.method === "POST") {
+        const isValidCsrf = await validateCsrfToken(req, user.sessionId);
+        if (!isValidCsrf) return errorResponse("Invalid CSRF Token", 403);
+
         const bucketName = signPreviewMatch[1];
 
         const bucket = await db
@@ -258,6 +262,9 @@ export async function handleFiles(req: Request): Promise<Response> {
 
     // Delete File
     if (listFilesMatch && req.method === "DELETE") {
+        const isValidCsrf = await validateCsrfToken(req, user.sessionId);
+        if (!isValidCsrf) return errorResponse("Invalid CSRF Token", 403);
+
         const bucketName = listFilesMatch[1];
         const key = url.searchParams.get("key");
 

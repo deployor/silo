@@ -1,6 +1,7 @@
 import { getCurrentUser } from "../../../lib/session";
 import { BucketService } from "../../../services/bucket-service";
 import { jsonResponse, errorResponse } from "../../../lib/api-utils";
+import { validateCsrfToken } from "../../../lib/csrf";
 
 export async function handleCors(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
@@ -15,6 +16,9 @@ export async function handleCors(req: Request): Promise<Response> {
         const bucketName = corsMatch[1];
 
         if (req.method === "PUT") {
+            const isValidCsrf = await validateCsrfToken(req, user.sessionId);
+            if (!isValidCsrf) return errorResponse("Invalid CSRF Token", 403);
+
             try {
                 const body = await req.json();
                 const rules = body.rules;
@@ -37,6 +41,9 @@ export async function handleCors(req: Request): Promise<Response> {
         }
 
         if (req.method === "DELETE") {
+            const isValidCsrf = await validateCsrfToken(req, user.sessionId);
+            if (!isValidCsrf) return errorResponse("Invalid CSRF Token", 403);
+
             try {
                 await BucketService.deleteCorsConfig(bucketName, user.id, user.isAdmin);
                 return jsonResponse({ message: "Deleted" });
