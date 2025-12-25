@@ -371,6 +371,24 @@
 </div>
 
 <script>
+    function escapeHtml(unsafe) {
+        if (unsafe === null || unsafe === undefined) return "";
+        return String(unsafe)
+          .replace(/&/g, "&")
+          .replace(/</g, "<")
+          .replace(/>/g, ">")
+          .replace(/"/g, """)
+          .replace(/'/g, "&#039;");
+    }
+
+    function escapeJs(unsafe) {
+        if (unsafe === null || unsafe === undefined) return "";
+        return String(unsafe)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/"/g, '\\"');
+    }
+
     function formatBytes(bytes, decimals = 2) {
         if (!+bytes) return "0 Bytes";
         const k = 1024;
@@ -404,10 +422,14 @@
     }
 
     let allUsers = [];
+    let currentLogs = [];
     let currentUser = null;
     let currentBucket = null;
     
-    function openLogModal(log) {
+    function openLogModal(index) {
+        const log = currentLogs[index];
+        if (!log) return;
+
         document.getElementById("modal-log-method").textContent = log.method;
         document.getElementById("modal-log-status").textContent = log.statusCode;
         document.getElementById("modal-log-path").textContent = log.path;
@@ -577,7 +599,13 @@
             if (!res.ok) throw new Error("Failed to load logs");
             const data = await res.json();
             
-            renderLogs(data.logs);
+            if (reset) {
+                currentLogs = data.logs;
+            } else {
+                currentLogs = [...currentLogs, ...data.logs];
+            }
+
+            renderLogs(data.logs, reset);
             
             logsOffset += data.logs.length;
             
@@ -604,9 +632,12 @@
         loadLogs(false);
     }
 
-    function renderLogs(logs) {
+    function renderLogs(logs, reset) {
         const tbody = document.getElementById("logs-table");
-        const html = logs.map(log => {
+        const startIndex = reset ? 0 : currentLogs.length - logs.length;
+
+        const html = logs.map((log, i) => {
+            const globalIndex = startIndex + i;
             let methodColor = "text-white";
             if (log.method === "GET") methodColor = "text-blue-400";
             if (log.method === "PUT") methodColor = "text-yellow-400";
@@ -622,25 +653,25 @@
                     ${new Date(log.createdAt).toLocaleString()}
                 </td>
                 <td class="px-6 py-4 font-bold text-xs ${methodColor}">
-                    ${log.method}
+                    ${escapeHtml(log.method)}
                 </td>
                 <td class="px-6 py-4 font-bold text-xs ${statusColor}">
-                    ${log.statusCode}
+                    ${escapeHtml(log.statusCode)}
                 </td>
-                <td class="px-6 py-4 font-mono text-xs text-white truncate max-w-xs" title="${log.path}">
-                    ${log.path}
-                </td>
-                <td class="px-6 py-4 font-mono text-xs text-text-muted">
-                    ${log.bucketName || '-'}
-                </td>
-                <td class="px-6 py-4 font-mono text-xs text-text-muted truncate max-w-[150px]" title="${log.ownerEmail}">
-                    ${log.ownerEmail || '-'}
+                <td class="px-6 py-4 font-mono text-xs text-white truncate max-w-xs" title="${escapeHtml(log.path)}">
+                    ${escapeHtml(log.path)}
                 </td>
                 <td class="px-6 py-4 font-mono text-xs text-text-muted">
-                    ${log.ipAddress || '-'}
+                    ${escapeHtml(log.bucketName || '-')}
                 </td>
-                <td class="px-6 py-4 font-mono text-xs text-text-muted truncate max-w-[150px]" title="${log.userAgent || ''}">
-                    ${log.userAgent ? log.userAgent.substring(0, 20) + (log.userAgent.length > 20 ? '...' : '') : '-'}
+                <td class="px-6 py-4 font-mono text-xs text-text-muted truncate max-w-[150px]" title="${escapeHtml(log.ownerEmail)}">
+                    ${escapeHtml(log.ownerEmail || '-')}
+                </td>
+                <td class="px-6 py-4 font-mono text-xs text-text-muted">
+                    ${escapeHtml(log.ipAddress || '-')}
+                </td>
+                <td class="px-6 py-4 font-mono text-xs text-text-muted truncate max-w-[150px]" title="${escapeHtml(log.userAgent || '')}">
+                    ${log.userAgent ? escapeHtml(log.userAgent.substring(0, 20) + (log.userAgent.length > 20 ? '...' : '')) : '-'}
                 </td>
                 <td class="px-6 py-4 font-mono text-xs text-text-muted">
                     ${formatBytes(log.ingressBytes)}
@@ -652,7 +683,7 @@
                     ${log.latencyMs ? log.latencyMs + 'ms' : '-'}
                 </td>
                 <td class="px-6 py-4 text-right">
-                    <button onclick='openLogModal(${JSON.stringify(log).replace(/'/g, "'")})' class="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider">View</button>
+                    <button onclick='openLogModal(${globalIndex})' class="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider">View</button>
                 </td>
             </tr>
             `;
@@ -664,17 +695,17 @@
     function renderUsers(users, reset) {
         const tbody = document.getElementById("users-table");
         const html = users.map(u => `
-            <tr class="hover:bg-white/5 transition-colors cursor-pointer" onclick="openUserModal('${u.id}')">
+            <tr class="hover:bg-white/5 transition-colors cursor-pointer" onclick="openUserModal('${escapeJs(u.id)}')">
                 <td class="px-6 py-4 font-medium text-white">
                     <div class="flex items-center gap-3">
-                        ${u.slackId ? `<img src="https://cachet.dunkirk.sh/users/${u.slackId}/r" class="w-8 h-8 rounded-full bg-white/10" alt="">` : '<div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs text-text-muted">?</div>'}
+                        ${u.slackId ? `<img src="https://cachet.dunkirk.sh/users/${escapeHtml(u.slackId)}/r" class="w-8 h-8 rounded-full bg-white/10" alt="">` : '<div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs text-text-muted">?</div>'}
                         <div>
-                            <div>${u.email}</div>
-                            <div class="text-xs text-text-muted font-mono">${u.id}</div>
+                            <div>${escapeHtml(u.email)}</div>
+                            <div class="text-xs text-text-muted font-mono">${escapeHtml(u.id)}</div>
                         </div>
                     </div>
                 </td>
-                <td class="px-6 py-4 font-mono text-xs text-text-muted">${u.slackId || '-'}</td>
+                <td class="px-6 py-4 font-mono text-xs text-text-muted">${escapeHtml(u.slackId || '-')}</td>
                 <td class="px-6 py-4">
                     <div class="text-xs font-mono">
                         <span class="text-white">${formatBytes(u.storageUsageBytes)}</span>
@@ -707,7 +738,7 @@
                     ${u.isLocked
                         ? `<div class="flex flex-col items-start gap-1">
                             <span class="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-bold border border-red-500/30">LOCKED</span>
-                            ${u.lockReason ? `<span class="text-[10px] text-red-300 max-w-[150px] truncate" title="${u.lockReason}">${u.lockReason}</span>` : ''}
+                            ${u.lockReason ? `<span class="text-[10px] text-red-300 max-w-[150px] truncate" title="${escapeHtml(u.lockReason)}">${escapeHtml(u.lockReason)}</span>` : ''}
                            </div>`
                         : '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-bold border border-emerald-500/30">ACTIVE</span>'}
                 </td>
@@ -765,7 +796,7 @@
         if (user.isLocked && user.lockReason) {
             const reasonHtml = `
                 <div id="modal-lock-reason-container" class="mt-2 p-2 bg-red-500/10 border border-red-500/20 rounded text-xs text-red-300">
-                    <span class="font-bold">Reason:</span> ${user.lockReason}
+                    <span class="font-bold">Reason:</span> ${escapeHtml(user.lockReason)}
                 </div>
             `;
             document.getElementById("modal-is-locked").closest(".bg-black\\/30").insertAdjacentHTML('beforeend', reasonHtml);
@@ -779,7 +810,7 @@
         tbody.innerHTML = buckets.map(b => `
             <tr class="hover:bg-white/5 transition-colors">
                 <td class="px-4 py-3 font-mono text-white">
-                    ${b.name}
+                    ${escapeHtml(b.name)}
                     ${b.isCdn ? '<span class="ml-2 bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-purple-500/30">CDN</span>' : ''}
                 </td>
                 <td class="px-4 py-3 font-mono text-xs text-text-muted">${formatBytes(b.totalBytes)}</td>
@@ -787,12 +818,12 @@
                      ${b.isPaused
                         ? `<div class="flex flex-col items-start">
                             <span class="text-red-400 text-xs font-bold">SUSPENDED</span>
-                            ${b.pauseReason ? `<span class="text-[10px] text-red-300 max-w-[100px] truncate" title="${b.pauseReason}">${b.pauseReason}</span>` : ''}
+                            ${b.pauseReason ? `<span class="text-[10px] text-red-300 max-w-[100px] truncate" title="${escapeHtml(b.pauseReason)}">${escapeHtml(b.pauseReason)}</span>` : ''}
                            </div>`
                         : '<span class="text-emerald-400 text-xs font-bold">ACTIVE</span>'}
                 </td>
                 <td class="px-4 py-3 text-right">
-                    <button onclick="openAdminBucketModal('${b.name}')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
+                    <button onclick="openAdminBucketModal('${escapeJs(b.name)}')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">
                         View
                     </button>
                 </td>
@@ -925,7 +956,7 @@
         if (data.isPaused && data.pauseReason) {
             const reasonHtml = `
                 <div id="admin-bucket-pause-reason" class="mt-2 text-xs text-red-300">
-                    <span class="font-bold">Reason:</span> ${data.pauseReason}
+                    <span class="font-bold">Reason:</span> ${escapeHtml(data.pauseReason)}
                 </div>
             `;
             document.getElementById("admin-bucket-paused").closest("div").insertAdjacentHTML('beforeend', reasonHtml);
@@ -935,20 +966,20 @@
         const keysBody = document.getElementById("admin-bucket-keys-table");
         keysBody.innerHTML = data.keys.map(k => `
             <tr class="hover:bg-white/5 transition-colors">
-                <td class="px-4 py-3 font-mono text-white">${k.accessKey}</td>
+                <td class="px-4 py-3 font-mono text-white">${escapeHtml(k.accessKey)}</td>
                 <td class="px-4 py-3">
                     ${k.isPaused
                         ? `<div class="flex flex-col items-start">
                             <span class="text-red-400 text-xs font-bold">PAUSED</span>
-                            ${k.pauseReason ? `<span class="text-[10px] text-red-300 max-w-[100px] truncate" title="${k.pauseReason}">${k.pauseReason}</span>` : ''}
+                            ${k.pauseReason ? `<span class="text-[10px] text-red-300 max-w-[100px] truncate" title="${escapeHtml(k.pauseReason)}">${escapeHtml(k.pauseReason)}</span>` : ''}
                            </div>`
                         : '<span class="text-emerald-400 text-xs font-bold">ACTIVE</span>'}
                 </td>
                 <td class="px-4 py-3 text-right">
-                    <button onclick="toggleKeyPause('${k.id}', ${!k.isPaused})" class="text-xs font-bold uppercase tracking-wider ${k.isPaused ? 'text-emerald-400' : 'text-yellow-400'}">
+                    <button onclick="toggleKeyPause('${escapeJs(k.id)}', ${!k.isPaused})" class="text-xs font-bold uppercase tracking-wider ${k.isPaused ? 'text-emerald-400' : 'text-yellow-400'}">
                         ${k.isPaused ? 'Resume' : 'Pause'}
                     </button>
-                    <button onclick="deleteKeyAdmin('${k.id}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider ml-2">Delete</button>
+                    <button onclick="deleteKeyAdmin('${escapeJs(k.id)}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider ml-2">Delete</button>
                 </td>
             </tr>
         `).join("");
@@ -958,11 +989,11 @@
         const filesBody = document.getElementById("admin-bucket-files-table");
         filesBody.innerHTML = data.files.map(f => `
             <tr class="hover:bg-white/5 transition-colors">
-                <td class="px-4 py-3 font-mono text-white text-xs truncate max-w-xs" title="${f.key}">${f.key}</td>
+                <td class="px-4 py-3 font-mono text-white text-xs truncate max-w-xs" title="${escapeHtml(f.key)}">${escapeHtml(f.key)}</td>
                 <td class="px-4 py-3 font-mono text-xs text-text-muted">${formatBytes(f.size)}</td>
                 <td class="px-4 py-3 text-right">
-                    <a href="${f.url}" target="_blank" class="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider">View</a>
-                    <button onclick="deleteFileAdmin('${f.key}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider ml-2">Delete</button>
+                    <a href="${escapeHtml(f.url)}" target="_blank" class="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider">View</a>
+                    <button onclick="deleteFileAdmin('${escapeJs(f.key)}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider ml-2">Delete</button>
                 </td>
             </tr>
         `).join("");
