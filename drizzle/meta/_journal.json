@@ -1,48 +1,48 @@
 {
-  "version": "5",
-  "dialect": "pg",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "5",
-      "when": 1766281067729,
-      "tag": "0000_uneven_shriek",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1766444899634,
-      "tag": "0001_tan_salo",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1766444915587,
-      "tag": "0002_aspiring_purple_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "5",
-      "when": 1766457563455,
-      "tag": "0003_colorful_tattoo",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "5",
-      "when": 1766502175064,
-      "tag": "0004_abnormal_gamma_corps",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "5",
-      "when": 1766521158614,
-      "tag": "0005_majestic_synch",
-      "breakpoints": true
-    }
-  ]
+	"version": "5",
+	"dialect": "pg",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "5",
+			"when": 1766281067729,
+			"tag": "0000_uneven_shriek",
+			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "5",
+			"when": 1766444899634,
+			"tag": "0001_tan_salo",
+			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "5",
+			"when": 1766444915587,
+			"tag": "0002_aspiring_purple_man",
+			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "5",
+			"when": 1766457563455,
+			"tag": "0003_colorful_tattoo",
+			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "5",
+			"when": 1766502175064,
+			"tag": "0004_abnormal_gamma_corps",
+			"breakpoints": true
+		},
+		{
+			"idx": 5,
+			"version": "5",
+			"when": 1766521158614,
+			"tag": "0005_majestic_synch",
+			"breakpoints": true
+		}
+	]
 }

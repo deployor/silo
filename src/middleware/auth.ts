@@ -130,7 +130,9 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 		user.storageUsageBytes = Number(usageResult[0]?.total) || 0;
 
 		if (user.isLocked) {
-			return S3Errors.AccessDenied("Account is temporarily locked.").toResponse();
+			return S3Errors.AccessDenied(
+				"Account is temporarily locked.",
+			).toResponse();
 		}
 
 		if (bucket.isPaused) {
@@ -204,7 +206,8 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 	}
 
 	const amzDate = getDate(req);
-	if (!amzDate) return S3Errors.AccessDenied("Missing Date Header").toResponse();
+	if (!amzDate)
+		return S3Errors.AccessDenied("Missing Date Header").toResponse();
 
 	// Verify Signature
 	const isValid = await verifyAwsV4Signature(req, key.secretKey);

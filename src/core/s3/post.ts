@@ -1,15 +1,11 @@
-import { buckets, users } from "../../db/schema";
+import type { buckets, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
 import {
 	rewriteDeleteObjectsResponse,
 	rewriteMultipartUploadResponse,
 } from "../../lib/xml-rewriter";
-import {
-	filterUpstreamHeaders,
-	getInternalPath,
-	stripAuthQueryParams,
-} from "./utils";
+import { filterUpstreamHeaders, getInternalPath } from "./utils";
 
 export async function handlePostRequest(
 	req: Request,

@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { db } from "../../db";
-import { buckets, users } from "../../db/schema";
+import { buckets, type users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
 import {
@@ -51,7 +51,6 @@ export async function handlePutRequest(
 
 		try {
 			const parsed = parser.parse(bodyText);
-			console.log("[CORS] Parsed Body:", JSON.stringify(parsed, null, 2));
 
 			if (!parsed.CORSConfiguration || !parsed.CORSConfiguration.CORSRule) {
 				throw new Error("Invalid CORS Configuration");
@@ -108,7 +107,7 @@ export async function handlePutRequest(
 				.where(eq(buckets.id, bucket.id));
 
 			return new Response(null, { status: 200 });
-		} catch (e) {
+		} catch (_e) {
 			return S3Errors.MalformedXML().toResponse();
 		}
 	}
@@ -123,7 +122,11 @@ export async function handlePutRequest(
 	const copySource = req.headers.get("x-amz-copy-source");
 
 	if (copySource) {
-		const rewrittenSource = await rewriteCopySourceHeader(req, copySource, user);
+		const rewrittenSource = await rewriteCopySourceHeader(
+			req,
+			copySource,
+			user,
+		);
 		if (!rewrittenSource) {
 			return S3Errors.AccessDenied().toResponse();
 		}

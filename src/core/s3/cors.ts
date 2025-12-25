@@ -1,5 +1,5 @@
-import { buckets } from "../../db/schema";
-import type { CORSConfiguration, CORSRule } from "./types";
+import type { buckets } from "../../db/schema";
+import type { CORSConfiguration } from "./types";
 
 // Helper to match origin against allowed origins (supports wildcards)
 function matchOrigin(origin: string, allowedOrigins: string[]): boolean {
@@ -80,7 +80,7 @@ export async function handleCorsPreflight(
 	// Security: If the rule allows "*", we should return "*" unless credentials are required.
 	// However, S3 behavior is often to echo the origin.
 	// We must ensure we don't return "*" if Access-Control-Allow-Credentials is true (not supported here yet but good practice).
-	
+
 	if (rule.AllowedOrigins.includes("*") && rule.AllowedOrigins.length === 1) {
 		headers.set("Access-Control-Allow-Origin", "*");
 	} else {
@@ -140,12 +140,15 @@ export function getCorsHeaders(
 				});
 
 				if (rule) {
-					if (rule.AllowedOrigins.includes("*") && rule.AllowedOrigins.length === 1) {
+					if (
+						rule.AllowedOrigins.includes("*") &&
+						rule.AllowedOrigins.length === 1
+					) {
 						corsHeaders.set("Access-Control-Allow-Origin", "*");
 					} else {
 						corsHeaders.set("Access-Control-Allow-Origin", origin);
 					}
-					
+
 					if (rule.ExposeHeaders && rule.ExposeHeaders.length > 0) {
 						corsHeaders.set(
 							"Access-Control-Expose-Headers",

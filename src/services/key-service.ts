@@ -25,7 +25,12 @@ export class KeyService {
 		return { accessKey, secretKey };
 	}
 
-	static async deleteKey(keyId: string, bucketName: string, userId: string, isAdmin = false) {
+	static async deleteKey(
+		keyId: string,
+		bucketName: string,
+		userId: string,
+		isAdmin = false,
+	) {
 		const bucket = await db
 			.select()
 			.from(buckets)
@@ -33,7 +38,8 @@ export class KeyService {
 			.limit(1);
 
 		if (bucket.length === 0) throw new Error("Bucket not found");
-		if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
+		if (bucket[0].userId !== userId && !isAdmin)
+			throw new Error("Unauthorized");
 		if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
 		if (bucket[0].isCdn) throw new Error("Cannot delete keys for CDN bucket");
 

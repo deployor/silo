@@ -1,9 +1,10 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { config } from "../../config";
-import { db } from "../../db";
-import { bucketKeys, buckets, users } from "../../db/schema";
-import { s3Client } from "../../lib/s3-client";
 import { getInternalPath, isReservedBucketName } from "../../core/s3/utils";
+import { db } from "../../db";
+import { bucketKeys, buckets } from "../../db/schema";
+import { s3Client } from "../../lib/s3-client";
+import { UserService } from "../../services/user-service";
 import { openModal, publishView } from "./client";
 import {
 	createBucketModal,
@@ -11,7 +12,6 @@ import {
 	homeView,
 	manageKeysModal,
 } from "./views";
-import { UserService } from "../../services/user-service";
 
 export async function handleAppHomeOpened(event: { user: string }) {
 	const slackId = event.user;
@@ -24,7 +24,7 @@ export async function handleAppHomeOpened(event: { user: string }) {
 		user.storageUsageBytes = await UserService.getStorageUsage(user.id);
 	}
 
-	if (user && user.isLocked) {
+	if (user?.isLocked) {
 		await publishView(slackId, {
 			type: "home",
 			blocks: [
@@ -487,7 +487,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			// This is tricky because we don't have the block ID easily.
 			// But we have the message blocks in the payload if it's a block action.
 
-			if (payload.message && payload.message.blocks) {
+			if (payload.message?.blocks) {
 				const newBlocks = payload.message.blocks.map((block: any) => {
 					if (
 						block.accessory &&

@@ -13,16 +13,19 @@ export function validateOrigin(req: Request): boolean {
 	}
 
 	const allowedDomain = config.s3Domain; // e.g. "silo.deployor.dev"
-    // We also need to allow localhost for development if needed, but config.s3Domain should cover the production case.
-    // Assuming config.s3Domain is the main domain.
+	// We also need to allow localhost for development if needed, but config.s3Domain should cover the production case.
+	// Assuming config.s3Domain is the main domain.
 
 	if (origin) {
 		try {
 			const originUrl = new URL(origin);
-			if (originUrl.hostname !== allowedDomain && originUrl.hostname !== "localhost") {
+			if (
+				originUrl.hostname !== allowedDomain &&
+				originUrl.hostname !== "localhost"
+			) {
 				return false;
 			}
-		} catch (e) {
+		} catch (_e) {
 			return false;
 		}
 	}
@@ -30,10 +33,13 @@ export function validateOrigin(req: Request): boolean {
 	if (referer) {
 		try {
 			const refererUrl = new URL(referer);
-			if (refererUrl.hostname !== allowedDomain && refererUrl.hostname !== "localhost") {
+			if (
+				refererUrl.hostname !== allowedDomain &&
+				refererUrl.hostname !== "localhost"
+			) {
 				return false;
 			}
-		} catch (e) {
+		} catch (_e) {
 			return false;
 		}
 	}

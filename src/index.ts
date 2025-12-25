@@ -2,14 +2,14 @@ import { config } from "./config";
 import { handleS3Request } from "./core/s3";
 import { updateStats } from "./core/s3/utils";
 import { handleSlackRequest } from "./integrations/slack";
+import { errorResponse } from "./lib/api-utils";
+import { S3Errors } from "./lib/s3-errors";
+import { validateOrigin } from "./lib/security";
+import { render } from "./lib/view-engine";
+import { authenticate } from "./middleware/auth";
+import { rateLimit } from "./middleware/rate-limit";
 import { handleAdminRequest } from "./web/admin";
 import { handleDashboardRequest } from "./web/dashboard";
-import { S3Errors } from "./lib/s3-errors";
-import { authenticate } from "./middleware/auth";
-import { render } from "./lib/view-engine";
-import { validateOrigin } from "./lib/security";
-import { errorResponse } from "./lib/api-utils";
-import { rateLimit } from "./middleware/rate-limit";
 
 const S3_DOMAIN = config.s3Domain;
 
@@ -17,16 +17,25 @@ const S3_DOMAIN = config.s3Domain;
 const apiLimiter = rateLimit({ limit: 300, windowMs: 60000 }); // 300 req/min for API
 const authLimiter = rateLimit({ limit: 60, windowMs: 60000 }); // 60 req/min for Auth
 
-// Helper to determine if a request is for the dashboard or S3
+/**
+ * Determines if a request is intended for the dashboard or the S3 gateway.
+ *
+ * Logic:
+ * 1. If the host starts with "dashboard.", it's a dashboard request.
+ * 2. If the host matches the S3 domain (or localhost):
+ *    - If the request has S3 auth headers or params, it's an S3 request.
+ *    - If the path matches known dashboard routes, it's a dashboard request.
+ *    - Otherwise, it's treated as a public bucket access (S3 request).
+ */
 function isDashboardRequest(req: Request, url: URL): boolean {
 	const host = req.headers.get("host") || "";
 
-	// Explicit dashboard subdomain
+	// 1. Explicit dashboard subdomain
 	if (host.startsWith("dashboard.")) {
 		return true;
 	}
 
-	// If host matches S3 domain (or localhost), check path and auth
+	// 2. Host matches S3 domain (or localhost)
 	if (
 		host === S3_DOMAIN ||
 		(S3_DOMAIN === "localhost:3000" && host.startsWith("localhost"))
@@ -67,9 +76,7 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 			return true;
 		}
 
-		// If it's not a known dashboard path and not an S3 auth request,
-		// it might be a public bucket access (e.g. /bucket/key).
-		// We should treat this as an S3 request.
+		// Default to S3 for unknown paths (public bucket access)
 		return false;
 	}
 
@@ -81,11 +88,8 @@ Bun.serve({
 	maxRequestBodySize: 1024 * 1024 * 1024, // 1GB
 	async fetch(req) {
 		const url = new URL(req.url);
-		console.log(`[Request] ${req.method} ${url.pathname} (Host: ${req.headers.get("host")})`);
 
 		if (isDashboardRequest(req, url)) {
-			console.log(`[Routing] Routing to Dashboard: ${url.pathname}`);
-
 			// Rate Limiting
 			if (url.pathname.startsWith("/api/")) {
 				const limitRes = await apiLimiter(req);

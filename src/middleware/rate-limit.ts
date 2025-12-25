@@ -39,7 +39,7 @@ export function rateLimit(options: RateLimitOptions) {
 
 		record.count++;
 
-		const remaining = Math.max(0, options.limit - record.count);
+		const _remaining = Math.max(0, options.limit - record.count);
 		const reset = Math.ceil((record.resetTime - now) / 1000);
 
 		// Add headers to the request so we can append them to the response later if needed
