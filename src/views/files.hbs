@@ -121,6 +121,24 @@
   let continuationToken = null;
   let isLoading = false;
 
+  function escapeHtml(unsafe) {
+    if (unsafe === null || unsafe === undefined) return "";
+    return String(unsafe)
+      .replace(/&/g, "&")
+      .replace(/</g, "<")
+      .replace(/>/g, ">")
+      .replace(/"/g, """)
+      .replace(/'/g, "&#039;");
+  }
+
+  function escapeJs(unsafe) {
+    if (unsafe === null || unsafe === undefined) return "";
+    return String(unsafe)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"');
+  }
+
   function formatBytes(bytes, decimals = 2) {
     if (!+bytes) return "0 Bytes";
     const k = 1024;
@@ -183,7 +201,7 @@
         currentPath += `${part}/`;
         const isLast = index === parts.length - 1;
         html += ` <span class="text-text-muted">/</span> `;
-        html += `<button onclick="navigateTo('${currentPath}')" class="hover:text-white ${isLast ? 'text-white font-bold' : 'text-text-muted'}">${part}</button>`;
+        html += `<button onclick="navigateTo('${escapeJs(currentPath)}')" class="hover:text-white ${isLast ? 'text-white font-bold' : 'text-text-muted'}">${escapeHtml(part)}</button>`;
     });
     
     container.innerHTML = html;
@@ -212,7 +230,7 @@
                     <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
                 </svg>
             </td>
-            <td class="px-6 py-4 font-medium text-white font-mono">${folder.name}</td>
+            <td class="px-6 py-4 font-medium text-white font-mono">${escapeHtml(folder.name)}</td>
             <td class="px-6 py-4 text-text-muted">-</td>
             <td class="px-6 py-4 text-text-muted">-</td>
             <td class="px-6 py-4 text-right"></td>
@@ -231,12 +249,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
             </td>
-            <td class="px-6 py-4 font-medium text-white font-mono break-all">${file.name}</td>
+            <td class="px-6 py-4 font-medium text-white font-mono break-all">${escapeHtml(file.name)}</td>
             <td class="px-6 py-4 text-text-muted font-mono text-xs">${formatBytes(file.size)}</td>
             <td class="px-6 py-4 text-text-muted font-mono text-xs">${new Date(file.lastModified).toLocaleString()}</td>
             <td class="px-6 py-4 text-right flex justify-end gap-2">
-                <button onclick="previewFile('${file.key}', '${file.url}')" class="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider transition-colors">Preview</button>
-                <button onclick="deleteFile('${file.key}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all">Delete</button>
+                <button onclick="previewFile('${escapeJs(file.key)}', '${escapeJs(file.url)}')" class="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider transition-colors">Preview</button>
+                <button onclick="deleteFile('${escapeJs(file.key)}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all">Delete</button>
             </td>
         `;
         tbody.appendChild(row);
@@ -268,7 +286,7 @@
   function deleteFile(key) {
     openConfirmModal(
         "Delete File",
-        `Are you sure you want to delete "${key}"? This cannot be undone.`,
+        `Are you sure you want to delete "${escapeHtml(key)}"? This cannot be undone.`,
         async () => {
             const res = await fetch(`/api/dashboard/buckets/${bucketName}/files?key=${encodeURIComponent(key)}`, {
                 method: "DELETE",

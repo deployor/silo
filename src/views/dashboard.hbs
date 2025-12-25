@@ -301,6 +301,24 @@
     return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`;
   }
 
+  function escapeHtml(unsafe) {
+    if (unsafe === null || unsafe === undefined) return "";
+    return String(unsafe)
+      .replace(/&/g, "&")
+      .replace(/</g, "<")
+      .replace(/>/g, ">")
+      .replace(/"/g, """)
+      .replace(/'/g, "&#039;");
+  }
+
+  function escapeJs(unsafe) {
+    if (unsafe === null || unsafe === undefined) return "";
+    return String(unsafe)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"');
+  }
+
   let currentDashboardData = null;
   let currentManagedBucket = null;
   let currentCorsBucket = null;
@@ -403,13 +421,13 @@
             return `
                 <tr class="hover:bg-white/5 transition-colors group ${isPaused ? 'bg-red-500/5' : ''}">
                     <td class="px-6 py-4 font-medium text-white font-mono">
-                        ${bucket.name}
-                        ${isPaused ? `<span class="ml-2 bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-500/30" title="${bucket.pauseReason || 'Paused by admin'}">PAUSED</span>` : ''}
+                        ${escapeHtml(bucket.name)}
+                        ${isPaused ? `<span class="ml-2 bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-500/30" title="${escapeHtml(bucket.pauseReason || 'Paused by admin')}">PAUSED</span>` : ''}
                         ${isCdn ? `<span class="ml-2 bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-blue-500/30" title="Slack CDN Bucket">CDN</span>` : ''}
                     </td>
                     <td class="px-6 py-4 font-mono text-xs text-text-muted group-hover:text-white transition-colors">
                         ${!isCdn ? `
-                        <button onclick="openManageKeysModal('${bucket.name}')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2 ${disabledClass}" ${disabledAttr}>
+                        <button onclick="openManageKeysModal('${escapeJs(bucket.name)}')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2 ${disabledClass}" ${disabledAttr}>
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                             </svg>
@@ -424,7 +442,7 @@
                     </td>
                     <td class="px-6 py-4">
                       <label class="inline-flex items-center cursor-pointer ${disabledClass} ${cdnDisabledClass}">
-                        <input type="checkbox" class="sr-only peer" onchange="togglePublic('${bucket.name}', this.checked)" ${bucket.isPublic ? "checked" : ""} ${disabledAttr} ${cdnDisabledAttr}>
+                        <input type="checkbox" class="sr-only peer" onchange="togglePublic('${escapeJs(bucket.name)}', this.checked)" ${bucket.isPublic ? "checked" : ""} ${disabledAttr} ${cdnDisabledAttr}>
                         <div class="relative w-9 h-5 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-blue rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-hc-blue"></div>
                         <span class="ms-2 text-xs font-medium text-text-muted peer-checked:text-white">${bucket.isPublic ? "Public" : "Private"}</span>
                       </label>
@@ -432,24 +450,24 @@
                     <td class="px-6 py-4 text-text-muted text-xs font-mono">${new Date(bucket.createdAt).toLocaleDateString()}</td>
                     <td class="px-6 py-4 text-right flex justify-end items-center gap-3">
                         ${!isCdn ? `
-                        <button onclick="openCorsModal('${bucket.name}')" class="bg-white/5 hover:bg-white/10 text-text-muted hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${disabledClass}" ${disabledAttr}>
+                        <button onclick="openCorsModal('${escapeJs(bucket.name)}')" class="bg-white/5 hover:bg-white/10 text-text-muted hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${disabledClass}" ${disabledAttr}>
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
                             </svg>
                             CORS
                         </button>` : ''}
-                        <a href="/dashboard/buckets/${bucket.name}" class="bg-hc-blue/10 hover:bg-hc-blue/20 text-hc-blue px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${disabledClass}">
+                        <a href="/dashboard/buckets/${escapeHtml(bucket.name)}" class="bg-hc-blue/10 hover:bg-hc-blue/20 text-hc-blue px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${disabledClass}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
                             </svg>
                             Files
                         </a>
                         ${isCdn ?
-                            `<button onclick="emptyBucket('${bucket.name}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all ${disabledClass}" ${disabledAttr}>Empty</button>`
+                            `<button onclick="emptyBucket('${escapeJs(bucket.name)}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all ${disabledClass}" ${disabledAttr}>Empty</button>`
                             : (bucket.name !== data.user.slackId?.toLowerCase() ? `
                             <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                                <button onclick="emptyBucket('${bucket.name}')" class="text-yellow-400 hover:text-yellow-300 text-xs font-bold uppercase tracking-wider ${disabledClass}" ${disabledAttr}>Empty</button>
-                                <button onclick="deleteBucket('${bucket.name}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider ${disabledClass}" ${disabledAttr}>Delete</button>
+                                <button onclick="emptyBucket('${escapeJs(bucket.name)}')" class="text-yellow-400 hover:text-yellow-300 text-xs font-bold uppercase tracking-wider ${disabledClass}" ${disabledAttr}>Empty</button>
+                                <button onclick="deleteBucket('${escapeJs(bucket.name)}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider ${disabledClass}" ${disabledAttr}>Delete</button>
                             </div>` : '')
                         }
                     </td>
@@ -536,7 +554,7 @@
   function deleteBucket(name) {
     openConfirmModal(
         "Delete Bucket",
-        `Are you sure you want to delete bucket "${name}"? This action cannot be undone and all data will be permanently lost.`,
+        `Are you sure you want to delete bucket "${escapeHtml(name)}"? This action cannot be undone and all data will be permanently lost.`,
         async () => {
             const res = await fetch(`/api/dashboard/buckets/${name}`, {
                 method: "DELETE",
@@ -555,7 +573,7 @@
   function emptyBucket(name) {
     openConfirmModal(
         "Empty Bucket",
-        `Are you sure you want to empty bucket "${name}"? This will delete ALL files in it. This action cannot be undone.`,
+        `Are you sure you want to empty bucket "${escapeHtml(name)}"? This will delete ALL files in it. This action cannot be undone.`,
         async () => {
             const res = await fetch(`/api/dashboard/buckets/${name}?empty=true`, {
                 method: "DELETE",
@@ -574,7 +592,7 @@
   function generateKey(bucketName) {
     openConfirmModal(
         "Generate New Key",
-        `Generate a new access key pair for bucket "${bucketName}"?`,
+        `Generate a new access key pair for bucket "${escapeHtml(bucketName)}"?`,
         async () => {
             const res = await fetch(`/api/dashboard/buckets/${bucketName}/keys`, {
                 method: "POST",
@@ -737,9 +755,9 @@
     }
     tbody.innerHTML = bucket.keys.map(k => `
         <tr class="hover:bg-white/5 transition-colors">
-            <td class="px-4 py-3 font-mono text-white">${k.accessKey}</td>
+            <td class="px-4 py-3 font-mono text-white">${escapeHtml(k.accessKey)}</td>
             <td class="px-4 py-3 text-right">
-                <button onclick="deleteKey('${bucket.name}', '${k.id}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider transition-colors">Delete</button>
+                <button onclick="deleteKey('${escapeJs(bucket.name)}', '${escapeJs(k.id)}')" class="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider transition-colors">Delete</button>
             </td>
         </tr>
     `).join('');
@@ -796,8 +814,8 @@
     pendingToggle = { name, isPublic };
     const action = isPublic ? "make public" : "make private";
     const message = isPublic
-        ? `Are you sure you want to make bucket "${name}" public? Anyone with the link will be able to view files.`
-        : `Are you sure you want to make bucket "${name}" private? Only authenticated users will be able to access files.`;
+        ? `Are you sure you want to make bucket "${escapeHtml(name)}" public? Anyone with the link will be able to view files.`
+        : `Are you sure you want to make bucket "${escapeHtml(name)}" private? Only authenticated users will be able to access files.`;
 
     openConfirmModal(
         `Confirm ${action}`,
