@@ -15,6 +15,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 	// Delegate to API Handler
 	if (path.startsWith("/api/")) {
+		console.log(`[Dashboard] Delegating to API Handler: ${path}`);
 		return handleApiRequest(req);
 	}
 
