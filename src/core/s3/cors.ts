@@ -46,7 +46,12 @@ export async function handleCorsPreflight(
 
 	const headers = new Headers();
 	headers.set("Access-Control-Allow-Origin", origin);
-	headers.set("Access-Control-Allow-Methods", requestMethod);
+	
+	// Return ALL allowed methods for this rule, not just the requested one
+	const allowedMethods = Array.isArray(rule.AllowedMethods)
+		? rule.AllowedMethods
+		: [rule.AllowedMethods];
+	headers.set("Access-Control-Allow-Methods", allowedMethods.join(", "));
 
 	if (rule.AllowedHeaders) {
 		const allowedHeaders = Array.isArray(rule.AllowedHeaders)
