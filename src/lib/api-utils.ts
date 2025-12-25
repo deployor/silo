@@ -5,6 +5,12 @@ export function jsonResponse(data: any, status = 200): Response {
 	});
 }
 
-export function errorResponse(message: string, status = 500): Response {
-	return jsonResponse({ error: message }, status);
+export function errorResponse(message: string, status = 500, headers?: Headers): Response {
+	const response = jsonResponse({ error: message }, status);
+	if (headers) {
+		headers.forEach((value, key) => {
+			response.headers.set(key, value);
+		});
+	}
+	return response;
 }
