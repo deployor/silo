@@ -32,7 +32,10 @@ export async function handleCorsPreflight(
 			return o === origin;
 		});
 
-		const methodMatch = allowedMethods.includes(requestMethod);
+		// For preflight, we check if the requested method is allowed
+		const methodMatch = allowedMethods.some(
+			(m: string) => m === "*" || m === requestMethod,
+		);
 
 		return originMatch && methodMatch;
 	});
