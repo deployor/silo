@@ -11,7 +11,6 @@ import { getInternalPath } from "../../core/s3/utils";
 import { s3Client } from "../../lib/s3-client";
 import { BucketService } from "../../services/bucket-service";
 import { jsonResponse, errorResponse } from "../../lib/api-utils";
-import { validateCsrfToken } from "../../lib/csrf";
 
 export async function handleApiRequest(req: Request): Promise<Response> {
 	const url = new URL(req.url);
@@ -21,9 +20,6 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 	if (path === "/api/onboarding/complete" && req.method === "POST") {
 		const user = await getCurrentUser(req);
 		if (!user) return errorResponse("Unauthorized", 401);
-
-		const isValidCsrf = await validateCsrfToken(req, user.sessionId);
-		if (!isValidCsrf) return errorResponse("Invalid CSRF Token", 403);
 
 		await db
 			.update(users)
@@ -41,9 +37,6 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 		if (user.isLocked) return errorResponse("Account Locked", 403);
 		if (!user.slackId)
 			return errorResponse("Slack account required", 403);
-
-		const isValidCsrf = await validateCsrfToken(req, user.sessionId);
-		if (!isValidCsrf) return errorResponse("Invalid CSRF Token", 403);
 
 		try {
 			const formData = await req.formData();
