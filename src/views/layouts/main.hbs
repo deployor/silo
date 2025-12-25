@@ -21,8 +21,8 @@
         {{/if}}
       </div>
       <div class="flex items-center gap-6 font-bold text-sm">
-        {{#if user}}
-          {{#unless hideNavLinks}}
+        {{#unless hideNavLinks}}
+          {{#if user}}
             <a href="/cdn" class="text-text-muted hover:text-white transition-colors">CDN</a>
             <a href="/docs" class="text-text-muted hover:text-white transition-colors">Docs</a>
             <div class="flex items-center gap-2">
@@ -33,10 +33,10 @@
               <a href="/admin" id="admin-link" class="text-text-muted hover:text-white transition-colors">Admin</a>
             {{/if}}
             <a href="/auth/logout" class="text-hc-red hover:text-white transition-colors">Logout</a>
-          {{/unless}}
-        {{else}}
-           <a href="/auth/login" class="text-hc-red hover:text-white transition-colors">Login</a>
-        {{/if}}
+          {{else}}
+             <a href="/auth/login" class="text-hc-red hover:text-white transition-colors">Login</a>
+          {{/if}}
+        {{/unless}}
       </div>
     </nav>
 
