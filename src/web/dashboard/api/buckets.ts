@@ -3,12 +3,16 @@ import { KeyService } from "../../../services/key-service";
 import { getCurrentUser } from "../../../lib/session";
 import { config } from "../../../config";
 import { jsonResponse, errorResponse } from "../../../lib/api-utils";
+import { validateCsrfToken } from "../../../lib/csrf";
 
 export async function handleBuckets(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
 	if (!user) return errorResponse("Unauthorized", 401);
 
 	if (req.method === "POST") {
+		const isValidCsrf = await validateCsrfToken(req, user.sessionId);
+		if (!isValidCsrf) return errorResponse("Invalid CSRF Token", 403);
+
 		try {
 			const body = await req.json();
 			const name = body.name;
@@ -39,6 +43,9 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 	if (!bucketName) return errorResponse("Invalid bucket name", 400);
 
 	if (req.method === "DELETE") {
+		const isValidCsrf = await validateCsrfToken(req, user.sessionId);
+		if (!isValidCsrf) return errorResponse("Invalid CSRF Token", 403);
+
 		try {
 			await BucketService.deleteBucket(bucketName, user.id, user.isAdmin);
 			return jsonResponse({ message: "Deleted" });
@@ -48,6 +55,9 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 	}
 
 	if (req.method === "PATCH") {
+		const isValidCsrf = await validateCsrfToken(req, user.sessionId);
+		if (!isValidCsrf) return errorResponse("Invalid CSRF Token", 403);
+
 		try {
 			const body = await req.json();
 			if (typeof body.isPublic === "boolean") {

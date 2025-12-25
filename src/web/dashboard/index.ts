@@ -1,4 +1,5 @@
 import { config } from "../../config";
+import { generateCsrfToken } from "../../lib/csrf";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
 import { handleApiRequest } from "./api";
@@ -22,9 +23,11 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 	if (path === "/docs" || path === "/docs/") {
 		const user = await getCurrentUser(req);
+		const csrfToken = user ? generateCsrfToken(user.sessionId) : null;
 		const html = await render("docs", {
 			title: "Documentation - Silo",
 			user,
+			csrfToken,
 			s3Domain: config.s3Domain,
 		});
 
@@ -68,10 +71,12 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			);
 		}
 
+		const csrfToken = generateCsrfToken(user.sessionId);
 		const html = await render("cdn", {
 			title: "Silo CDN",
 			layout: "main",
 			user,
+			csrfToken,
 			pageTitle: "CDN",
 		});
 
@@ -112,11 +117,13 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	const fileExplorerMatch = path.match(/^\/dashboard\/buckets\/([a-z0-9-]+)$/);
 	if (fileExplorerMatch) {
 		const bucketName = fileExplorerMatch[1];
+		const csrfToken = generateCsrfToken(user.sessionId);
 		const html = await render("files", {
 			title: "File Explorer - Silo",
 			layout: "blank",
 			bucketName,
 			user,
+			csrfToken,
 			isAdmin: user.isAdmin,
 		});
 
@@ -125,9 +132,11 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		});
 	}
 
+	const csrfToken = generateCsrfToken(user.sessionId);
 	const html = await render("dashboard", {
 		title: "Dashboard - Silo",
 		user,
+		csrfToken,
 		s3Domain: config.s3Domain,
 	});
 

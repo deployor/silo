@@ -65,8 +65,28 @@ export async function verifyAwsV4Signature(
 	// URL Encode - S3 requires specific encoding
 	// But usually url.pathname is already decoded. We need to encode it back, but keep slashes.
 	// AWS expects each path segment to be URI-encoded.
-	canonicalUri = canonicalUri.split("/").map(encodeURIComponent).join("/");
-	if (canonicalUri.startsWith("//")) canonicalUri = canonicalUri.slice(1); // Fix double slash from split/join if leading slash
+	// RFC 3986: A-Z, a-z, 0-9, hyphen ( - ), underscore ( _ ), period ( . ), and tilde ( ~ ) are unreserved.
+	// encodeURIComponent leaves - _ . ! ~ * ' ( ) unencoded.
+	// AWS requires ! * ' ( ) to be encoded.
+	const awsUriEncode = (input: string, encodeSlash: boolean = true) => {
+		let result = encodeURIComponent(input).replace(
+			/[!'()*]/g,
+			(c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+		);
+		if (!encodeSlash) {
+			result = result.replace(/%2F/g, "/");
+		}
+		return result;
+	};
+
+	canonicalUri = canonicalUri
+		.split("/")
+		.map((segment) => awsUriEncode(segment))
+		.join("/");
+	
+	if (canonicalUri.startsWith("//") && !url.pathname.startsWith("//")) {
+		canonicalUri = canonicalUri.slice(1);
+	}
 
 	// CanonicalQueryString
 	const searchParams = new URLSearchParams(url.search);
@@ -76,7 +96,7 @@ export async function verifyAwsV4Signature(
 	const canonicalQueryString = sortedKeys
 		.map((key) => {
 			const value = searchParams.get(key) || "";
-			return `${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+			return `${awsUriEncode(key)}=${awsUriEncode(value)}`;
 		})
 		.join("&");
 
