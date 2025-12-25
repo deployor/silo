@@ -2,6 +2,7 @@ import { config } from "../../config";
 import { buckets, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
+import { XMLBuilder } from "fast-xml-parser";
 import {
 	rewriteListObjectsV2Response,
 	rewriteMultipartUploadResponse,
