@@ -122,6 +122,10 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 				id: sessionId,
 				userId: userId,
 				expiresAt: expiresAt,
+				accessToken: tokenData.access_token,
+				refreshToken: tokenData.refresh_token,
+				tokenExpiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
+				scope: tokenData.scope,
 			});
 
 			const headers = new Headers();
