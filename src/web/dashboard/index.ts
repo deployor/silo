@@ -46,7 +46,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		}
 		const html = await render("onboarding", {
 			title: "Silo - Welcome",
-			layout: "blank",
+			layout: "main",
+			hideNavLinks: true,
+			mainClass: "flex flex-col items-center justify-center",
 		});
 		return new Response(html, {
 			headers: { "Content-Type": "text/html" },
