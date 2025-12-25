@@ -332,42 +332,33 @@
       // }
 
       // Update Storage Stats
-      const _usageGB = (
-        data.user.storageUsage /
-        (1024 * 1024 * 1024)
-      ).toFixed(2);
-      const limitGB = (
-        data.user.storageLimit /
-        (1024 * 1024 * 1024)
-      ).toFixed(0);
-      document.getElementById("storage-usage").textContent = formatBytes(
-        data.user.storageUsage,
-      );
+      const storageUsage = data.user.storageUsage || 0;
+      const storageLimit = data.user.storageLimit || 1073741824; // 1GB default
+
+      const limitGB = (storageLimit / (1024 * 1024 * 1024)).toFixed(0);
+      
+      document.getElementById("storage-usage").textContent = formatBytes(storageUsage);
       document.getElementById("storage-limit").textContent = limitGB;
 
-      const percent = Math.min(
-        (data.user.storageUsage / data.user.storageLimit) * 100,
-        100,
-      );
+      const percent = Math.min((storageUsage / storageLimit) * 100, 100);
       document.getElementById("storage-bar").style.width = `${percent}%`;
       if (percent > 90)
         document.getElementById("storage-bar").classList.add("bg-hc-red");
 
       // Update Traffic Stats
-      document.getElementById("ingress-bytes").textContent = formatBytes(
-        data.user.ingressBytes,
-      );
-      document.getElementById("egress-bytes").textContent = formatBytes(
-        data.user.egressBytes,
-      );
+      const ingressBytes = data.user.ingressBytes || 0;
+      const egressBytes = data.user.egressBytes || 0;
+
+      document.getElementById("ingress-bytes").textContent = formatBytes(ingressBytes);
+      document.getElementById("egress-bytes").textContent = formatBytes(egressBytes);
       
       // Egress Limit Logic
       let egressLimitBytes;
       let egressLimitText;
       
-      if (data.user.egressLimit === null) {
+      if (data.user.egressLimit === null || data.user.egressLimit === undefined) {
          // Default: Max(10GB, 3x Storage)
-         const calculated = data.user.storageLimit * 3;
+         const calculated = storageLimit * 3;
          const minLimit = 10 * 1024 * 1024 * 1024; // 10GB
          egressLimitBytes = Math.max(calculated, minLimit);
          egressLimitText = `/ ${formatBytes(egressLimitBytes)} (Default)`;
@@ -385,24 +376,17 @@
       
       let egressPercent = 0;
       if (egressLimitBytes === Infinity) {
-         egressPercent = 0; // Or maybe show a small bar to indicate usage?
+         egressPercent = 0;
       } else {
-         egressPercent = Math.min(
-            (data.user.egressBytes / egressLimitBytes) * 100,
-            100
-         );
+         egressPercent = Math.min((egressBytes / egressLimitBytes) * 100, 100);
       }
       document.getElementById("egress-bar").style.width = `${egressPercent}%`;
       
-      document.getElementById("total-bytes").textContent = formatBytes(
-        data.user.ingressBytes + data.user.egressBytes,
-      );
-      document.getElementById("total-requests").textContent =
-        data.user.totalRequests.toLocaleString();
+      document.getElementById("total-bytes").textContent = formatBytes(ingressBytes + egressBytes);
+      document.getElementById("total-requests").textContent = (data.user.totalRequests || 0).toLocaleString();
 
       // Update Buckets List
-      document.getElementById("bucket-count").textContent =
-        data.buckets.length;
+      document.getElementById("bucket-count").textContent = data.buckets ? data.buckets.length : 0;
       const tbody = document.getElementById("buckets-table");
       tbody.innerHTML = data.buckets
         .map(
