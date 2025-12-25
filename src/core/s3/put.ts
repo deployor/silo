@@ -55,14 +55,34 @@ export async function handlePutRequest(
 				throw new Error("Invalid CORS Configuration");
 			}
 
-			const rules = parsed.CORSConfiguration.CORSRule.map((r: any) => ({
-				ID: r.ID,
-				AllowedOrigins: r.AllowedOrigin,
-				AllowedMethods: r.AllowedMethod,
-				AllowedHeaders: r.AllowedHeader,
-				ExposeHeaders: r.ExposeHeader,
-				MaxAgeSeconds: r.MaxAgeSeconds,
-			}));
+			const rules = parsed.CORSConfiguration.CORSRule.map((r: any) => {
+				// Ensure arrays for single values
+				const allowedOrigins = Array.isArray(r.AllowedOrigin)
+					? r.AllowedOrigin
+					: [r.AllowedOrigin];
+				const allowedMethods = Array.isArray(r.AllowedMethod)
+					? r.AllowedMethod
+					: [r.AllowedMethod];
+				const allowedHeaders = r.AllowedHeader
+					? Array.isArray(r.AllowedHeader)
+						? r.AllowedHeader
+						: [r.AllowedHeader]
+					: undefined;
+				const exposeHeaders = r.ExposeHeader
+					? Array.isArray(r.ExposeHeader)
+						? r.ExposeHeader
+						: [r.ExposeHeader]
+					: undefined;
+
+				return {
+					ID: r.ID,
+					AllowedOrigins: allowedOrigins,
+					AllowedMethods: allowedMethods,
+					AllowedHeaders: allowedHeaders,
+					ExposeHeaders: exposeHeaders,
+					MaxAgeSeconds: r.MaxAgeSeconds,
+				};
+			});
 
 			const corsConfig = {
 				CORSRules: rules,
