@@ -3,9 +3,10 @@ import { handleS3Request } from "./core/s3";
 import { updateStats } from "./core/s3/utils";
 import { handleSlackRequest } from "./integrations/slack";
 import { handleAdminRequest } from "./web/admin";
-import { handleDashboardRequest, slackSuccessTemplate } from "./web/dashboard";
+import { handleDashboardRequest } from "./web/dashboard";
 import { S3Errors } from "./lib/s3-errors";
 import { authenticate } from "./middleware/auth";
+import { render } from "./lib/view-engine";
 
 const S3_DOMAIN = config.s3Domain;
 
@@ -88,7 +89,11 @@ Bun.serve({
 				}
 			}
 			if (url.pathname === "/slack-success") {
-				return new Response(slackSuccessTemplate, {
+				const html = await render("slack-success", {
+					title: "Silo - Account Linked",
+					layout: "blank",
+				});
+				return new Response(html, {
 					headers: { "Content-Type": "text/html" },
 				});
 			}
