@@ -24,6 +24,8 @@ export async function handleMessage(event: any) {
 	const user = await UserService.getUserBySlackId(slackId);
 
 	if (!user) {
+		// Security: Do not process files for unknown users.
+		// This prevents unauthorized users from using the bot as a file proxy or storage.
 		await postMessage(
 			channelId,
 			`I don't know who you are! Please <https://${config.s3Domain}/auth/login?source=slack|login to the dashboard> first to link your account.`,
@@ -112,6 +114,13 @@ export async function handleMessage(event: any) {
 
 		// Download
 		const downloadUrl = file.url_private_download;
+		
+		// Security: Validate URL scheme
+		if (!downloadUrl.startsWith("https://files.slack.com/")) {
+			results.push({ name: file.name, error: "Invalid file source" });
+			continue;
+		}
+
 		const fileRes = await fetch(downloadUrl, {
 			headers: {
 				Authorization: `Bearer ${config.slack.botToken}`,
@@ -126,7 +135,8 @@ export async function handleMessage(event: any) {
 		const fileBuffer = await fileRes.arrayBuffer();
 
 		// Upload to S3
-		const ext = file.name.split(".").pop();
+		// Security: Sanitize file extension
+		const ext = file.name.split(".").pop()?.replace(/[^a-z0-9]/gi, "") || "bin";
 		const hash = crypto.randomUUID();
 		const fileName = `${hash}.${ext}`;
 
