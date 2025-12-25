@@ -3,7 +3,7 @@ import { config } from "../../config";
 import { db } from "../../db";
 import { bucketKeys, buckets, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
-import { getInternalPath, isReservedBucketName } from "../s3-api/utils";
+import { getInternalPath, isReservedBucketName } from "../../core/s3/utils";
 import { openModal, publishView } from "./client";
 import {
 	createBucketModal,
@@ -518,19 +518,24 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 					return block;
 				});
 
-				await fetch(payload.container?.message_ts ? "https://slack.com/api/chat.update" : "", {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json",
-						Authorization: `Bearer ${config.slack.botToken}`,
+				await fetch(
+					payload.container?.message_ts
+						? "https://slack.com/api/chat.update"
+						: "",
+					{
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${config.slack.botToken}`,
+						},
+						body: JSON.stringify({
+							channel: payload.container?.channel_id,
+							ts: payload.container?.message_ts,
+							blocks: newBlocks,
+							text: "File Upload Summary (Updated)",
+						}),
 					},
-					body: JSON.stringify({
-						channel: payload.container?.channel_id,
-						ts: payload.container?.message_ts,
-						blocks: newBlocks,
-						text: "File Upload Summary (Updated)",
-					}),
-				});
+				);
 			}
 		}
 	}
