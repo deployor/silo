@@ -9,8 +9,13 @@ import { authenticate } from "./middleware/auth";
 import { render } from "./lib/view-engine";
 import { validateOrigin } from "./lib/security";
 import { errorResponse } from "./lib/api-utils";
+import { rateLimit } from "./middleware/rate-limit";
 
 const S3_DOMAIN = config.s3Domain;
+
+// Rate Limiters
+const apiLimiter = rateLimit({ limit: 100, windowMs: 60000 }); // 100 req/min for API
+const authLimiter = rateLimit({ limit: 20, windowMs: 60000 }); // 20 req/min for Auth
 
 // Helper to determine if a request is for the dashboard or S3
 function isDashboardRequest(req: Request, url: URL): boolean {
@@ -80,6 +85,16 @@ Bun.serve({
 
 		if (isDashboardRequest(req, url)) {
 			console.log(`[Routing] Routing to Dashboard: ${url.pathname}`);
+
+			// Rate Limiting
+			if (url.pathname.startsWith("/api/")) {
+				const limitRes = await apiLimiter(req);
+				if (limitRes) return limitRes;
+			}
+			if (url.pathname.startsWith("/auth/")) {
+				const limitRes = await authLimiter(req);
+				if (limitRes) return limitRes;
+			}
 
 			// Global Security Check for API routes (except Slack events which are verified by signature)
 			if (
