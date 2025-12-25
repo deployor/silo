@@ -34,10 +34,15 @@ export async function handleGetRequest(
 			format: true,
 		});
 
+		// Ensure CORSRules is always an array
+		const rulesArray = Array.isArray(config.CORSRules)
+			? config.CORSRules
+			: [config.CORSRules];
+
 		const corsConfiguration = {
 			CORSConfiguration: {
 				"@_xmlns": "http://s3.amazonaws.com/doc/2006-03-01/",
-				CORSRule: config.CORSRules.map((r: any) => {
+				CORSRule: rulesArray.map((r: any) => {
 					const rule: any = {};
 					if (r.ID) rule.ID = r.ID;
 
