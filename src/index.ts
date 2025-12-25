@@ -65,8 +65,10 @@ Bun.serve({
 	maxRequestBodySize: 1024 * 1024 * 1024, // 1GB
 	async fetch(req) {
 		const url = new URL(req.url);
+		console.log(`[Request] ${req.method} ${url.pathname} (Host: ${req.headers.get("host")})`);
 
 		if (isDashboardRequest(req, url)) {
+			console.log(`[Routing] Routing to Dashboard: ${url.pathname}`);
 			if (
 				url.pathname.startsWith("/admin") ||
 				url.pathname.startsWith("/api/admin")
