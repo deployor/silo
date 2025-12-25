@@ -29,6 +29,16 @@ export async function getCurrentUser(req: Request) {
 					.where(eq(buckets.userId, u.id));
 
 				u.storageUsageBytes = Number(usageResult[0]?.total) || 0;
+
+				// Ensure other numeric fields are numbers
+				u.ingressBytes = Number(u.ingressBytes) || 0;
+				u.egressBytes = Number(u.egressBytes) || 0;
+				u.totalRequests = Number(u.totalRequests) || 0;
+				u.storageLimitBytes = Number(u.storageLimitBytes) || 1073741824;
+				if (u.egressLimitBytes !== null) {
+					u.egressLimitBytes = Number(u.egressLimitBytes);
+				}
+
 				return u;
 			}
 		}
