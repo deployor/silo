@@ -259,16 +259,16 @@ export async function updateStats(
 			await tx
 				.update(users)
 				.set({
-					ingressBytes: sql`${users.ingressBytes} + ${ingress}`,
-					egressBytes: sql`${users.egressBytes} + ${egress}`,
-					totalRequests: sql`${users.totalRequests} + 1`,
+					ingressBytes: sql`COALESCE(${users.ingressBytes}, 0) + ${ingress}`,
+					egressBytes: sql`COALESCE(${users.egressBytes}, 0) + ${egress}`,
+					totalRequests: sql`COALESCE(${users.totalRequests}, 0) + 1`,
 				})
 				.where(eq(users.id, user.id));
 
 			await tx
 				.update(buckets)
 				.set({
-					totalRequests: sql`${buckets.totalRequests} + 1`,
+					totalRequests: sql`COALESCE(${buckets.totalRequests}, 0) + 1`,
 				})
 				.where(eq(buckets.id, bucket.id));
 		});
