@@ -1,5 +1,4 @@
 import { config } from "../../config";
-import { generateCsrfToken } from "../../lib/csrf";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
 import { handleApiRequest } from "./api";
@@ -23,11 +22,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 	if (path === "/docs" || path === "/docs/") {
 		const user = await getCurrentUser(req);
-		const csrfToken = user ? generateCsrfToken(user.sessionId) : null;
 		const html = await render("docs", {
 			title: "Documentation - Silo",
 			user,
-			csrfToken,
 			s3Domain: config.s3Domain,
 		});
 
@@ -44,13 +41,11 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		if (user.onboarded) {
 			return Response.redirect("/");
 		}
-		const csrfToken = generateCsrfToken(user.sessionId);
 		const html = await render("onboarding", {
 			title: "Silo - Welcome",
 			layout: "main",
 			hideNavLinks: true,
 			mainClass: "flex flex-col items-center justify-center",
-			csrfToken,
 		});
 		return new Response(html, {
 			headers: { "Content-Type": "text/html" },
@@ -75,12 +70,10 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			);
 		}
 
-		const csrfToken = generateCsrfToken(user.sessionId);
 		const html = await render("cdn", {
 			title: "Silo CDN",
 			layout: "main",
 			user,
-			csrfToken,
 			pageTitle: "CDN",
 		});
 
@@ -125,13 +118,11 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	const fileExplorerMatch = path.match(/^\/dashboard\/buckets\/([a-z0-9-]+)$/);
 	if (fileExplorerMatch) {
 		const bucketName = fileExplorerMatch[1];
-		const csrfToken = generateCsrfToken(user.sessionId);
 		const html = await render("files", {
 			title: "File Explorer - Silo",
 			layout: "main",
 			bucketName,
 			user,
-			csrfToken,
 			isAdmin: user.isAdmin,
 			breadcrumbs: `<span class="text-text-muted">/</span> <span class="bg-hc-blue/20 text-hc-blue px-2 py-0.5 rounded text-sm font-mono border border-hc-blue/30">${bucketName}</span>`,
 		});
@@ -141,11 +132,9 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		});
 	}
 
-	const csrfToken = generateCsrfToken(user.sessionId);
 	const html = await render("dashboard", {
 		title: "Dashboard - Silo",
 		user,
-		csrfToken,
 		s3Domain: config.s3Domain,
 	});
 

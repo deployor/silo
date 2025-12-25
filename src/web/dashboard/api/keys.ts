@@ -5,7 +5,6 @@ import { db } from "../../../db";
 import { buckets } from "../../../db/schema";
 import { eq } from "drizzle-orm";
 import { jsonResponse, errorResponse } from "../../../lib/api-utils";
-import { validateCsrfToken } from "../../../lib/csrf";
 
 export async function handleKeys(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
@@ -17,9 +16,6 @@ export async function handleKeys(req: Request): Promise<Response> {
     // /api/dashboard/buckets/:name/keys
     const generateKeyMatch = path.match(/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/keys$/);
     if (generateKeyMatch && req.method === "POST") {
-        const isValidCsrf = await validateCsrfToken(req, user.sessionId);
-        if (!isValidCsrf) return errorResponse("Invalid CSRF Token", 403);
-
         const bucketName = generateKeyMatch[1];
         const bucket = await db
             .select()
@@ -46,9 +42,6 @@ export async function handleKeys(req: Request): Promise<Response> {
     // /api/dashboard/buckets/:name/keys/:keyId
     const deleteKeyMatch = path.match(/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/keys\/([^/]+)$/);
     if (deleteKeyMatch && req.method === "DELETE") {
-        const isValidCsrf = await validateCsrfToken(req, user.sessionId);
-        if (!isValidCsrf) return errorResponse("Invalid CSRF Token", 403);
-
         const bucketName = deleteKeyMatch[1];
         const keyId = deleteKeyMatch[2];
 
