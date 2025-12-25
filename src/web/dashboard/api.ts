@@ -176,21 +176,25 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 					user: {
 						id: user.id,
 						slackId: user.slackId,
-						storageUsage: user.storageUsageBytes,
-						storageLimit: user.storageLimitBytes,
-						egressLimit: user.egressLimitBytes,
-						ingressBytes: user.ingressBytes,
-						egressBytes: user.egressBytes,
-						totalBytes: user.ingressBytes + user.egressBytes,
-						totalRequests: user.totalRequests,
+						storageUsage: Number(user.storageUsageBytes) || 0,
+						storageLimit: Number(user.storageLimitBytes) || 1073741824,
+						egressLimit:
+							user.egressLimitBytes !== null
+								? Number(user.egressLimitBytes)
+								: null,
+						ingressBytes: Number(user.ingressBytes) || 0,
+						egressBytes: Number(user.egressBytes) || 0,
+						totalBytes:
+							(Number(user.ingressBytes) || 0) + (Number(user.egressBytes) || 0),
+						totalRequests: Number(user.totalRequests) || 0,
 						isAdmin: user.isAdmin,
 					},
 					buckets: bucketsWithKeys.map((b) => ({
 						name: b.name,
 						keys: b.keys,
 						createdAt: b.createdAt,
-						totalBytes: b.totalBytes,
-						totalRequests: b.totalRequests,
+						totalBytes: Number(b.totalBytes) || 0,
+						totalRequests: Number(b.totalRequests) || 0,
 						isPublic: b.isPublic,
 						isPaused: b.isPaused,
 						pauseReason: b.pauseReason,
