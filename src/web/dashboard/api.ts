@@ -1,311 +1,20 @@
-import { createHmac } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
+import { createHmac } from "node:crypto";
 import { config } from "../../config";
 import { db } from "../../db";
 import { bucketKeys, buckets, requestLogs, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
-import { deleteBucketContents, getInternalPath, isReservedBucketName } from "../s3-api/utils";
+import { getCurrentUser } from "../../lib/session";
+import {
+	deleteBucketContents,
+	getInternalPath,
+	isReservedBucketName,
+} from "../../core/s3/utils";
 
-const landingTemplate = await Bun.file(
-	"src/features/landing/templates/landing.html",
-).text();
-const dashboardTemplate = await Bun.file(
-	"src/features/landing/templates/dashboard.html",
-).text();
-const filesTemplate = await Bun.file(
-	"src/features/landing/templates/files.html",
-).text();
-const docsTemplate = await Bun.file(
-	"src/features/landing/templates/docs.html",
-).text();
-const lockedTemplate = await Bun.file(
-	"src/features/landing/templates/locked.html",
-).text();
-const cdnTemplate = await Bun.file(
-	"src/features/landing/templates/cdn.html",
-).text();
-const onboardingTemplate = await Bun.file(
-	"src/features/landing/templates/onboarding.html",
-).text();
-export const slackSuccessTemplate = await Bun.file(
-	"src/features/landing/templates/slack-success.html",
-).text();
-const wipTemplate = await Bun.file(
-	"src/features/landing/templates/wip.html",
-).text();
-
-async function getCurrentUser(req: Request) {
-	const cookieHeader = req.headers.get("Cookie");
-	if (cookieHeader) {
-		const cookies = cookieHeader.split(";").reduce(
-			(acc, cookie) => {
-				const [key, value] = cookie.trim().split("=");
-				acc[key] = value;
-				return acc;
-			},
-			{} as Record<string, string>,
-		);
-
-		if (cookies.silo_user_id) {
-			const user = await db
-				.select()
-				.from(users)
-				.where(eq(users.id, cookies.silo_user_id))
-				.limit(1);
-			if (user.length > 0) {
-				const u = user[0];
-				// Calculate storage usage from all buckets
-				const usageResult = await db
-					.select({ total: sql<number>`sum(${buckets.totalBytes})` })
-					.from(buckets)
-					.where(eq(buckets.userId, u.id));
-
-				u.storageUsageBytes = Number(usageResult[0]?.total) || 0;
-				return u;
-			}
-		}
-	}
-
-	return null;
-}
-
-export async function handleDashboardRequest(req: Request): Promise<Response> {
+export async function handleApiRequest(req: Request): Promise<Response> {
 	const url = new URL(req.url);
 	const path = url.pathname;
-
-	if (path === "/docs" || path === "/docs/") {
-		const user = await getCurrentUser(req);
-		let finalDocs = docsTemplate.replace(
-			/https:\/\/silo\.deployor\.dev/g,
-			`https://${config.s3Domain}`,
-		);
-
-		const cdnLink = user
-			? '<a href="/cdn" class="hover:text-white transition-colors">CDN</a>'
-			: "";
-		finalDocs = finalDocs.replace("<!-- CDN_LINK_PLACEHOLDER -->", cdnLink);
-
-		return new Response(finalDocs, {
-			headers: { "Content-Type": "text/html" },
-		});
-	}
-
-	if (path.startsWith("/auth/")) {
-		if (path === "/auth/login") {
-			const source = url.searchParams.get("source");
-			const redirectUri = source === "slack"
-				? `${config.hcAuth.redirectUri}?source=slack`
-				: config.hcAuth.redirectUri;
-
-			const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${config.hcAuth.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20profile%20email%20slack_id%20verification_status`;
-			return Response.redirect(authUrl);
-		}
-
-		if (path === "/auth/callback") {
-			const code = url.searchParams.get("code");
-			const source = url.searchParams.get("source");
-			if (!code) return new Response("Missing code", { status: 400 });
-
-			try {
-				const params = new URLSearchParams();
-				params.append("client_id", config.hcAuth.clientId);
-				params.append("client_secret", config.hcAuth.clientSecret);
-				params.append("code", code);
-				params.append("grant_type", "authorization_code");
-				
-				const redirectUri = source === "slack"
-					? `${config.hcAuth.redirectUri}?source=slack`
-					: config.hcAuth.redirectUri;
-				params.append("redirect_uri", redirectUri);
-
-				const tokenRes = await fetch("https://auth.hackclub.com/oauth/token", {
-					method: "POST",
-					headers: { "Content-Type": "application/x-www-form-urlencoded" },
-					body: params,
-				});
-
-				if (!tokenRes.ok) {
-					const text = await tokenRes.text();
-					console.error("Token Exchange Failed:", text);
-					throw new Error(`Token exchange failed: ${tokenRes.status}`);
-				}
-
-				const tokenData = await tokenRes.json();
-				if (!tokenData.access_token) {
-					console.error("Token Error:", tokenData);
-					throw new Error("Failed to get token");
-				}
-
-				const userRes = await fetch(
-					"https://auth.hackclub.com/oauth/userinfo",
-					{
-						headers: { Authorization: `Bearer ${tokenData.access_token}` },
-					},
-				);
-				const userData = await userRes.json();
-
-				const userId = userData.sub;
-				const slackId = userData.slack_id;
-
-				// Check if user exists
-				const existingUser = await db
-					.select()
-					.from(users)
-					.where(eq(users.id, userId))
-					.limit(1);
-
-				if (existingUser.length === 0) {
-					// Check for bypass cookie
-					const cookieHeader = req.headers.get("Cookie");
-					const cookies = cookieHeader
-						? cookieHeader.split(";").reduce(
-								(acc, cookie) => {
-									const [key, value] = cookie.trim().split("=");
-									acc[key] = value;
-									return acc;
-								},
-								{} as Record<string, string>,
-							)
-						: {};
-
-					const expectedBypass = createHmac("sha256", config.hcAuth.clientSecret)
-						.update("wip_bypass")
-						.digest("hex");
-
-					if (cookies.silo_wip_bypass !== expectedBypass) {
-						return new Response(wipTemplate, {
-							headers: { "Content-Type": "text/html" },
-						});
-					}
-				}
-
-				await db
-					.insert(users)
-					.values({
-						id: userId,
-						email: userData.email,
-						slackId: slackId,
-					})
-					.onConflictDoUpdate({
-						target: users.id,
-						set: {
-							email: userData.email,
-							slackId: slackId,
-						},
-					});
-
-				const headers = new Headers();
-				headers.set(
-					"Set-Cookie",
-					`silo_user_id=${userId}; Path=/; HttpOnly; SameSite=Lax`,
-				);
-				
-				if (source === "slack") {
-					headers.set("Content-Type", "text/html");
-					return new Response(slackSuccessTemplate, { headers });
-				}
-
-				headers.set("Location", "/");
-
-				return new Response(null, { status: 302, headers });
-			} catch (e) {
-				console.error("Auth Error:", e);
-				return new Response("Authentication Failed", { status: 500 });
-			}
-		}
-
-		if (path === "/auth/logout") {
-			const headers = new Headers();
-			headers.set(
-				"Set-Cookie",
-				`silo_user_id=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
-			);
-			headers.set("Location", "/");
-			return new Response(null, { status: 302, headers });
-		}
-
-		if (path === "/auth/wip" && req.method === "POST") {
-			const cookieHeader = req.headers.get("Cookie");
-			const cookies = cookieHeader
-				? cookieHeader.split(";").reduce(
-						(acc, cookie) => {
-							const [key, value] = cookie.trim().split("=");
-							acc[key] = value;
-							return acc;
-						},
-						{} as Record<string, string>,
-					)
-				: {};
-
-			const lastAttempt = parseInt(cookies.silo_wip_attempt || "0", 10);
-			const now = Date.now();
-
-			if (now - lastAttempt < 3000) {
-				const errorHtml = wipTemplate.replace(
-					"<!-- ERROR_PLACEHOLDER -->",
-					'<div class="bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-3 rounded-lg mb-6 text-sm">Please wait a few seconds before trying again.</div>',
-				);
-				return new Response(errorHtml, {
-					headers: { "Content-Type": "text/html" },
-				});
-			}
-
-			const formData = await req.formData();
-			const code = formData.get("code");
-
-			if (code === "1beans") {
-				const bypassValue = createHmac("sha256", config.hcAuth.clientSecret)
-					.update("wip_bypass")
-					.digest("hex");
-
-				const headers = new Headers();
-				headers.append(
-					"Set-Cookie",
-					`silo_wip_bypass=${bypassValue}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`,
-				);
-				// Clear attempt cookie
-				headers.append(
-					"Set-Cookie",
-					`silo_wip_attempt=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`,
-				);
-				headers.set("Location", "/auth/login");
-				return new Response(null, { status: 302, headers });
-			}
-
-			const headers = new Headers();
-			headers.set(
-				"Set-Cookie",
-				`silo_wip_attempt=${now}; Path=/; HttpOnly; SameSite=Lax`,
-			);
-
-			const errorHtml = wipTemplate.replace(
-				"<!-- ERROR_PLACEHOLDER -->",
-				'<div class="bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-3 rounded-lg mb-6 text-sm">Invalid access code. Please try again.</div>',
-			);
-
-			return new Response(errorHtml, {
-				status: 401,
-				headers: {
-					"Content-Type": "text/html",
-					...Object.fromEntries(headers.entries()),
-				},
-			});
-		}
-	}
-
-	if (path === "/onboarding" || path === "/onboarding/") {
-		const user = await getCurrentUser(req);
-		if (!user) {
-			return Response.redirect("/auth/login");
-		}
-		if (user.onboarded) {
-			return Response.redirect("/");
-		}
-		return new Response(onboardingTemplate, {
-			headers: { "Content-Type": "text/html" },
-		});
-	}
 
 	if (path === "/api/onboarding/complete" && req.method === "POST") {
 		const user = await getCurrentUser(req);
@@ -319,29 +28,6 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		const headers = new Headers();
 		headers.set("Location", "/");
 		return new Response(null, { status: 302, headers });
-	}
-
-	if (path === "/cdn" || path === "/cdn/") {
-		const user = await getCurrentUser(req);
-		if (!user) {
-			return Response.redirect("/auth/login");
-		}
-		if (user.isLocked) {
-			return new Response("Account Locked", { status: 403 });
-		}
-		if (!user.onboarded) {
-			return Response.redirect("/onboarding");
-		}
-		if (!user.slackId) {
-			return new Response(
-				"You must link your Slack account to use the CDN feature.",
-				{ status: 403 },
-			);
-		}
-
-		return new Response(cdnTemplate, {
-			headers: { "Content-Type": "text/html" },
-		});
 	}
 
 	if (path === "/api/cdn/upload" && req.method === "POST") {
@@ -621,13 +307,13 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				try {
 					const internalPrefix = getInternalPath("", user, bucket[0]);
 					await deleteBucketContents(internalPrefix);
-					
+
 					// Reset usage stats
 					await db
 						.update(buckets)
 						.set({ totalBytes: 0, totalRequests: 0 })
 						.where(eq(buckets.id, bucket[0].id));
-						
+
 					return new Response("CDN Bucket Emptied", { status: 200 });
 				} catch (e) {
 					console.error("Failed to empty CDN bucket:", e);
@@ -639,13 +325,13 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				try {
 					const internalPrefix = getInternalPath("", user, bucket[0]);
 					await deleteBucketContents(internalPrefix);
-					
+
 					// Reset usage stats
 					await db
 						.update(buckets)
 						.set({ totalBytes: 0 }) // Keep requests count for history? Or reset? Usually empty means files.
 						.where(eq(buckets.id, bucket[0].id));
-						
+
 					return new Response("Bucket Emptied", { status: 200 });
 				} catch (e) {
 					console.error("Failed to empty bucket:", e);
@@ -1068,13 +754,13 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 				try {
 					const body = await req.json();
 					const rules = body.rules;
-					
+
 					if (!Array.isArray(rules)) {
 						return new Response("Invalid rules format", { status: 400 });
 					}
 
 					const corsConfig = {
-						CORSRules: rules
+						CORSRules: rules,
 					};
 
 					await db
@@ -1162,70 +848,5 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		}
 	}
 
-	const user = await getCurrentUser(req);
-	if (!user) {
-		return new Response(landingTemplate, {
-			headers: { "Content-Type": "text/html" },
-		});
-	}
-
-	if (!user.onboarded) {
-		return Response.redirect("/onboarding");
-	}
-
-	if (user.isLocked) {
-		const reason = user.lockReason
-			? `<p class="text-text-muted mb-4 text-sm">Reason: ${user.lockReason}</p>`
-			: "";
-		let finalLocked = lockedTemplate.replace(
-			"<!-- REASON_PLACEHOLDER -->",
-			reason,
-		);
-
-		// Fetch buckets for locked user to display
-		const userBuckets = await db
-			.select()
-			.from(buckets)
-			.where(eq(buckets.userId, user.id));
-
-		const bucketsHtml =
-			userBuckets.length > 0
-				? `
-	       <div class="bg-white/5 rounded-xl p-4 border border-white/10 text-left mb-8">
-	           <h3 class="text-sm font-bold text-white mb-2">Your Buckets</h3>
-	           <ul class="text-xs text-text-muted space-y-1 list-disc list-inside ml-1">
-	               ${userBuckets.map((b) => `<li>${b.name} (${b.isPublic ? "Public" : "Private"})</li>`).join("")}
-	           </ul>
-	       </div>`
-				: "";
-
-		finalLocked = finalLocked.replace("<!-- BUCKETS_PLACEHOLDER -->", bucketsHtml);
-
-		return new Response(finalLocked, {
-			status: 403,
-			headers: { "Content-Type": "text/html" },
-		});
-	}
-
-	// Serve File Explorer Page
-	const fileExplorerMatch = path.match(/^\/dashboard\/buckets\/([a-z0-9-]+)$/);
-	if (fileExplorerMatch) {
-		const _bucketName = fileExplorerMatch[1];
-		// Verify bucket exists and belongs to user (optional, but good for UX to 404 early)
-		// But we can just let the API calls handle auth.
-		// However, we need to inject the bucket name or just let the client side handle it from URL.
-		// The template uses window.location to get bucket name.
-
-		return new Response(filesTemplate, {
-			headers: { "Content-Type": "text/html" },
-		});
-	}
-
-	const finalDashboard = dashboardTemplate.replace(
-		/https:\/\/silo\.deployor\.dev/g,
-		`https://${config.s3Domain}`,
-	);
-	return new Response(finalDashboard, {
-		headers: { "Content-Type": "text/html" },
-	});
+	return new Response("Not Found", { status: 404 });
 }

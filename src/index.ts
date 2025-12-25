@@ -1,70 +1,75 @@
 import { config } from "./config";
-import { handleAdminRequest } from "./features/admin";
-import { handleDashboardRequest, slackSuccessTemplate } from "./features/landing";
-import { handleS3Request } from "./features/s3-api";
-import { updateStats } from "./features/s3-api/utils";
-import { handleSlackRequest } from "./features/slack";
+import { handleS3Request } from "./core/s3";
+import { updateStats } from "./core/s3/utils";
+import { handleSlackRequest } from "./integrations/slack";
+import { handleAdminRequest } from "./web/admin";
+import { handleDashboardRequest, slackSuccessTemplate } from "./web/dashboard";
+import { S3Errors } from "./lib/s3-errors";
 import { authenticate } from "./middleware/auth";
 
 const S3_DOMAIN = config.s3Domain;
+
+// Helper to determine if a request is for the dashboard or S3
+function isDashboardRequest(req: Request, url: URL): boolean {
+	const host = req.headers.get("host") || "";
+
+	// Explicit dashboard subdomain
+	if (host.startsWith("dashboard.")) {
+		return true;
+	}
+
+	// If host matches S3 domain (or localhost), check path and auth
+	if (
+		host === S3_DOMAIN ||
+		(S3_DOMAIN === "localhost:3000" && host.startsWith("localhost"))
+	) {
+		const path = url.pathname;
+		const hasAuthHeader = req.headers.has("authorization");
+		const hasAmzParams =
+			url.searchParams.has("X-Amz-Algorithm") ||
+			url.searchParams.has("x-amz-algorithm");
+
+		// If it looks like an S3 request (Auth header or params), treat as S3
+		if (hasAuthHeader || hasAmzParams) {
+			return false;
+		}
+
+		// Known dashboard paths
+		const dashboardPaths = [
+			"/",
+			"/auth/",
+			"/api/dashboard/",
+			"/dashboard/",
+			"/docs",
+			"/api/slack/",
+			"/assets/",
+			"/admin",
+			"/api/admin",
+			"/cdn",
+			"/api/cdn/",
+			"/onboarding",
+			"/api/onboarding/",
+		];
+
+		if (dashboardPaths.some((p) => path.startsWith(p))) {
+			return true;
+		}
+	}
+
+	return false;
+}
 
 Bun.serve({
 	port: process.env.PORT || 3000,
 	maxRequestBodySize: 1024 * 1024 * 1024, // 1GB
 	async fetch(req) {
 		const url = new URL(req.url);
-		const host = req.headers.get("host") || "";
 
-		let isDashboard = false;
-
-		if (
-			host === S3_DOMAIN ||
-			(S3_DOMAIN === "localhost:3000" && host.startsWith("localhost"))
-		) {
-			const path = url.pathname;
-			const hasAuthHeader = req.headers.has("authorization");
-			const hasAmzParams =
-				url.searchParams.has("X-Amz-Algorithm") ||
-				url.searchParams.has("x-amz-algorithm");
-
-			// If it looks like an S3 request (Auth header or params), treat as S3
-			if (hasAuthHeader || hasAmzParams) {
-				isDashboard = false;
-			} else {
-				// Otherwise, check if it matches dashboard paths
-				if (
-					path === "/" ||
-					path.startsWith("/auth/") ||
-					path.startsWith("/api/dashboard/") ||
-					path.startsWith("/dashboard/") ||
-					path.startsWith("/docs") ||
-					path.startsWith("/api/slack/") ||
-					path.startsWith("/assets/") ||
-					path.startsWith("/admin") ||
-					path.startsWith("/api/admin") ||
-					path.startsWith("/cdn") ||
-					path.startsWith("/api/cdn/") ||
-					path.startsWith("/onboarding") ||
-					path.startsWith("/api/onboarding/")
-				) {
-					isDashboard = true;
-				} else {
-					// If it's not a known dashboard path and has no auth,
-					// it might be an unauthenticated S3 request (which will fail auth)
-					// OR a static asset for dashboard (if we had any).
-					// For now, default to S3 to let auth middleware handle the denial.
-					isDashboard = false;
-				}
-			}
-		} else if (host.startsWith("dashboard.")) {
-			// Explicit dashboard subdomain support
-			isDashboard = true;
-		} else {
-			isDashboard = false;
-		}
-
-		if (isDashboard) {
-			if (url.pathname.startsWith("/admin") || url.pathname.startsWith("/api/admin")) {
+		if (isDashboardRequest(req, url)) {
+			if (
+				url.pathname.startsWith("/admin") ||
+				url.pathname.startsWith("/api/admin")
+			) {
 				return handleAdminRequest(req);
 			}
 			if (url.pathname === "/api/slack/events") {
@@ -90,10 +95,10 @@ Bun.serve({
 			return handleDashboardRequest(req);
 		}
 
+		// S3 Request Handling
 		const forbiddenParams = [
 			"policy",
 			"acl",
-			// "cors", // Allowed
 			"lifecycle",
 			"replication",
 			"tagging",
@@ -109,15 +114,7 @@ Bun.serve({
 
 		for (const param of forbiddenParams) {
 			if (url.searchParams.has(param)) {
-				return new Response(
-					`<?xml version="1.0" encoding="UTF-8"?>
-<Error>
-    <Code>NotImplemented</Code>
-    <Message>A header you provided implies functionality that is not implemented</Message>
-    <RequestId>0000000000000000</RequestId>
-</Error>`,
-					{ status: 501, headers: { "Content-Type": "application/xml" } },
-				);
+				return S3Errors.NotImplemented().toResponse();
 			}
 		}
 
@@ -133,7 +130,7 @@ Bun.serve({
 			const response = await handleS3Request(req, user, bucket, mode);
 			const duration = Math.round(performance.now() - start);
 
-			// Fire and forget stats update to not block response
+			// Fire and forget stats update
 			updateStats(user, bucket, req, response, mode, duration).catch((err) => {
 				console.error("Error updating stats:", err);
 			});
@@ -141,7 +138,7 @@ Bun.serve({
 			return response;
 		} catch (e) {
 			console.error("S3 Request Error:", e);
-			return new Response("Internal Server Error", { status: 500 });
+			return S3Errors.InternalError().toResponse();
 		}
 	},
 });
