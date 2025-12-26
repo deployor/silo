@@ -68,6 +68,21 @@
               JavaScript / Bun
             </button>
           </li>
+          <li>
+            <button onclick="showSection('python')" class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg" id="nav-python">
+              Python (Boto3)
+            </button>
+          </li>
+          <li>
+            <button onclick="showSection('go')" class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg" id="nav-go">
+              Go
+            </button>
+          </li>
+          <li>
+            <button onclick="showSection('rclone')" class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg" id="nav-rclone">
+              Rclone
+            </button>
+          </li>
         </ul>
       </div>
     </div>
@@ -376,7 +391,7 @@ aws s3 ls s3://my-bucket --endpoint-url https://silo.deployor.dev --profile silo
       <pre class="rounded-lg"><code class="language-javascript">import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 const s3 = new S3Client({
-  region: "eu-central-1",
+  region: "auto",
   endpoint: "https://silo.deployor.dev",
   credentials: {
     accessKeyId: "YOUR_ACCESS_KEY",
@@ -393,6 +408,109 @@ await s3.send(
 );</code></pre>
     </div>
 
+    <!-- Python -->
+    <div id="python" class="section-content">
+      <h1 class="text-4xl font-bold mb-6 text-white">Python (Boto3)</h1>
+      <p class="mb-6 text-text-muted">
+        Use the standard <code>boto3</code> library.
+      </p>
+
+      <pre class="rounded-lg"><code class="language-python">import boto3
+
+s3 = boto3.client('s3',
+    endpoint_url='https://silo.deployor.dev',
+    aws_access_key_id='YOUR_ACCESS_KEY',
+    aws_secret_access_key='YOUR_SECRET_KEY'
+)
+
+# Upload a file
+s3.put_object(
+    Bucket='my-bucket',
+    Key='hello.txt',
+    Body='Hello World!'
+)
+
+# List objects
+response = s3.list_objects_v2(Bucket='my-bucket')
+for obj in response.get('Contents', []):
+    print(obj['Key'])</code></pre>
+    </div>
+
+    <!-- Go -->
+    <div id="go" class="section-content">
+      <h1 class="text-4xl font-bold mb-6 text-white">Go</h1>
+      <p class="mb-6 text-text-muted">
+        Use the AWS SDK for Go v2.
+      </p>
+
+      <pre class="rounded-lg"><code class="language-go">package main
+
+import (
+ "context"
+ "fmt"
+ "strings"
+
+ "github.com/aws/aws-sdk-go-v2/aws"
+ "github.com/aws/aws-sdk-go-v2/config"
+ "github.com/aws/aws-sdk-go-v2/credentials"
+ "github.com/aws/aws-sdk-go-v2/service/s3"
+)
+
+func main() {
+ r2Resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+  return aws.Endpoint{
+   URL: "https://silo.deployor.dev",
+  }, nil
+ })
+
+ cfg, _ := config.LoadDefaultConfig(context.TODO(),
+  config.WithEndpointResolverWithOptions(r2Resolver),
+  config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("ACCESS_KEY", "SECRET_KEY", "")),
+ )
+
+ client := s3.NewFromConfig(cfg)
+
+ _, err := client.PutObject(context.TODO(), &s3.PutObjectInput{
+  Bucket: aws.String("my-bucket"),
+  Key:    aws.String("hello.txt"),
+  Body:   strings.NewReader("Hello World!"),
+ })
+
+ if err != nil {
+  panic(err)
+ }
+ fmt.Println("Uploaded!")
+}</code></pre>
+    </div>
+
+    <!-- Rclone -->
+    <div id="rclone" class="section-content">
+      <h1 class="text-4xl font-bold mb-6 text-white">Rclone</h1>
+      <p class="mb-6 text-text-muted">
+        Rclone is a command-line program to manage files on cloud storage. It works perfectly with Silo.
+      </p>
+
+      <h3 class="text-lg font-bold text-white mb-3">Configuration (~/.config/rclone/rclone.conf)</h3>
+      <pre class="rounded-lg mb-6"><code class="language-ini">[silo]
+type = s3
+provider = Other
+env_auth = false
+access_key_id = YOUR_ACCESS_KEY
+secret_access_key = YOUR_SECRET_KEY
+endpoint = https://silo.deployor.dev
+acl = private</code></pre>
+
+      <h3 class="text-lg font-bold text-white mb-3">Usage</h3>
+      <pre class="rounded-lg"><code class="language-bash"># List buckets
+rclone lsd silo:
+
+# Copy a file
+rclone copy myfile.txt silo:my-bucket/
+
+# Sync a directory
+rclone sync ./local-folder silo:my-bucket/remote-folder</code></pre>
+    </div>
+
   </main>
 </div>
 
@@ -407,6 +525,9 @@ await s3.send(
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-go.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
 <script>
   function showSection(id) {
     document.querySelectorAll(".section-content").forEach((el) => {
