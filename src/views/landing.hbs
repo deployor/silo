@@ -1,53 +1,47 @@
 <div class="flex flex-col items-center font-sans w-full">
   {{!-- Hero Section --}}
   <div class="w-full max-w-4xl mx-auto text-center py-20">
-    <h1 class="text-8xl font-bold mb-2 italic tracking-tighter text-white opacity-20 select-none">SILO</h1>
-    <h2 class="text-7xl font-bold mb-6 italic tracking-tighter leading-tight -mt-12 relative z-10">
-      SHIP <span class="text-hc-red">LOUD</span>.<br>
-      STORE <span class="text-hc-blue">FREE</span>.
+    <h1 class="text-9xl font-bold mb-6 italic tracking-tighter text-white">SILO</h1>
+    
+    <h2 class="text-4xl md:text-5xl font-bold mb-8 text-gray-200">
+      Ship <span class="text-hc-red">Loud</span>. Store <span class="text-hc-blue">Free</span>.
     </h2>
-    <p class="text-2xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-      The high-performance S3 gateway built for Hack Clubbers who build.
-      <span class="text-white font-bold">Ship your projects, and we'll keep the storage.</span>
+    
+    <p class="text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
+      The high-performance S3 gateway built for Hack Clubbers.
+      <br>
+      You build the projects, we'll handle the storage.
     </p>
+    
     <div class="flex gap-4 justify-center">
       <a
         href="/auth/login"
-        class="bg-hc-red hover:bg-red-600 text-white px-8 py-4 rounded-xl font-bold text-xl transition-all hover:scale-105 hover:shadow-lg hover:shadow-red-900/20"
+        class="bg-hc-red hover:bg-red-600 text-white px-8 py-4 rounded-xl font-bold text-xl transition-all hover:scale-105"
       >
         Start Storing
       </a>
       <a
         href="/docs"
-        class="bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-xl font-bold text-xl transition-all hover:scale-105 backdrop-blur-sm"
+        class="bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-xl font-bold text-xl transition-all hover:scale-105"
       >
-        Read the Docs
+        Documentation
       </a>
     </div>
   </div>
 
   {{!-- Features Grid --}}
   <div class="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl mx-auto py-16 px-4">
-    <div class="bg-white/5 p-8 rounded-2xl border border-white/10 hover:border-hc-red/50 transition-colors group">
-      <div class="text-hc-red mb-4 transform group-hover:scale-110 transition-transform">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-      </div>
-      <h3 class="text-2xl font-bold mb-2">S3 Compatible</h3>
-      <p class="text-gray-400">Drop-in replacement for AWS S3. Use the libraries and tools you already love.</p>
+    <div class="bg-white/5 p-8 rounded-2xl border border-white/10 hover:border-hc-red/50 transition-colors">
+      <h3 class="text-2xl font-bold mb-2 text-hc-red">S3 Compatible</h3>
+      <p class="text-gray-400">Drop-in replacement for AWS S3. Works with all your favorite tools.</p>
     </div>
-    <div class="bg-white/5 p-8 rounded-2xl border border-white/10 hover:border-hc-blue/50 transition-colors group">
-      <div class="text-hc-blue mb-4 transform group-hover:scale-110 transition-transform">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-      </div>
-      <h3 class="text-2xl font-bold mb-2">High Performance</h3>
-      <p class="text-gray-400">Optimized for speed and reliability. Your assets are served instantly.</p>
+    <div class="bg-white/5 p-8 rounded-2xl border border-white/10 hover:border-hc-blue/50 transition-colors">
+      <h3 class="text-2xl font-bold mb-2 text-hc-blue">High Performance</h3>
+      <p class="text-gray-400">Optimized for speed. Your assets are served instantly via our global CDN.</p>
     </div>
-    <div class="bg-white/5 p-8 rounded-2xl border border-white/10 hover:border-green-500/50 transition-colors group">
-      <div class="text-green-500 mb-4 transform group-hover:scale-110 transition-transform">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-      </div>
-      <h3 class="text-2xl font-bold mb-2">Community First</h3>
-      <p class="text-gray-400">Built by Hack Clubbers, for Hack Clubbers. Authentication via HCB.</p>
+    <div class="bg-white/5 p-8 rounded-2xl border border-white/10 hover:border-green-500/50 transition-colors">
+      <h3 class="text-2xl font-bold mb-2 text-green-500">Community First</h3>
+      <p class="text-gray-400">Built by Hack Clubbers, for Hack Clubbers. Free for all your projects.</p>
     </div>
   </div>
 
