@@ -83,6 +83,11 @@
               Rclone
             </button>
           </li>
+          <li>
+            <button onclick="showSection('uppy')" class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg" id="nav-uppy">
+              Uppy (File Uploads)
+            </button>
+          </li>
         </ul>
       </div>
     </div>
@@ -566,7 +571,92 @@ rclone copy myfile.txt silo:my-bucket/
 rclone sync ./local-folder silo:my-bucket/remote-folder</code></pre>
     </div>
 
-  </main>
+    <!-- Uppy -->
+    <div id="uppy" class="section-content">
+      <h1 class="text-4xl font-bold mb-6 text-white">Uppy</h1>
+      <p class="mb-6 text-text-muted">
+        Uppy is a sleek, modular JavaScript file uploader that integrates seamlessly with any application. You can use it with Silo via the AWS S3 plugin using Presigned URLs.
+      </p>
+
+      <div class="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-lg mb-8">
+        <p class="text-yellow-200 text-sm">
+          <strong>Note:</strong> For security, you should never expose your Secret Key in the frontend. Instead, you must generate <strong>Presigned URLs</strong> on your backend and pass them to Uppy.
+        </p>
+      </div>
+
+      <h3 class="text-lg font-bold text-white mb-3">1. Backend: Generate Presigned URL</h3>
+      <p class="text-text-muted mb-3">Create an API route (e.g., <code>/api/sign-s3</code>) that generates a temporary upload URL.</p>
+      <pre class="rounded-lg mb-6"><code class="language-javascript">// backend/api/sign-s3.js
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+
+const s3 = new S3Client({
+  region: "auto",
+  endpoint: "https://silo.deployor.dev",
+  credentials: {
+    accessKeyId: process.env.ACCESS_KEY,
+    secretAccessKey: process.env.SECRET_KEY,
+  },
+});
+
+export async function POST(request) {
+  const { filename, contentType } = await request.json();
+
+  const command = new PutObjectCommand({
+    Bucket: "my-bucket",
+    Key: filename,
+    ContentType: contentType,
+  });
+
+  // Generate a URL valid for 1 hour
+  const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+
+  return Response.json({ url, method: "PUT" });
+}</code></pre>
+
+      <h3 class="text-lg font-bold text-white mb-3">2. Frontend: Configure Uppy</h3>
+      <p class="text-text-muted mb-3">Install Uppy and the AwsS3 plugin.</p>
+      <pre class="rounded-lg mb-6"><code class="language-bash">npm install @uppy/core @uppy/dashboard @uppy/aws-s3</code></pre>
+
+      <pre class="rounded-lg mb-6"><code class="language-javascript">// frontend/app.js
+import Uppy from '@uppy/core';
+import Dashboard from '@uppy/dashboard';
+import AwsS3 from '@uppy/aws-s3';
+
+import '@uppy/core/dist/style.css';
+import '@uppy/dashboard/dist/style.css';
+
+const uppy = new Uppy()
+  .use(Dashboard, {
+    inline: true,
+    target: '#drag-drop-area',
+  })
+  .use(AwsS3, {
+    // Uppy will call this function for every file
+    async getUploadParameters(file) {
+      // Call your backend to get the presigned URL
+      const response = await fetch('/api/sign-s3', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: file.name,
+          contentType: file.type,
+        }),
+      });
+      
+      const data = await response.json();
+
+      // Return the signed URL and method to Uppy
+      return {
+        method: data.method,
+        url: data.url,
+        headers: {
+          'Content-Type': file.type,
+        },
+      };
+    },
+  });</code></pre>
+    </div>
 </div>
 
 {{#section "extraStyles"}}
