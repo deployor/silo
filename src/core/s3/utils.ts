@@ -6,8 +6,6 @@ import { db } from "../../db";
 import { buckets, requestLogs, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 
-// --- Types ---
-
 interface LogEntry {
 	bucketId: string;
 	bucketName: string;
@@ -23,17 +21,11 @@ interface LogEntry {
 	latencyMs: number;
 }
 
-// --- Constants ---
-
 const BATCH_SIZE = 100;
 const FLUSH_INTERVAL_MS = 5000;
 
-// --- State ---
-
 let logQueue: LogEntry[] = [];
 let flushTimer: Timer | null = null;
-
-// --- Helper Functions ---
 
 export function getKeyFromRequest(req: Request, bucketName: string): string {
 	const url = new URL(req.url);
@@ -57,11 +49,8 @@ export function getKeyFromRequest(req: Request, bucketName: string): string {
 		}
 	}
 
-	// Path Traversal Protection
-	// Decode key to check for traversal attempts like %2e%2e/
 	const decodedKey = decodeURIComponent(key);
 	if (decodedKey.includes("..")) {
-		// Simple check for ".." segments
 		const parts = decodedKey.split("/");
 		if (parts.includes("..")) {
 			throw new Error("Invalid Key: Path traversal detected");
@@ -71,18 +60,11 @@ export function getKeyFromRequest(req: Request, bucketName: string): string {
 	return key;
 }
 
-/**
-	* Constructs the internal S3 path for a given key.
-	* Format: users/{userId}/{bucketName}/{key}
-	*
-	* This ensures isolation between users and buckets.
-	*/
 export function getInternalPath(
 	key: string,
 	user: typeof users.$inferSelect,
 	bucket: typeof buckets.$inferSelect,
 ): string {
-	// Double check for path traversal before constructing internal path
 	if (key.includes("..")) {
 		const decodedKey = decodeURIComponent(key);
 		const parts = decodedKey.split("/");
@@ -151,8 +133,6 @@ export function filterUpstreamHeaders(reqHeaders: Headers): Headers {
 export function isReservedBucketName(name: string): boolean {
 	return /^[uw][a-z0-9]{7,}$/.test(name);
 }
-
-// --- Async Operations ---
 
 export async function deleteBucketContents(prefix: string) {
 	let continuationToken: string | undefined;
@@ -238,8 +218,6 @@ export async function rewriteCopySourceHeader(
 	return `/${config.s3.bucket}/${internalPath}`;
 }
 
-// --- Logging & Stats ---
-
 async function flushLogs() {
 	if (logQueue.length === 0) return;
 
@@ -282,7 +260,6 @@ export async function updateStats(
 		"unknown";
 	const userAgent = req.headers.get("user-agent");
 
-	// 1. Update aggregates immediately
 	try {
 		await db.transaction(async (tx) => {
 			await tx
@@ -305,7 +282,6 @@ export async function updateStats(
 		console.error("Failed to update aggregate stats:", e);
 	}
 
-	// 2. Queue detailed log for batch insertion
 	logQueue.push({
 		bucketId: bucket.id,
 		bucketName: bucket.name,

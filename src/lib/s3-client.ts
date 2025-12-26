@@ -108,13 +108,6 @@ export class HetznerS3Client {
 		const relative = path.startsWith("/") ? path.slice(1) : path;
 		const url = new URL(relative, baseUrl.toString());
 
-		// Note: This method currently returns the direct upstream URL.
-		// In a proxy setup, users typically generate presigned URLs for the proxy service itself
-		// using their credentials. The proxy service then validates the signature and forwards
-		// the request to the upstream bucket.
-		//
-		// If we needed to generate a presigned URL for the upstream bucket (e.g. for a redirect),
-		// we would use this.client.sign() here.
 		return url.toString();
 	}
 

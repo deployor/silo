@@ -21,7 +21,6 @@ export async function handleGetRequest(
 	url: URL,
 	corsHeaders: Headers,
 ) {
-	// Handle CORS Configuration Request
 	if (key === "" && url.searchParams.has("cors")) {
 		if (!bucket.corsConfig) {
 			return S3Errors.NoSuchCORSConfiguration().toResponse();
@@ -81,7 +80,6 @@ ${rulesXml}
 		);
 	}
 
-	// Egress Limit Check
 	let egressLimit: bigint | null = null;
 	if (user.egressLimitBytes !== null) {
 		const manualLimit = BigInt(user.egressLimitBytes);

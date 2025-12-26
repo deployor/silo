@@ -34,18 +34,14 @@ export async function render(
 	};
 
 	try {
-		// 1. Render the view
-		// Assume templates are in src/views/
 		const templatePath = `src/views/${templateName}.hbs`;
 		const viewTemplate = await compile(templatePath);
 		const body = viewTemplate({ ...data, config });
 
-		// 2. If no layout, return body
 		if (options.layout === false) {
 			return body;
 		}
 
-		// 3. Render the layout
 		const layoutName =
 			typeof options.layout === "string" ? options.layout : "main";
 		const layoutPath = `src/views/layouts/${layoutName}.hbs`;
@@ -53,7 +49,7 @@ export async function render(
 
 		return layoutTemplate({
 			...data,
-			...data.sections, // Flatten sections into the root context for the layout
+			...data.sections,
 			config,
 			body,
 		});

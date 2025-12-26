@@ -64,7 +64,6 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 			const userId = userData.sub;
 			const slackId = userData.slack_id;
 
-			// Check if user exists
 			const existingUser = await db
 				.select()
 				.from(users)
@@ -72,7 +71,6 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 				.limit(1);
 
 			if (existingUser.length === 0) {
-				// Check for bypass cookie
 				const cookieHeader = req.headers.get("Cookie");
 				const cookies = cookieHeader
 					? cookieHeader.split(";").reduce(
@@ -222,7 +220,6 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 				"Set-Cookie",
 				`silo_wip_bypass=${bypassValue}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=31536000`,
 			);
-			// Clear attempt cookie
 			headers.append(
 				"Set-Cookie",
 				`silo_wip_attempt=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0`,

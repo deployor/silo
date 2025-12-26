@@ -49,7 +49,7 @@ export async function handleMessage(event: any) {
 
 	// 3. Get/Create CDN Bucket
 	// Bucket name is the lowercase Slack ID
-	const bucketName = user.slackId?.toLowerCase();
+	const bucketName = user.slackId?.toLowerCase() ?? "";
 
 	let bucket = await db
 		.select()
@@ -58,7 +58,6 @@ export async function handleMessage(event: any) {
 		.limit(1);
 
 	if (bucket.length === 0) {
-		// Create it
 		const newBucket = await db
 			.insert(buckets)
 			.values({
@@ -277,16 +276,9 @@ export async function handleMessage(event: any) {
 		}
 	}
 
-	// Chunk and Send
-	const CHUNK_SIZE = 40; // Safe limit
-	// First chunk includes header (2 blocks)
-	// Subsequent chunks are just files
-
-	// Actually, let's just send multiple messages if needed.
-	// But we want the header in the first one.
+	const CHUNK_SIZE = 40;
 
 	let currentBlocks = [];
-	// Add header blocks
 	currentBlocks.push(blocks[0]);
 	currentBlocks.push(blocks[1]);
 

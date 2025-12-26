@@ -16,7 +16,6 @@ export async function handleFiles(req: Request): Promise<Response> {
 	const url = new URL(req.url);
 	const path = url.pathname;
 
-	// Sign Preview URL
 	const signPreviewMatch = path.match(
 		/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/files\/sign$/,
 	);
@@ -54,7 +53,6 @@ export async function handleFiles(req: Request): Promise<Response> {
 		}
 	}
 
-	// Preview File (Proxy)
 	const previewFileMatch = path.match(
 		/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/files\/preview$/,
 	);
@@ -94,7 +92,6 @@ export async function handleFiles(req: Request): Promise<Response> {
 		if (bucket[0].isPaused && !user.isAdmin)
 			return errorResponse("Bucket is paused", 403);
 
-		// If admin is viewing another user's bucket, we need the owner's user object for the path
 		let owner = user;
 		if (bucket[0].userId !== user.id) {
 			const ownerResult = await db
@@ -103,7 +100,13 @@ export async function handleFiles(req: Request): Promise<Response> {
 				.where(eq(users.id, bucket[0].userId))
 				.limit(1);
 			if (ownerResult.length > 0) {
-				owner = ownerResult[0];
+				owner = {
+					...ownerResult[0],
+					sessionId: "",
+					accessToken: null,
+					refreshToken: null,
+					tokenExpiresAt: null,
+				};
 			}
 		}
 
@@ -135,7 +138,6 @@ export async function handleFiles(req: Request): Promise<Response> {
 		}
 	}
 
-	// List Files (Proxy to S3 ListObjectsV2)
 	const listFilesMatch = path.match(
 		/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/files$/,
 	);
@@ -156,7 +158,6 @@ export async function handleFiles(req: Request): Promise<Response> {
 		if (bucket[0].isPaused && !user.isAdmin)
 			return errorResponse("Bucket is paused", 403);
 
-		// If admin is viewing another user's bucket, we need the owner's user object for the path
 		let owner = user;
 		if (bucket[0].userId !== user.id) {
 			const ownerResult = await db
@@ -165,15 +166,19 @@ export async function handleFiles(req: Request): Promise<Response> {
 				.where(eq(users.id, bucket[0].userId))
 				.limit(1);
 			if (ownerResult.length > 0) {
-				owner = ownerResult[0];
+				owner = {
+					...ownerResult[0],
+					sessionId: "",
+					accessToken: null,
+					refreshToken: null,
+					tokenExpiresAt: null,
+				};
 			}
 		}
 
 		// Construct internal prefix
 		const internalPrefix = getInternalPath(prefix, owner, bucket[0]);
 
-		// We need to list objects from S3
-		// We'll use the s3Client directly
 		const query = new URLSearchParams();
 		query.set("list-type", "2");
 		query.set("prefix", internalPrefix);
@@ -195,7 +200,6 @@ export async function handleFiles(req: Request): Promise<Response> {
 			const parser = new XMLParser();
 			const result = parser.parse(xml).ListBucketResult;
 
-			// Process Contents (Files)
 			let files = [];
 			if (result.Contents) {
 				const contents = Array.isArray(result.Contents)
@@ -224,7 +228,6 @@ export async function handleFiles(req: Request): Promise<Response> {
 					.filter((f: { key: string }) => f.key !== prefix); // Exclude the folder itself if it appears
 			}
 
-			// Process CommonPrefixes (Folders)
 			let folders = [];
 			if (result.CommonPrefixes) {
 				const prefixes = Array.isArray(result.CommonPrefixes)
@@ -256,7 +259,6 @@ export async function handleFiles(req: Request): Promise<Response> {
 		}
 	}
 
-	// Delete File
 	if (listFilesMatch && req.method === "DELETE") {
 		const bucketName = listFilesMatch[1];
 		const key = url.searchParams.get("key");
@@ -275,7 +277,6 @@ export async function handleFiles(req: Request): Promise<Response> {
 		if (bucket[0].isPaused && !user.isAdmin)
 			return errorResponse("Bucket is paused", 403);
 
-		// If admin is viewing another user's bucket, we need the owner's user object for the path
 		let owner = user;
 		if (bucket[0].userId !== user.id) {
 			const ownerResult = await db
@@ -284,7 +285,13 @@ export async function handleFiles(req: Request): Promise<Response> {
 				.where(eq(users.id, bucket[0].userId))
 				.limit(1);
 			if (ownerResult.length > 0) {
-				owner = ownerResult[0];
+				owner = {
+					...ownerResult[0],
+					sessionId: "",
+					accessToken: null,
+					refreshToken: null,
+					tokenExpiresAt: null,
+				};
 			}
 		}
 

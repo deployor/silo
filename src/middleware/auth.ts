@@ -72,7 +72,6 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 	const credential = getCredential(req);
 
 	if (!credential) {
-		// Allow OPTIONS requests for CORS preflight
 		if (req.method === "OPTIONS") {
 			const requestedBucket = getBucketFromRequest(req);
 			if (!requestedBucket) {
@@ -121,7 +120,6 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 
 		const { bucket, user } = bucketResult[0];
 
-		// Calculate storage usage from all buckets
 		const usageResult = await db
 			.select({ total: sql<number>`sum(${buckets.totalBytes})` })
 			.from(buckets)
@@ -173,7 +171,6 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 
 	const { bucket, user, key } = keyResult[0];
 
-	// Calculate storage usage from all buckets
 	const usageResult = await db
 		.select({ total: sql<number>`sum(${buckets.totalBytes})` })
 		.from(buckets)
@@ -199,8 +196,6 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 
 	const requestedBucket = getBucketFromRequest(req);
 
-	// If requestedBucket is present (Path-Style or Virtual-Host), it MUST match the key's bucket.
-	// If it is NOT present (Implicit Mode), we allow it and assume the key's bucket.
 	if (requestedBucket && requestedBucket !== bucket.name) {
 		return S3Errors.AccessDenied().toResponse();
 	}
@@ -209,7 +204,6 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 	if (!amzDate)
 		return S3Errors.AccessDenied("Missing Date Header").toResponse();
 
-	// Verify Signature
 	const isValid = await verifyAwsV4Signature(req, key.secretKey);
 	if (!isValid) {
 		return S3Errors.SignatureDoesNotMatch().toResponse();

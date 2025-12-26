@@ -38,7 +38,6 @@ export async function handleS3Request(
 	const host = req.headers.get("host") || "";
 	const key = getKeyFromRequest(req, bucket.name);
 
-	// Handle ListBuckets
 	if (
 		(host === S3_DOMAIN && url.pathname === "/") ||
 		(key === "" &&
@@ -57,10 +56,10 @@ export async function handleS3Request(
 				const bucketsXml = userBuckets
 					.map(
 						(b) => `
-    <Bucket>
-      <Name>${b.name}</Name>
-      <CreationDate>${b.createdAt ? new Date(b.createdAt).toISOString() : new Date().toISOString()}</CreationDate>
-    </Bucket>`,
+	   <Bucket>
+	     <Name>${b.name}</Name>
+	     <CreationDate>${b.createdAt ? new Date(b.createdAt).toISOString() : new Date().toISOString()}</CreationDate>
+	   </Bucket>`,
 					)
 					.join("");
 
@@ -68,12 +67,12 @@ export async function handleS3Request(
 					`
 <?xml version="1.0" encoding="UTF-8"?>
 <ListAllMyBucketsResult>
-  <Owner>
-    <ID>${user.id}</ID>
-    <DisplayName>${user.id}</DisplayName>
-  </Owner>
-  <Buckets>${bucketsXml}
-  </Buckets>
+	 <Owner>
+	   <ID>${user.id}</ID>
+	   <DisplayName>${user.id}</DisplayName>
+	 </Owner>
+	 <Buckets>${bucketsXml}
+	 </Buckets>
 </ListAllMyBucketsResult>`.trim(),
 					{
 						headers: { "Content-Type": "application/xml" },
