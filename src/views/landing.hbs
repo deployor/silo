@@ -1,12 +1,89 @@
-<div class="flex flex-col items-center justify-center font-sans">
-  <h1 class="text-6xl font-bold mb-4 italic tracking-tighter">SILO</h1>
-  <p class="text-xl text-gray-400 mb-8">
-    High-performance S3 Gateway for Hack Club
-  </p>
-  <a
-    href="/auth/login"
-    class="bg-hc-red hover:bg-red-600 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all hover:scale-105"
-  >
-    Login with Hack Club
-  </a>
+<div class="flex flex-col items-center font-sans w-full">
+  {{!-- Hero Section --}}
+  <div class="w-full max-w-4xl mx-auto text-center py-20">
+    <h1 class="text-7xl font-bold mb-6 italic tracking-tighter leading-tight">
+      SHIP <span class="text-hc-red">LOUD</span>.<br>
+      STORE <span class="text-hc-blue">FREE</span>.
+    </h1>
+    <p class="text-2xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
+      The high-performance S3 gateway built for Hack Clubbers who build.
+      <span class="text-white font-bold">Ship your projects, and we'll keep the storage.</span>
+    </p>
+    <div class="flex gap-4 justify-center">
+      <a
+        href="/auth/login"
+        class="bg-hc-red hover:bg-red-600 text-white px-8 py-4 rounded-xl font-bold text-xl transition-all hover:scale-105 hover:shadow-lg hover:shadow-red-900/20"
+      >
+        Start Storing
+      </a>
+      <a
+        href="/docs"
+        class="bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-xl font-bold text-xl transition-all hover:scale-105 backdrop-blur-sm"
+      >
+        Read the Docs
+      </a>
+    </div>
+  </div>
+
+  {{!-- Features Grid --}}
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl mx-auto py-16 px-4">
+    <div class="bg-white/5 p-8 rounded-2xl border border-white/10 hover:border-hc-red/50 transition-colors">
+      <div class="text-hc-red text-4xl mb-4">⚡️</div>
+      <h3 class="text-2xl font-bold mb-2">S3 Compatible</h3>
+      <p class="text-gray-400">Drop-in replacement for AWS S3. Use the libraries and tools you already love.</p>
+    </div>
+    <div class="bg-white/5 p-8 rounded-2xl border border-white/10 hover:border-hc-blue/50 transition-colors">
+      <div class="text-hc-blue text-4xl mb-4">🚀</div>
+      <h3 class="text-2xl font-bold mb-2">High Performance</h3>
+      <p class="text-gray-400">Optimized for speed and reliability. Your assets are served instantly.</p>
+    </div>
+    <div class="bg-white/5 p-8 rounded-2xl border border-white/10 hover:border-green-500/50 transition-colors">
+      <div class="text-green-500 text-4xl mb-4">🤝</div>
+      <h3 class="text-2xl font-bold mb-2">Community First</h3>
+      <p class="text-gray-400">Built by Hack Clubbers, for Hack Clubbers. Authentication via HCB.</p>
+    </div>
+  </div>
+
+  {{!-- Code Example Section --}}
+  <div class="w-full max-w-5xl mx-auto py-16 px-4">
+    <div class="bg-[#1c1c21] rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
+      <div class="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/5">
+        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+        <span class="ml-2 text-sm text-gray-500 font-mono">upload.js</span>
+      </div>
+      <div class="p-6 overflow-x-auto">
+<pre><code class="language-javascript text-sm md:text-base"><span class="text-purple-400">import</span> { S3Client, PutObjectCommand } <span class="text-purple-400">from</span> <span class="text-green-400">"@aws-sdk/client-s3"</span>;
+
+<span class="text-gray-500">// 1. Configure Silo</span>
+<span class="text-purple-400">const</span> s3 = <span class="text-purple-400">new</span> <span class="text-yellow-400">S3Client</span>({
+  endpoint: <span class="text-green-400">"https://silo.hackclub.com"</span>,
+  region: <span class="text-green-400">"auto"</span>,
+  credentials: {
+    accessKeyId: <span class="text-green-400">"YOUR_ACCESS_KEY"</span>,
+    secretAccessKey: <span class="text-green-400">"YOUR_SECRET_KEY"</span>
+  }
+});
+
+<span class="text-gray-500">// 2. Ship it!</span>
+<span class="text-purple-400">await</span> s3.<span class="text-blue-400">send</span>(<span class="text-purple-400">new</span> <span class="text-yellow-400">PutObjectCommand</span>({
+  Bucket: <span class="text-green-400">"my-cool-project"</span>,
+  Key: <span class="text-green-400">"ship.png"</span>,
+  Body: fileStream
+}));</code></pre>
+      </div>
+    </div>
+  </div>
+
+  {{!-- Bottom CTA --}}
+  <div class="text-center py-20">
+    <h2 class="text-4xl font-bold mb-8">Ready to ship?</h2>
+    <a
+      href="/auth/login"
+      class="bg-white text-black hover:bg-gray-200 px-8 py-4 rounded-xl font-bold text-xl transition-all hover:scale-105 inline-block"
+    >
+      Get Your Keys
+    </a>
+  </div>
 </div>
