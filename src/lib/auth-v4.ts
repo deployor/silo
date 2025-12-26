@@ -10,7 +10,6 @@ export async function verifyAwsV4Signature(
 	const method = req.method;
 	const headers = req.headers;
 
-	// 1. Extract Signature and Components
 	let signature = "";
 	let signedHeadersStr = "";
 	let credential = "";
@@ -21,7 +20,6 @@ export async function verifyAwsV4Signature(
 	const query = url.searchParams;
 
 	if (authHeader?.startsWith("AWS4-HMAC-SHA256")) {
-		// Header Auth
 		algorithm = "AWS4-HMAC-SHA256";
 		const params = authHeader.slice("AWS4-HMAC-SHA256".length).trim();
 		const pairs = params.split(",").map((p) => p.trim());
@@ -33,41 +31,23 @@ export async function verifyAwsV4Signature(
 		}
 		date = headers.get("X-Amz-Date") || headers.get("Date") || "";
 	} else if (query.has("X-Amz-Signature")) {
-		// Query Auth (Presigned URL)
 		signature = query.get("X-Amz-Signature") || "";
 		credential = query.get("X-Amz-Credential") || "";
 		signedHeadersStr = query.get("X-Amz-SignedHeaders") || "";
 		date = query.get("X-Amz-Date") || "";
 		algorithm = query.get("X-Amz-Algorithm") || "AWS4-HMAC-SHA256";
 	} else {
-		return false; // No signature found
+		return false;
 	}
 
 	if (!signature || !credential || !date || !signedHeadersStr) {
 		return false;
 	}
 
-	// 2. Canonical Request
-	// CanonicalURI
-	// We need to determine if the user signed the path-style or virtual-host style URI.
-	// The `req.url` we get here is the full URL as received by the server.
-	// If the host header indicates a bucket subdomain, the user likely signed the path relative to that bucket.
-	// If it's the root domain, they signed the full path.
-
-	// However, standard S3 proxies often normalize this.
-	// Let's assume the URI in the request line is what was signed.
-	// In Bun/Hono, url.pathname is the path.
 	let canonicalUri = url.pathname;
 
-	// If the path is empty, it's "/"
 	if (canonicalUri === "") canonicalUri = "/";
 
-	// URL Encode - S3 requires specific encoding
-	// But usually url.pathname is already decoded. We need to encode it back, but keep slashes.
-	// AWS expects each path segment to be URI-encoded.
-	// RFC 3986: A-Z, a-z, 0-9, hyphen ( - ), underscore ( _ ), period ( . ), and tilde ( ~ ) are unreserved.
-	// encodeURIComponent leaves - _ . ! ~ * ' ( ) unencoded.
-	// AWS requires ! * ' ( ) to be encoded.
 	const awsUriEncode = (input: string, encodeSlash: boolean = true) => {
 		let result = encodeURIComponent(input).replace(
 			/[!'()*]/g,
@@ -88,9 +68,8 @@ export async function verifyAwsV4Signature(
 		canonicalUri = canonicalUri.slice(1);
 	}
 
-	// CanonicalQueryString
 	const searchParams = new URLSearchParams(url.search);
-	searchParams.delete("X-Amz-Signature"); // Remove signature from query
+	searchParams.delete("X-Amz-Signature");
 
 	const sortedKeys = Array.from(searchParams.keys()).sort();
 	const canonicalQueryString = sortedKeys
@@ -100,7 +79,6 @@ export async function verifyAwsV4Signature(
 		})
 		.join("&");
 
-	// CanonicalHeaders
 	const signedHeaders = signedHeadersStr.split(";");
 	const canonicalHeaders = `${signedHeaders
 		.map((header) => {
@@ -109,14 +87,12 @@ export async function verifyAwsV4Signature(
 		})
 		.join("\n")}\n`;
 
-	// HashedPayload
 	let hashedPayload = "UNSIGNED-PAYLOAD";
 	if (headers.has("X-Amz-Content-Sha256")) {
 		hashedPayload = headers.get("X-Amz-Content-Sha256") || "";
 	} else if (headers.has("x-amz-content-sha256")) {
 		hashedPayload = headers.get("x-amz-content-sha256") || "";
 	} else if (query.has("X-Amz-Signature")) {
-		// Presigned URLs usually don't include payload hash in calculation unless specified
 		hashedPayload = "UNSIGNED-PAYLOAD";
 	}
 
@@ -133,7 +109,6 @@ export async function verifyAwsV4Signature(
 		.update(canonicalRequest)
 		.digest("hex");
 
-	// 3. String to Sign
 	const [_accessKey, dateStamp, regionScope, serviceScope, requestType] =
 		credential.split("/");
 	const credentialScope = `${dateStamp}/${regionScope}/${serviceScope}/${requestType}`;
@@ -145,7 +120,6 @@ export async function verifyAwsV4Signature(
 		hashedCanonicalRequest,
 	].join("\n");
 
-	// 4. Calculate Signature
 	const kDate = createHmac("sha256", `AWS4${secretKey}`)
 		.update(dateStamp)
 		.digest();

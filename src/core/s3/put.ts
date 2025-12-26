@@ -56,13 +56,11 @@ export async function handlePutRequest(
 				throw new Error("Invalid CORS Configuration");
 			}
 
-			// Handle both single rule (object) and multiple rules (array)
 			const rulesArray = Array.isArray(parsed.CORSConfiguration.CORSRule)
 				? parsed.CORSConfiguration.CORSRule
 				: [parsed.CORSConfiguration.CORSRule];
 
 			const rules = rulesArray.map((r: any) => {
-				// Ensure arrays for single values
 				const allowedOrigins = r.AllowedOrigin
 					? Array.isArray(r.AllowedOrigin)
 						? r.AllowedOrigin

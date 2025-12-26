@@ -44,7 +44,6 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 				return errorResponse("No file uploaded", 400);
 			}
 
-			// Get/Create CDN Bucket
 			const bucketName = user.slackId.toLowerCase();
 			let bucket = await db
 				.select()
@@ -71,7 +70,6 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 				return errorResponse(`Bucket paused: ${targetBucket.pauseReason}`, 403);
 			}
 
-			// Check Quota
 			const usageResult = await db
 				.select({ total: sql<number>`sum(${buckets.totalBytes})` })
 				.from(buckets)
@@ -83,7 +81,6 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 				return errorResponse("Quota exceeded", 403);
 			}
 
-			// Upload
 			const ext = file.name.split(".").pop();
 			const hash = crypto.randomUUID();
 			const fileName = `${hash}.${ext}`;
@@ -103,7 +100,6 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 				throw new Error(`S3 Upload Failed: ${s3Res.status}`);
 			}
 
-			// Update Stats
 			await db
 				.update(buckets)
 				.set({
@@ -112,7 +108,6 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 				})
 				.where(eq(buckets.id, targetBucket.id));
 
-			// Log Request
 			await db.insert(requestLogs).values({
 				bucketId: targetBucket.id,
 				bucketName: targetBucket.name,

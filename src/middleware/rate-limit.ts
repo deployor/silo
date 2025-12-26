@@ -42,12 +42,6 @@ export function rateLimit(options: RateLimitOptions) {
 		const _remaining = Math.max(0, options.limit - record.count);
 		const reset = Math.ceil((record.resetTime - now) / 1000);
 
-		// Add headers to the request so we can append them to the response later if needed
-		// But we can't easily modify the response here if we return null.
-		// We could attach them to the request object?
-		// Or we just return them if we block.
-		// For now, let's just block.
-
 		if (record.count > options.limit) {
 			const headers = new Headers();
 			headers.set("X-RateLimit-Limit", options.limit.toString());

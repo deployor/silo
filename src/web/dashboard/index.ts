@@ -8,12 +8,10 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	const url = new URL(req.url);
 	const path = url.pathname;
 
-	// Delegate to Auth Handler
 	if (path.startsWith("/auth/")) {
 		return handleAuthRequest(req);
 	}
 
-	// Delegate to API Handler
 	if (path.startsWith("/api/")) {
 		return handleApiRequest(req);
 	}
@@ -112,7 +110,6 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		});
 	}
 
-	// Serve File Explorer Page
 	const fileExplorerMatch = path.match(/^\/dashboard\/buckets\/([a-z0-9-]+)$/);
 	if (fileExplorerMatch) {
 		const bucketName = fileExplorerMatch[1];

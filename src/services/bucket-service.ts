@@ -80,8 +80,6 @@ export class BucketService {
 			throw new Error("Unauthorized");
 		if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
 
-		// We don't actually delete the files here, the caller should handle that or we can add it later
-		// For now, just delete the DB record
 		await db.delete(buckets).where(eq(buckets.name, name));
 	}
 

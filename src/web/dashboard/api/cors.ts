@@ -9,7 +9,6 @@ export async function handleCors(req: Request): Promise<Response> {
 	const url = new URL(req.url);
 	const path = url.pathname;
 
-	// /api/dashboard/buckets/:name/cors
 	const corsMatch = path.match(
 		/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/cors$/,
 	);

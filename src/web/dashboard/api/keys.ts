@@ -13,7 +13,6 @@ export async function handleKeys(req: Request): Promise<Response> {
 	const url = new URL(req.url);
 	const path = url.pathname;
 
-	// /api/dashboard/buckets/:name/keys
 	const generateKeyMatch = path.match(
 		/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/keys$/,
 	);
@@ -40,7 +39,6 @@ export async function handleKeys(req: Request): Promise<Response> {
 		return jsonResponse({ ...keys, publicUrl });
 	}
 
-	// /api/dashboard/buckets/:name/keys/:keyId
 	const deleteKeyMatch = path.match(
 		/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/keys\/([^/]+)$/,
 	);

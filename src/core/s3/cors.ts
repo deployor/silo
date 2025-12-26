@@ -1,7 +1,6 @@
 import type { buckets } from "../../db/schema";
 import type { CORSConfiguration } from "./types";
 
-// Helper to match origin against allowed origins (supports wildcards)
 function matchOrigin(origin: string, allowedOrigins: string[]): boolean {
 	return allowedOrigins.some((allowed) => {
 		if (allowed === "*") return true;
@@ -9,7 +8,6 @@ function matchOrigin(origin: string, allowedOrigins: string[]): boolean {
 	});
 }
 
-// Helper to match method against allowed methods
 function matchMethod(method: string, allowedMethods: string[]): boolean {
 	return allowedMethods.some((allowed) => {
 		if (allowed === "*") return true;
@@ -17,7 +15,6 @@ function matchMethod(method: string, allowedMethods: string[]): boolean {
 	});
 }
 
-// Helper to match headers against allowed headers
 function matchHeaders(
 	requestHeaders: string | null,
 	allowedHeaders: string[] | undefined,
@@ -38,7 +35,6 @@ function matchHeaders(
 	});
 }
 
-// Helper to handle CORS preflight
 export async function handleCorsPreflight(
 	req: Request,
 	bucket: typeof buckets.$inferSelect,
@@ -120,7 +116,6 @@ export async function handleCorsPreflight(
 	return new Response(null, { status: 200, headers });
 }
 
-// Helper to get CORS headers for a request
 export function getCorsHeaders(
 	req: Request,
 	bucket: typeof buckets.$inferSelect,
