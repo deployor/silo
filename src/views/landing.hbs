@@ -1,90 +1,122 @@
 <div class="flex flex-col items-center font-sans w-full">
   {{!-- Hero Section --}}
-  <div class="w-full max-w-4xl mx-auto text-center py-20">
-    <h1 class="text-9xl font-bold mb-6 italic tracking-tighter text-white">SILO</h1>
+  <div class="w-full max-w-5xl mx-auto text-center py-24 px-6">
+    <div class="inline-block mb-6 px-4 py-1.5 rounded-full border border-hc-red/30 bg-hc-red/10 text-hc-red text-sm font-mono font-bold tracking-wide">
+      S3-COMPATIBLE STORAGE FOR HACK CLUBBERS
+    </div>
     
-    <h2 class="text-4xl md:text-5xl font-bold mb-8 text-gray-200">
-      Ship <span class="text-hc-red">Loud</span>. Store <span class="text-hc-blue">Free</span>.
-    </h2>
+    <h1 class="text-6xl md:text-8xl font-bold mb-8 tracking-tighter leading-none">
+      Your projects need<br>
+      <span class="text-transparent bg-clip-text bg-gradient-to-r from-hc-red to-hc-blue">storage.</span> We have it.
+    </h1>
     
-    <p class="text-xl text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
-      Need S3 storage for your next project? We've got you covered.
-      <br>
-      <span class="text-white">Simple, fast, and free object storage for Hack Clubbers.</span>
+    <p class="text-xl md:text-2xl text-gray-400 mb-12 max-w-3xl mx-auto leading-relaxed">
+      Stop worrying about AWS bills or configuring buckets. 
+      <span class="text-white">Silo gives you instant, free S3-compatible object storage</span> so you can focus on shipping.
     </p>
     
-    <div class="flex gap-4 justify-center">
+    <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
       <a
         href="/auth/login"
-        class="bg-hc-red hover:bg-red-600 text-white px-8 py-4 rounded-xl font-bold text-xl transition-all hover:scale-105"
+        class="w-full sm:w-auto bg-white text-black hover:bg-gray-200 px-8 py-4 rounded-xl font-bold text-xl transition-all hover:scale-105 flex items-center justify-center gap-2"
       >
-        Start Storing
+        <span>Get Storage Keys</span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
       </a>
       <a
         href="/docs"
-        class="bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-xl font-bold text-xl transition-all hover:scale-105"
+        class="w-full sm:w-auto bg-white/5 hover:bg-white/10 text-white border border-white/10 px-8 py-4 rounded-xl font-bold text-xl transition-all hover:scale-105"
       >
-        Documentation
+        View Documentation
       </a>
     </div>
   </div>
 
-  {{!-- Features Grid --}}
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl mx-auto py-16 px-4">
-    <div class="bg-white/5 p-8 rounded-2xl border border-white/10 hover:border-hc-red/50 transition-colors">
-      <h3 class="text-2xl font-bold mb-2 text-hc-red">S3 Compatible</h3>
-      <p class="text-gray-400">Drop-in replacement for AWS S3. Works with all your favorite tools.</p>
-    </div>
-    <div class="bg-white/5 p-8 rounded-2xl border border-white/10 hover:border-hc-blue/50 transition-colors">
-      <h3 class="text-2xl font-bold mb-2 text-hc-blue">High Performance</h3>
-      <p class="text-gray-400">Optimized for speed. Your assets are served instantly via our global CDN.</p>
-    </div>
-    <div class="bg-white/5 p-8 rounded-2xl border border-white/10 hover:border-green-500/50 transition-colors">
-      <h3 class="text-2xl font-bold mb-2 text-green-500">Community First</h3>
-      <p class="text-gray-400">Built by Hack Clubbers, for Hack Clubbers. Free for all your projects.</p>
+  {{!-- How it works --}}
+  <div class="w-full border-y border-white/10 bg-white/5 backdrop-blur-sm">
+    <div class="max-w-6xl mx-auto px-6 py-20">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+        <div class="space-y-4">
+          <div class="text-hc-red font-mono text-xl font-bold">01. LOGIN</div>
+          <h3 class="text-2xl font-bold">Auth with Hack Club</h3>
+          <p class="text-gray-400 leading-relaxed">No new accounts to create. Just sign in with your existing Hack Club Slack account to get started instantly.</p>
+        </div>
+        <div class="space-y-4">
+          <div class="text-hc-blue font-mono text-xl font-bold">02. CREATE</div>
+          <h3 class="text-2xl font-bold">Get your Buckets</h3>
+          <p class="text-gray-400 leading-relaxed">Create buckets for your projects in seconds. Manage access keys and permissions from a simple dashboard.</p>
+        </div>
+        <div class="space-y-4">
+          <div class="text-green-500 font-mono text-xl font-bold">03. SHIP</div>
+          <h3 class="text-2xl font-bold">Connect & Deploy</h3>
+          <p class="text-gray-400 leading-relaxed">Use standard S3 libraries to upload files. We handle the hosting, bandwidth, and reliability for free.</p>
+        </div>
+      </div>
     </div>
   </div>
 
-  {{!-- Code Example Section --}}
-  <div class="w-full max-w-5xl mx-auto py-16 px-4">
-    <div class="bg-[#1c1c21] rounded-2xl border border-white/10 overflow-hidden shadow-2xl">
-      <div class="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/5">
-        <div class="w-3 h-3 rounded-full bg-red-500"></div>
-        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-        <div class="w-3 h-3 rounded-full bg-green-500"></div>
-        <span class="ml-2 text-sm text-gray-500 font-mono">upload.js</span>
+  {{!-- Technical Section --}}
+  <div class="w-full max-w-6xl mx-auto px-6 py-24">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+      <div>
+        <h2 class="text-4xl md:text-5xl font-bold mb-6 tracking-tight">Works with everything you use.</h2>
+        <p class="text-xl text-gray-400 mb-8">
+          Since Silo is S3-compatible, it works out of the box with the tools and libraries you already know.
+        </p>
+        <ul class="space-y-4">
+          <li class="flex items-center gap-3 text-lg">
+            <div class="w-2 h-2 rounded-full bg-hc-red"></div>
+            <span>AWS SDK (JavaScript, Python, Go, etc)</span>
+          </li>
+          <li class="flex items-center gap-3 text-lg">
+            <div class="w-2 h-2 rounded-full bg-hc-blue"></div>
+            <span>Rclone & CLI tools</span>
+          </li>
+          <li class="flex items-center gap-3 text-lg">
+            <div class="w-2 h-2 rounded-full bg-green-500"></div>
+            <span>Direct HTTP uploads</span>
+          </li>
+          <li class="flex items-center gap-3 text-lg">
+            <div class="w-2 h-2 rounded-full bg-purple-500"></div>
+            <span>Presigned URLs</span>
+          </li>
+        </ul>
       </div>
-      <div class="p-6 overflow-x-auto">
-<pre><code class="language-javascript text-sm md:text-base"><span class="text-purple-400">import</span> { S3Client, PutObjectCommand } <span class="text-purple-400">from</span> <span class="text-green-400">"@aws-sdk/client-s3"</span>;
+      
+      <div class="bg-[#1c1c21] rounded-2xl border border-white/10 overflow-hidden shadow-2xl transform rotate-1 hover:rotate-0 transition-transform duration-500">
+        <div class="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/5">
+          <div class="w-3 h-3 rounded-full bg-red-500"></div>
+          <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+          <div class="w-3 h-3 rounded-full bg-green-500"></div>
+          <span class="ml-2 text-sm text-gray-500 font-mono">config.ts</span>
+        </div>
+        <div class="p-6 overflow-x-auto">
+<pre><code class="language-typescript text-sm md:text-base"><span class="text-purple-400">import</span> { S3Client } <span class="text-purple-400">from</span> <span class="text-green-400">"@aws-sdk/client-s3"</span>;
 
-<span class="text-gray-500">// 1. Configure Silo</span>
-<span class="text-purple-400">const</span> s3 = <span class="text-purple-400">new</span> <span class="text-yellow-400">S3Client</span>({
+<span class="text-purple-400">export const</span> s3 = <span class="text-purple-400">new</span> <span class="text-yellow-400">S3Client</span>({
   endpoint: <span class="text-green-400">"https://silo.hackclub.com"</span>,
   region: <span class="text-green-400">"auto"</span>,
   credentials: {
-    accessKeyId: <span class="text-green-400">"YOUR_ACCESS_KEY"</span>,
-    secretAccessKey: <span class="text-green-400">"YOUR_SECRET_KEY"</span>
+    accessKeyId: process.env.ACCESS_KEY,
+    secretAccessKey: process.env.SECRET_KEY
   }
-});
-
-<span class="text-gray-500">// 2. Ship it!</span>
-<span class="text-purple-400">await</span> s3.<span class="text-blue-400">send</span>(<span class="text-purple-400">new</span> <span class="text-yellow-400">PutObjectCommand</span>({
-  Bucket: <span class="text-green-400">"my-cool-project"</span>,
-  Key: <span class="text-green-400">"ship.png"</span>,
-  Body: fileStream
-}));</code></pre>
+});</code></pre>
+        </div>
       </div>
     </div>
   </div>
 
-  {{!-- Bottom CTA --}}
-  <div class="text-center py-20">
-    <h2 class="text-4xl font-bold mb-8">Ready to ship?</h2>
-    <a
-      href="/auth/login"
-      class="bg-white text-black hover:bg-gray-200 px-8 py-4 rounded-xl font-bold text-xl transition-all hover:scale-105 inline-block"
-    >
-      Get Your Keys
-    </a>
+  {{!-- Final CTA --}}
+  <div class="w-full max-w-4xl mx-auto text-center py-20 px-6 mb-10">
+    <div class="bg-gradient-to-b from-white/5 to-transparent p-12 rounded-3xl border border-white/10">
+      <h2 class="text-4xl font-bold mb-6">Ready to start storing?</h2>
+      <p class="text-xl text-gray-400 mb-8">Join hundreds of other Hack Clubbers using Silo for their projects.</p>
+      <a
+        href="/auth/login"
+        class="inline-block bg-hc-red hover:bg-red-600 text-white px-10 py-5 rounded-xl font-bold text-xl transition-all hover:scale-105 shadow-xl shadow-red-900/20"
+      >
+        Login with Hack Club
+      </a>
+    </div>
   </div>
 </div>
