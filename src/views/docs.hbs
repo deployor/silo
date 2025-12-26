@@ -83,11 +83,6 @@
               Rclone
             </button>
           </li>
-          <li>
-            <button onclick="showSection('uppy')" class="nav-link text-left w-full hover:text-white transition-colors py-2 px-3 rounded-lg" id="nav-uppy">
-              Uppy (File Uploads)
-            </button>
-          </li>
         </ul>
       </div>
     </div>
@@ -393,30 +388,38 @@ aws s3 ls s3://my-bucket --endpoint-url https://silo.deployor.dev --profile silo
         The best way to interact with Silo in JavaScript/TypeScript is using the official AWS SDK v3.
       </p>
 
+      <div class="bg-hc-blue/10 border border-hc-blue/20 p-4 rounded-lg mb-8">
+        <h4 class="text-hc-blue font-bold mb-2">Quick Start</h4>
+        <p class="text-sm text-text-muted">
+          Don't want to read? Copy the initialization code and start shipping.
+        </p>
+      </div>
+
       <h3 class="text-lg font-bold text-white mb-3">1. Installation</h3>
       <pre class="rounded-lg mb-6"><code class="language-bash">npm install @aws-sdk/client-s3
 # or
 bun add @aws-sdk/client-s3</code></pre>
 
       <h3 class="text-lg font-bold text-white mb-3">2. Initialization</h3>
-      <p class="text-text-muted mb-3">Create a reusable client instance.</p>
+      <p class="text-text-muted mb-3">Create a reusable client instance. We recommend storing your keys in a <code>.env</code> file.</p>
       <pre class="rounded-lg mb-6"><code class="language-javascript">import { S3Client } from "@aws-sdk/client-s3";
 
+// Initialize the client
 const s3 = new S3Client({
   region: "auto",
   endpoint: "https://silo.deployor.dev",
   credentials: {
-    accessKeyId: process.env.ACCESS_KEY_ID,
-    secretAccessKey: process.env.SECRET_ACCESS_KEY,
+    accessKeyId: process.env.ACCESS_KEY_ID,     // e.g. "23823..."
+    secretAccessKey: process.env.SECRET_ACCESS_KEY, // e.g. "82382..."
   },
 });</code></pre>
 
       <h3 class="text-lg font-bold text-white mb-3">3. Uploading Files (PutObject)</h3>
-      <p class="text-text-muted mb-3">You can upload strings, Buffers, or Streams.</p>
+      <p class="text-text-muted mb-3">You can upload strings, Buffers, or Streams. Always set the <code>ContentType</code> so browsers know how to handle the file.</p>
       <pre class="rounded-lg mb-6"><code class="language-javascript">import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { readFile } from "fs/promises";
 
-// Upload text
+// Example 1: Uploading a simple text string
 await s3.send(new PutObjectCommand({
   Bucket: "my-bucket",
   Key: "hello.txt",
@@ -424,7 +427,7 @@ await s3.send(new PutObjectCommand({
   ContentType: "text/plain"
 }));
 
-// Upload a file from disk
+// Example 2: Uploading an image from disk
 const fileBuffer = await readFile("./image.png");
 await s3.send(new PutObjectCommand({
   Bucket: "my-bucket",
@@ -447,7 +450,7 @@ const str = await response.Body.transformToString();
 console.log(str); // "Hello World!"</code></pre>
 
       <h3 class="text-lg font-bold text-white mb-3">5. Listing Files</h3>
-      <p class="text-text-muted mb-3">List contents of a bucket.</p>
+      <p class="text-text-muted mb-3">List contents of a bucket. Useful for building file browsers.</p>
       <pre class="rounded-lg mb-6"><code class="language-javascript">import { ListObjectsV2Command } from "@aws-sdk/client-s3";
 
 const response = await s3.send(new ListObjectsV2Command({
@@ -455,9 +458,14 @@ const response = await s3.send(new ListObjectsV2Command({
   Prefix: "images/" // Optional: filter by folder
 }));
 
-response.Contents.forEach((file) => {
-  console.log(`${file.Key} (${file.Size} bytes)`);
-});</code></pre>
+// Check if bucket is empty
+if (!response.Contents) {
+  console.log("Bucket is empty!");
+} else {
+  response.Contents.forEach((file) => {
+    console.log(`${file.Key} (${file.Size} bytes)`);
+  });
+}</code></pre>
 
       <h3 class="text-lg font-bold text-white mb-3">6. Deleting Files</h3>
       <pre class="rounded-lg mb-6"><code class="language-javascript">import { DeleteObjectCommand } from "@aws-sdk/client-s3";
@@ -466,48 +474,98 @@ await s3.send(new DeleteObjectCommand({
   Bucket: "my-bucket",
   Key: "hello.txt"
 }));</code></pre>
+
+      <h3 class="text-lg font-bold text-white mb-3">7. Generating Presigned URLs</h3>
+      <p class="text-text-muted mb-3">
+        Want to let users upload directly to your bucket without sharing your secret key? Use Presigned URLs.
+      </p>
+      <pre class="rounded-lg mb-6"><code class="language-javascript">import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+
+const command = new PutObjectCommand({
+  Bucket: "my-bucket",
+  Key: "user-upload.png",
+});
+
+// Generate a URL valid for 15 minutes
+const url = await getSignedUrl(s3, command, { expiresIn: 900 });
+console.log("Upload here:", url);</code></pre>
     </div>
 
     <!-- Python -->
     <div id="python" class="section-content">
       <h1 class="text-4xl font-bold mb-6 text-white">Python (Boto3)</h1>
       <p class="mb-6 text-text-muted">
-        Use the standard <code>boto3</code> library.
+        Boto3 is the standard AWS SDK for Python. It's robust and widely used in data science and backend development.
       </p>
 
-      <pre class="rounded-lg"><code class="language-python">import boto3
+      <h3 class="text-lg font-bold text-white mb-3">1. Installation</h3>
+      <pre class="rounded-lg mb-6"><code class="language-bash">pip install boto3</code></pre>
 
+      <h3 class="text-lg font-bold text-white mb-3">2. Initialization</h3>
+      <pre class="rounded-lg mb-6"><code class="language-python">import boto3
+import os
+
+# Initialize the S3 client
 s3 = boto3.client('s3',
     endpoint_url='https://silo.deployor.dev',
-    aws_access_key_id='YOUR_ACCESS_KEY',
-    aws_secret_access_key='YOUR_SECRET_KEY'
-)
+    aws_access_key_id=os.getenv('ACCESS_KEY'),
+    aws_secret_access_key=os.getenv('SECRET_KEY'),
+    region_name='auto'
+)</code></pre>
 
-# Upload a file
+      <h3 class="text-lg font-bold text-white mb-3">3. Uploading Files</h3>
+      <pre class="rounded-lg mb-6"><code class="language-python"># Upload a file from disk
+s3.upload_file('local_image.jpg', 'my-bucket', 'images/remote_image.jpg')
+
+# Upload a file object (useful for web frameworks like Flask/Django)
+with open('local_image.jpg', 'rb') as f:
+    s3.upload_fileobj(f, 'my-bucket', 'images/remote_image.jpg')
+
+# Upload raw bytes
 s3.put_object(
     Bucket='my-bucket',
     Key='hello.txt',
-    Body='Hello World!'
-)
+    Body=b'Hello World!',
+    ContentType='text/plain'
+)</code></pre>
 
-# List objects
-response = s3.list_objects_v2(Bucket='my-bucket')
-for obj in response.get('Contents', []):
-    print(obj['Key'])</code></pre>
+      <h3 class="text-lg font-bold text-white mb-3">4. Downloading Files</h3>
+      <pre class="rounded-lg mb-6"><code class="language-python"># Download to disk
+s3.download_file('my-bucket', 'images/remote_image.jpg', 'local_image.jpg')
+
+# Download to memory
+response = s3.get_object(Bucket='my-bucket', Key='hello.txt')
+content = response['Body'].read().decode('utf-8')
+print(content)</code></pre>
+
+      <h3 class="text-lg font-bold text-white mb-3">5. Listing Objects</h3>
+      <pre class="rounded-lg mb-6"><code class="language-python">paginator = s3.get_paginator('list_objects_v2')
+for page in paginator.paginate(Bucket='my-bucket'):
+    for obj in page.get('Contents', []):
+        print(f"{obj['Key']} - {obj['Size']} bytes")</code></pre>
     </div>
 
     <!-- Go -->
     <div id="go" class="section-content">
       <h1 class="text-4xl font-bold mb-6 text-white">Go</h1>
       <p class="mb-6 text-text-muted">
-        Use the AWS SDK for Go v2.
+        Use the official AWS SDK for Go v2. It provides a type-safe and performant way to interact with Silo.
       </p>
 
-      <pre class="rounded-lg"><code class="language-go">package main
+      <h3 class="text-lg font-bold text-white mb-3">1. Installation</h3>
+      <pre class="rounded-lg mb-6"><code class="language-bash">go get github.com/aws/aws-sdk-go-v2
+go get github.com/aws/aws-sdk-go-v2/config
+go get github.com/aws/aws-sdk-go-v2/service/s3</code></pre>
+
+      <h3 class="text-lg font-bold text-white mb-3">2. Complete Example</h3>
+      <pre class="rounded-lg mb-6"><code class="language-go">package main
 
 import (
  "context"
  "fmt"
+ "log"
+ "os"
  "strings"
 
  "github.com/aws/aws-sdk-go-v2/aws"
@@ -517,29 +575,52 @@ import (
 )
 
 func main() {
+    // 1. Configure the custom endpoint resolver
  r2Resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
   return aws.Endpoint{
    URL: "https://silo.deployor.dev",
   }, nil
  })
 
- cfg, _ := config.LoadDefaultConfig(context.TODO(),
+    // 2. Load credentials
+ cfg, err := config.LoadDefaultConfig(context.TODO(),
   config.WithEndpointResolverWithOptions(r2Resolver),
-  config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("ACCESS_KEY", "SECRET_KEY", "")),
+  config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+            os.Getenv("ACCESS_KEY"),
+            os.Getenv("SECRET_KEY"),
+            "",
+        )),
+        config.WithRegion("auto"),
  )
+ if err != nil {
+  log.Fatal(err)
+ }
 
  client := s3.NewFromConfig(cfg)
 
- _, err := client.PutObject(context.TODO(), &s3.PutObjectInput{
+    // 3. Upload a file
+ _, err = client.PutObject(context.TODO(), &s3.PutObjectInput{
   Bucket: aws.String("my-bucket"),
   Key:    aws.String("hello.txt"),
   Body:   strings.NewReader("Hello World!"),
+        ContentType: aws.String("text/plain"),
  })
-
  if err != nil {
-  panic(err)
+  log.Fatal(err)
  }
- fmt.Println("Uploaded!")
+ fmt.Println("Uploaded hello.txt")
+
+    // 4. List files
+    output, err := client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
+        Bucket: aws.String("my-bucket"),
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    for _, object := range output.Contents {
+        fmt.Printf("Found: %s (%d bytes)\n", *object.Key, object.Size)
+    }
 }</code></pre>
     </div>
 
@@ -547,10 +628,26 @@ func main() {
     <div id="rclone" class="section-content">
       <h1 class="text-4xl font-bold mb-6 text-white">Rclone</h1>
       <p class="mb-6 text-text-muted">
-        Rclone is a command-line program to manage files on cloud storage. It works perfectly with Silo.
+        Rclone is the "Swiss army knife of cloud storage". It's perfect for backups, migrations, and mounting buckets as local drives.
       </p>
 
-      <h3 class="text-lg font-bold text-white mb-3">Configuration (~/.config/rclone/rclone.conf)</h3>
+      <h3 class="text-lg font-bold text-white mb-3">1. Interactive Configuration</h3>
+      <p class="text-text-muted mb-3">Run <code>rclone config</code> and follow these steps:</p>
+      <ol class="list-decimal list-inside space-y-2 text-text-muted mb-6 font-mono text-sm bg-black/20 p-4 rounded-lg">
+        <li><span class="text-hc-blue">n</span> (New remote)</li>
+        <li>name: <span class="text-hc-blue">silo</span></li>
+        <li>Storage: <span class="text-hc-blue">s3</span></li>
+        <li>Provider: <span class="text-hc-blue">Other</span></li>
+        <li>env_auth: <span class="text-hc-blue">false</span></li>
+        <li>access_key_id: <span class="text-hc-blue">[Paste your Access Key]</span></li>
+        <li>secret_access_key: <span class="text-hc-blue">[Paste your Secret Key]</span></li>
+        <li>region: <span class="text-hc-blue">auto</span></li>
+        <li>endpoint: <span class="text-hc-blue">https://silo.deployor.dev</span></li>
+        <li>acl: <span class="text-hc-blue">private</span></li>
+      </ol>
+
+      <h3 class="text-lg font-bold text-white mb-3">2. Manual Configuration</h3>
+      <p class="text-text-muted mb-3">Alternatively, edit <code>~/.config/rclone/rclone.conf</code> directly:</p>
       <pre class="rounded-lg mb-6"><code class="language-ini">[silo]
 type = s3
 provider = Other
@@ -558,105 +655,31 @@ env_auth = false
 access_key_id = YOUR_ACCESS_KEY
 secret_access_key = YOUR_SECRET_KEY
 endpoint = https://silo.deployor.dev
+region = auto
 acl = private</code></pre>
 
-      <h3 class="text-lg font-bold text-white mb-3">Usage</h3>
-      <pre class="rounded-lg"><code class="language-bash"># List buckets
-rclone lsd silo:
-
-# Copy a file
-rclone copy myfile.txt silo:my-bucket/
-
-# Sync a directory
-rclone sync ./local-folder silo:my-bucket/remote-folder</code></pre>
-    </div>
-
-    <!-- Uppy -->
-    <div id="uppy" class="section-content">
-      <h1 class="text-4xl font-bold mb-6 text-white">Uppy</h1>
-      <p class="mb-6 text-text-muted">
-        Uppy is a sleek, modular JavaScript file uploader that integrates seamlessly with any application. You can use it with Silo via the AWS S3 plugin using Presigned URLs.
-      </p>
-
-      <div class="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-lg mb-8">
-        <p class="text-yellow-200 text-sm">
-          <strong>Note:</strong> For security, you should never expose your Secret Key in the frontend. Instead, you must generate <strong>Presigned URLs</strong> on your backend and pass them to Uppy.
-        </p>
+      <h3 class="text-lg font-bold text-white mb-3">3. Common Commands</h3>
+      <div class="space-y-4">
+        <div>
+            <p class="text-white font-bold text-sm mb-1">List all buckets</p>
+            <pre class="rounded-lg"><code class="language-bash">rclone lsd silo:</code></pre>
+        </div>
+        <div>
+            <p class="text-white font-bold text-sm mb-1">Copy a local file to Silo</p>
+            <pre class="rounded-lg"><code class="language-bash">rclone copy ./my-game.zip silo:games-bucket/v1/</code></pre>
+        </div>
+        <div>
+            <p class="text-white font-bold text-sm mb-1">Sync a local folder (mirror)</p>
+            <pre class="rounded-lg"><code class="language-bash">rclone sync ./build silo:my-website/ --progress</code></pre>
+        </div>
+        <div>
+            <p class="text-white font-bold text-sm mb-1">Mount bucket as a local drive (macOS/Linux)</p>
+            <pre class="rounded-lg"><code class="language-bash">mkdir ~/mnt/silo
+rclone mount silo:my-bucket ~/mnt/silo --vfs-cache-mode writes</code></pre>
+        </div>
       </div>
-
-      <h3 class="text-lg font-bold text-white mb-3">1. Backend: Generate Presigned URL</h3>
-      <p class="text-text-muted mb-3">Create an API route (e.g., <code>/api/sign-s3</code>) that generates a temporary upload URL.</p>
-      <pre class="rounded-lg mb-6"><code class="language-javascript">// backend/api/sign-s3.js
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-
-const s3 = new S3Client({
-  region: "auto",
-  endpoint: "https://silo.deployor.dev",
-  credentials: {
-    accessKeyId: process.env.ACCESS_KEY,
-    secretAccessKey: process.env.SECRET_KEY,
-  },
-});
-
-export async function POST(request) {
-  const { filename, contentType } = await request.json();
-
-  const command = new PutObjectCommand({
-    Bucket: "my-bucket",
-    Key: filename,
-    ContentType: contentType,
-  });
-
-  // Generate a URL valid for 1 hour
-  const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
-
-  return Response.json({ url, method: "PUT" });
-}</code></pre>
-
-      <h3 class="text-lg font-bold text-white mb-3">2. Frontend: Configure Uppy</h3>
-      <p class="text-text-muted mb-3">Install Uppy and the AwsS3 plugin.</p>
-      <pre class="rounded-lg mb-6"><code class="language-bash">npm install @uppy/core @uppy/dashboard @uppy/aws-s3</code></pre>
-
-      <pre class="rounded-lg mb-6"><code class="language-javascript">// frontend/app.js
-import Uppy from '@uppy/core';
-import Dashboard from '@uppy/dashboard';
-import AwsS3 from '@uppy/aws-s3';
-
-import '@uppy/core/dist/style.css';
-import '@uppy/dashboard/dist/style.css';
-
-const uppy = new Uppy()
-  .use(Dashboard, {
-    inline: true,
-    target: '#drag-drop-area',
-  })
-  .use(AwsS3, {
-    // Uppy will call this function for every file
-    async getUploadParameters(file) {
-      // Call your backend to get the presigned URL
-      const response = await fetch('/api/sign-s3', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename: file.name,
-          contentType: file.type,
-        }),
-      });
-      
-      const data = await response.json();
-
-      // Return the signed URL and method to Uppy
-      return {
-        method: data.method,
-        url: data.url,
-        headers: {
-          'Content-Type': file.type,
-        },
-      };
-    },
-  });</code></pre>
     </div>
+
 </div>
 
 {{#section "extraStyles"}}
