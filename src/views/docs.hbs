@@ -383,29 +383,84 @@ aws s3 ls s3://my-bucket --endpoint-url https://silo.deployor.dev --profile silo
 
     <!-- JS -->
     <div id="js" class="section-content">
-      <h1 class="text-4xl font-bold mb-6 text-white">JavaScript / Bun</h1>
+      <h1 class="text-4xl font-bold mb-6 text-white">JavaScript / TypeScript</h1>
       <p class="mb-6 text-text-muted">
-        Use the <code>@aws-sdk/client-s3</code> package.
+        The best way to interact with Silo in JavaScript/TypeScript is using the official AWS SDK v3.
       </p>
 
-      <pre class="rounded-lg"><code class="language-javascript">import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+      <h3 class="text-lg font-bold text-white mb-3">1. Installation</h3>
+      <pre class="rounded-lg mb-6"><code class="language-bash">npm install @aws-sdk/client-s3
+# or
+bun add @aws-sdk/client-s3</code></pre>
+
+      <h3 class="text-lg font-bold text-white mb-3">2. Initialization</h3>
+      <p class="text-text-muted mb-3">Create a reusable client instance.</p>
+      <pre class="rounded-lg mb-6"><code class="language-javascript">import { S3Client } from "@aws-sdk/client-s3";
 
 const s3 = new S3Client({
   region: "auto",
   endpoint: "https://silo.deployor.dev",
   credentials: {
-    accessKeyId: "YOUR_ACCESS_KEY",
-    secretAccessKey: "YOUR_SECRET_KEY",
+    accessKeyId: process.env.ACCESS_KEY_ID,
+    secretAccessKey: process.env.SECRET_ACCESS_KEY,
   },
-});
+});</code></pre>
 
-await s3.send(
-  new PutObjectCommand({
-    Bucket: "my-bucket",
-    Key: "hello.txt",
-    Body: "Hello World!",
-  })
-);</code></pre>
+      <h3 class="text-lg font-bold text-white mb-3">3. Uploading Files (PutObject)</h3>
+      <p class="text-text-muted mb-3">You can upload strings, Buffers, or Streams.</p>
+      <pre class="rounded-lg mb-6"><code class="language-javascript">import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { readFile } from "fs/promises";
+
+// Upload text
+await s3.send(new PutObjectCommand({
+  Bucket: "my-bucket",
+  Key: "hello.txt",
+  Body: "Hello World!",
+  ContentType: "text/plain"
+}));
+
+// Upload a file from disk
+const fileBuffer = await readFile("./image.png");
+await s3.send(new PutObjectCommand({
+  Bucket: "my-bucket",
+  Key: "images/profile.png",
+  Body: fileBuffer,
+  ContentType: "image/png"
+}));</code></pre>
+
+      <h3 class="text-lg font-bold text-white mb-3">4. Downloading Files (GetObject)</h3>
+      <p class="text-text-muted mb-3">Reading files returns a stream. Here's a helper to convert it to a string.</p>
+      <pre class="rounded-lg mb-6"><code class="language-javascript">import { GetObjectCommand } from "@aws-sdk/client-s3";
+
+const response = await s3.send(new GetObjectCommand({
+  Bucket: "my-bucket",
+  Key: "hello.txt"
+}));
+
+// Helper to convert stream to string
+const str = await response.Body.transformToString();
+console.log(str); // "Hello World!"</code></pre>
+
+      <h3 class="text-lg font-bold text-white mb-3">5. Listing Files</h3>
+      <p class="text-text-muted mb-3">List contents of a bucket.</p>
+      <pre class="rounded-lg mb-6"><code class="language-javascript">import { ListObjectsV2Command } from "@aws-sdk/client-s3";
+
+const response = await s3.send(new ListObjectsV2Command({
+  Bucket: "my-bucket",
+  Prefix: "images/" // Optional: filter by folder
+}));
+
+response.Contents.forEach((file) => {
+  console.log(`${file.Key} (${file.Size} bytes)`);
+});</code></pre>
+
+      <h3 class="text-lg font-bold text-white mb-3">6. Deleting Files</h3>
+      <pre class="rounded-lg mb-6"><code class="language-javascript">import { DeleteObjectCommand } from "@aws-sdk/client-s3";
+
+await s3.send(new DeleteObjectCommand({
+  Bucket: "my-bucket",
+  Key: "hello.txt"
+}));</code></pre>
     </div>
 
     <!-- Python -->
