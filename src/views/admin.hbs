@@ -851,7 +851,7 @@
             const unit = parseFloat(document.getElementById("modal-storage-unit").value);
 
             if (isNaN(amount) || amount < 0) {
-                showToast("Invalid amount.", "error");
+                alert("Invalid amount.");
                 return;
             }
             const totalBytes = Math.floor(amount * unit);
@@ -868,7 +868,7 @@
                 const amount = parseFloat(document.getElementById("modal-egress-limit").value);
                 const unit = parseFloat(document.getElementById("modal-egress-unit").value);
                 if (isNaN(amount) || amount < 0) {
-                    showToast("Invalid amount.", "error");
+                    alert("Invalid amount.");
                     return;
                 }
                 limit = Math.floor(amount * unit);
@@ -889,7 +889,7 @@
         
         // Refresh
         loadUsers();
-        showToast(message, "success");
+        alert(message);
     }
 
     async function toggleUserLock(locked) {
@@ -911,7 +911,7 @@
     async function openAdminBucketModal(bucketName) {
         // Fetch bucket details including keys and files
         const res = await fetch(`/api/admin/buckets/${bucketName}`);
-        if (!res.ok) return showToast("Failed to load bucket", "error");
+        if (!res.ok) return alert("Failed to load bucket");
         const data = await res.json();
         currentBucket = data;
 
@@ -1049,7 +1049,7 @@
     async function resetBucketCorsAdmin() {
         if (!currentBucket || !confirm("Reset CORS configuration for this bucket?")) return;
         await fetch(`/api/admin/buckets/${currentBucket.name}/cors`, { method: "DELETE" });
-        showToast("CORS configuration reset.", "success");
+        alert("CORS configuration reset.");
     }
 
     async function toggleKeyPause(keyId, pause) {
