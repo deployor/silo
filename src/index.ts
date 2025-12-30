@@ -1,13 +1,15 @@
 import { config } from "./config";
 import { handleS3Request } from "./core/s3";
-import { updateStats } from "./core/s3/utils";
 import { handleSlackRequest } from "./integrations/slack";
 import { errorResponse } from "./lib/api-utils";
+import { context } from "./lib/context";
 import { S3Errors } from "./lib/s3-errors";
 import { validateOrigin } from "./lib/security";
 import { render } from "./lib/view-engine";
 import { authenticate } from "./middleware/auth";
 import { rateLimit } from "./middleware/rate-limit";
+import { logService } from "./services/log-service";
+import { statsService } from "./services/stats-service";
 import { handleAdminRequest } from "./web/admin";
 import { handleDashboardRequest } from "./web/dashboard";
 
@@ -88,108 +90,163 @@ Bun.serve({
 	maxRequestBodySize: 1024 * 1024 * 1024, // 1GB
 	async fetch(req) {
 		const url = new URL(req.url);
+		const requestId = crypto.randomUUID();
+		const startTime = performance.now();
 
-		if (isDashboardRequest(req, url)) {
-			// Rate Limiting
-			if (url.pathname.startsWith("/api/")) {
-				const limitRes = await apiLimiter(req);
-				if (limitRes) return limitRes;
-			}
-			if (url.pathname.startsWith("/auth/")) {
-				const limitRes = await authLimiter(req);
-				if (limitRes) return limitRes;
-			}
+		return context.run(
+			{
+				requestId,
+				startTime,
+				ip:
+					req.headers.get("x-forwarded-for") ||
+					req.headers.get("cf-connecting-ip") ||
+					"unknown",
+				userAgent: req.headers.get("user-agent"),
+				method: req.method,
+				path: url.pathname,
+			},
+			async () => {
+				let response: Response;
 
-			// Global Security Check for API routes (except Slack events which are verified by signature)
-			if (
-				url.pathname.startsWith("/api/") &&
-				!url.pathname.startsWith("/api/slack/") &&
-				req.method !== "GET" &&
-				req.method !== "HEAD"
-			) {
-				if (!validateOrigin(req)) {
-					return errorResponse("Invalid Origin", 403);
+				if (isDashboardRequest(req, url)) {
+					// Rate Limiting
+					if (url.pathname.startsWith("/api/")) {
+						const limitRes = await apiLimiter(req);
+						if (limitRes) return limitRes;
+					}
+					if (url.pathname.startsWith("/auth/")) {
+						const limitRes = await authLimiter(req);
+						if (limitRes) return limitRes;
+					}
+
+					// Global Security Check for API routes (except Slack events which are verified by signature)
+					if (
+						url.pathname.startsWith("/api/") &&
+						!url.pathname.startsWith("/api/slack/") &&
+						req.method !== "GET" &&
+						req.method !== "HEAD"
+					) {
+						if (!validateOrigin(req)) {
+							return errorResponse("Invalid Origin", 403);
+						}
+					}
+
+					if (
+						url.pathname.startsWith("/admin") ||
+						url.pathname.startsWith("/api/admin")
+					) {
+						response = await handleAdminRequest(req);
+					} else if (url.pathname === "/api/slack/events") {
+						response = await handleSlackRequest(req);
+					} else if (url.pathname.startsWith("/assets/")) {
+						const filePath = `src${url.pathname}`;
+						const file = Bun.file(filePath);
+						if (await file.exists()) {
+							response = new Response(file, {
+								headers: {
+									"Content-Type": file.type,
+									"Cache-Control": "public, max-age=31536000",
+								},
+							});
+						} else {
+							response = new Response("Not Found", { status: 404 });
+						}
+					} else if (url.pathname === "/slack-success") {
+						const html = await render("slack-success", {
+							title: "Silo - Account Linked",
+							layout: "blank",
+						});
+						response = new Response(html, {
+							headers: { "Content-Type": "text/html" },
+						});
+					} else {
+						response = await handleDashboardRequest(req);
+					}
+				} else {
+					// S3 Request Handling
+					const forbiddenParams = [
+						"policy",
+						"acl",
+						"lifecycle",
+						"replication",
+						"tagging",
+						"encryption",
+						"website",
+						"logging",
+						"accelerate",
+						"payment",
+						"object-lock",
+						"versioning",
+						"versions",
+					];
+
+					let forbidden = false;
+					for (const param of forbiddenParams) {
+						if (url.searchParams.has(param)) {
+							response = S3Errors.NotImplemented().toResponse();
+							forbidden = true;
+							break;
+						}
+					}
+
+					if (!forbidden) {
+						try {
+							const authResult = await authenticate(req);
+
+							if (authResult instanceof Response) {
+								response = authResult;
+							} else {
+								const { user, bucket, mode } = authResult;
+								// Populate context with auth info
+								const ctx = context.getStore();
+								if (ctx) {
+									ctx.user = user;
+									ctx.bucket = bucket;
+									ctx.mode = mode;
+								}
+
+								response = await handleS3Request(req, user, bucket, mode);
+							}
+						} catch (e) {
+							console.error("S3 Request Error:", e);
+							response = S3Errors.InternalError().toResponse();
+						}
+					} else {
+						// Already handled forbidden
+						if (!response!) response = S3Errors.InternalError().toResponse();
+					}
 				}
-			}
 
-			if (
-				url.pathname.startsWith("/admin") ||
-				url.pathname.startsWith("/api/admin")
-			) {
-				return handleAdminRequest(req);
-			}
-			if (url.pathname === "/api/slack/events") {
-				return handleSlackRequest(req);
-			}
-			if (url.pathname.startsWith("/assets/")) {
-				const filePath = `src${url.pathname}`;
-				const file = Bun.file(filePath);
-				if (await file.exists()) {
-					return new Response(file, {
-						headers: {
-							"Content-Type": file.type,
-							"Cache-Control": "public, max-age=31536000",
-						},
+				// Post-request logging and stats
+				// We only log if we have a user context (authenticated requests)
+				const ctx = context.getStore();
+				if (ctx?.user) {
+					// For PUT requests, we might have already logged ingress in the handler
+					// But for general stats, we do it here.
+					// Note: Ingress for PUT is tricky because the body stream is consumed.
+					// We rely on the handler to have updated the DB for storage usage,
+					// but for traffic stats we can try to use Content-Length.
+					const ingress = parseInt(
+						req.headers.get("content-length") || "0",
+						10,
+					);
+					const egress = parseInt(
+						response.headers.get("content-length") || "0",
+						10,
+					);
+
+					// Fire and forget
+					Promise.all([
+						logService.logRequest(response, ingress),
+						statsService.recordUsage(ingress, egress),
+					]).catch((err) => {
+						console.error("Error updating stats/logs:", err);
 					});
 				}
-			}
-			if (url.pathname === "/slack-success") {
-				const html = await render("slack-success", {
-					title: "Silo - Account Linked",
-					layout: "blank",
-				});
-				return new Response(html, {
-					headers: { "Content-Type": "text/html" },
-				});
-			}
-			return handleDashboardRequest(req);
-		}
 
-		// S3 Request Handling
-		const forbiddenParams = [
-			"policy",
-			"acl",
-			"lifecycle",
-			"replication",
-			"tagging",
-			"encryption",
-			"website",
-			"logging",
-			"accelerate",
-			"payment",
-			"object-lock",
-			"versioning",
-			"versions",
-		];
-
-		for (const param of forbiddenParams) {
-			if (url.searchParams.has(param)) {
-				return S3Errors.NotImplemented().toResponse();
-			}
-		}
-
-		try {
-			const authResult = await authenticate(req);
-
-			if (authResult instanceof Response) {
-				return authResult;
-			}
-
-			const { user, bucket, mode } = authResult;
-			const start = performance.now();
-			const response = await handleS3Request(req, user, bucket, mode);
-			const duration = Math.round(performance.now() - start);
-
-			// Fire and forget stats update
-			updateStats(user, bucket, req, response, mode, duration).catch((err) => {
-				console.error("Error updating stats:", err);
-			});
-
-			return response;
-		} catch (e) {
-			console.error("S3 Request Error:", e);
-			return S3Errors.InternalError().toResponse();
-		}
+				return response;
+			},
+		);
 	},
 });
 

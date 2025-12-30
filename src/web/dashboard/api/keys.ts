@@ -4,6 +4,7 @@ import { db } from "../../../db";
 import { buckets } from "../../../db/schema";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import { getCurrentUser } from "../../../lib/session";
+import { bucketNameSchema } from "../../../lib/validation";
 import { KeyService } from "../../../services/key-service";
 
 export async function handleKeys(req: Request): Promise<Response> {
@@ -18,6 +19,12 @@ export async function handleKeys(req: Request): Promise<Response> {
 	);
 	if (generateKeyMatch && req.method === "POST") {
 		const bucketName = generateKeyMatch[1];
+
+		const nameValidation = bucketNameSchema.safeParse(bucketName);
+		if (!nameValidation.success) {
+			return errorResponse("Invalid bucket name", 400);
+		}
+
 		const bucket = await db
 			.select()
 			.from(buckets)

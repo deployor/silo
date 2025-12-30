@@ -1,31 +1,10 @@
 import { createHash } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { config } from "../../config";
 import { db } from "../../db";
-import { buckets, requestLogs, users } from "../../db/schema";
+import { buckets, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
-
-interface LogEntry {
-	bucketId: string;
-	bucketName: string;
-	ownerId: string;
-	requesterId: string | null;
-	method: string;
-	path: string;
-	statusCode: number;
-	ingressBytes: number;
-	egressBytes: number;
-	ipAddress: string;
-	userAgent: string | null;
-	latencyMs: number;
-}
-
-const BATCH_SIZE = 100;
-const FLUSH_INTERVAL_MS = 5000;
-
-let logQueue: LogEntry[] = [];
-let flushTimer: Timer | null = null;
 
 export function getKeyFromRequest(req: Request, bucketName: string): string {
 	const url = new URL(req.url);
@@ -218,92 +197,3 @@ export async function rewriteCopySourceHeader(
 	return `/${config.s3.bucket}/${internalPath}`;
 }
 
-async function flushLogs() {
-	if (logQueue.length === 0) return;
-
-	const batch = [...logQueue];
-	logQueue = [];
-
-	try {
-		await db.insert(requestLogs).values(batch);
-	} catch (e) {
-		console.error("Failed to flush log batch:", e);
-	}
-}
-
-function scheduleFlush() {
-	if (!flushTimer) {
-		flushTimer = setTimeout(() => {
-			flushTimer = null;
-			flushLogs();
-		}, FLUSH_INTERVAL_MS);
-	}
-}
-
-export async function updateStats(
-	user: typeof users.$inferSelect,
-	bucket: typeof buckets.$inferSelect,
-	req: Request,
-	res: Response,
-	mode: "authenticated" | "public",
-	durationMs: number,
-) {
-	const ingress = parseInt(req.headers.get("content-length") || "0", 10);
-	const egress = parseInt(res.headers.get("content-length") || "0", 10);
-	const method = req.method;
-	const url = new URL(req.url);
-	const path = url.pathname;
-	const statusCode = res.status;
-	const ip =
-		req.headers.get("x-forwarded-for") ||
-		req.headers.get("cf-connecting-ip") ||
-		"unknown";
-	const userAgent = req.headers.get("user-agent");
-
-	try {
-		await db.transaction(async (tx) => {
-			await tx
-				.update(users)
-				.set({
-					ingressBytes: sql`COALESCE(${users.ingressBytes}, 0) + ${ingress}`,
-					egressBytes: sql`COALESCE(${users.egressBytes}, 0) + ${egress}`,
-					totalRequests: sql`COALESCE(${users.totalRequests}, 0) + 1`,
-				})
-				.where(eq(users.id, user.id));
-
-			await tx
-				.update(buckets)
-				.set({
-					totalRequests: sql`COALESCE(${buckets.totalRequests}, 0) + 1`,
-				})
-				.where(eq(buckets.id, bucket.id));
-		});
-	} catch (e) {
-		console.error("Failed to update aggregate stats:", e);
-	}
-
-	logQueue.push({
-		bucketId: bucket.id,
-		bucketName: bucket.name,
-		ownerId: user.id,
-		requesterId: mode === "authenticated" ? user.id : null,
-		method,
-		path,
-		statusCode,
-		ingressBytes: ingress,
-		egressBytes: egress,
-		ipAddress: ip,
-		userAgent: userAgent ? userAgent.slice(0, 255) : null,
-		latencyMs: durationMs,
-	});
-
-	if (logQueue.length >= BATCH_SIZE) {
-		if (flushTimer) {
-			clearTimeout(flushTimer);
-			flushTimer = null;
-		}
-		flushLogs();
-	} else {
-		scheduleFlush();
-	}
-}

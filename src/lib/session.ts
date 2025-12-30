@@ -2,6 +2,7 @@ import { and, eq, gt, sql } from "drizzle-orm";
 import { config } from "../config";
 import { db } from "../db";
 import { buckets, sessions, users } from "../db/schema";
+import { context } from "./context";
 
 export async function getCurrentUser(req: Request) {
 	const cookieHeader = req.headers.get("Cookie");
@@ -102,6 +103,12 @@ export async function getCurrentUser(req: Request) {
 				u.storageLimitBytes = Number(u.storageLimitBytes) || 1073741824;
 				if (u.egressLimitBytes !== null) {
 					u.egressLimitBytes = Number(u.egressLimitBytes);
+				}
+
+				const ctx = context.getStore();
+				if (ctx) {
+					ctx.user = u;
+					ctx.mode = "authenticated";
 				}
 
 				return {
