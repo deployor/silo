@@ -1,7 +1,7 @@
 import { AwsClient } from "aws4fetch";
 import { eq, sql } from "drizzle-orm";
 import { db } from "../src/db";
-import { buckets, requestLogs, users } from "../src/db/schema";
+import { bucketKeys, buckets, requestLogs, users } from "../src/db/schema";
 
 async function runTest() {
 	console.log("🧪 Starting Integration Test...");
@@ -19,12 +19,19 @@ async function runTest() {
 	});
 
 	console.log(`Creating test bucket: ${testBucketName}`);
-	await db.insert(buckets).values({
-		name: testBucketName,
-		userId: testUserId,
+	const bucketRes = await db
+		.insert(buckets)
+		.values({
+			name: testBucketName,
+			userId: testUserId,
+			isPublic: false,
+		})
+		.returning({ id: buckets.id });
+
+	await db.insert(bucketKeys).values({
+		bucketId: bucketRes[0].id,
 		accessKey: accessKey,
 		secretKey: secretKey,
-		isPublic: false,
 	});
 
 	const s3 = new AwsClient({
@@ -97,12 +104,19 @@ async function runTest() {
 		console.log("\nTesting Public Bucket...");
 		const publicBucketName = `public-bucket-${Date.now()}`;
 		console.log(`Creating public bucket: ${publicBucketName}`);
-		await db.insert(buckets).values({
-			name: publicBucketName,
-			userId: testUserId,
+		const pubBucketRes = await db
+			.insert(buckets)
+			.values({
+				name: publicBucketName,
+				userId: testUserId,
+				isPublic: true,
+			})
+			.returning({ id: buckets.id });
+
+		await db.insert(bucketKeys).values({
+			bucketId: pubBucketRes[0].id,
 			accessKey: `AKIA_PUB_${Date.now()}`,
 			secretKey: `secret_pub_${Date.now()}`,
-			isPublic: true,
 		});
 
 		console.log("Updating test bucket to be public...");
