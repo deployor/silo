@@ -167,7 +167,7 @@
         currentPrefix = prefix;
     } catch (error) {
         console.error(error);
-        alert("Failed to load files");
+        showToast("Failed to load files", "error");
     } finally {
         isLoading = false;
     }
@@ -373,9 +373,10 @@
         try {
             await onConfirm();
             closeConfirmModal();
+            showToast("Action completed successfully", "success");
         } catch (e) {
             console.error(e);
-            alert("Action failed");
+            showToast("Action failed: " + e.message, "error");
         } finally {
             btn.disabled = false;
             spinner.classList.add("hidden");

@@ -517,7 +517,7 @@
 
       if (!res.ok) {
         const err = await res.text();
-        alert(err);
+        showToast(err, "error");
         return;
       }
 
@@ -526,6 +526,8 @@
       closeCreateModal();
       form.reset();
       
+      showToast("Bucket created successfully", "success");
+
       // Show keys modal
       document.getElementById("new-access-key").textContent = data.accessKey;
       document.getElementById("new-secret-key").textContent = data.secretKey;
@@ -534,7 +536,7 @@
       document.getElementById("key-modal").classList.add("flex");
     } catch (_error) {
       console.error(_error);
-      alert("Failed to create bucket");
+      showToast("Failed to create bucket", "error");
     }
   }
 
@@ -742,8 +744,9 @@
 
         await loadDashboard();
         closeCorsModal();
+        showToast("CORS configuration reset", "success");
     } catch (e) {
-        alert("Failed to reset CORS: " + e.message);
+        showToast("Failed to reset CORS: " + e.message, "error");
     }
   }
 
@@ -788,7 +791,7 @@
             closeConfirmModal();
         } catch (e) {
             console.error(e);
-            alert("Action failed");
+            showToast("Action failed: " + e.message, "error");
         } finally {
             btn.disabled = false;
             spinner.classList.add("hidden");
