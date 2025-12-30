@@ -1,6 +1,10 @@
 import { config } from "../../../config";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import { getCurrentUser } from "../../../lib/session";
+import {
+	createBucketSchema,
+	updateBucketVisibilitySchema,
+} from "../../../lib/validation";
 import { BucketService } from "../../../services/bucket-service";
 import { KeyService } from "../../../services/key-service";
 
@@ -11,7 +15,13 @@ export async function handleBuckets(req: Request): Promise<Response> {
 	if (req.method === "POST") {
 		try {
 			const body = await req.json();
-			const name = body.name;
+			const result = createBucketSchema.safeParse(body);
+
+			if (!result.success) {
+				return errorResponse(result.error.issues[0].message, 400);
+			}
+
+			const { name } = result.data;
 
 			const newBucket = await BucketService.createBucket(user.id, name);
 			const keys = await KeyService.createKey(newBucket.id);
@@ -50,16 +60,21 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 	if (req.method === "PATCH") {
 		try {
 			const body = await req.json();
-			if (typeof body.isPublic === "boolean") {
-				await BucketService.updateBucketVisibility(
-					bucketName,
-					user.id,
-					body.isPublic,
-					user.isAdmin,
-				);
-				return jsonResponse({ message: "Updated" });
+			const result = updateBucketVisibilitySchema.safeParse(body);
+
+			if (!result.success) {
+				return errorResponse(result.error.issues[0].message, 400);
 			}
-			return errorResponse("Invalid body", 400);
+
+			const { isPublic } = result.data;
+
+			await BucketService.updateBucketVisibility(
+				bucketName,
+				user.id,
+				isPublic,
+				user.isAdmin,
+			);
+			return jsonResponse({ message: "Updated" });
 		} catch (e: any) {
 			return errorResponse(e.message || "Internal Error", 500);
 		}

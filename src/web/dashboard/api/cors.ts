@@ -1,5 +1,6 @@
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import { getCurrentUser } from "../../../lib/session";
+import { updateCorsSchema } from "../../../lib/validation";
 import { BucketService } from "../../../services/bucket-service";
 
 export async function handleCors(req: Request): Promise<Response> {
@@ -18,11 +19,13 @@ export async function handleCors(req: Request): Promise<Response> {
 		if (req.method === "PUT") {
 			try {
 				const body = await req.json();
-				const rules = body.rules;
+				const result = updateCorsSchema.safeParse(body);
 
-				if (!Array.isArray(rules)) {
-					return errorResponse("Invalid rules format", 400);
+				if (!result.success) {
+					return errorResponse(result.error.issues[0].message, 400);
 				}
+
+				const { rules } = result.data;
 
 				await BucketService.updateCorsConfig(
 					bucketName,
