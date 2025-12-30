@@ -1,7 +1,7 @@
 import { AwsClient } from "aws4fetch";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "../src/db";
-import { buckets, users } from "../src/db/schema";
+import { buckets, requestLogs, users } from "../src/db/schema";
 
 async function runTest() {
 	console.log("🧪 Starting Integration Test...");
@@ -274,6 +274,23 @@ async function runTest() {
 			);
 		}
 		console.log("✅ Presigned URL success");
+
+		// Wait for logs to flush (batch size 100 or 5s interval)
+		console.log("\nWaiting for logs to flush...");
+		await new Promise((resolve) => setTimeout(resolve, 6000));
+
+		const logs = await db
+			.select({ count: sql<number>`count(*)` })
+			.from(requestLogs)
+			.where(eq(requestLogs.ownerId, testUserId));
+
+		const logCount = Number(logs[0].count);
+		console.log(`Found ${logCount} logs for test user`);
+
+		if (logCount === 0) {
+			throw new Error("No request logs found! Logging middleware might be broken.");
+		}
+		console.log("✅ Request logging verified");
 
 		console.log("\n🎉 All tests passed!");
 	} catch (error) {

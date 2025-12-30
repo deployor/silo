@@ -3,6 +3,7 @@ import { requestLogs } from "../db/schema";
 import { getContext } from "../lib/context";
 
 interface LogEntry {
+	id: string;
 	bucketId: string;
 	bucketName: string;
 	ownerId: string;
@@ -31,6 +32,7 @@ class LogService {
 		const egress = parseInt(response.headers.get("content-length") || "0", 10);
 
 		this.queue.push({
+			id: ctx.requestId,
 			bucketId: ctx.bucket.id,
 			bucketName: ctx.bucket.name,
 			ownerId: ctx.user.id,

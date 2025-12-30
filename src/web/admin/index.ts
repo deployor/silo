@@ -481,6 +481,7 @@ async function listLogs(url: URL) {
 			egressBytes: requestLogs.egressBytes,
 			userAgent: requestLogs.userAgent,
 			requesterId: requestLogs.requesterId,
+			requestId: requestLogs.id,
 		})
 		.from(requestLogs)
 		.leftJoin(users, eq(requestLogs.ownerId, users.id))

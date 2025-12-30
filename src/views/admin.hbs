@@ -211,6 +211,11 @@
                 <div class="text-white font-mono text-xs" id="modal-log-time"></div>
             </div>
         </div>
+        
+        <div class="mt-4 bg-black/30 p-4 rounded-xl border border-white/10">
+            <div class="text-xs text-text-muted uppercase font-bold mb-1">Request ID</div>
+            <div class="text-white font-mono text-xs break-all" id="modal-log-id"></div>
+        </div>
     </div>
     
     <div class="p-6 border-t border-white/10 shrink-0 flex justify-end">
@@ -442,6 +447,7 @@
         document.getElementById("modal-log-latency").textContent = log.latencyMs ? log.latencyMs + 'ms' : '-';
         document.getElementById("modal-log-requester").textContent = log.requesterId || '-';
         document.getElementById("modal-log-time").textContent = new Date(log.createdAt).toLocaleString();
+        document.getElementById("modal-log-id").textContent = log.id || '-';
 
         document.getElementById("log-modal").classList.remove("hidden");
         document.getElementById("log-modal").classList.add("flex");
