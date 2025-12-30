@@ -22,9 +22,9 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 async function runTest() {
 	console.log("🧪 Starting Comprehensive Security & Integration Test...");
 
-	const testBucketName = "testtest";
-	const accessKey = "CK879AF852B314B4D652E7";
-	const secretKey = "344efd09e342553e9578cd8b92b448d70c7c2f75";
+	const testBucketName = "testprod";
+	const accessKey = "CKDFF6206F787F987A2EE5";
+	const secretKey = "3637a2e9eac5c03009cfd65ee5fceecc6fa1dc49";
 	const endpoint = "https://silo.deployor.dev";
 
 	const s3 = new S3Client({

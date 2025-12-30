@@ -3,6 +3,7 @@ import { config } from "../config";
 import { db } from "../db";
 import { bucketKeys, buckets, users } from "../db/schema";
 import { verifyAwsV4Signature } from "../lib/auth-v4";
+import { context } from "../lib/context";
 import { S3Errors } from "../lib/s3-errors";
 
 const S3_DOMAIN = config.s3Domain;
@@ -92,6 +93,12 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 			}
 
 			const { bucket, user } = bucketResult[0];
+			const ctx = context.getStore();
+			if (ctx) {
+				ctx.user = user;
+				ctx.bucket = bucket;
+				ctx.mode = "public";
+			}
 			return { user, bucket, mode: "public" };
 		}
 
@@ -141,6 +148,13 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 
 		if (!bucket.isPublic) {
 			return S3Errors.AccessDenied().toResponse();
+		}
+
+		const ctx = context.getStore();
+		if (ctx) {
+			ctx.user = user;
+			ctx.bucket = bucket;
+			ctx.mode = "public";
 		}
 
 		return { user, bucket, mode: "public" };
@@ -207,6 +221,13 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 	const isValid = await verifyAwsV4Signature(req, key.secretKey);
 	if (!isValid) {
 		return S3Errors.SignatureDoesNotMatch().toResponse();
+	}
+
+	const ctx = context.getStore();
+	if (ctx) {
+		ctx.user = user;
+		ctx.bucket = bucket;
+		ctx.mode = "authenticated";
 	}
 
 	return { user, bucket, mode: "authenticated" };
