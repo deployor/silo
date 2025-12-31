@@ -15,6 +15,7 @@ import {
 	getKeyFromRequest,
 	stripAuthQueryParams,
 } from "./utils";
+import { S3Action, determineAction } from "./types";
 
 export async function handleS3Request(
 	req: Request,
@@ -23,21 +24,33 @@ export async function handleS3Request(
 	mode: "authenticated" | "public",
 ): Promise<Response> {
 	const method = req.method;
-
-	if (
-		mode === "public" &&
-		method !== "GET" &&
-		method !== "HEAD" &&
-		method !== "OPTIONS"
-	) {
-		return S3Errors.AccessDenied().toResponse();
-	}
-
 	const url = new URL(req.url);
 	const S3_DOMAIN = config.s3Domain;
 	const host = req.headers.get("host") || "";
 	const key = getKeyFromRequest(req, bucket.name);
 
+	// Determine Action
+	const action = determineAction(method, key, url.searchParams, req.headers);
+
+	// Whitelist Check
+	if (action === S3Action.Unknown) {
+		return S3Errors.MethodNotAllowed().toResponse();
+	}
+
+	// Public Access Check
+	if (mode === "public") {
+		const allowedPublicActions = [
+			S3Action.GetObject,
+			S3Action.HeadObject,
+			S3Action.ListObjectsV2,
+			S3Action.Options,
+		];
+		if (!allowedPublicActions.includes(action)) {
+			return S3Errors.AccessDenied().toResponse();
+		}
+	}
+
+	// Handle ListBuckets (Service Root)
 	if (
 		(host === S3_DOMAIN && url.pathname === "/") ||
 		(key === "" &&
@@ -85,6 +98,8 @@ export async function handleS3Request(
 
 	const internalPath = getInternalPath(key, user, bucket);
 
+	// Explicitly block Bucket Creation/Deletion (handled by Dashboard)
+	// Although determineAction maps them to Unknown if not CORS, we double check here for safety if logic changes
 	if (key === "") {
 		if (method === "PUT" && !url.searchParams.has("cors")) {
 			return S3Errors.AccessDenied(

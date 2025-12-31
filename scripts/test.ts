@@ -306,6 +306,20 @@ async function runTest() {
 		}
 		console.log("✅ Request logging verified");
 
+		// Verify Stats
+		const userStats = await db
+			.select({ totalRequests: users.totalRequests })
+			.from(users)
+			.where(eq(users.id, testUserId));
+
+		const requestCount = Number(userStats[0].totalRequests);
+		console.log(`User totalRequests: ${requestCount}`);
+
+		if (requestCount === 0) {
+			throw new Error("User stats not updated! Stats service might be broken.");
+		}
+		console.log("✅ Stats aggregation verified");
+
 		console.log("\n🎉 All tests passed!");
 	} catch (error) {
 		console.error("\n❌ Test Failed:", error);

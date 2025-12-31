@@ -124,6 +124,7 @@ export async function handlePutRequest(
 			req,
 			copySource,
 			user,
+			bucket,
 		);
 		if (!rewrittenSource) {
 			return S3Errors.AccessDenied().toResponse();
