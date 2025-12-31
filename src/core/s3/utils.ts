@@ -165,6 +165,7 @@ export async function rewriteCopySourceHeader(
 	_req: Request,
 	headerValue: string,
 	currentUser: typeof users.$inferSelect,
+	targetBucket: typeof buckets.$inferSelect,
 ): Promise<string | null> {
 	const clean = headerValue.startsWith("/")
 		? headerValue.slice(1)
@@ -176,18 +177,26 @@ export async function rewriteCopySourceHeader(
 	const bucketName = clean.slice(0, firstSlash);
 	const key = clean.slice(firstSlash + 1);
 
-	const bucketResult = await db
-		.select()
-		.from(buckets)
-		.where(eq(buckets.name, bucketName))
-		.limit(1);
-	if (bucketResult.length === 0) return null;
+	let sourceBucket: typeof buckets.$inferSelect;
 
-	const sourceBucket = bucketResult[0];
+	if (bucketName === targetBucket.name) {
+		sourceBucket = targetBucket;
+	} else {
+		const bucketResult = await db
+			.select()
+			.from(buckets)
+			.where(eq(buckets.name, bucketName))
+			.limit(1);
+		if (bucketResult.length === 0) return null;
+		sourceBucket = bucketResult[0];
+	}
 
 	if (sourceBucket.isCdn) return null;
 
-	if (!currentUser || sourceBucket.userId !== currentUser.id) {
+	// Security Check:
+	// 1. Same bucket (Self-Copy) -> Allowed
+	// 2. Different bucket -> Only if source is Public
+	if (sourceBucket.id !== targetBucket.id && !sourceBucket.isPublic) {
 		return null;
 	}
 
