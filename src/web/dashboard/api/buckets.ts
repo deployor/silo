@@ -21,12 +21,12 @@ export async function handleBuckets(req: Request): Promise<Response> {
 				return errorResponse(result.error.issues[0].message, 400);
 			}
 
-			const { name } = result.data;
+			const { name: bucketName } = result.data;
 
-			const newBucket = await BucketService.createBucket(user.id, name);
+			const newBucket = await BucketService.createBucket(user.id, bucketName);
 			const keys = await KeyService.createKey(newBucket.id);
 
-			const publicUrl = `https://${config.s3Domain}/${name}/file.png`;
+			const publicUrl = `https://${config.s3Domain}/${bucketName}/file.png`;
 
 			return jsonResponse({ ...keys, publicUrl });
 		} catch (e: any) {

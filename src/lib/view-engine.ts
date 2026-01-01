@@ -9,14 +9,14 @@ interface RenderOptions {
 
 export async function render(
 	templateName: string,
-	data: any = {},
+	viewData: any = {},
 	options: RenderOptions = { layout: "main" },
 ): Promise<string> {
 	const isDev = process.env.NODE_ENV !== "production";
 
 	// Initialize sections container
-	if (!data.sections) {
-		data.sections = {};
+	if (!viewData.sections) {
+		viewData.sections = {};
 	}
 
 	// Helper to compile a template
@@ -36,7 +36,7 @@ export async function render(
 	try {
 		const templatePath = `src/views/${templateName}.hbs`;
 		const viewTemplate = await compile(templatePath);
-		const body = viewTemplate({ ...data, config });
+		const body = viewTemplate({ ...viewData, config });
 
 		if (options.layout === false) {
 			return body;
@@ -48,8 +48,8 @@ export async function render(
 		const layoutTemplate = await compile(layoutPath);
 
 		return layoutTemplate({
-			...data,
-			...data.sections,
+			...viewData,
+			...viewData.sections,
 			config,
 			body,
 		});

@@ -171,10 +171,10 @@ async function getBucketDetails(bucketName: string) {
 					const contents = Array.isArray(result.Contents)
 						? result.Contents
 						: [result.Contents];
-					files = contents.map((item: any) => ({
-						key: item.Key.replace(internalPrefix, ""),
-						size: item.Size,
-						url: `/api/admin/buckets/${bucketName}/files/preview?key=${encodeURIComponent(item.Key.replace(internalPrefix, ""))}`,
+					files = contents.map((contentItem: any) => ({
+						key: contentItem.Key.replace(internalPrefix, ""),
+						size: contentItem.Size,
+						url: `/api/admin/buckets/${bucketName}/files/preview?key=${encodeURIComponent(contentItem.Key.replace(internalPrefix, ""))}`,
 					}));
 				}
 			}

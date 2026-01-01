@@ -15,13 +15,13 @@ export async function publishView(userId: string, view: unknown) {
 		}),
 	});
 
-	const data = await response.json();
-	if (!data.ok) {
-		console.error("Slack API Error (views.publish):", data);
-		throw new Error(`Slack API Error: ${data.error}`);
+	const responseData = await response.json();
+	if (!responseData.ok) {
+		console.error("Slack API Error (views.publish):", responseData);
+		throw new Error(`Slack API Error: ${responseData.error}`);
 	}
 
-	return data;
+	return responseData;
 }
 
 export async function openModal(triggerId: string, view: unknown) {
@@ -37,11 +37,11 @@ export async function openModal(triggerId: string, view: unknown) {
 		}),
 	});
 
-	const data = await response.json();
-	if (!data.ok) {
-		console.error("Slack API Error (views.open):", data);
-		throw new Error(`Slack API Error: ${data.error}`);
+	const responseData = await response.json();
+	if (!responseData.ok) {
+		console.error("Slack API Error (views.open):", responseData);
+		throw new Error(`Slack API Error: ${responseData.error}`);
 	}
 
-	return data;
+	return responseData;
 }
