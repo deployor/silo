@@ -139,7 +139,7 @@ export async function deleteBucketContents(prefix: string) {
 		if (contents.length === 0) break;
 
 		const objects = contents
-			.map((item: { Key: string }) => `<Object><Key>${item.Key}</Key></Object>`)
+			.map((object: { Key: string }) => `<Object><Key>${object.Key}</Key></Object>`)
 			.join("");
 
 		const deleteBody = `<Delete xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Quiet>true</Quiet>${objects}</Delete>`;

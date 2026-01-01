@@ -1,16 +1,16 @@
 import { eq, sql } from "drizzle-orm";
-import { config } from "../../config";
-import { getInternalPath } from "../../core/s3/utils";
-import { db } from "../../db";
-import { buckets, requestLogs, users } from "../../db/schema";
-import { errorResponse, jsonResponse } from "../../lib/api-utils";
-import { s3Client } from "../../lib/s3-client";
-import { getCurrentUser } from "../../lib/session";
-import { BucketService } from "../../services/bucket-service";
-import { handleBucketOperations, handleBuckets } from "./api/buckets";
-import { handleCors } from "./api/cors";
-import { handleFiles } from "./api/files";
-import { handleKeys } from "./api/keys";
+import { config } from "../../../config";
+import { getInternalPath } from "../../../core/s3/utils";
+import { db } from "../../../db";
+import { buckets, requestLogs, users } from "../../../db/schema";
+import { errorResponse, jsonResponse } from "../../../lib/api-utils";
+import { s3Client } from "../../../lib/s3-client";
+import { getCurrentUser } from "../../../lib/session";
+import { BucketService } from "../../../services/bucket-service";
+import { handleBucketOperations, handleBuckets } from "./buckets";
+import { handleCors } from "./cors";
+import { handleFiles } from "./files";
+import { handleKeys } from "./keys";
 
 export async function handleApiRequest(req: Request): Promise<Response> {
 	const url = new URL(req.url);
