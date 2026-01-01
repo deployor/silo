@@ -128,6 +128,21 @@ export async function handleFiles(req: Request): Promise<Response> {
 			headers.delete("x-amz-request-id");
 			headers.delete("x-amz-id-2");
 
+			// Security: Force text/plain for dangerous types in preview
+			const contentType = headers.get("content-type") || "";
+			const dangerousTypes = [
+				"text/html",
+				"application/xhtml+xml",
+				"image/svg+xml",
+				"text/xml",
+				"application/xml",
+				"text/javascript",
+			];
+
+			if (dangerousTypes.some((t) => contentType.includes(t))) {
+				headers.set("Content-Type", "text/plain");
+			}
+
 			return new Response(s3Res.body, {
 				status: s3Res.status,
 				headers,
