@@ -38,10 +38,10 @@ export class HetznerS3Client {
 			const relative = pathAndQuery.startsWith("/")
 				? pathAndQuery.slice(1)
 				: pathAndQuery;
-			const tempUrl = new URL(relative, baseUrl.toString());
+			const rewrittenUrl = new URL(relative, baseUrl.toString());
 
-			baseUrl.pathname = tempUrl.pathname;
-			baseUrl.search = tempUrl.search;
+			baseUrl.pathname = rewrittenUrl.pathname;
+			baseUrl.search = rewrittenUrl.search;
 		}
 
 		let lastError: unknown;

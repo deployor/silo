@@ -1,7 +1,7 @@
 import { config } from "../../config";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
-import { handleApiRequest } from "./api";
+import { handleApiRequest } from "./api/index";
 import { handleAuthRequest } from "./auth";
 
 export async function handleDashboardRequest(req: Request): Promise<Response> {
