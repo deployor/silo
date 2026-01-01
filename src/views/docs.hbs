@@ -1,6 +1,12 @@
 <div class="flex flex-1 max-w-7xl mx-auto w-full">
   <!-- Sidebar -->
-  <aside class="w-64 hidden md:block h-[calc(100vh-65px)] sticky top-16.25 border-r border-white/10 bg-hc-dark p-6 overflow-y-auto">
+  <aside id="docs-sidebar" class="fixed inset-0 z-50 bg-hc-dark p-6 overflow-y-auto transition-transform duration-300 -translate-x-full md:translate-x-0 md:relative md:inset-auto md:w-64 md:block md:h-[calc(100vh-65px)] md:sticky md:top-[65px] md:border-r md:border-white/10">
+    <div class="md:hidden flex justify-between items-center mb-6">
+      <span class="font-bold text-white">Navigation</span>
+      <button onclick="toggleMobileMenu()" class="text-text-muted hover:text-white">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
     <div class="space-y-8">
       <div>
         <h5 class="font-bold text-text-muted text-xs uppercase tracking-wider mb-3 pl-3">
@@ -89,7 +95,16 @@
   </aside>
 
   <!-- Main Content -->
-  <main class="flex-1 p-6 md:p-12 max-w-3xl">
+  <main class="flex-1 max-w-3xl min-w-0">
+    <!-- Mobile Menu Toggle -->
+    <div class="md:hidden sticky top-0 z-30 bg-hc-darker/80 backdrop-blur-md border-b border-white/10 px-6 py-3 mb-6">
+      <button onclick="toggleMobileMenu()" class="flex items-center gap-2 text-sm font-bold text-text-muted hover:text-white transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        Table of Contents
+      </button>
+    </div>
+
+    <div class="p-6 md:p-12 pt-0 md:pt-12">
     <!-- Intro -->
     <div id="intro" class="section-content active">
       <h1 class="text-4xl font-bold mb-6 text-white">Introduction</h1>
@@ -679,6 +694,7 @@ rclone mount silo:my-bucket ~/mnt/silo --vfs-cache-mode writes</code></pre>
         </div>
       </div>
     </div>
+    </div>
 
 </div>
 
@@ -697,6 +713,20 @@ rclone mount silo:my-bucket ~/mnt/silo --vfs-cache-mode writes</code></pre>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-go.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-ini.min.js"></script>
 <script>
+  function toggleMobileMenu() {
+    const sidebar = document.getElementById('docs-sidebar');
+    const isClosed = sidebar.classList.contains('-translate-x-full');
+    
+    if (isClosed) {
+      sidebar.classList.remove('-translate-x-full');
+      // Prevent body scroll when menu is open
+      document.body.style.overflow = 'hidden';
+    } else {
+      sidebar.classList.add('-translate-x-full');
+      document.body.style.overflow = '';
+    }
+  }
+
   function showSection(id) {
     document.querySelectorAll(".section-content").forEach((el) => {
       el.classList.remove("active");
@@ -710,6 +740,12 @@ rclone mount silo:my-bucket ~/mnt/silo --vfs-cache-mode writes</code></pre>
     
     // Update URL hash without scrolling
     history.pushState(null, null, `#${id}`);
+
+    // Close mobile menu if open
+    const sidebar = document.getElementById('docs-sidebar');
+    if (!sidebar.classList.contains('-translate-x-full') && window.innerWidth < 768) {
+        toggleMobileMenu();
+    }
   }
 
   if (window.location.hash) {
