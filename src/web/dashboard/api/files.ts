@@ -206,9 +206,9 @@ export async function handleFiles(req: Request): Promise<Response> {
 					? result.Contents
 					: [result.Contents];
 				files = contents
-					.map((item: { Key: string; Size: number; LastModified: string }) => {
+					.map((contentItem: { Key: string; Size: number; LastModified: string }) => {
 						// Strip internal prefix to get relative path
-						const key = item.Key;
+						const key = contentItem.Key;
 						// We want to show the name relative to the current prefix for display?
 						// Or just the full key? The UI handles display.
 						// But we must strip the user/bucket prefix part.
@@ -220,8 +220,8 @@ export async function handleFiles(req: Request): Promise<Response> {
 						return {
 							key: relativeKey,
 							name: relativeKey.split("/").pop(),
-							size: item.Size,
-							lastModified: item.LastModified,
+							size: contentItem.Size,
+							lastModified: contentItem.LastModified,
 							url: `https://${config.s3Domain}/${relativeKey}`,
 						};
 					})
@@ -233,8 +233,8 @@ export async function handleFiles(req: Request): Promise<Response> {
 				const prefixes = Array.isArray(result.CommonPrefixes)
 					? result.CommonPrefixes
 					: [result.CommonPrefixes];
-				folders = prefixes.map((item: { Prefix: string }) => {
-					const p = item.Prefix;
+				folders = prefixes.map((prefixItem: { Prefix: string }) => {
+					const p = prefixItem.Prefix;
 					const rootPrefix = getInternalPath("", user, bucket[0]);
 					const relativePrefix = p.startsWith(rootPrefix)
 						? p.slice(rootPrefix.length)

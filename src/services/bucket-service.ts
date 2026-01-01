@@ -107,7 +107,7 @@ export class BucketService {
 	static async updateCorsConfig(
 		name: string,
 		userId: string,
-		rules: any[],
+		corsRules: any[],
 		isAdmin = false,
 	) {
 		const bucket = await db
@@ -123,7 +123,7 @@ export class BucketService {
 		if (bucket[0].isCdn) throw new Error("Cannot modify CDN bucket CORS");
 
 		const corsConfig = {
-			CORSRules: rules,
+			CORSRules: corsRules,
 		};
 
 		await db

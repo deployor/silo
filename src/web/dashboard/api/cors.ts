@@ -25,12 +25,12 @@ export async function handleCors(req: Request): Promise<Response> {
 					return errorResponse(result.error.issues[0].message, 400);
 				}
 
-				const { rules } = result.data;
+				const { rules: corsRules } = result.data;
 
 				await BucketService.updateCorsConfig(
 					bucketName,
 					user.id,
-					rules,
+					corsRules,
 					user.isAdmin,
 				);
 

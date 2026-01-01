@@ -41,9 +41,9 @@ export function rewriteListObjectsV2Response(
 					? result.Contents
 					: [result.Contents];
 
-				for (const item of contents) {
-					if (item.Key) {
-						item.Key = stripPrefix(item.Key);
+				for (const contentItem of contents) {
+					if (contentItem.Key) {
+						contentItem.Key = stripPrefix(contentItem.Key);
 					}
 				}
 			}
@@ -53,9 +53,9 @@ export function rewriteListObjectsV2Response(
 					? result.CommonPrefixes
 					: [result.CommonPrefixes];
 
-				for (const item of commonPrefixes) {
-					if (item.Prefix) {
-						item.Prefix = stripPrefix(item.Prefix);
+				for (const prefixItem of commonPrefixes) {
+					if (prefixItem.Prefix) {
+						prefixItem.Prefix = stripPrefix(prefixItem.Prefix);
 					}
 				}
 			}
@@ -91,9 +91,9 @@ export function rewriteDeleteObjectsResponse(
 				const deleted = Array.isArray(result.Deleted)
 					? result.Deleted
 					: [result.Deleted];
-				for (const item of deleted) {
-					if (item.Key) {
-						item.Key = stripPrefix(item.Key);
+				for (const deletedItem of deleted) {
+					if (deletedItem.Key) {
+						deletedItem.Key = stripPrefix(deletedItem.Key);
 					}
 				}
 			}
@@ -102,9 +102,9 @@ export function rewriteDeleteObjectsResponse(
 				const errors = Array.isArray(result.Error)
 					? result.Error
 					: [result.Error];
-				for (const item of errors) {
-					if (item.Key) {
-						item.Key = stripPrefix(item.Key);
+				for (const errorItem of errors) {
+					if (errorItem.Key) {
+						errorItem.Key = stripPrefix(errorItem.Key);
 					}
 				}
 			}
@@ -171,9 +171,9 @@ export function rewriteMultipartUploadResponse(
 				const commonPrefixes = Array.isArray(result.CommonPrefixes)
 					? result.CommonPrefixes
 					: [result.CommonPrefixes];
-				for (const item of commonPrefixes) {
-					if (item.Prefix) {
-						item.Prefix = stripPrefix(item.Prefix);
+				for (const prefixItem of commonPrefixes) {
+					if (prefixItem.Prefix) {
+						prefixItem.Prefix = stripPrefix(prefixItem.Prefix);
 					}
 				}
 			}
