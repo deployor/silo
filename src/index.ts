@@ -8,6 +8,7 @@ import { validateOrigin } from "./lib/security";
 import { render } from "./lib/view-engine";
 import { authenticate } from "./middleware/auth";
 import { rateLimit } from "./middleware/rate-limit";
+import { securityHeaders } from "./middleware/security-headers";
 import { logService } from "./services/log-service";
 import { statsService } from "./services/stats-service";
 import { handleAdminRequest } from "./web/admin";
@@ -18,6 +19,7 @@ const S3_DOMAIN = config.s3Domain;
 // Rate Limiters
 const apiLimiter = rateLimit({ limit: 300, windowMs: 60000 }); // 300 req/min for API
 const authLimiter = rateLimit({ limit: 60, windowMs: 60000 }); // 60 req/min for Auth
+const s3Limiter = rateLimit({ limit: 1000, windowMs: 60000 }); // 1000 req/min for S3
 
 /**
  * Determines if a request is intended for the dashboard or the S3 gateway.
@@ -163,6 +165,10 @@ Bun.serve({
 						response = await handleDashboardRequest(req);
 					}
 				} else {
+					// S3 Rate Limiting
+					const limitRes = await s3Limiter(req);
+					if (limitRes) return limitRes;
+
 					// S3 Request Handling
 					const forbiddenParams = [
 						"policy",
@@ -244,7 +250,7 @@ Bun.serve({
 					});
 				}
 
-				return response;
+				return securityHeaders(req, response);
 			},
 		);
 	},

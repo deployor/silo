@@ -232,6 +232,22 @@ ${rulesXml}
 			headers.set(k, v);
 		}
 
+		// Security: Force download for dangerous types to prevent XSS
+		const contentType = headers.get("content-type") || "";
+		const dangerousTypes = [
+			"text/html",
+			"application/xhtml+xml",
+			"image/svg+xml",
+			"text/xml",
+			"application/xml",
+			"text/javascript",
+		];
+
+		if (dangerousTypes.some((t) => contentType.includes(t))) {
+			headers.set("Content-Disposition", "attachment");
+			headers.set("Content-Type", "application/octet-stream");
+		}
+
 		return new Response(response.body, {
 			status: response.status,
 			headers,
