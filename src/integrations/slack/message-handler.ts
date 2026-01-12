@@ -315,7 +315,14 @@ async function postMessage(channel: string, text: string, threadTs?: string) {
 			"Content-Type": "application/json",
 			Authorization: `Bearer ${config.slack.botToken}`,
 		},
-		body: JSON.stringify({ channel, text, thread_ts: threadTs }),
+		body: JSON.stringify({
+			channel,
+			text,
+			thread_ts: threadTs,
+			// Helps prevent Slack from unfurling links into rich previews (especially important in channels)
+			unfurl_links: false,
+			unfurl_media: false,
+		}),
 	});
 }
 
@@ -331,6 +338,8 @@ async function postBlocks(channel: string, blocks: any[], threadTs?: string) {
 			blocks,
 			thread_ts: threadTs,
 			text: "File Upload Summary", // Fallback text
+			unfurl_links: false,
+			unfurl_media: false,
 		}),
 	});
 }

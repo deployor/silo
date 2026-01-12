@@ -16,6 +16,7 @@ oauth_config:
       - chat:write
       - files:read
       - channels:history
+      - groups:history
 settings:
   event_subscriptions:
     request_url: https://silo.deployor.dev/api/slack/events
@@ -23,6 +24,7 @@ settings:
       - app_home_opened
       - message.im
       - message.channels
+      - message.groups
   interactivity:
     is_enabled: true
     request_url: https://silo.deployor.dev/api/slack/events
