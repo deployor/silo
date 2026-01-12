@@ -42,9 +42,9 @@
           {{#if user}}
             <a href="/cdn" class="text-text-muted hover:text-white transition-colors">CDN</a>
             <a href="/docs" class="text-text-muted hover:text-white transition-colors">Docs</a>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 min-w-0">
               <img id="user-avatar" src="{{user.avatarUrl}}" alt="User Avatar" class="w-6 h-6 rounded-full {{#unless user.avatarUrl}}hidden{{/unless}}" />
-              <span class="text-text-muted font-mono" id="user-id">{{user.id}}</span>
+              <span class="text-text-muted font-mono truncate max-w-[14rem]" id="user-id">{{user.id}}</span>
             </div>
             {{#if user.isAdmin}}
               <a href="/admin" id="admin-link" class="text-text-muted hover:text-white transition-colors">Admin</a>

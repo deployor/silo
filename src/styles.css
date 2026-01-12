@@ -47,6 +47,11 @@ body {
   color: var(--color-text-main);
 }
 
+/* Prevent long tokens/URLs from forcing horizontal scroll on mobile */
+* {
+  overflow-wrap: break-word;
+}
+
 .card-shadow {
   box-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 0.3);
 }
@@ -83,11 +88,63 @@ body {
 code {
   font-family: var(--font-mono);
   font-size: 0.9em;
-  background: rgba(255,255,255,0.1);
+  background: rgba(255, 255, 255, 0.1);
   padding: 0.2em 0.4em;
   border-radius: 4px;
+}
+pre {
+  max-width: 100%;
+  overflow-x: auto;
 }
 pre code {
   background: transparent;
   padding: 0;
+}
+
+/*
+  Mobile responsiveness helpers.
+  Kept intentionally conservative so desktop stays visually identical.
+*/
+@media (max-width: 640px) {
+  /* Global page padding on mobile */
+  main {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    padding-top: 1rem !important;
+  }
+
+  /* Nav: allow wrapping instead of squeezing */
+  nav {
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  /* The right-side nav cluster can wrap below */
+  nav > div:last-child {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  /* Header title + pills / breadcrumbs wrap nicely */
+  nav > div:first-child {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  /* Make wide inputs/buttons not overflow */
+  input[type="text"],
+  input[type="number"],
+  select,
+  textarea {
+    max-width: 100%;
+  }
+
+  /* Tables: keep scrollable, but add some affordance */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
 }
