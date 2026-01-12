@@ -1,3 +1,11 @@
+interface ParsedCORSRule {
+	ID?: string;
+	AllowedOrigin?: string | string[];
+	AllowedMethod?: string | string[];
+	AllowedHeader?: string | string[];
+	ExposeHeader?: string | string[];
+}
+
 import { XMLParser } from "fast-xml-parser";
 
 const xml = `
@@ -28,7 +36,7 @@ const parser = new XMLParser({
 const parsed = parser.parse(xml);
 console.log(JSON.stringify(parsed, null, 2));
 
-const rules = parsed.CORSConfiguration.CORSRule.map((r: any) => {
+const rules = parsed.CORSConfiguration.CORSRule.map((r: ParsedCORSRule) => {
 	// Ensure arrays for single values
 	const allowedOrigins = r.AllowedOrigin
 		? Array.isArray(r.AllowedOrigin)

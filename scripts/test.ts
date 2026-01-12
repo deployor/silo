@@ -302,7 +302,9 @@ async function runTest() {
 		console.log(`Found ${logCount} logs for test user`);
 
 		if (logCount === 0) {
-			throw new Error("No request logs found! Logging middleware might be broken.");
+			throw new Error(
+				"No request logs found! Logging middleware might be broken.",
+			);
 		}
 		console.log("✅ Request logging verified");
 

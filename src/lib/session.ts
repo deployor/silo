@@ -33,7 +33,32 @@ export async function getCurrentUser(req: Request) {
 				.limit(1);
 
 			if (sessionResult.length > 0) {
-				const { user: u, session: s } = sessionResult[0];
+				const { user: directUser, session: s } = sessionResult[0];
+
+				// Admin impersonation support (best-practice):
+				// - sessions.userId is the real session owner (admin)
+				// - sessions.impersonatedUserId is the effective user for dashboard actions
+				// - Only allow if the real user is admin AND impersonation is not expired.
+				let u = directUser;
+				const hasActiveImpersonation =
+					!!s.impersonatorUserId &&
+					!!s.impersonatedUserId &&
+					directUser.isAdmin === true &&
+					(!s.impersonationExpiresAt || s.impersonationExpiresAt > new Date());
+
+				if (hasActiveImpersonation) {
+					const impersonated = await db
+						.select()
+						.from(users)
+						.where(eq(users.id, s.impersonatedUserId!))
+						.limit(1);
+
+					if (impersonated.length > 0) {
+						u = impersonated[0];
+						// Guardrail: impersonated user should never get admin powers.
+						u.isAdmin = false;
+					}
+				}
 
 				// Token Refresh Logic
 				if (

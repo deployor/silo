@@ -108,7 +108,7 @@ Bun.serve({
 				path: url.pathname,
 			},
 			async () => {
-				let response: Response;
+				let response: Response = new Response("Internal Error", { status: 500 });
 
 				if (isDashboardRequest(req, url)) {
 					// Rate Limiting
@@ -217,10 +217,9 @@ Bun.serve({
 							console.error("S3 Request Error:", e);
 							response = S3Errors.InternalError().toResponse();
 						}
-					} else {
-						// Already handled forbidden
-						if (!response!) response = S3Errors.InternalError().toResponse();
 					}
+
+					if (!response) response = S3Errors.InternalError().toResponse();
 				}
 
 				// Post-request logging and stats

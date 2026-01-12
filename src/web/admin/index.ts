@@ -2,7 +2,7 @@ import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { deleteBucketContents, getInternalPath } from "../../core/s3/utils";
 import { db } from "../../db";
-import { bucketKeys, buckets, requestLogs, users } from "../../db/schema";
+import { bucketKeys, buckets, requestLogs, sessions, users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
@@ -539,6 +539,144 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 
 	// API Routes
 	if (path.startsWith("/api/admin/")) {
+		// Start impersonation (admin-only): switches current session into impersonation mode.
+		if (path === "/api/admin/impersonate" && req.method === "POST") {
+			try {
+				const body = await req.json();
+				const targetUserId = body?.userId;
+				const ttlMinutes = Number(body?.ttlMinutes ?? 30);
+
+				if (!targetUserId || typeof targetUserId !== "string") {
+					return new Response("Missing userId", { status: 400 });
+				}
+
+				// Clamp TTL (guardrail)
+				const ttlMs = Math.min(Math.max(ttlMinutes, 5), 60) * 60_000;
+				const impersonationExpiresAt = new Date(Date.now() + ttlMs);
+
+				// Read the current cookie session id
+				const cookieHeader = req.headers.get("Cookie") || "";
+				const cookies = cookieHeader.split(";").reduce(
+					(acc, cookie) => {
+						const [key, value] = cookie.trim().split("=");
+						if (key && value) acc[key] = value;
+						return acc;
+					},
+					{} as Record<string, string>,
+				);
+
+				const sessionId = cookies.silo_session;
+				if (!sessionId) return new Response("No session", { status: 401 });
+
+				// Ensure target exists
+				const target = await db
+					.select({ id: users.id, isAdmin: users.isAdmin })
+					.from(users)
+					.where(eq(users.id, targetUserId))
+					.limit(1);
+
+				if (target.length === 0) return new Response("User not found", { status: 404 });
+
+				// Best-practice: keep sessions.userId as the real admin.
+				// Store the target separately in sessions.impersonatedUserId.
+				await db
+					.update(sessions)
+					.set({
+						impersonatorUserId: user.id,
+						impersonatedUserId: targetUserId,
+						impersonationExpiresAt,
+					})
+					.where(eq(sessions.id, sessionId));
+
+				// Audit log (very lightweight; will show up in Admin Logs)
+				await db.insert(requestLogs).values({
+					bucketId: null,
+					bucketName: null,
+					ownerId: targetUserId,
+					requesterId: user.id,
+					method: "ADMIN",
+					path: `impersonate:start:${targetUserId}`,
+					statusCode: 200,
+					ingressBytes: 0,
+					egressBytes: 0,
+					ipAddress: req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown",
+					userAgent: req.headers.get("user-agent") || "Admin",
+					latencyMs: 0,
+				});
+
+				return new Response(
+					JSON.stringify({ ok: true, userId: targetUserId, expiresAt: impersonationExpiresAt.toISOString() }),
+					{ headers: { "Content-Type": "application/json" } },
+				);
+			} catch (e) {
+				console.error("Failed to start impersonation", e);
+				return new Response("Failed", { status: 500 });
+			}
+		}
+
+		// Stop impersonation (admin-only): revert session to impersonator
+		if (path === "/api/admin/impersonate" && req.method === "DELETE") {
+			try {
+				const cookieHeader = req.headers.get("Cookie") || "";
+				const cookies = cookieHeader.split(";").reduce(
+					(acc, cookie) => {
+						const [key, value] = cookie.trim().split("=");
+						if (key && value) acc[key] = value;
+						return acc;
+					},
+					{} as Record<string, string>,
+				);
+
+				const sessionId = cookies.silo_session;
+				if (!sessionId) return new Response("No session", { status: 401 });
+
+				const sess = await db
+					.select({
+						id: sessions.id,
+						impersonatorUserId: sessions.impersonatorUserId,
+						userId: sessions.userId,
+					})
+					.from(sessions)
+					.where(eq(sessions.id, sessionId))
+					.limit(1);
+
+				if (sess.length === 0) return new Response("Not found", { status: 404 });
+				if (!sess[0].impersonatorUserId) return new Response("Not impersonating", { status: 400 });
+
+				await db
+					.update(sessions)
+					.set({
+						impersonatorUserId: null,
+						impersonatedUserId: null,
+						impersonationExpiresAt: null,
+					})
+					.where(eq(sessions.id, sessionId));
+
+				// Audit log
+				await db.insert(requestLogs).values({
+					bucketId: null,
+					bucketName: null,
+					ownerId: sess[0].userId,
+					requesterId: user.id,
+					method: "ADMIN",
+					path: `impersonate:stop:${sess[0].userId}`,
+					statusCode: 200,
+					ingressBytes: 0,
+					egressBytes: 0,
+					ipAddress: req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown",
+					userAgent: req.headers.get("user-agent") || "Admin",
+					latencyMs: 0,
+				});
+
+				return new Response(JSON.stringify({ ok: true }), {
+					headers: { "Content-Type": "application/json" },
+				});
+			} catch (e) {
+				console.error("Failed to stop impersonation", e);
+				return new Response("Failed", { status: 500 });
+			}
+		}
+
 		// List Users
 		if (path === "/api/admin/users" && req.method === "GET") {
 			return listUsers(url, user);

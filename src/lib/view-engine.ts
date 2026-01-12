@@ -7,9 +7,13 @@ interface RenderOptions {
 	layout?: string | boolean;
 }
 
+interface ViewData extends Record<string, unknown> {
+	sections?: Record<string, unknown>;
+}
+
 export async function render(
 	templateName: string,
-	viewData: any = {},
+	viewData: ViewData = {},
 	options: RenderOptions = { layout: "main" },
 ): Promise<string> {
 	const isDev = process.env.NODE_ENV !== "production";
@@ -22,7 +26,7 @@ export async function render(
 	// Helper to compile a template
 	const compile = async (path: string) => {
 		if (!isDev && templateCache.has(path)) {
-			return templateCache.get(path)!;
+			return templateCache.get(path) as Handlebars.TemplateDelegate;
 		}
 		const file = Bun.file(path);
 		const text = await file.text();
@@ -68,7 +72,7 @@ Handlebars.registerHelper("eq", (a, b) => {
 	return a === b;
 });
 
-Handlebars.registerHelper("section", function (this: any, name, options) {
+Handlebars.registerHelper("section", function (this: ViewData, name, options) {
 	if (!this.sections) this.sections = {};
 	this.sections[name] = options.fn(this);
 	return null;
