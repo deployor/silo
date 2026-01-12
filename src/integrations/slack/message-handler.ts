@@ -38,7 +38,10 @@ export async function handleMessage(event: any) {
 		// This prevents unauthorized users from using the bot as a file proxy or storage.
 		await postMessage(
 			channelId,
-			`I don't know who you are! Please <https://${config.s3Domain}/auth/login?source=slack|login to the dashboard> first to link your account.`,
+			`Heyho! you need an account on Silo so i can manage quota (and more) for you.
+
+Please sign in with Hack Club Auth so we can match this Slack user to your record:
+<https://${config.s3Domain}/auth/login?source=slack|Sign in to Silo>`,
 			threadTs,
 		);
 		await removeReaction(channelId, event.ts, "homer-load-2");

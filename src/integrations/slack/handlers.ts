@@ -54,7 +54,7 @@ export async function handleAppHomeOpened(event: { user: string }) {
 				.blocks(
 					Header({ text: "Welcome to Silo! :wave:" }),
 					Section({
-						text: `*Hold up!* :ms-stop-sign:\n\nWe don't recognize this Slack account yet. To get started, you need to log in to the web dashboard at least once to link your account.\n\n *<https://${config.s3Domain}/auth/login?source=slack|Log in to Silo Dashboard>*`,
+						text: `Heyho — you need an account on Silo so we can manage quota (and more) for you.\n\nPlease sign in with Hack Club Auth so we can match this Slack user to your record:\n\n*<https://${config.s3Domain}/auth/login?source=slack|Sign in to Silo>*`,
 					}),
 					Context().elements(
 						"Once you've logged in, come back here and click 'Refresh'!",
