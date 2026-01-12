@@ -28,7 +28,23 @@ export function getKeyFromRequest(req: Request, bucketName: string): string {
 		}
 	}
 
-	const decodedKey = decodeURIComponent(key);
+	// Security: reject path traversal.
+	// Important: `url.pathname` may already have normalized away raw ".." segments
+	// in some runtimes, but keys can still contain encoded traversal like "%2e%2e".
+	// Decode repeatedly to catch double-encoding attempts.
+	const decodeRepeated = (input: string, rounds: number) => {
+		let out = input;
+		for (let i = 0; i < rounds; i++) {
+			try {
+				out = decodeURIComponent(out);
+			} catch {
+				break;
+			}
+		}
+		return out;
+	};
+
+	const decodedKey = decodeRepeated(key, 3);
 	if (decodedKey.includes("..")) {
 		const parts = decodedKey.split("/");
 		if (parts.includes("..")) {
