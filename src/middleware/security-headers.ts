@@ -32,8 +32,9 @@ export function securityHeaders(req: Request, res: Response): Response {
 			// Allow third-party script tags used by our templates.
 			// NOTE: We still do NOT allow 'unsafe-eval'; Alpine must use the CSP build.
 			"script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net",
-			// Some browsers distinguish between script-src (inline/eval) vs script-src-elem (script tags).
-			"script-src-elem 'self' https://unpkg.com https://cdn.jsdelivr.net",
+			// Allow inline scripts embedded in templates (admin, nav logout tweak, etc).
+			// We keep this separate from script-src so we can potentially tighten it later.
+			"script-src-elem 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net",
 			// Allow CSS loaded via <link rel=\"stylesheet\"> (e.g. phosphor icons CSS from jsdelivr).
 			"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
 			// Include 'unsafe-inline' here too; style-src-elem can override style-src in some browsers.
