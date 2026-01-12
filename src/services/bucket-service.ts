@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
-import { isReservedBucketName } from "../core/s3/utils";
+import { deleteBucketContents, getInternalPath, isReservedBucketName } from "../core/s3/utils";
 import { db } from "../db";
-import { bucketKeys, buckets } from "../db/schema";
+import { bucketKeys, buckets, users } from "../db/schema";
 
 export class BucketService {
 	static async getBucketsForUser(userId: string) {
@@ -68,6 +68,35 @@ export class BucketService {
 		return newBucket[0];
 	}
 
+	static async emptyBucket(name: string, userId: string, isAdmin = false) {
+		const bucket = await db
+			.select()
+			.from(buckets)
+			.where(eq(buckets.name, name))
+			.limit(1);
+
+		if (bucket.length === 0) throw new Error("Bucket not found");
+		if (bucket[0].userId !== userId && !isAdmin)
+			throw new Error("Unauthorized");
+		if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
+
+		const owner = await db
+			.select()
+			.from(users)
+			.where(eq(users.id, bucket[0].userId))
+			.limit(1);
+		if (owner.length === 0) throw new Error("Owner not found");
+
+		const internalPrefix = getInternalPath("", owner[0], bucket[0]);
+		await deleteBucketContents(internalPrefix);
+
+		// Reset usage stats for the bucket
+		await db
+			.update(buckets)
+			.set({ totalBytes: 0 })
+			.where(eq(buckets.id, bucket[0].id));
+	}
+
 	static async deleteBucket(name: string, userId: string, isAdmin = false) {
 		const bucket = await db
 			.select()
@@ -79,6 +108,21 @@ export class BucketService {
 		if (bucket[0].userId !== userId && !isAdmin)
 			throw new Error("Unauthorized");
 		if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
+
+		// Best-effort: remove all objects first so upstream storage doesn't leak
+		try {
+			const owner = await db
+				.select()
+				.from(users)
+				.where(eq(users.id, bucket[0].userId))
+				.limit(1);
+			if (owner.length > 0) {
+				const internalPrefix = getInternalPath("", owner[0], bucket[0]);
+				await deleteBucketContents(internalPrefix);
+			}
+		} catch (e) {
+			console.error("Failed to empty bucket during delete:", e);
+		}
 
 		await db.delete(buckets).where(eq(buckets.name, name));
 	}

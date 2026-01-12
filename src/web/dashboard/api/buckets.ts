@@ -48,8 +48,18 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 
 	if (!bucketName) return errorResponse("Invalid bucket name", 400);
 
+	// NOTE: Dashboard UI sends:
+	// - DELETE /api/dashboard/buckets/:name           => delete bucket
+	// - DELETE /api/dashboard/buckets/:name?empty=true => empty bucket (delete all files only)
 	if (req.method === "DELETE") {
+		const isEmpty = url.searchParams.get("empty") === "true";
+
 		try {
+			if (isEmpty) {
+				await BucketService.emptyBucket(bucketName, user.id, user.isAdmin);
+				return jsonResponse({ message: "Emptied" });
+			}
+
 			await BucketService.deleteBucket(bucketName, user.id, user.isAdmin);
 			return jsonResponse({ message: "Deleted" });
 		} catch (e: any) {
