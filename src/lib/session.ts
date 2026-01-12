@@ -43,8 +43,7 @@ export async function getCurrentUser(req: Request) {
 				const hasActiveImpersonation =
 					!!s.impersonatorUserId &&
 					!!s.impersonatedUserId &&
-					directUser.isAdmin === true &&
-					(!s.impersonationExpiresAt || s.impersonationExpiresAt > new Date());
+					directUser.isAdmin === true;
 
 				if (hasActiveImpersonation) {
 					const impersonated = await db

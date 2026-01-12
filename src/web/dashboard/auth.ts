@@ -165,6 +165,32 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 			);
 
 			if (cookies.silo_session) {
+				// If admin is impersonating, "logout" should just stop impersonation.
+				const sess = await db
+					.select({
+						id: sessions.id,
+						impersonatorUserId: sessions.impersonatorUserId,
+					})
+					.from(sessions)
+					.where(eq(sessions.id, cookies.silo_session))
+					.limit(1);
+
+				if (sess.length > 0 && sess[0].impersonatorUserId) {
+					await db
+						.update(sessions)
+						.set({
+							impersonatorUserId: null,
+							impersonatedUserId: null,
+							impersonationExpiresAt: null,
+						})
+						.where(eq(sessions.id, cookies.silo_session));
+
+					const headers = new Headers();
+					headers.set("Location", "/admin");
+					return new Response(null, { status: 302, headers });
+				}
+
+				// Normal logout
 				await db.delete(sessions).where(eq(sessions.id, cookies.silo_session));
 			}
 		}

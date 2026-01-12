@@ -544,15 +544,14 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 			try {
 				const body = await req.json();
 				const targetUserId = body?.userId;
-				const ttlMinutes = Number(body?.ttlMinutes ?? 30);
+				const ttlMinutes = 30;
 
 				if (!targetUserId || typeof targetUserId !== "string") {
 					return new Response("Missing userId", { status: 400 });
 				}
 
-				// Clamp TTL (guardrail)
-				const ttlMs = Math.min(Math.max(ttlMinutes, 5), 60) * 60_000;
-				const impersonationExpiresAt = new Date(Date.now() + ttlMs);
+				// TTL removed by design: impersonation persists until admin logs out.
+				const impersonationExpiresAt = null;
 
 				// Read the current cookie session id
 				const cookieHeader = req.headers.get("Cookie") || "";
@@ -605,7 +604,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				});
 
 				return new Response(
-					JSON.stringify({ ok: true, userId: targetUserId, expiresAt: impersonationExpiresAt.toISOString() }),
+					JSON.stringify({ ok: true, userId: targetUserId }),
 					{ headers: { "Content-Type": "application/json" } },
 				);
 			} catch (e) {
