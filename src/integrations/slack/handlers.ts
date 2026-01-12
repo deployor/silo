@@ -391,6 +391,17 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 		const parts = actionValue.split(":");
 		const bucketId = parts[1];
 		const key = parts[2];
+		const uploaderSlackId = parts[3];
+
+		// If this delete button belongs to a different uploader, deny.
+		if (uploaderSlackId && uploaderSlackId !== payload.user.id) {
+			return {
+				response_action: "errors",
+				errors: {
+					_action: "This isn't your file.",
+				},
+			};
+		}
 
 		const bucket = await db
 			.select()

@@ -13,6 +13,7 @@ const envSchema = z.object({
 	HC_AUTH_REDIRECT_URI: z.string().min(1, "HC_AUTH_REDIRECT_URI is required"),
 	SLACK_BOT_TOKEN: z.string().min(1, "SLACK_BOT_TOKEN is required"),
 	SLACK_SIGNING_SECRET: z.string().min(1, "SLACK_SIGNING_SECRET is required"),
+	SLACK_FILE_UPLOAD_CHANNEL_ID: z.string().optional(),
 	DEV_ACCESS_CODE: z.string().optional(),
 });
 
@@ -36,6 +37,7 @@ export const config = {
 	slack: {
 		botToken: env.SLACK_BOT_TOKEN,
 		signingSecret: env.SLACK_SIGNING_SECRET,
+		fileUploadChannelId: env.SLACK_FILE_UPLOAD_CHANNEL_ID,
 	},
 	devAccessCode: env.DEV_ACCESS_CODE,
 };

@@ -16,6 +16,16 @@ export async function handleMessage(event: any) {
 	const channelId = event.channel;
 	const threadTs = event.thread_ts || event.ts;
 
+	// Only allow channel uploads in the configured channel. DMs are always allowed.
+	// Note: Slack sends IMs as "message.im" events (see manifest). Channel messages are plain "message".
+	const isIm = event.channel_type === "im";
+	if (!isIm) {
+		const allowedChannelId = config.slack.fileUploadChannelId;
+		if (allowedChannelId && channelId !== allowedChannelId) {
+			return;
+		}
+	}
+
 	// 0. Add Loading Reaction
 	await addReaction(channelId, event.ts, "homer-load-2");
 
@@ -243,7 +253,8 @@ export async function handleMessage(event: any) {
 						emoji: true,
 					},
 					style: "danger",
-					value: `delete_cdn_file:${targetBucket.id}:${r.key}`,
+					// Encode uploader slack id so only the uploader can use the button
+					value: `delete_cdn_file:${targetBucket.id}:${r.key}:${slackId}`,
 					action_id: "delete_cdn_file",
 					confirm: {
 						title: {
