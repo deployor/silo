@@ -186,6 +186,10 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 						.where(eq(sessions.id, cookies.silo_session));
 
 					const headers = new Headers();
+					headers.append(
+						"Set-Cookie",
+						"silo_impersonating=; Path=/; SameSite=Lax; Secure; Max-Age=0",
+					);
 					headers.set("Location", "/admin");
 					return new Response(null, { status: 302, headers });
 				}
@@ -196,9 +200,14 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 		}
 
 		const headers = new Headers();
-		headers.set(
+		headers.append(
 			"Set-Cookie",
 			`silo_session=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0`,
+		);
+		// Always clear the UI cookie on real logout too.
+		headers.append(
+			"Set-Cookie",
+			"silo_impersonating=; Path=/; SameSite=Lax; Secure; Max-Age=0",
 		);
 		headers.set("Location", "/");
 		return new Response(null, { status: 302, headers });
