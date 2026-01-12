@@ -49,7 +49,20 @@
             {{#if user.isAdmin}}
               <a href="/admin" id="admin-link" class="text-text-muted hover:text-white transition-colors">Admin</a>
             {{/if}}
-            <a href="/auth/logout" class="text-hc-red hover:text-white transition-colors">Logout</a>
+            <a href="/auth/logout" class="text-hc-red hover:text-white transition-colors" id="logout-link">Logout</a>
+            <script>
+              // If the current session is impersonating, /auth/logout will stop impersonation.
+              // We don't have a server-side flag in the template context, so we detect via cookie.
+              (function () {
+                try {
+                  const c = document.cookie || "";
+                  if (c.includes("silo_impersonating=true")) {
+                    const el = document.getElementById("logout-link");
+                    if (el) el.textContent = "Stop impersonating";
+                  }
+                } catch (_e) {}
+              })();
+            </script>
           {{else}}
              <a href="/auth/login" class="text-hc-red hover:text-white transition-colors">Login</a>
           {{/if}}
