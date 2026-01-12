@@ -56,8 +56,9 @@ export async function handleKeys(req: Request): Promise<Response> {
 		try {
 			await KeyService.deleteKey(keyId, bucketName, user.id, user.isAdmin);
 			return jsonResponse({ message: "Deleted" });
-		} catch (e: any) {
-			return errorResponse(e.message, 403);
+		} catch (e) {
+			const message = e instanceof Error ? e.message : "Unknown error";
+			return errorResponse(message, 403);
 		}
 	}
 

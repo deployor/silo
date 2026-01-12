@@ -221,25 +221,31 @@ export async function handleFiles(req: Request): Promise<Response> {
 					? result.Contents
 					: [result.Contents];
 				files = contents
-					.map((contentItem: { Key: string; Size: number; LastModified: string }) => {
-						// Strip internal prefix to get relative path
-						const key = contentItem.Key;
-						// We want to show the name relative to the current prefix for display?
-						// Or just the full key? The UI handles display.
-						// But we must strip the user/bucket prefix part.
-						const rootPrefix = getInternalPath("", user, bucket[0]);
-						const relativeKey = key.startsWith(rootPrefix)
-							? key.slice(rootPrefix.length)
-							: key;
+					.map(
+						(contentItem: {
+							Key: string;
+							Size: number;
+							LastModified: string;
+						}) => {
+							// Strip internal prefix to get relative path
+							const key = contentItem.Key;
+							// We want to show the name relative to the current prefix for display?
+							// Or just the full key? The UI handles display.
+							// But we must strip the user/bucket prefix part.
+							const rootPrefix = getInternalPath("", user, bucket[0]);
+							const relativeKey = key.startsWith(rootPrefix)
+								? key.slice(rootPrefix.length)
+								: key;
 
-						return {
-							key: relativeKey,
-							name: relativeKey.split("/").pop(),
-							size: contentItem.Size,
-							lastModified: contentItem.LastModified,
-							url: `https://${config.s3Domain}/${relativeKey}`,
-						};
-					})
+							return {
+								key: relativeKey,
+								name: relativeKey.split("/").pop(),
+								size: contentItem.Size,
+								lastModified: contentItem.LastModified,
+								url: `https://${config.s3Domain}/${relativeKey}`,
+							};
+						},
+					)
 					.filter((f: { key: string }) => f.key !== prefix); // Exclude the folder itself if it appears
 			}
 

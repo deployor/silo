@@ -1,9 +1,11 @@
-
 export function securityHeaders(req: Request, res: Response): Response {
 	const headers = new Headers(res.headers);
 
 	// HSTS - Force HTTPS
-	headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+	headers.set(
+		"Strict-Transport-Security",
+		"max-age=31536000; includeSubDomains",
+	);
 
 	// Prevent MIME type sniffing
 	headers.set("X-Content-Type-Options", "nosniff");

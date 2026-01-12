@@ -1,4 +1,4 @@
-export function jsonResponse(responseData: any, status = 200): Response {
+export function jsonResponse(responseData: unknown, status = 200): Response {
 	return new Response(JSON.stringify(responseData), {
 		status,
 		headers: { "Content-Type": "application/json" },

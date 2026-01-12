@@ -35,8 +35,9 @@ export async function handleCors(req: Request): Promise<Response> {
 				);
 
 				return jsonResponse({ message: "Updated" });
-			} catch (e: any) {
-				return errorResponse(e.message || "Invalid JSON", 400);
+			} catch (e) {
+				const message = e instanceof Error ? e.message : "Invalid JSON";
+				return errorResponse(message, 400);
 			}
 		}
 
@@ -44,8 +45,9 @@ export async function handleCors(req: Request): Promise<Response> {
 			try {
 				await BucketService.deleteCorsConfig(bucketName, user.id, user.isAdmin);
 				return jsonResponse({ message: "Deleted" });
-			} catch (e: any) {
-				return errorResponse(e.message, 403);
+			} catch (e) {
+				const message = e instanceof Error ? e.message : "Unknown error";
+				return errorResponse(message, 403);
 			}
 		}
 	}

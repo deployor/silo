@@ -45,6 +45,16 @@ export const sessions = pgTable("sessions", {
 	refreshToken: text("refresh_token"),
 	tokenExpiresAt: timestamp("token_expires_at"),
 	scope: text("scope"),
+	// Admin impersonation support (best-practice):
+	// - userId always remains the real session owner (admin)
+	// - impersonatedUserId is the effective "current user" for dashboard actions
+	impersonatorUserId: text("impersonator_user_id").references(() => users.id, {
+		onDelete: "set null",
+	}),
+	impersonatedUserId: text("impersonated_user_id").references(() => users.id, {
+		onDelete: "set null",
+	}),
+	impersonationExpiresAt: timestamp("impersonation_expires_at"),
 });
 
 export const buckets = pgTable(

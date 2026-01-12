@@ -139,7 +139,10 @@ export async function deleteBucketContents(prefix: string) {
 		if (contents.length === 0) break;
 
 		const objects = contents
-			.map((object: { Key: string }) => `<Object><Key>${object.Key}</Key></Object>`)
+			.map(
+				(object: { Key: string }) =>
+					`<Object><Key>${object.Key}</Key></Object>`,
+			)
 			.join("");
 
 		const deleteBody = `<Delete xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Quiet>true</Quiet>${objects}</Delete>`;
@@ -205,4 +208,3 @@ export async function rewriteCopySourceHeader(
 
 	return `/${config.s3.bucket}/${internalPath}`;
 }
-
