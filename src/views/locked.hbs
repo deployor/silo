@@ -1,40 +1,27 @@
 <div class="flex-1 flex items-center justify-center p-6">
-  <div class="max-w-md w-full bg-hc-dark rounded-3xl border border-white/10 p-8 card-shadow text-center">
-    <div class="w-16 h-16 bg-hc-red/20 rounded-full flex items-center justify-center mx-auto mb-6">
+  <div class="max-w-md w-full bg-black/30 rounded-2xl border border-white/10 p-6 text-center">
+    <div class="w-16 h-16 bg-hc-red/20 rounded-full flex items-center justify-center mx-auto mb-4">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-hc-red" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
       </svg>
     </div>
-    
-    <h1 class="text-2xl font-bold text-white mb-4">Account Locked</h1>
-    
-    <p class="text-text-muted mb-8">
-      Your account has been temporarily locked by an administrator. You cannot perform any actions, access your buckets, or manage your keys at this time.
+
+    <h1 class="text-2xl font-bold text-white mb-2">Your account is locked</h1>
+
+    <p class="text-text-muted mb-4">
+      Your account has been locked temporarily.
     </p>
-    
+
     {{#if reason}}
-    <div class="bg-red-500/10 border border-red-500/20 p-4 rounded-lg mb-8 text-left">
-        <h3 class="text-sm font-bold text-red-400 mb-1">Reason:</h3>
-        <p class="text-white text-sm">{{reason}}</p>
-    </div>
+      <div class="bg-white/5 border border-white/10 p-3 rounded-lg mb-4 text-left">
+        <p class="text-text-muted text-xs font-mono mb-1">Reason</p>
+        <p class="text-white text-sm font-bold">{{reason}}</p>
+      </div>
     {{/if}}
 
-    <div class="bg-white/5 rounded-xl p-4 border border-white/10 text-left mb-8">
-      <h3 class="text-sm font-bold text-white mb-2 flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        What does this mean?
-      </h3>
-      <ul class="text-xs text-text-muted space-y-2 list-disc list-inside ml-1">
-        <li>All API access keys are temporarily paused.</li>
-        <li>Dashboard access is restricted.</li>
-        <li>Public bucket access may be affected.</li>
-      </ul>
-    </div>
-
-    <div class="text-center text-text-muted text-sm">
-      Please contact someone in the Slack for help if needed.
-    </div>
+    <p class="text-text-muted text-sm">
+      All access (API + dashboard) is suspended for now.
+      If you need support, ask in Slack.
+    </p>
   </div>
 </div>
