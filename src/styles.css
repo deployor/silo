@@ -47,6 +47,11 @@ body {
   color: var(--color-text-main);
 }
 
+/* Alpine.js: prevent elements from flashing before hydration */
+[x-cloak] {
+  display: none !important;
+}
+
 
 /* Prevent long tokens/URLs from forcing horizontal scroll on mobile */
 * {
