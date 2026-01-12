@@ -29,7 +29,7 @@ const s3Limiter = rateLimit({ limit: 1000, windowMs: 60000 }); // 1000 req/min f
  * 2. If the host matches the S3 domain (or localhost):
  *    - If the request has S3 auth headers or params, it's an S3 request.
  *    - If the path matches known dashboard routes, it's a dashboard request.
- *    - Otherwise, it's treated as a public bucket access (S3 request).
+ *    - Otherwise, it's treated as a public bucket access (S3 reuest).
  */
 function isDashboardRequest(req: Request, url: URL): boolean {
 	const host = req.headers.get("host") || "";
