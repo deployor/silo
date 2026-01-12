@@ -60,8 +60,23 @@ export function getInternalPath(
 	user: typeof users.$inferSelect,
 	bucket: typeof buckets.$inferSelect,
 ): string {
-	if (key.includes("..")) {
-		const decodedKey = decodeURIComponent(key);
+	// Security: reject path traversal.
+	// NOTE: `key` may contain encoded traversal ("%2e%2e", "%2f") even if it doesn't
+	// literally include "..". Decode repeatedly to catch double-encoding.
+	const decodeRepeated = (input: string, rounds: number) => {
+		let out = input;
+		for (let i = 0; i < rounds; i++) {
+			try {
+				out = decodeURIComponent(out);
+			} catch {
+				break;
+			}
+		}
+		return out;
+	};
+
+	const decodedKey = decodeRepeated(key, 3);
+	if (decodedKey.includes("..")) {
 		const parts = decodedKey.split("/");
 		if (parts.includes("..")) {
 			throw new Error("Invalid Key: Path traversal detected");

@@ -304,8 +304,9 @@ async function securityProbes(aws: AwsClient, cfg: Env, runPrefix: string) {
   const results: Array<{ name: string; ok: boolean; status?: number; note: string }> = [];
 
   // 1) Path traversal attempts (should not allow, ideally 400/403)
+  // NOTE: raw "../" segments are normalized by URL parsers/runtimes (client + server)
+  // and are not a reliable app-level test. We keep encoded variants which reach routing.
   const traversalKeys = [
-    `${runPrefix}/../evil.txt`,
     `${runPrefix}/..%2Fevil.txt`,
     `${runPrefix}/%2e%2e/evil.txt`,
     `${runPrefix}/%2e%2e%2fevil.txt`,
