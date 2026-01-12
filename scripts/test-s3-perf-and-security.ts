@@ -168,6 +168,7 @@ async function perfPutGet(
   size: number,
 ) {
   const body = randomBytes(size);
+  const contentLength = body.byteLength;
   const key = `${runPrefix}/obj-${size}.bin`;
   const putUrl = `${cfg.endpoint}/${cfg.bucket}/${escapeKeyForPath(key)}`;
 
@@ -177,9 +178,11 @@ async function perfPutGet(
   let putOnceBody = "";
   for (let attempt = 0; attempt < 6; attempt++) {
     const signedPut = await aws.sign(putUrl, { method: "PUT" });
+    const h = new Headers(signedPut.headers);
+    h.set("Content-Length", String(contentLength));
     const putOnce = await fetchWithTimeout(
       signedPut.url,
-      { method: "PUT", headers: signedPut.headers, body },
+      { method: "PUT", headers: h, body },
       cfg.timeoutMs,
     );
     putOnceStatus = putOnce.status;
@@ -213,10 +216,12 @@ async function perfPutGet(
         const k = `${runPrefix}/w${workerId}/put-${size}-${i}.bin`;
         const u = `${cfg.endpoint}/${cfg.bucket}/${escapeKeyForPath(k)}`;
         const s = await aws.sign(u, { method: "PUT" });
+        const h = new Headers(s.headers);
+        h.set("Content-Length", String(contentLength));
         const t0 = performance.now();
         const res = await fetchWithTimeout(
           s.url,
-          { method: "PUT", headers: s.headers, body },
+          { method: "PUT", headers: h, body },
           cfg.timeoutMs,
         );
         const ms = performance.now() - t0;
