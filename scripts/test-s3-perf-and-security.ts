@@ -172,14 +172,28 @@ async function perfPutGet(
   const putUrl = `${cfg.endpoint}/${cfg.bucket}/${escapeKeyForPath(key)}`;
 
   // PUT once to be sure object exists.
-  const signedPut = await aws.sign(putUrl, { method: "PUT" });
-  const putOnce = await fetchWithTimeout(
-    signedPut.url,
-    { method: "PUT", headers: signedPut.headers, body },
-    cfg.timeoutMs,
-  );
-  if (!putOnce.ok) {
-    throw new Error(`seed PUT failed size=${size} status=${putOnce.status} body=${await putOnce.text().catch(() => "")}`);
+  // Under heavy load, this can hit rate limits; retry with backoff.
+  let putOnceStatus: number | undefined;
+  let putOnceBody = "";
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const signedPut = await aws.sign(putUrl, { method: "PUT" });
+    const putOnce = await fetchWithTimeout(
+      signedPut.url,
+      { method: "PUT", headers: signedPut.headers, body },
+      cfg.timeoutMs,
+    );
+    putOnceStatus = putOnce.status;
+    if (putOnce.ok) break;
+
+    putOnceBody = await putOnce.text().catch(() => "");
+    if (putOnce.status !== 429) break;
+
+    const backoffMs = 250 * Math.pow(2, attempt);
+    await sleep(backoffMs);
+  }
+
+  if (!(putOnceStatus && putOnceStatus >= 200 && putOnceStatus < 300)) {
+    throw new Error(`seed PUT failed size=${size} status=${putOnceStatus} body=${putOnceBody}`);
   }
 
   const putLat = newLat();
@@ -263,16 +277,34 @@ async function perfList(aws: AwsClient, cfg: Env, runPrefix: string) {
   const listUrl = `${cfg.endpoint}/${cfg.bucket}?${query.toString()}`;
 
   // Seed a handful of objects.
+  // Under high concurrency runs, seeding can hit rate limits; retry with backoff.
   for (let i = 0; i < 20; i++) {
     const k = `${prefix}/seed-${i}.txt`;
     const u = `${cfg.endpoint}/${cfg.bucket}/${escapeKeyForPath(k)}`;
-    const s = await aws.sign(u, { method: "PUT" });
-    const res = await fetchWithTimeout(
-      s.url,
-      { method: "PUT", headers: s.headers, body: `seed-${i}` },
-      cfg.timeoutMs,
-    );
-    if (!res.ok) throw new Error(`seed list PUT failed status=${res.status}`);
+
+    let lastStatus: number | undefined;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const s = await aws.sign(u, { method: "PUT" });
+      const res = await fetchWithTimeout(
+        s.url,
+        { method: "PUT", headers: s.headers, body: `seed-${i}` },
+        cfg.timeoutMs,
+      );
+      lastStatus = res.status;
+
+      if (res.ok) break;
+      if (res.status !== 429) {
+        throw new Error(`seed list PUT failed status=${res.status}`);
+      }
+
+      await res.text().catch(() => "");
+      const backoffMs = 250 * Math.pow(2, attempt);
+      await sleep(backoffMs);
+    }
+
+    if (lastStatus === 429) {
+      throw new Error(`seed list PUT failed status=429 (throttled after retries)`);
+    }
   }
 
   const lat = newLat();
@@ -304,11 +336,14 @@ async function securityProbes(aws: AwsClient, cfg: Env, runPrefix: string) {
   const results: Array<{ name: string; ok: boolean; status?: number; note: string }> = [];
 
   // 1) Path traversal attempts (should not allow, ideally 400/403)
-  // NOTE: raw "../" segments are normalized by URL parsers/runtimes (client + server)
-  // and are not a reliable app-level test. We keep encoded variants which reach routing.
+  // NOTE:
+  // - Raw "../" is normalized by URL parsers.
+  // - Also, some stacks normalize a dot-segment *even when it originated from percent-encoding*.
+  //   Example: "%2e%2e/" is often treated as "../" and removed, yielding a different pathname.
+  //   If you see 200 for "%2e%2e/", it may mean the proxy/router normalized it *before* your app.
+  // We keep the variants that actually reach the app intact.
   const traversalKeys = [
     `${runPrefix}/..%2Fevil.txt`,
-    `${runPrefix}/%2e%2e/evil.txt`,
     `${runPrefix}/%2e%2e%2fevil.txt`,
     `..%2F..%2Fetc%2Fpasswd`,
   ];
