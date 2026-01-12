@@ -446,6 +446,8 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 							ts: payload.container?.message_ts,
 							blocks: newBlocks,
 							text: "File Upload Summary (Updated)",
+							unfurl_links: false,
+							unfurl_media: false,
 						}),
 					},
 				);
