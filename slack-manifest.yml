@@ -15,6 +15,7 @@ oauth_config:
     bot:
       - chat:write
       - files:read
+      - channels:history
 settings:
   event_subscriptions:
     request_url: https://silo.deployor.dev/api/slack/events

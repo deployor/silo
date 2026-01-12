@@ -17,7 +17,8 @@ export async function handleMessage(event: any) {
 	const threadTs = event.thread_ts || event.ts;
 
 	// Only allow channel uploads in the configured channel. DMs are always allowed.
-	// Note: Slack sends IMs as "message.im" events (see manifest). Channel messages are plain "message".
+	// Note: Slack sends IMs as "message.im" events (see manifest). Channel messages are "message.channels".
+	// Some Slack event payloads omit `channel_type`, so treat missing as non-IM.
 	const isIm = event.channel_type === "im";
 	if (!isIm) {
 		const allowedChannelId = config.slack.fileUploadChannelId;
