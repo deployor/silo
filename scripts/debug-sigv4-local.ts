@@ -25,7 +25,7 @@ function canonicalize(req: Request) {
   const url = new URL(req.url);
 
   // canonical URI
-  let canonicalUri = url.pathname;<
+  let canonicalUri = url.pathname;
   if (canonicalUri === "") canonicalUri = "/";
 
   const preservePctEncoded = (s: string) => s.replace(/%[0-9A-Fa-f]{2}/g, (m) => m.toUpperCase());
