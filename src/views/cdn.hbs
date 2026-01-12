@@ -19,7 +19,7 @@
   <!-- Upload Zone -->
   <div
     id="drop-zone"
-    class="w-full max-w-3xl aspect-21/9 bg-hc-dark border-2 border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center p-12 transition-colors duration-200 hover:border-hc-red/30 hover:bg-white/5 cursor-pointer relative overflow-hidden group card-shadow"
+    class="w-full max-w-3xl aspect-21/9 bg-hc-dark border-2 border-dashed border-white/10 rounded-3xl flex flex-col items-center justify-center p-12 cursor-pointer relative overflow-hidden card-shadow"
   >
     <input
       type="file"
@@ -28,7 +28,7 @@
       multiple
     />
     
-    <div class="text-center pointer-events-none transition-transform duration-300 group-hover:scale-110" id="upload-prompt">
+    <div class="text-center pointer-events-none" id="upload-prompt">
       <div class="bg-hc-red/10 p-4 md:p-6 rounded-2xl inline-flex mb-6 text-hc-red border border-hc-red/20 shadow-inner">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 md:h-12 md:w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -185,7 +185,7 @@
     
     results.forEach(res => {
         const div = document.createElement('div');
-        div.className = 'bg-hc-dark border border-white/10 rounded-2xl p-5 flex items-center justify-between animate-fade-in card-shadow hover:border-white/20 transition-colors group';
+        div.className = 'bg-hc-dark border border-white/10 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 card-shadow';
         
         if (res.success) {
             div.innerHTML = `
@@ -205,12 +205,12 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button onclick="copyToClipboard('${escapeHtml(res.url)}', this)" class="text-text-muted hover:text-white hover:bg-white/10 p-2 rounded-lg transition-all active:scale-95" title="Copy URL">
+                    <button onclick="copyToClipboard('${escapeHtml(res.url)}', this)" class="text-text-muted hover:text-white p-2 rounded-lg" title="Copy URL">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                         </svg>
                     </button>
-                    <a href="${escapeHtml(res.url)}" target="_blank" class="text-text-muted hover:text-white hover:bg-white/10 p-2 rounded-lg transition-all active:scale-95" title="Open">
+                    <a href="${escapeHtml(res.url)}" target="_blank" class="text-text-muted hover:text-white p-2 rounded-lg" title="Open">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                         </svg>
