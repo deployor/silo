@@ -143,46 +143,43 @@ export async function handlePutRequest(
 		let actualSize = 0;
 
 		if (!copySource) {
-			// Security/quotas: require Content-Length and verify it by counting bytes.
-			// We cannot trust the client size claims, but we also don't want to buffer
-			// the whole object in memory.
+			// There is no way to know the full size *before* reading the stream.
+			// If we truly must NOT rely on Content-Length, the only 100% accurate option
+			// is to stream while counting.
+			//
+			// Design here:
+			// - If Content-Length is present: we can pre-check quota and also verify it by counting.
+			// - If Content-Length is absent: we stream+count and enforce quota mid-stream.
+			//   If quota exceeded, we abort the upstream request.
 			const contentLengthHeader = req.headers.get("content-length");
-			if (!contentLengthHeader) {
-				return S3Errors.InvalidRequest(
-					"Missing required Content-Length header",
-				).toResponse();
+			const declared = contentLengthHeader ? Number(contentLengthHeader) : null;
+			if (declared !== null && (!Number.isFinite(declared) || declared < 0)) {
+				return S3Errors.InvalidRequest("Invalid Content-Length header").toResponse();
 			}
 
-			const declared = Number(contentLengthHeader);
-			if (!Number.isFinite(declared) || declared < 0) {
-				return S3Errors.InvalidRequest(
-					"Invalid Content-Length header",
-				).toResponse();
-			}
-			actualSize = declared;
+			if (declared !== null) {
+				actualSize = declared;
+				upstreamHeaders.set("Content-Length", contentLengthHeader!);
 
-			if (limit !== null) {
-				if (
-					BigInt(user.storageUsageBytes) + BigInt(actualSize) >
-					BigInt(limit)
-				) {
-					return S3Errors.QuotaExceeded(
-						"You have exceeded your storage quota.",
-						key,
-					).toResponse();
+				if (limit !== null) {
+					if (
+						BigInt(user.storageUsageBytes) + BigInt(actualSize) >
+						BigInt(limit)
+					) {
+						return S3Errors.QuotaExceeded(
+							"You have exceeded your storage quota.",
+							key,
+						).toResponse();
+					}
 				}
 			}
 
-			// Forward the declared Content-Length.
-			upstreamHeaders.set("Content-Length", contentLengthHeader);
-
-			// Verify the body length by wrapping the stream.
-			let seen = 0;
 			const body = req.body;
 			if (!body) {
 				return S3Errors.InvalidRequest("Missing request body").toResponse();
 			}
 
+			let seen = 0;
 			requestBody = new ReadableStream({
 				start(controller) {
 					const reader = body.getReader();
@@ -191,26 +188,31 @@ export async function handlePutRequest(
 							.read()
 							.then(({ value, done }) => {
 								if (done) {
-									if (seen !== declared) {
+									// If we had a declared length, verify it.
+									if (declared !== null && seen !== declared) {
 										controller.error(
 											new Error(
 												`Content-Length mismatch: declared=${declared} actual=${seen}`,
 											),
 										);
 									} else {
+										actualSize = seen;
 										controller.close();
 									}
 									return;
 								}
 
 								seen += value?.byteLength ?? 0;
-								if (seen > declared) {
-									controller.error(
-										new Error(
-											`Content-Length exceeded: declared=${declared} actual>${seen}`,
-										),
-									);
-									return;
+
+								// Enforce quota without relying on Content-Length.
+								if (limit !== null) {
+									if (
+										BigInt(user.storageUsageBytes) + BigInt(seen) >
+										BigInt(limit)
+									) {
+										controller.error(new Error("QuotaExceeded"));
+										return;
+									}
 								}
 
 								controller.enqueue(value);
