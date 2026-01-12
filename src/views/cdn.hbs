@@ -8,11 +8,11 @@
     <p class="text-text-muted text-xl max-w-2xl mx-auto font-medium mb-6">
       Drag and drop any file to upload.
     </p>
-    <div class="inline-flex items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/10">
+    <div class="inline-flex flex-wrap justify-center items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/10 max-w-full">
         <div class="w-32 h-2 bg-white/10 rounded-full overflow-hidden">
             <div id="storage-bar" class="h-full bg-hc-red rounded-full transition-all duration-500" style="width: 0%"></div>
         </div>
-        <span id="storage-text" class="text-xs font-mono text-text-muted">Loading usage...</span>
+        <span id="storage-text" class="text-xs font-mono text-text-muted break-words">Loading usage...</span>
     </div>
   </div>
 
@@ -29,12 +29,12 @@
     />
     
     <div class="text-center pointer-events-none transition-transform duration-300 group-hover:scale-110" id="upload-prompt">
-      <div class="bg-hc-red/10 p-6 rounded-2xl inline-flex mb-6 text-hc-red border border-hc-red/20 shadow-inner">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div class="bg-hc-red/10 p-4 md:p-6 rounded-2xl inline-flex mb-6 text-hc-red border border-hc-red/20 shadow-inner">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 md:h-12 md:w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
         </svg>
       </div>
-      <h3 class="text-2xl font-bold text-white mb-2">Drop files here</h3>
+      <h3 class="text-xl md:text-2xl font-bold text-white mb-2">Drop files here</h3>
       <p class="text-text-muted font-mono text-sm">or click to browse</p>
       <p class="text-white/20 font-mono text-xs mt-4">Max 1GB per file</p>
     </div>
@@ -44,12 +44,12 @@
         <div class="w-full bg-white/10 rounded-full h-3 mb-6 overflow-hidden backdrop-blur-sm">
             <div id="progress-bar" class="bg-hc-red h-3 rounded-full transition-all duration-100 shadow-[0_0_10px_rgba(236,55,80,0.5)]" style="width: 0%"></div>
         </div>
-        <p class="text-white font-mono text-lg animate-pulse flex items-center gap-2">
+        <p class="text-white font-mono text-base md:text-lg animate-pulse flex items-center gap-2 text-center">
             <svg class="animate-spin h-5 w-5 text-hc-red" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            Uploading <span id="file-count" class="font-bold text-hc-red">0</span> files...
+            <span>Uploading <span id="file-count" class="font-bold text-hc-red">0</span> files...</span>
         </p>
     </div>
   </div>
