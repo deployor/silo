@@ -395,12 +395,17 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 
 		// If this delete button belongs to a different uploader, deny.
 		if (uploaderSlackId && uploaderSlackId !== payload.user.id) {
-			return {
-				response_action: "errors",
-				errors: {
-					_action: "This isn't your file.",
-				},
-			};
+			await openModal(
+				payload.trigger_id,
+				Modal({ title: "Nope" })
+					.blocks(
+						Section({
+							text: "You can't delete someone else's file.",
+						}),
+					)
+					.buildToObject(),
+			);
+			return;
 		}
 
 		const bucket = await db
@@ -425,6 +430,13 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 							text: {
 								type: "mrkdwn",
 								text: `~${block.text.text.split("\n")[0]}~\n_Deleted_`,
+							},
+							accessory: {
+								type: "button",
+								text: { type: "plain_text", text: "Deleted", emoji: true },
+								style: "danger",
+								action_id: "delete_cdn_file_done",
+								value: actionValue,
 							},
 						};
 					}
