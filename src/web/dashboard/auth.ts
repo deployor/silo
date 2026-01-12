@@ -153,26 +153,62 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 	}
 
 	if (path === "/auth/logout") {
-		const cookieHeader = req.headers.get("Cookie");
-		if (cookieHeader) {
-			const cookies = cookieHeader.split(";").reduce(
-				(acc, cookie) => {
-					const [key, value] = cookie.trim().split("=");
-					acc[key] = value;
-					return acc;
-				},
-				{} as Record<string, string>,
-			);
-
-			if (cookies.silo_session) {
-				await db.delete(sessions).where(eq(sessions.id, cookies.silo_session));
-			}
-		}
+		const cookieHeader = req.headers.get("Cookie") || "";
+		const cookies = cookieHeader
+			? cookieHeader.split(";").reduce(
+					(acc, cookie) => {
+						const [key, value] = cookie.trim().split("=");
+						acc[key] = value;
+						return acc;
+					},
+					{} as Record<string, string>,
+				)
+			: ({} as Record<string, string>);
 
 		const headers = new Headers();
-		headers.set(
+
+		// If the current session is impersonating, "logout" should *stop impersonation*
+		// (best UX for admins) without destroying the admin session.
+		if (cookies.silo_session) {
+			const sess = await db
+				.select({
+					id: sessions.id,
+					impersonatorUserId: sessions.impersonatorUserId,
+					impersonatedUserId: sessions.impersonatedUserId,
+				})
+				.from(sessions)
+				.where(eq(sessions.id, cookies.silo_session))
+				.limit(1);
+
+			if (sess.length > 0 && sess[0].impersonatorUserId && sess[0].impersonatedUserId) {
+				await db
+					.update(sessions)
+					.set({
+						impersonatorUserId: null,
+						impersonatedUserId: null,
+						impersonationExpiresAt: null,
+					})
+					.where(eq(sessions.id, cookies.silo_session));
+
+				headers.append(
+					"Set-Cookie",
+					"silo_impersonating=; Path=/; SameSite=Lax; Secure; Max-Age=0",
+				);
+				headers.set("Location", "/admin");
+				return new Response(null, { status: 302, headers });
+			}
+
+			// Normal logout
+			await db.delete(sessions).where(eq(sessions.id, cookies.silo_session));
+		}
+
+		headers.append(
 			"Set-Cookie",
 			`silo_session=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0`,
+		);
+		headers.append(
+			"Set-Cookie",
+			"silo_impersonating=; Path=/; SameSite=Lax; Secure; Max-Age=0",
 		);
 		headers.set("Location", "/");
 		return new Response(null, { status: 302, headers });
