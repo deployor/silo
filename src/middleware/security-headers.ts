@@ -26,7 +26,17 @@ export function securityHeaders(req: Request, res: Response): Response {
 	// We also allow data: images for the dashboard.
 	headers.set(
 		"Content-Security-Policy",
-		"default-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:;",
+		[
+			"default-src 'self'",
+			"img-src 'self' data: https:",
+			// Allow third-party script tags used by our templates.
+			// NOTE: We still do NOT allow 'unsafe-eval'; Alpine must use the CSP build.
+			"script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net",
+			// Some browsers distinguish between script-src (inline/eval) vs script-src-elem (script tags).
+			"script-src-elem 'self' https://unpkg.com https://cdn.jsdelivr.net",
+			"style-src 'self' 'unsafe-inline'",
+			"font-src 'self' data:",
+		].join("; ") + ";",
 	);
 
 	return new Response(res.body, {
