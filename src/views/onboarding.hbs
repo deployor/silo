@@ -1,5 +1,21 @@
 <div class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto" id="onboarding">
 
+  <style>
+    /* Local-only onboarding transitions (kept scoped to #onboarding) */
+    #onboarding [data-step] {
+      transition: opacity 180ms ease, transform 180ms ease;
+      will-change: opacity, transform;
+    }
+    #onboarding [data-step].is-enter {
+      opacity: 0;
+      transform: translateY(8px) scale(0.99);
+    }
+    #onboarding [data-step].is-leave {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.99);
+    }
+  </style>
+
   <!-- Step 1: Welcome -->
   <section data-step="1" class="text-center max-w-3xl mx-auto w-full">
     <div class="mb-8 flex justify-center">
@@ -132,11 +148,36 @@
 
     function show(step) {
       const n = Math.max(1, Math.min(maxStep, Number(step) || 1));
-      for (const el of steps) {
-        const s = Number(el.getAttribute("data-step"));
-        if (s === n) el.classList.remove("hidden");
-        else el.classList.add("hidden");
+
+      const prev = Number(root.getAttribute("data-current-step")) || 1;
+      if (prev === n) {
+        root.setAttribute("data-current-step", String(n));
+        return;
       }
+
+      const prevEl = steps.find((el) => Number(el.getAttribute("data-step")) === prev);
+      const nextEl = steps.find((el) => Number(el.getAttribute("data-step")) === n);
+
+      // Reveal next immediately but start from "enter" state.
+      if (nextEl) {
+        nextEl.classList.remove("hidden");
+        nextEl.classList.add("is-enter");
+      }
+
+      // Trigger transitions on next frame.
+      requestAnimationFrame(() => {
+        if (nextEl) nextEl.classList.remove("is-enter");
+        if (prevEl) prevEl.classList.add("is-leave");
+
+        // After transition ends, fully hide previous.
+        window.setTimeout(() => {
+          if (prevEl) {
+            prevEl.classList.add("hidden");
+            prevEl.classList.remove("is-leave");
+          }
+        }, 200);
+      });
+
       root.setAttribute("data-current-step", String(n));
     }
 
