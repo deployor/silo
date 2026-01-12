@@ -143,6 +143,13 @@ pre code {
     max-width: 100%;
   }
 
+  /* CDN page: prevent the upload zone from being a tiny strip */
+  #drop-zone {
+    padding: 1.25rem !important;
+    aspect-ratio: auto !important;
+    min-height: 14rem;
+  }
+
   /* Tables: keep scrollable, but add some affordance */
   .overflow-x-auto {
     -webkit-overflow-scrolling: touch;
