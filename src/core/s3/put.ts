@@ -143,9 +143,23 @@ export async function handlePutRequest(
 		let actualSize = 0;
 
 		if (!copySource) {
-			const arrayBuffer = await req.arrayBuffer();
-			actualSize = arrayBuffer.byteLength;
-			requestBody = arrayBuffer;
+			// Security/quotas: require Content-Length and verify it by counting bytes.
+			// We cannot trust the client size claims, but we also don't want to buffer
+			// the whole object in memory.
+			const contentLengthHeader = req.headers.get("content-length");
+			if (!contentLengthHeader) {
+				return S3Errors.InvalidRequest(
+					"Missing required Content-Length header",
+				).toResponse();
+			}
+
+			const declared = Number(contentLengthHeader);
+			if (!Number.isFinite(declared) || declared < 0) {
+				return S3Errors.InvalidRequest(
+					"Invalid Content-Length header",
+				).toResponse();
+			}
+			actualSize = declared;
 
 			if (limit !== null) {
 				if (
@@ -159,7 +173,54 @@ export async function handlePutRequest(
 				}
 			}
 
-			upstreamHeaders.set("Content-Length", actualSize.toString());
+			// Forward the declared Content-Length.
+			upstreamHeaders.set("Content-Length", contentLengthHeader);
+
+			// Verify the body length by wrapping the stream.
+			let seen = 0;
+			const body = req.body;
+			if (!body) {
+				return S3Errors.InvalidRequest("Missing request body").toResponse();
+			}
+
+			requestBody = new ReadableStream({
+				start(controller) {
+					const reader = body.getReader();
+					const pump = (): void => {
+						reader
+							.read()
+							.then(({ value, done }) => {
+								if (done) {
+									if (seen !== declared) {
+										controller.error(
+											new Error(
+												`Content-Length mismatch: declared=${declared} actual=${seen}`,
+											),
+										);
+									} else {
+										controller.close();
+									}
+									return;
+								}
+
+								seen += value?.byteLength ?? 0;
+								if (seen > declared) {
+									controller.error(
+										new Error(
+											`Content-Length exceeded: declared=${declared} actual>${seen}`,
+										),
+									);
+									return;
+								}
+
+								controller.enqueue(value);
+								pump();
+							})
+							.catch((err) => controller.error(err));
+					};
+					pump();
+				},
+			});
 		}
 
 		const response = await s3Client.fetch(

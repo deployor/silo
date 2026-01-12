@@ -229,30 +229,36 @@ Bun.serve({
 				}
 
 				// Post-request logging and stats
-				// We only log if we have a user context (authenticated requests)
+				// We only log if we have a user context (authenticated requests).
+				// Under heavy S3 throughput testing, DB writes can become a bottleneck.
+				// Allow disabling via env (best for perf/bench environments).
 				const ctx = context.getStore();
-				if (ctx?.user) {
-					// For PUT requests, we might have already logged ingress in the handler
-					// But for general stats, we do it here.
-					// Note: Ingress for PUT is tricky because the body stream is consumed.
-					// We rely on the handler to have updated the DB for storage usage,
-					// but for traffic stats we can try to use Content-Length.
-					const ingress = parseInt(
-						req.headers.get("content-length") || "0",
-						10,
-					);
-					const egress = parseInt(
-						response.headers.get("content-length") || "0",
-						10,
-					);
+				const disableS3Stats = (process.env.DISABLE_S3_STATS ?? "0") === "1";
+				if (ctx?.user && !(ctx.path.startsWith("/") && disableS3Stats)) {
+					const isS3Request = !isDashboardRequest(req, url);
+					if (!(disableS3Stats && isS3Request)) {
+						// For PUT requests, we might have already logged ingress in the handler
+						// But for general stats, we do it here.
+						// Note: Ingress for PUT is tricky because the body stream is consumed.
+						// We rely on the handler to have updated the DB for storage usage,
+						// but for traffic stats we can try to use Content-Length.
+						const ingress = parseInt(
+							req.headers.get("content-length") || "0",
+							10,
+						);
+						const egress = parseInt(
+							response.headers.get("content-length") || "0",
+							10,
+						);
 
-					// Fire and forget
-					Promise.all([
-						logService.logRequest(response, ingress),
-						statsService.recordUsage(ingress, egress),
-					]).catch((err) => {
-						console.error("Error updating stats/logs:", err);
-					});
+						// Fire and forget
+						Promise.all([
+							logService.logRequest(response, ingress),
+							statsService.recordUsage(ingress, egress),
+						]).catch((err) => {
+							console.error("Error updating stats/logs:", err);
+						});
+					}
 				}
 
 				return securityHeaders(req, response);
