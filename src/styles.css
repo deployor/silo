@@ -101,10 +101,6 @@ pre code {
   padding: 0;
 }
 
-[x-cloak] {
-  display: none !important;
-}
-
 /*
   Mobile responsiveness helpers.
   Kept intentionally conservative so desktop stays visually identical.
