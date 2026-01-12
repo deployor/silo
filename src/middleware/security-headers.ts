@@ -34,7 +34,9 @@ export function securityHeaders(req: Request, res: Response): Response {
 			"script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net",
 			// Some browsers distinguish between script-src (inline/eval) vs script-src-elem (script tags).
 			"script-src-elem 'self' https://unpkg.com https://cdn.jsdelivr.net",
-			"style-src 'self' 'unsafe-inline'",
+			// Allow CSS loaded via <link rel="stylesheet"> (e.g. phosphor icons CSS from jsdelivr).
+			"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+			"style-src-elem 'self' https://cdn.jsdelivr.net",
 			"font-src 'self' data:",
 		].join("; ") + ";",
 	);
