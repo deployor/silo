@@ -49,7 +49,20 @@
             {{#if user.isAdmin}}
               <a href="/admin" id="admin-link" class="text-text-muted hover:text-white transition-colors">Admin</a>
             {{/if}}
-            <a href="/auth/logout" class="text-hc-red hover:text-white transition-colors">Logout</a>
+            <a href="/auth/logout" class="text-hc-red hover:text-white transition-colors" id="logout-link">Logout</a>
+            <script>
+              // During admin impersonation, /auth/logout stops impersonation.
+              // We detect via a non-HttpOnly cookie set when impersonation starts.
+              (function () {
+                try {
+                  const c = document.cookie || "";
+                  if (c.includes("silo_impersonating=true")) {
+                    const el = document.getElementById("logout-link");
+                    if (el) el.textContent = "Stop impersonating";
+                  }
+                } catch (_e) {}
+              })();
+            </script>
           {{else}}
              <a href="/auth/login" class="text-hc-red hover:text-white transition-colors">Login</a>
           {{/if}}

@@ -540,18 +540,16 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	// API Routes
 	if (path.startsWith("/api/admin/")) {
 		// Start impersonation (admin-only): switches current session into impersonation mode.
+		// Behavior: always 30 minutes, no user-selectable TTL.
 		if (path === "/api/admin/impersonate" && req.method === "POST") {
 			try {
 				const body = await req.json();
 				const targetUserId = body?.userId;
-				const ttlMinutes = Number(body?.ttlMinutes ?? 30);
-
 				if (!targetUserId || typeof targetUserId !== "string") {
 					return new Response("Missing userId", { status: 400 });
 				}
 
-				// Clamp TTL (guardrail)
-				const ttlMs = Math.min(Math.max(ttlMinutes, 5), 60) * 60_000;
+				const ttlMs = 30 * 60_000;
 				const impersonationExpiresAt = new Date(Date.now() + ttlMs);
 
 				// Read the current cookie session id
@@ -570,20 +568,19 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 
 				// Ensure target exists
 				const target = await db
-					.select({ id: users.id, isAdmin: users.isAdmin })
+					.select({ id: users.id })
 					.from(users)
 					.where(eq(users.id, targetUserId))
 					.limit(1);
 
 				if (target.length === 0) return new Response("User not found", { status: 404 });
 
-				// Update session in-place: keep cookie, flip session.user_id to target,
-				// and store impersonator_user_id + expiry.
+				// Best-practice: keep session owner in sessions.userId; store impersonation overlay separately.
 				await db
 					.update(sessions)
 					.set({
-						userId: targetUserId,
 						impersonatorUserId: user.id,
+						impersonatedUserId: targetUserId,
 						impersonationExpiresAt,
 					})
 					.where(eq(sessions.id, sessionId));
@@ -599,14 +596,24 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					statusCode: 200,
 					ingressBytes: 0,
 					egressBytes: 0,
-					ipAddress: req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown",
+					ipAddress:
+						req.headers.get("x-forwarded-for") ||
+						req.headers.get("cf-connecting-ip") ||
+						"unknown",
 					userAgent: req.headers.get("user-agent") || "Admin",
 					latencyMs: 0,
 				});
 
+				const headers = new Headers({ "Content-Type": "application/json" });
+				// Non-HttpOnly flag used only for UI label changes.
+				headers.append(
+					"Set-Cookie",
+					"silo_impersonating=true; Path=/; SameSite=Lax; Secure; Max-Age=1800",
+				);
+
 				return new Response(
 					JSON.stringify({ ok: true, userId: targetUserId, expiresAt: impersonationExpiresAt.toISOString() }),
-					{ headers: { "Content-Type": "application/json" } },
+					{ headers },
 				);
 			} catch (e) {
 				console.error("Failed to start impersonation", e);
@@ -614,7 +621,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 			}
 		}
 
-		// Stop impersonation (admin-only): revert session to impersonator
+		// Stop impersonation (admin-only): removes impersonation overlay from the current session.
 		if (path === "/api/admin/impersonate" && req.method === "DELETE") {
 			try {
 				const cookieHeader = req.headers.get("Cookie") || "";
@@ -633,21 +640,24 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				const sess = await db
 					.select({
 						id: sessions.id,
-						impersonatorUserId: sessions.impersonatorUserId,
 						userId: sessions.userId,
+						impersonatorUserId: sessions.impersonatorUserId,
+						impersonatedUserId: sessions.impersonatedUserId,
 					})
 					.from(sessions)
 					.where(eq(sessions.id, sessionId))
 					.limit(1);
 
 				if (sess.length === 0) return new Response("Not found", { status: 404 });
-				if (!sess[0].impersonatorUserId) return new Response("Not impersonating", { status: 400 });
+				if (!sess[0].impersonatorUserId || !sess[0].impersonatedUserId) {
+					return new Response("Not impersonating", { status: 400 });
+				}
 
 				await db
 					.update(sessions)
 					.set({
-						userId: sess[0].impersonatorUserId,
 						impersonatorUserId: null,
+						impersonatedUserId: null,
 						impersonationExpiresAt: null,
 					})
 					.where(eq(sessions.id, sessionId));
@@ -656,21 +666,28 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				await db.insert(requestLogs).values({
 					bucketId: null,
 					bucketName: null,
-					ownerId: sess[0].userId,
+					ownerId: sess[0].impersonatedUserId,
 					requesterId: user.id,
 					method: "ADMIN",
-					path: `impersonate:stop:${sess[0].userId}`,
+					path: `impersonate:stop:${sess[0].impersonatedUserId}`,
 					statusCode: 200,
 					ingressBytes: 0,
 					egressBytes: 0,
-					ipAddress: req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown",
+					ipAddress:
+						req.headers.get("x-forwarded-for") ||
+						req.headers.get("cf-connecting-ip") ||
+						"unknown",
 					userAgent: req.headers.get("user-agent") || "Admin",
 					latencyMs: 0,
 				});
 
-				return new Response(JSON.stringify({ ok: true }), {
-					headers: { "Content-Type": "application/json" },
-				});
+				const headers = new Headers({ "Content-Type": "application/json" });
+				headers.append(
+					"Set-Cookie",
+					"silo_impersonating=; Path=/; SameSite=Lax; Secure; Max-Age=0",
+				);
+
+				return new Response(JSON.stringify({ ok: true }), { headers });
 			} catch (e) {
 				console.error("Failed to stop impersonation", e);
 				return new Response("Failed", { status: 500 });
