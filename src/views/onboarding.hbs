@@ -1,4 +1,4 @@
-<div class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto" x-data="{ step: 1 }">
+<div class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto" x-data="{ step: 1 }" x-cloak>
   
   <!-- Step 1: Welcome -->
   <div x-show="step === 1" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" class="text-center max-w-3xl mx-auto w-full">
@@ -14,7 +14,7 @@
     </p>
 
     <div class="flex items-center justify-center gap-6">
-        <button @click="step = 2" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
+        <button type="button" @click="step = 2" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
             <span>Next: Your Storage</span>
             <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
         </button>
@@ -44,11 +44,11 @@
     </div>
 
     <div class="flex items-center justify-between w-full max-w-md mx-auto">
-        <button @click="step = 1" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
+        <button type="button" @click="step = 1" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
             <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
             <span>Back</span>
         </button>
-        <button @click="step = 3" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
+        <button type="button" @click="step = 3" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
             <span>Next: Privacy & Logs</span>
             <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
         </button>
@@ -71,11 +71,11 @@
     </p>
 
     <div class="flex items-center justify-between w-full max-w-md mx-auto">
-        <button @click="step = 2" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
+        <button type="button" @click="step = 2" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
             <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
             <span>Back</span>
         </button>
-        <button @click="step = 4" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
+        <button type="button" @click="step = 4" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
             <span>Next: How it Works</span>
             <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
         </button>
@@ -98,7 +98,7 @@
     </p>
 
     <div class="flex items-center justify-between w-full max-w-md mx-auto">
-        <button @click="step = 3" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
+        <button type="button" @click="step = 3" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
             <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
             <span>Back</span>
         </button>
@@ -115,6 +115,7 @@
 
 {{#section "extraScripts"}}
 <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<!-- CSP-safe Alpine build (no eval / Function constructor) -->
+<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.x.x/dist/cdn.min.js"></script>
 <script src="https://unpkg.com/@phosphor-icons/web"></script>
 {{/section}}
