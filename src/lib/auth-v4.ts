@@ -120,7 +120,12 @@ export async function verifyAwsV4Signature(
 	const signedHeaders = signedHeadersStr.split(";");
 	const canonicalHeaders = `${signedHeaders
 		.map((header) => {
-			const value = headers.get(header) || "";
+			// Some runtimes do not expose an explicit Host header, but SigV4 requires it.
+			// Derive it from the request URL when absent.
+			let value = headers.get(header) || "";
+			if (!value && header.toLowerCase() === "host") {
+				value = url.host;
+			}
 			return `${header.toLowerCase()}:${value.trim().replace(/\s+/g, " ")}`;
 		})
 		.join("\n")}\n`;
