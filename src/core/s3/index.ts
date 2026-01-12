@@ -27,7 +27,14 @@ export async function handleS3Request(
 	const url = new URL(req.url);
 	const S3_DOMAIN = config.s3Domain;
 	const host = req.headers.get("host") || "";
-	const key = getKeyFromRequest(req, bucket.name);
+
+	let key: string;
+	try {
+		key = getKeyFromRequest(req, bucket.name);
+	} catch {
+		// Treat invalid keys as AccessDenied (403) instead of 500.
+		return S3Errors.AccessDenied().toResponse();
+	}
 
 	// Determine Action
 	const action = determineAction(method, key, url.searchParams, req.headers);

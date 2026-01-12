@@ -314,7 +314,12 @@ async function securityProbes(aws: AwsClient, cfg: Env, runPrefix: string) {
   ];
 
   for (const key of traversalKeys) {
-    const u = `${cfg.endpoint}/${cfg.bucket}/${key}`; // intentionally do NOT normalize/escape
+    // IMPORTANT:
+    // - We want to send the path *exactly* as written (including %2e%2e, %2f, etc)
+    // - Using `new URL()` or any encoding helpers can normalize/escape and change what the server receives.
+    // So we build a literal URL string and do NOT re-parse it.
+    const u = `${cfg.endpoint}/${cfg.bucket}/${key}`;
+
     const s = await aws.sign(u, { method: "PUT" });
     const res = await fetchWithTimeout(
       s.url,
