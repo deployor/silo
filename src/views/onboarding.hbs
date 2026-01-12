@@ -1,38 +1,10 @@
-<div class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto" id="onboarding">
-
-  <style>
-    /* Local-only onboarding transitions (kept scoped to #onboarding) */
-    #onboarding {
-      /* Prevent layout jump while we crossfade steps */
-      position: relative;
-    }
-
-    /* All steps occupy the same space via absolute positioning during transitions */
-    #onboarding [data-step] {
-      width: 100%;
-      max-width: 48rem; /* matches max-w-3xl */
-      margin-left: auto;
-      margin-right: auto;
-
-      transition: opacity 180ms ease;
-      will-change: opacity;
-    }
-
-    #onboarding [data-step].is-animating {
-      position: absolute;
-      inset: 0;
-    }
-
-    #onboarding [data-step].is-enter {
-      opacity: 0;
-    }
-    #onboarding [data-step].is-leave {
-      opacity: 0;
-    }
-  </style>
+<div class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto"
+  x-data="onboarding"
+  x-init="init()"
+>
 
   <!-- Step 1: Welcome -->
-  <section data-step="1" class="text-center max-w-3xl mx-auto w-full">
+  <section x-show="step === 1" x-transition.opacity.duration.200ms class="text-center max-w-3xl mx-auto w-full">
     <div class="mb-8 flex justify-center">
       <i class="ph-duotone ph-hand-waving text-8xl text-hc-red"></i>
     </div>
@@ -45,7 +17,7 @@
     </p>
 
     <div class="flex items-center justify-center gap-6">
-      <button type="button" data-next class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
+      <button type="button" @click="next()" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
         <span>Next: Your Storage</span>
         <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
       </button>
@@ -53,7 +25,7 @@
   </section>
 
   <!-- Step 2: Storage -->
-  <section data-step="2" class="text-center max-w-3xl mx-auto w-full hidden">
+  <section x-show="step === 2" x-transition.opacity.duration.200ms class="text-center max-w-3xl mx-auto w-full" style="display: none;">
     <div class="mb-8 flex justify-center">
       <i class="ph-duotone ph-hard-drives text-8xl text-blue-500"></i>
     </div>
@@ -75,11 +47,11 @@
     </div>
 
     <div class="flex items-center justify-between w-full max-w-md mx-auto">
-      <button type="button" data-prev class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
+      <button type="button" @click="prev()" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
         <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
         <span>Back</span>
       </button>
-      <button type="button" data-next class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
+      <button type="button" @click="next()" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
         <span>Next: Privacy & Logs</span>
         <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
       </button>
@@ -87,7 +59,7 @@
   </section>
 
   <!-- Step 3: Privacy & Logs -->
-  <section data-step="3" class="text-center max-w-3xl mx-auto w-full hidden">
+  <section x-show="step === 3" x-transition.opacity.duration.200ms class="text-center max-w-3xl mx-auto w-full" style="display: none;">
     <div class="mb-8 flex justify-center">
       <i class="ph-duotone ph-shield-check text-8xl text-yellow-500"></i>
     </div>
@@ -102,11 +74,11 @@
     </p>
 
     <div class="flex items-center justify-between w-full max-w-md mx-auto">
-      <button type="button" data-prev class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
+      <button type="button" @click="prev()" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
         <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
         <span>Back</span>
       </button>
-      <button type="button" data-next class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
+      <button type="button" @click="next()" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
         <span>Next: How it Works</span>
         <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
       </button>
@@ -114,7 +86,7 @@
   </section>
 
   <!-- Step 4: How it Works -->
-  <section data-step="4" class="text-center max-w-3xl mx-auto w-full hidden">
+  <section x-show="step === 4" x-transition.opacity.duration.200ms class="text-center max-w-3xl mx-auto w-full" style="display: none;">
     <div class="mb-8 flex justify-center">
       <i class="ph-duotone ph-cloud-check text-8xl text-green-500"></i>
     </div>
@@ -129,7 +101,7 @@
     </p>
 
     <div class="flex items-center justify-between w-full max-w-md mx-auto">
-      <button type="button" data-prev class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
+      <button type="button" @click="prev()" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
         <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
         <span>Back</span>
       </button>
@@ -146,85 +118,7 @@
 </div>
 
 {{#section "extraScripts"}}
+<script src="/assets/onboarding.js" defer></script>
 <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 <script src="https://unpkg.com/@phosphor-icons/web"></script>
-<script>
-  (function () {
-    /**
-     * Simple onboarding stepper.
-     * No Alpine. No overlapping "x-show" layers.
-     * Uses Tailwind's `hidden` class to ensure non-active steps cannot intercept clicks.
-     */
-    const root = document.getElementById("onboarding");
-    if (!root) return;
-
-    const steps = Array.from(root.querySelectorAll("[data-step]"));
-    const maxStep = steps.length;
-
-    function show(step) {
-      const n = Math.max(1, Math.min(maxStep, Number(step) || 1));
-
-      const prev = Number(root.getAttribute("data-current-step")) || 1;
-      if (prev === n) {
-        root.setAttribute("data-current-step", String(n));
-        return;
-      }
-
-      const prevEl = steps.find((el) => Number(el.getAttribute("data-step")) === prev);
-      const nextEl = steps.find((el) => Number(el.getAttribute("data-step")) === n);
-
-      // Make both steps overlay each other to avoid "down then up" layout shifts.
-      if (prevEl) prevEl.classList.add("is-animating");
-      if (nextEl) nextEl.classList.add("is-animating");
-
-      // Reveal next immediately but start from "enter" state.
-      if (nextEl) {
-        nextEl.classList.remove("hidden");
-        nextEl.classList.add("is-enter");
-      }
-
-      // Trigger transitions on next frame.
-      requestAnimationFrame(() => {
-        if (nextEl) nextEl.classList.remove("is-enter");
-        if (prevEl) prevEl.classList.add("is-leave");
-
-        // After transition ends, fully hide previous and remove overlay positioning.
-        window.setTimeout(() => {
-          if (prevEl) {
-            prevEl.classList.add("hidden");
-            prevEl.classList.remove("is-leave");
-            prevEl.classList.remove("is-animating");
-          }
-          if (nextEl) {
-            nextEl.classList.remove("is-animating");
-          }
-        }, 220);
-      });
-
-      root.setAttribute("data-current-step", String(n));
-    }
-
-    root.addEventListener("click", (e) => {
-      const target = e.target instanceof Element ? e.target : null;
-      if (!target) return;
-
-      const current = Number(root.getAttribute("data-current-step")) || 1;
-
-      const nextBtn = target.closest("[data-next]");
-      if (nextBtn) {
-        e.preventDefault();
-        show(current + 1);
-        return;
-      }
-
-      const prevBtn = target.closest("[data-prev]");
-      if (prevBtn) {
-        e.preventDefault();
-        show(current - 1);
-      }
-    });
-
-    show(1);
-  })();
-</script>
 {{/section}}
