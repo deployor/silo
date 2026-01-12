@@ -1,116 +1,162 @@
-<div class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto" x-data="{ step: 1 }" x-init="$nextTick(() => step = 1)">
-  
-  <!-- Step 1: Welcome -->
-  <div x-show="step === 1" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" class="text-center max-w-3xl mx-auto w-full">
-    <div class="mb-8 flex justify-center">
-        <i class="ph-duotone ph-hand-waving text-8xl text-hc-red"></i>
-    </div>
-    <h1 class="text-6xl md:text-8xl font-black text-white mb-8 tracking-tighter italic">
-      Welcome to Cargo!
-    </h1>
-    
-    <p class="text-text-muted text-2xl max-w-3xl mx-auto font-medium mb-12 leading-relaxed">
-      Cargo is an S3 Gateway and the new Hack Club CDN.
-    </p>
+<div class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto"
+  x-data="onboardingWizard()"
+  x-init="init()"
+>
+  <!-- Header / Progress -->
+  <div class="w-full max-w-3xl mx-auto mb-10">
+    <div class="flex items-center justify-between gap-4">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-black text-white tracking-tighter italic">Welcome to Cargo</h1>
+        <p class="text-text-muted mt-1 font-medium">Step <span class="text-white" x-text="step"></span> of <span class="text-white" x-text="steps.length"></span></p>
+      </div>
 
-    <div class="flex items-center justify-center gap-6">
-        <button @click="step = 2" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
-            <span>Next: Your Storage</span>
-            <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
-        </button>
+      <div class="flex items-center gap-2">
+        <template x-for="(s, idx) in steps" :key="s.id">
+          <button
+            type="button"
+            class="w-8 h-8 rounded-full border text-xs font-bold transition-colors"
+            :class="idx + 1 === step ? 'bg-hc-red border-hc-red text-white' : (idx + 1 < step ? 'bg-white/10 border-white/10 text-white' : 'bg-transparent border-white/20 text-text-muted')"
+            :aria-current="idx + 1 === step ? 'step' : null"
+            :title="s.short"
+            @click="goTo(idx + 1)"
+          >
+            <span x-text="idx + 1"></span>
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <div class="mt-4 w-full bg-white/5 rounded-full h-2 overflow-hidden">
+      <div class="bg-hc-red h-2 transition-all duration-300"
+        :style="`width: ${(step - 1) / (steps.length - 1) * 100}%`"
+      ></div>
     </div>
   </div>
 
-  <!-- Step 2: Storage -->
-  <div x-show="step === 2" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" class="text-center max-w-3xl mx-auto w-full">
-    <div class="mb-8 flex justify-center">
-        <i class="ph-duotone ph-hard-drives text-8xl text-blue-500"></i>
-    </div>
-    <h1 class="text-6xl md:text-8xl font-black text-white mb-8 tracking-tighter italic">
-      1GB Free Storage
-    </h1>
-    
-    <p class="text-text-muted text-2xl max-w-3xl mx-auto font-medium mb-8 leading-relaxed">
-      Every Hack Clubber on Slack gets <span class="text-white font-bold">1 GB for free</span>. 
-      <br>
-      Need more? Ship projects! Storage can be used for public CDN hosting or private S3 buckets.
-    </p>
-    
-    <div class="bg-white/5 rounded-xl p-4 mb-12 max-w-2xl mx-auto border border-white/10 flex items-start gap-4 text-left">
-        <i class="ph-fill ph-info text-text-muted text-xl mt-1"></i>
-        <p class="text-text-muted/70 text-sm font-medium leading-relaxed">
-            When you turn 18, we'll archive your data and send you a download link before deleting it. But that's a problem for future you!
-        </p>
+  <!-- Card -->
+  <div class="w-full max-w-3xl mx-auto bg-hc-dark rounded-3xl border border-white/10 card-shadow p-8">
+    <!-- Step content (single slot; no stacked hidden divs that can intercept clicks) -->
+    <div class="text-center">
+      <div class="mb-8 flex justify-center">
+        <i class="text-8xl" :class="current.iconClass"></i>
+      </div>
+
+      <h2 class="text-5xl md:text-7xl font-black text-white mb-6 tracking-tighter italic" x-text="current.title"></h2>
+
+      <p class="text-text-muted text-xl md:text-2xl max-w-3xl mx-auto font-medium leading-relaxed" x-html="current.html"></p>
+
+      <template x-if="current.note">
+        <div class="mt-8 bg-white/5 rounded-xl p-4 max-w-2xl mx-auto border border-white/10 flex items-start gap-4 text-left">
+          <i class="ph-fill ph-info text-text-muted text-xl mt-1"></i>
+          <p class="text-text-muted/70 text-sm font-medium leading-relaxed" x-text="current.note"></p>
+        </div>
+      </template>
     </div>
 
-    <div class="flex items-center justify-between w-full max-w-md mx-auto">
-        <button @click="step = 1" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
-            <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
-            <span>Back</span>
-        </button>
-        <button @click="step = 3" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
-            <span>Next: Privacy & Logs</span>
-            <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
-        </button>
-    </div>
-  </div>
+    <!-- Controls -->
+    <div class="mt-10 flex items-center justify-between w-full max-w-md mx-auto">
+      <button
+        type="button"
+        @click="prev()"
+        :disabled="step === 1"
+        class="px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group"
+        :class="step === 1 ? 'opacity-40 cursor-not-allowed text-text-muted' : 'text-text-muted hover:text-white'"
+      >
+        <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
+        <span>Back</span>
+      </button>
 
-  <!-- Step 3: Privacy & Logs -->
-  <div x-show="step === 3" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" class="text-center max-w-3xl mx-auto w-full">
-    <div class="mb-8 flex justify-center">
-        <i class="ph-duotone ph-shield-check text-8xl text-yellow-500"></i>
-    </div>
-    <h1 class="text-6xl md:text-8xl font-black text-white mb-8 tracking-tighter italic">
-      We Log Requests
-    </h1>
-    
-    <p class="text-text-muted text-2xl max-w-3xl mx-auto font-medium mb-12 leading-relaxed">
-      To keep Cargo safe and fast, we log all requests (User Agent, Path etc). 
-      <br><br>
-      <span class="text-white font-bold">We do NOT log your file contents.</span> Your data remains yours. We only track metadata to prevent abuse.
-    </p>
-
-    <div class="flex items-center justify-between w-full max-w-md mx-auto">
-        <button @click="step = 2" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
-            <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
-            <span>Back</span>
+      <template x-if="step < steps.length">
+        <button
+          type="button"
+          @click="next()"
+          class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20"
+        >
+          <span x-text="`Next: ${steps[step].short}`"></span>
+          <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
         </button>
-        <button @click="step = 4" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
-            <span>Next: How it Works</span>
-            <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
-        </button>
-    </div>
-  </div>
+      </template>
 
-  <!-- Step 4: How it Works -->
-  <div x-show="step === 4" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" class="text-center max-w-3xl mx-auto w-full">
-    <div class="mb-8 flex justify-center">
-        <i class="ph-duotone ph-cloud-check text-8xl text-green-500"></i>
-    </div>
-    <h1 class="text-6xl md:text-8xl font-black text-white mb-8 tracking-tighter italic">
-      It's Just S3
-    </h1>
-    
-    <p class="text-text-muted text-2xl max-w-3xl mx-auto font-medium mb-12 leading-relaxed">
-      You can use almost all standard S3 functions. We store everyone's data in one massive bucket, but to you, it feels like your own private bucket.
-      <br><br>
-      There is a middleman, but you'll never notice. Just create buckets and ship!
-    </p>
-
-    <div class="flex items-center justify-between w-full max-w-md mx-auto">
-        <button @click="step = 3" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
-            <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
-            <span>Back</span>
-        </button>
+      <template x-if="step === steps.length">
         <form action="/api/onboarding/complete" method="POST" class="inline-block">
-                <button type="submit" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
-                    <span>Get Started</span>
-                    <i class="ph-bold ph-rocket-launch group-hover:translate-x-1 transition-transform"></i>
-                </button>
-            </form>
+          <button
+            type="submit"
+            class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20"
+          >
+            <span>Get Started</span>
+            <i class="ph-bold ph-rocket-launch group-hover:translate-x-1 transition-transform"></i>
+          </button>
+        </form>
+      </template>
     </div>
   </div>
 
+  <script>
+    function onboardingWizard() {
+      return {
+        step: 1,
+        steps: [
+          {
+            id: "welcome",
+            short: "Your Storage",
+            title: "Welcome to Cargo!",
+            iconClass: "ph-duotone ph-hand-waving text-hc-red",
+            html: "Cargo is an S3 Gateway and the new Hack Club CDN.",
+          },
+          {
+            id: "storage",
+            short: "Privacy & Logs",
+            title: "1GB Free Storage",
+            iconClass: "ph-duotone ph-hard-drives text-blue-500",
+            html:
+              "Every Hack Clubber on Slack gets <span class='text-white font-bold'>1 GB for free</span>.<br>Need more? Ship projects! Storage can be used for public CDN hosting or private S3 buckets.",
+            note:
+              "When you turn 18, we'll archive your data and send you a download link before deleting it. But that's a problem for future you!",
+          },
+          {
+            id: "logs",
+            short: "How it Works",
+            title: "We Log Requests",
+            iconClass: "ph-duotone ph-shield-check text-yellow-500",
+            html:
+              "To keep Cargo safe and fast, we log all requests (User Agent, Path etc).<br><br><span class='text-white font-bold'>We do NOT log your file contents.</span> Your data remains yours. We only track metadata to prevent abuse.",
+          },
+          {
+            id: "how",
+            short: "Finish",
+            title: "It's Just S3",
+            iconClass: "ph-duotone ph-cloud-check text-green-500",
+            html:
+              "You can use almost all standard S3 functions. We store everyone's data in one massive bucket, but to you, it feels like your own private bucket.<br><br>There is a middleman, but you'll never notice. Just create buckets and ship!",
+          },
+        ],
+
+        get current() {
+          return this.steps[this.step - 1];
+        },
+
+        init() {
+          // Defensive: ensure we always start on step 1 and content is consistent.
+          this.step = 1;
+        },
+
+        goTo(n) {
+          const next = Number(n);
+          if (!Number.isFinite(next)) return;
+          if (next < 1 || next > this.steps.length) return;
+          this.step = next;
+        },
+
+        next() {
+          this.goTo(this.step + 1);
+        },
+
+        prev() {
+          this.goTo(this.step - 1);
+        },
+      };
+    }
+  </script>
 </div>
 
 {{#section "extraScripts"}}
