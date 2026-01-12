@@ -49,9 +49,7 @@
             {{#if user.isAdmin}}
               <a href="/admin" id="admin-link" class="text-text-muted hover:text-white transition-colors">Admin</a>
             {{/if}}
-            <a href="/auth/logout" class="text-hc-red hover:text-white transition-colors" id="logout-link">
-              {{#if isImpersonating}}Stop impersonating{{else}}Logout{{/if}}
-            </a>
+            <a href="/auth/logout" class="text-hc-red hover:text-white transition-colors">Logout</a>
           {{else}}
              <a href="/auth/login" class="text-hc-red hover:text-white transition-colors">Login</a>
           {{/if}}
