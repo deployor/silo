@@ -171,7 +171,11 @@ export async function verifyAwsV4Signature(
 		.digest();
 	const kRegion = createHmac("sha256", kDate).update(regionScope).digest();
 	const kService = createHmac("sha256", kRegion).update(serviceScope).digest();
-	const kSigning = createHmac("sha256", kService).update(requestType).digest();
+	// Per SigV4, the final key derivation step is ALWAYS with the literal string "aws4_request".
+	// (Not the requestType from the credential scope; it should always be aws4_request.)
+	const kSigning = createHmac("sha256", kService)
+		.update("aws4_request")
+		.digest();
 
 	const calculatedSignature = createHmac("sha256", kSigning)
 		.update(stringToSign)
