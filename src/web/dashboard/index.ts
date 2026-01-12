@@ -17,10 +17,13 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	}
 
 	if (path === "/docs" || path === "/docs/") {
+		const cookieHeader = req.headers.get("Cookie") || "";
+		const isImpersonating = cookieHeader.includes("silo_impersonating=true");
 		const user = await getCurrentUser(req);
 		const html = await render("docs", {
 			title: "Documentation - Silo",
 			user,
+			isImpersonating,
 			s3Domain: config.s3Domain,
 		});
 
@@ -30,6 +33,8 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	}
 
 	if (path === "/onboarding" || path === "/onboarding/") {
+		const cookieHeader = req.headers.get("Cookie") || "";
+		const isImpersonating = cookieHeader.includes("silo_impersonating=true");
 		const user = await getCurrentUser(req);
 		if (!user) {
 			return Response.redirect("/auth/login");
@@ -40,6 +45,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		const html = await render("onboarding", {
 			title: "Silo - Welcome",
 			layout: "main",
+			isImpersonating,
 			hideNavLinks: true,
 			mainClass: "flex flex-col items-center justify-center",
 		});
@@ -49,6 +55,8 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	}
 
 	if (path === "/cdn" || path === "/cdn/") {
+		const cookieHeader = req.headers.get("Cookie") || "";
+		const isImpersonating = cookieHeader.includes("silo_impersonating=true");
 		const user = await getCurrentUser(req);
 		if (!user) {
 			return Response.redirect("/auth/login");
@@ -70,6 +78,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			title: "Silo CDN",
 			layout: "main",
 			user,
+			isImpersonating,
 			pageTitle: "CDN",
 		});
 
@@ -78,11 +87,14 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		});
 	}
 
+	const cookieHeader = req.headers.get("Cookie") || "";
+	const isImpersonating = cookieHeader.includes("silo_impersonating=true");
 	const user = await getCurrentUser(req);
 	if (!user) {
 		const html = await render("landing", {
 			title: "Silo S3 Gateway",
 			layout: "main",
+			isImpersonating,
 			hideNavLinks: true,
 			mainClass: "flex flex-col items-center justify-center",
 		});
@@ -99,6 +111,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		const html = await render("locked", {
 			title: "Account Locked - Silo",
 			layout: "main",
+			isImpersonating,
 			hideNavLinks: true,
 			mainClass: "flex items-center justify-center",
 			reason: user.lockReason,
@@ -118,6 +131,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			layout: "main",
 			bucketName,
 			user,
+			isImpersonating,
 			isAdmin: user.isAdmin,
 			breadcrumbs: `<span class="text-text-muted">/</span> <span class="bg-hc-blue/20 text-hc-blue px-2 py-0.5 rounded text-sm font-mono border border-hc-blue/30">${bucketName}</span>`,
 		});
@@ -130,6 +144,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	const html = await render("dashboard", {
 		title: "Dashboard - Silo",
 		user,
+		isImpersonating,
 		s3Domain: config.s3Domain,
 	});
 
