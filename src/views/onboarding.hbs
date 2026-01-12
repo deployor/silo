@@ -66,28 +66,14 @@
         <span>Back</span>
       </button>
 
-      <template x-if="step < steps.length">
-        <button
-          type="button"
-          @click="next()"
-          class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20"
-        >
-          <span x-text="`Next: ${steps[step].short}`"></span>
-          <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
-        </button>
-      </template>
-
-      <template x-if="step === steps.length">
-        <form action="/api/onboarding/complete" method="POST" class="inline-block">
-          <button
-            type="submit"
-            class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20"
-          >
-            <span>Get Started</span>
-            <i class="ph-bold ph-rocket-launch group-hover:translate-x-1 transition-transform"></i>
-          </button>
-        </form>
-      </template>
+      <button
+        type="button"
+        @click="next()"
+        class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20"
+      >
+        <span x-text="step < steps.length ? `Next: ${steps[step].short}` : 'Get Started'"></span>
+        <i class="ph-bold" :class="step < steps.length ? 'ph-arrow-right group-hover:translate-x-1 transition-transform' : 'ph-rocket-launch group-hover:translate-x-1 transition-transform'"></i>
+      </button>
     </div>
   </div>
 
@@ -148,7 +134,25 @@
         },
 
         next() {
-          this.goTo(this.step + 1);
+          if (this.step < this.steps.length) {
+            this.goTo(this.step + 1);
+            return;
+          }
+
+          // Last step: submit the existing server endpoint.
+          // Use fetch so users don’t lose context if something goes wrong.
+          fetch("/api/onboarding/complete", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: "",
+          })
+            .then((res) => {
+              if (!res.ok) throw new Error("Failed to complete onboarding");
+              window.location.href = "/";
+            })
+            .catch(() => {
+              window.location.href = "/";
+            });
         },
 
         prev() {
