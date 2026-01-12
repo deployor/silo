@@ -4,7 +4,21 @@ import { db } from "../db";
 import { buckets, sessions, users } from "../db/schema";
 import { context } from "./context";
 
-export async function getCurrentUser(req: Request) {
+export type CurrentUserResult =
+	| {
+			user: (typeof users.$inferSelect & {
+				sessionId: string;
+				accessToken: string | null;
+				refreshToken: string | null;
+				tokenExpiresAt: Date | null;
+			}) | null;
+			isImpersonating: boolean;
+		}
+	| { user: null; isImpersonating: false };
+
+export async function getCurrentUser(
+	req: Request,
+): Promise<CurrentUserResult["user"]> {
 	const cookieHeader = req.headers.get("Cookie");
 	if (cookieHeader) {
 		const cookies = cookieHeader.split(";").reduce(
