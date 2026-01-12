@@ -19,7 +19,13 @@ const S3_DOMAIN = config.s3Domain;
 // Rate Limiters
 const apiLimiter = rateLimit({ limit: 300, windowMs: 60000 }); // 300 req/min for API
 const authLimiter = rateLimit({ limit: 60, windowMs: 60000 }); // 60 req/min for Auth
-const s3Limiter = rateLimit({ limit: 1000, windowMs: 60000 }); // 1000 req/min for S3
+
+// S3 should be more tolerant and independent from dashboard/API.
+// Defaults are intentionally high; override via env for different tiers.
+const s3Limiter = rateLimit({
+	limit: Number(process.env.S3_RATE_LIMIT_PER_MIN ?? "20000"),
+	windowMs: 60000,
+});
 
 /**
  * Determines if a request is intended for the dashboard or the S3 gateway.
