@@ -11,6 +11,12 @@ interface ViewData extends Record<string, unknown> {
 	sections?: Record<string, unknown>;
 }
 
+function stripHtmlComments(html: string): string {
+	// Remove HTML comments from the final HTML sent to the client.
+	// Keep IE conditional comments just in case (rare, but safe).
+	return html.replace(/<!--(?!\[if)([\s\S]*?)-->/g, "");
+}
+
 export async function render(
 	templateName: string,
 	viewData: ViewData = {},
@@ -43,7 +49,7 @@ export async function render(
 		const body = viewTemplate({ ...viewData, config });
 
 		if (options.layout === false) {
-			return body;
+			return isDev ? body : stripHtmlComments(body);
 		}
 
 		const layoutName =
@@ -51,12 +57,15 @@ export async function render(
 		const layoutPath = `src/views/layouts/${layoutName}.hbs`;
 		const layoutTemplate = await compile(layoutPath);
 
-		return layoutTemplate({
+		const html = layoutTemplate({
 			...viewData,
 			...viewData.sections,
 			config,
 			body,
 		});
+
+		// Strip client-visible HTML comments in production.
+		return isDev ? html : stripHtmlComments(html);
 	} catch (e) {
 		console.error(`Failed to render template: ${templateName}`, e);
 		throw e;
