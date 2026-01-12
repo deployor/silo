@@ -4,21 +4,7 @@ import { db } from "../db";
 import { buckets, sessions, users } from "../db/schema";
 import { context } from "./context";
 
-export type CurrentUserResult =
-	| {
-			user: (typeof users.$inferSelect & {
-				sessionId: string;
-				accessToken: string | null;
-				refreshToken: string | null;
-				tokenExpiresAt: Date | null;
-			}) | null;
-			isImpersonating: boolean;
-		}
-	| { user: null; isImpersonating: false };
-
-export async function getCurrentUser(
-	req: Request,
-): Promise<CurrentUserResult["user"]> {
+export async function getCurrentUser(req: Request) {
 	const cookieHeader = req.headers.get("Cookie");
 	if (cookieHeader) {
 		const cookies = cookieHeader.split(";").reduce(
@@ -57,7 +43,8 @@ export async function getCurrentUser(
 				const hasActiveImpersonation =
 					!!s.impersonatorUserId &&
 					!!s.impersonatedUserId &&
-					directUser.isAdmin === true;
+					directUser.isAdmin === true &&
+					(!s.impersonationExpiresAt || s.impersonationExpiresAt > new Date());
 
 				if (hasActiveImpersonation) {
 					const impersonated = await db

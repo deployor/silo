@@ -544,14 +544,15 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 			try {
 				const body = await req.json();
 				const targetUserId = body?.userId;
-				const ttlMinutes = 30;
+				const ttlMinutes = Number(body?.ttlMinutes ?? 30);
 
 				if (!targetUserId || typeof targetUserId !== "string") {
 					return new Response("Missing userId", { status: 400 });
 				}
 
-				// TTL removed by design: impersonation persists until admin logs out.
-				const impersonationExpiresAt = null;
+				// Clamp TTL (guardrail)
+				const ttlMs = Math.min(Math.max(ttlMinutes, 5), 60) * 60_000;
+				const impersonationExpiresAt = new Date(Date.now() + ttlMs);
 
 				// Read the current cookie session id
 				const cookieHeader = req.headers.get("Cookie") || "";
@@ -576,13 +577,13 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 
 				if (target.length === 0) return new Response("User not found", { status: 404 });
 
-				// Best-practice: keep sessions.userId as the real admin.
-				// Store the target separately in sessions.impersonatedUserId.
+				// Update session in-place: keep cookie, flip session.user_id to target,
+				// and store impersonator_user_id + expiry.
 				await db
 					.update(sessions)
 					.set({
+						userId: targetUserId,
 						impersonatorUserId: user.id,
-						impersonatedUserId: targetUserId,
 						impersonationExpiresAt,
 					})
 					.where(eq(sessions.id, sessionId));
@@ -604,7 +605,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				});
 
 				return new Response(
-					JSON.stringify({ ok: true, userId: targetUserId }),
+					JSON.stringify({ ok: true, userId: targetUserId, expiresAt: impersonationExpiresAt.toISOString() }),
 					{ headers: { "Content-Type": "application/json" } },
 				);
 			} catch (e) {
@@ -645,8 +646,8 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				await db
 					.update(sessions)
 					.set({
+						userId: sess[0].impersonatorUserId,
 						impersonatorUserId: null,
-						impersonatedUserId: null,
 						impersonationExpiresAt: null,
 					})
 					.where(eq(sessions.id, sessionId));
