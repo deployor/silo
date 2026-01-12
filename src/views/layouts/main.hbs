@@ -26,7 +26,7 @@
       {{{extraStyles}}}
     {{/if}}
   </head>
-  <body class="min-h-screen selection:bg-hc-red selection:text-white flex flex-col font-sans {{bodyClass}}">
+  <body class="min-h-screen selection:bg-hc-red selection:text-white flex flex-col font-sans {{bodyClass}}" x-data>
     <nav class="w-full bg-hc-darker border-b border-white/10 px-6 py-4 sticky top-0 z-50 flex justify-between items-center">
       <div class="flex items-center gap-4">
         <a href="/" class="font-bold text-2xl tracking-tighter italic text-white hover:text-hc-red transition-colors">HOARD</a>
@@ -70,7 +70,7 @@
       </div>
     </nav>
 
-    <main class="max-w-7xl mx-auto w-full px-6 py-8 {{mainClass}}">
+    <main class="max-w-7xl mx-auto w-full px-6 py-8 {{mainClass}}" x-cloak>
       {{{body}}}
     </main>
 
