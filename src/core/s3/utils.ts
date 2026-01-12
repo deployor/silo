@@ -31,7 +31,7 @@ export function getKeyFromRequest(req: Request, bucketName: string): string {
 	// Security: reject path traversal.
 	// Important: `url.pathname` may already have normalized away raw ".." segments
 	// in some runtimes, but keys can still contain encoded traversal like "%2e%2e".
-	// Decode repeatedly to catch double-encoding attempts.
+	// Also note: some stacks decode "%2e%2e" into ".." *before* we see it.
 	const decodeRepeated = (input: string, rounds: number) => {
 		let out = input;
 		for (let i = 0; i < rounds; i++) {
@@ -44,13 +44,26 @@ export function getKeyFromRequest(req: Request, bucketName: string): string {
 		return out;
 	};
 
-	const decodedKey = decodeRepeated(key, 3);
-	if (decodedKey.includes("..")) {
-		const parts = decodedKey.split("/");
-		if (parts.includes("..")) {
+	const assertNoTraversal = (rawKey: string) => {
+		const decodedKey = decodeRepeated(rawKey, 3);
+
+		// 1) Block any literal ".." segment after decoding.
+		if (decodedKey.includes("..")) {
+			const parts = decodedKey.split("/");
+			if (parts.includes("..")) {
+				throw new Error("Invalid Key: Path traversal detected");
+			}
+		}
+
+		// 2) Block any *encoded* dot-segments that might be normalized later.
+		// We check case-insensitively on the raw key too, to stop bypasses like "%2E%2E".
+		const lowerRaw = rawKey.toLowerCase();
+		if (lowerRaw.includes("%2e%2e") || lowerRaw.includes("%2e.") || lowerRaw.includes(".%2e")) {
 			throw new Error("Invalid Key: Path traversal detected");
 		}
-	}
+	};
+
+	assertNoTraversal(key);
 
 	return key;
 }
