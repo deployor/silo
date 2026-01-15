@@ -184,7 +184,7 @@
 
       <div class="flex items-center justify-between">
         <div class="text-xs text-text-muted font-mono">
-          Keys per bucket limit: <span class="text-white">20</span>
+          <span id="manage-keys-count" class="text-white">0</span><span class="text-text-muted"> / 20 keys</span>
         </div>
         <button id="manage-keys-generate-btn" onclick="generateKeyFromModal()" class="bg-hc-blue hover:bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105 card-shadow">
           + Generate New Key
@@ -652,9 +652,14 @@
 
     document.getElementById('manage-keys-bucket-name').textContent = bucket.name;
 
+    const keyCount = (bucket.keys?.length || 0);
+
+    const countEl = document.getElementById('manage-keys-count');
+    if (countEl) countEl.textContent = String(keyCount);
+
     const genBtn = document.getElementById('manage-keys-generate-btn');
     if (genBtn) {
-        const atLimit = (bucket.keys?.length || 0) >= 20;
+        const atLimit = keyCount >= 20;
         genBtn.disabled = atLimit;
         genBtn.classList.toggle('opacity-50', atLimit);
         genBtn.classList.toggle('cursor-not-allowed', atLimit);
