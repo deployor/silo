@@ -94,12 +94,12 @@
       <form id="create-bucket-form" onsubmit="createBucket(event)">
         <div class="mb-6">
           <label class="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider">Bucket Name</label>
-          <input type="text" name="name" required pattern="[a-z0-9\-]+" class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red font-mono placeholder-white/20 transition-colors" placeholder="my-awesome-project" />
+          <input type="text" name="name" required minlength="3" pattern="[a-z0-9\-]+" class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red font-mono placeholder-white/20 transition-colors" placeholder="my-awesome-project" />
           <p class="text-xs text-text-muted mt-2">
-            Only lowercase letters, numbers, and hyphens. Names starting with 'u' or 'w' followed by numbers are reserved.
+            Only lowercase letters, numbers, and hyphens. Minimum 3 characters. Names starting with 'u' or 'w' followed by numbers are reserved.
           </p>
           <p class="text-xs text-text-muted mt-2">
-            Bucket names are global (not per-user), can’t be changed later, and should match your project.
+            Bucket names are global (not per-user), can’t be changed later, and should match your project. Some names (like <span class="font-mono">dashboard</span>) are reserved.
           </p>
         </div>
         <div class="flex justify-end gap-3">
