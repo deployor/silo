@@ -201,7 +201,7 @@ export const manageKeysModal = (
 			),
 			Context().elements(
 				keys.length >= 20
-					? `Keys: ${keys.length} / 20 (limit reached — delete one to create another)`
+					? `Keys: ${keys.length} / 20 (limit reached… delete one to create another)`
 					: `Keys: ${keys.length} / 20`,
 			),
 			Divider(),
