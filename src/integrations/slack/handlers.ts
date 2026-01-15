@@ -253,6 +253,27 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			.limit(1);
 
 		if (bucket.length > 0) {
+			// Enforce 20 keys per bucket here too (Slack path bypasses dashboard API).
+			const keysBefore = await db
+				.select()
+				.from(bucketKeys)
+				.where(eq(bucketKeys.bucketId, bucketId));
+
+			const MAX_KEYS_PER_BUCKET = 20;
+			if (keysBefore.length >= MAX_KEYS_PER_BUCKET) {
+				await openModal(
+					payload.trigger_id,
+					Modal({ title: "Key Limit Reached" })
+						.blocks(
+							Section({
+								text: `This bucket already has ${MAX_KEYS_PER_BUCKET} keys. Delete an existing key to create a new one.`,
+							}),
+						)
+						.buildToObject(),
+				);
+				return;
+			}
+
 			const accessKey =
 				"CK" +
 				Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) =>

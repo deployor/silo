@@ -1,9 +1,22 @@
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { db } from "../db";
 import { bucketKeys, buckets } from "../db/schema";
 
 export class KeyService {
+	static readonly MAX_KEYS_PER_BUCKET = 20;
+
 	static async createKey(bucketId: string) {
+		const existingCount = await db
+			.select({ count: count() })
+			.from(bucketKeys)
+			.where(eq(bucketKeys.bucketId, bucketId));
+
+		if ((existingCount[0]?.count ?? 0) >= KeyService.MAX_KEYS_PER_BUCKET) {
+			throw new Error(
+				`Key limit reached (${KeyService.MAX_KEYS_PER_BUCKET}). Delete an existing key to create a new one.`,
+			);
+		}
+
 		const accessKey =
 			"CK" +
 			Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) =>

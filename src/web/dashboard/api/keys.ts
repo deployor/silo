@@ -40,10 +40,17 @@ export async function handleKeys(req: Request): Promise<Response> {
 		if (bucket[0].isCdn)
 			return errorResponse("Cannot create keys for CDN bucket", 403);
 
-		const keys = await KeyService.createKey(bucket[0].id);
-		const publicUrl = `https://${config.s3Domain}/${bucketName}/file.png`;
-
-		return jsonResponse({ ...keys, publicUrl });
+		try {
+			const keys = await KeyService.createKey(bucket[0].id);
+			const publicUrl = `https://${config.s3Domain}/${bucketName}/file.png`;
+			return jsonResponse({ ...keys, publicUrl });
+		} catch (e) {
+			const message = e instanceof Error ? e.message : "Unknown error";
+			// Key limit is an expected/handled case.
+			if (message.includes("Key limit reached"))
+				return errorResponse(message, 429);
+			return errorResponse(message, 400);
+		}
 	}
 
 	const deleteKeyMatch = path.match(
