@@ -140,21 +140,24 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 		const bucketName =
 			payload.view.state.values.bucket_name_block.bucket_name_input.value;
 
-		if (!bucketName || !/^[a-z0-9-]+$/.test(bucketName)) {
+		if (!bucketName || !/^[a-z0-9-]+$/.test(bucketName) || bucketName.length < 3) {
 			return {
 				response_action: "errors",
 				errors: {
 					bucket_name_block:
-						"Invalid name. Use lowercase letters, numbers, and hyphens.",
+						"Invalid name. Use lowercase letters, numbers, and hyphens (min 3 characters).",
 				},
 			};
 		}
 
-		if (isReservedBucketName(bucketName)) {
+		if (
+			isReservedBucketName(bucketName) ||
+			["dashboard", "admin", "api", "auth", "docs"].includes(bucketName)
+		) {
 			return {
 				response_action: "errors",
 				errors: {
-					bucket_name_block: "This name is reserved for system use.",
+					bucket_name_block: "This name is reserved.",
 				},
 			};
 		}
