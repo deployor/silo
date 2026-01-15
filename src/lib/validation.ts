@@ -3,6 +3,15 @@ import { z } from "zod";
 // Bucket Name Validation
 // Only lowercase letters, numbers, and hyphens.
 // Cannot start with 'u' or 'w' followed by numbers (reserved).
+// Also block a small set of globally-reserved product keywords.
+const reservedBucketNames = new Set([
+	"dashboard",
+	"admin",
+	"api",
+	"auth",
+	"docs",
+]);
+
 export const bucketNameSchema = z
 	.string()
 	.min(3, "Bucket name must be at least 3 characters")
@@ -13,6 +22,9 @@ export const bucketNameSchema = z
 	)
 	.refine((name) => !/^[uw][a-z0-9]{7,}$/.test(name), {
 		message: "This bucket name is reserved for system use",
+	})
+	.refine((name) => !reservedBucketNames.has(name), {
+		message: "This bucket name is reserved",
 	});
 
 export const createBucketSchema = z.object({
