@@ -5,44 +5,53 @@
   <a href="/admin/settings" id="tab-settings" class="text-white font-bold px-4 py-2 rounded-lg bg-white/10 transition-colors">Settings</a>
 </div>
 
-<div class="admin-container" style="max-width: 900px; margin: 0 auto;">
-  <div style="display:flex; align-items:center; justify-content:space-between; gap: 16px; margin-bottom: 16px;">
+<div class="bg-hc-dark rounded-3xl border border-white/10 overflow-hidden card-shadow mb-8">
+  <div class="p-6 border-b border-white/10 flex justify-between items-center">
     <div>
-      <h2 style="margin:0;">Admin Settings</h2>
-      <div class="text-muted" style="margin-top: 4px;">Global defaults used across Dashboard + Slack + backend.</div>
+      <h2 class="text-xl font-bold text-white">Settings</h2>
+      <p class="text-text-muted text-sm mt-1">
+        Global defaults used across Dashboard + Slack + backend.
+      </p>
+    </div>
+    <div class="flex items-center gap-3">
+      <button id="reloadBtn" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors">
+        Reload
+      </button>
+      <button id="saveBtn" class="bg-hc-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
+        Save
+      </button>
     </div>
   </div>
 
-  <div class="card" style="padding: 16px;">
-    <div id="status" class="text-muted" style="margin-bottom: 12px;"></div>
+  <div class="p-6">
+    <div id="status" class="text-xs text-text-muted font-mono mb-4"></div>
 
-    <div class="grid" style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-      <label>
-        <div style="font-weight:600;">Default Storage Quota (bytes)</div>
-        <input id="defaultStorageLimitBytes" type="number" min="0" step="1" style="width:100%;" />
-        <div class="text-muted" style="font-size: 12px;">Used when a user does not have an explicit per-user quota.</div>
-      </label>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-black/30 p-6 rounded-xl border border-white/10">
+        <h4 class="text-white font-bold mb-1">Default Storage Quota</h4>
+        <p class="text-xs text-text-muted mb-4">Used when a user does not have an explicit per-user quota.</p>
+        <input id="defaultStorageLimitBytes" type="number" min="0" step="1" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono" />
+        <p class="text-[11px] text-text-muted mt-2">Value is stored in bytes.</p>
+      </div>
 
-      <label>
-        <div style="font-weight:600;">Default Egress Quota (bytes)</div>
-        <input id="defaultEgressLimitBytes" type="number" min="0" step="1" style="width:100%;" />
-        <div class="text-muted" style="font-size: 12px;">0 means "unlimited" only if your backend interprets it that way.</div>
-      </label>
+      <div class="bg-black/30 p-6 rounded-xl border border-white/10">
+        <h4 class="text-white font-bold mb-1">Default Egress Quota</h4>
+        <p class="text-xs text-text-muted mb-4">Used when a user does not have an explicit per-user egress limit.</p>
+        <input id="defaultEgressLimitBytes" type="number" min="0" step="1" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono" />
+        <p class="text-[11px] text-text-muted mt-2">Value is stored in bytes.</p>
+      </div>
 
-      <label>
-        <div style="font-weight:600;">Max Buckets per User</div>
-        <input id="defaultMaxBucketsPerUser" type="number" min="1" step="1" style="width:100%;" />
-      </label>
+      <div class="bg-black/30 p-6 rounded-xl border border-white/10">
+        <h4 class="text-white font-bold mb-1">Max Buckets per User</h4>
+        <p class="text-xs text-text-muted mb-4">Enforced when creating buckets (Dashboard + Slack + API).</p>
+        <input id="defaultMaxBucketsPerUser" type="number" min="1" step="1" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono" />
+      </div>
 
-      <label>
-        <div style="font-weight:600;">Max Keys per Bucket</div>
-        <input id="defaultMaxKeysPerBucket" type="number" min="1" step="1" style="width:100%;" />
-      </label>
-    </div>
-
-    <div style="display:flex; gap: 8px; margin-top: 16px;">
-      <button class="button" id="saveBtn">Save</button>
-      <button class="button secondary" id="reloadBtn">Reload</button>
+      <div class="bg-black/30 p-6 rounded-xl border border-white/10">
+        <h4 class="text-white font-bold mb-1">Max Keys per Bucket</h4>
+        <p class="text-xs text-text-muted mb-4">Enforced when generating access keys.</p>
+        <input id="defaultMaxKeysPerBucket" type="number" min="1" step="1" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono" />
+      </div>
     </div>
   </div>
 </div>
