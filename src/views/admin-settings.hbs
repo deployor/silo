@@ -30,15 +30,37 @@
       <div class="bg-black/30 p-6 rounded-xl border border-white/10">
         <h4 class="text-white font-bold mb-1">Default Storage Quota</h4>
         <p class="text-xs text-text-muted mb-4">Used when a user does not have an explicit per-user quota.</p>
-        <input id="defaultStorageLimitBytes" type="number" min="0" step="1" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono" />
-        <p class="text-[11px] text-text-muted mt-2">Value is stored in bytes.</p>
+        <div class="flex gap-2 items-center">
+          <input id="defaultStorageLimitAmount" type="number" min="0" step="0.01" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono" placeholder="Amount" />
+          <select id="defaultStorageLimitUnit" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white cursor-pointer font-mono">
+            <option value="1">Bytes</option>
+            <option value="1024">KB</option>
+            <option value="1048576">MB</option>
+            <option value="1073741824">GB</option>
+            <option value="1099511627776">TB</option>
+            <option value="1125899906842624">PB</option>
+          </select>
+        </div>
+        <input id="defaultStorageLimitBytes" type="hidden" />
+        <p class="text-[11px] text-text-muted mt-2">Stored as bytes.</p>
       </div>
 
       <div class="bg-black/30 p-6 rounded-xl border border-white/10">
         <h4 class="text-white font-bold mb-1">Default Egress Quota</h4>
         <p class="text-xs text-text-muted mb-4">Used when a user does not have an explicit per-user egress limit.</p>
-        <input id="defaultEgressLimitBytes" type="number" min="0" step="1" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono" />
-        <p class="text-[11px] text-text-muted mt-2">Value is stored in bytes.</p>
+        <div class="flex gap-2 items-center">
+          <input id="defaultEgressLimitAmount" type="number" min="0" step="0.01" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono" placeholder="Amount" />
+          <select id="defaultEgressLimitUnit" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white cursor-pointer font-mono">
+            <option value="1">Bytes</option>
+            <option value="1024">KB</option>
+            <option value="1048576">MB</option>
+            <option value="1073741824">GB</option>
+            <option value="1099511627776">TB</option>
+            <option value="1125899906842624">PB</option>
+          </select>
+        </div>
+        <input id="defaultEgressLimitBytes" type="hidden" />
+        <p class="text-[11px] text-text-muted mt-2">Stored as bytes.</p>
       </div>
 
       <div class="bg-black/30 p-6 rounded-xl border border-white/10">
@@ -63,10 +85,40 @@
 
   const fields = {
     defaultStorageLimitBytes: document.getElementById('defaultStorageLimitBytes'),
+    defaultStorageLimitAmount: document.getElementById('defaultStorageLimitAmount'),
+    defaultStorageLimitUnit: document.getElementById('defaultStorageLimitUnit'),
+
     defaultEgressLimitBytes: document.getElementById('defaultEgressLimitBytes'),
+    defaultEgressLimitAmount: document.getElementById('defaultEgressLimitAmount'),
+    defaultEgressLimitUnit: document.getElementById('defaultEgressLimitUnit'),
+
     defaultMaxBucketsPerUser: document.getElementById('defaultMaxBucketsPerUser'),
     defaultMaxKeysPerBucket: document.getElementById('defaultMaxKeysPerBucket'),
   };
+
+  function getBestUnit(bytes) {
+    if (!Number(bytes)) return { value: 0, unit: 1 };
+    const k = 1024;
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const unitVal = Math.pow(k, i);
+    // Clamp to PB for the selector.
+    const maxUnit = 1125899906842624;
+    const chosen = unitVal > maxUnit ? maxUnit : unitVal;
+    return {
+      value: parseFloat((bytes / chosen).toFixed(2)),
+      unit: chosen,
+    };
+  }
+
+  function syncBytes(amountEl, unitEl, bytesEl) {
+    const amount = parseFloat(amountEl.value);
+    const unit = parseFloat(unitEl.value);
+    if (Number.isNaN(amount) || Number.isNaN(unit)) {
+      bytesEl.value = "0";
+      return;
+    }
+    bytesEl.value = String(Math.floor(amount * unit));
+  }
 
   function setStatus(text, isError = false) {
     statusEl.textContent = text;
@@ -81,16 +133,29 @@
       return;
     }
     const data = await res.json();
-    fields.defaultStorageLimitBytes.value = data.defaultStorageLimitBytes;
-    fields.defaultEgressLimitBytes.value = data.defaultEgressLimitBytes;
+
+    fields.defaultStorageLimitBytes.value = String(data.defaultStorageLimitBytes);
+    const bestStorage = getBestUnit(Number(data.defaultStorageLimitBytes));
+    fields.defaultStorageLimitAmount.value = String(bestStorage.value);
+    fields.defaultStorageLimitUnit.value = String(bestStorage.unit);
+
+    fields.defaultEgressLimitBytes.value = String(data.defaultEgressLimitBytes);
+    const bestEgress = getBestUnit(Number(data.defaultEgressLimitBytes));
+    fields.defaultEgressLimitAmount.value = String(bestEgress.value);
+    fields.defaultEgressLimitUnit.value = String(bestEgress.unit);
+
     fields.defaultMaxBucketsPerUser.value = data.defaultMaxBucketsPerUser;
     fields.defaultMaxKeysPerBucket.value = data.defaultMaxKeysPerBucket;
+
     setStatus('Loaded');
   }
 
   async function saveSettings() {
     setStatus('Saving...');
     saveBtn.disabled = true;
+
+    syncBytes(fields.defaultStorageLimitAmount, fields.defaultStorageLimitUnit, fields.defaultStorageLimitBytes);
+    syncBytes(fields.defaultEgressLimitAmount, fields.defaultEgressLimitUnit, fields.defaultEgressLimitBytes);
 
     const payload = {
       defaultStorageLimitBytes: Number(fields.defaultStorageLimitBytes.value),
@@ -115,6 +180,12 @@
 
     setStatus('Saved');
   }
+
+  fields.defaultStorageLimitAmount.addEventListener('input', () => syncBytes(fields.defaultStorageLimitAmount, fields.defaultStorageLimitUnit, fields.defaultStorageLimitBytes));
+  fields.defaultStorageLimitUnit.addEventListener('change', () => syncBytes(fields.defaultStorageLimitAmount, fields.defaultStorageLimitUnit, fields.defaultStorageLimitBytes));
+
+  fields.defaultEgressLimitAmount.addEventListener('input', () => syncBytes(fields.defaultEgressLimitAmount, fields.defaultEgressLimitUnit, fields.defaultEgressLimitBytes));
+  fields.defaultEgressLimitUnit.addEventListener('change', () => syncBytes(fields.defaultEgressLimitAmount, fields.defaultEgressLimitUnit, fields.defaultEgressLimitBytes));
 
   saveBtn.addEventListener('click', saveSettings);
   reloadBtn.addEventListener('click', loadSettings);
