@@ -1,0 +1,391 @@
+<!-- Admin Subnav -->
+<div class="flex gap-4 mb-6 border-b border-white/10 pb-4">
+  <a href="/admin/users" id="tab-users" class="text-text-muted font-bold px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">Users</a>
+  <a href="/admin/logs" id="tab-logs" class="text-white font-bold px-4 py-2 rounded-lg bg-white/10 transition-colors">Logs</a>
+</div>
+
+<!-- Logs Section -->
+<div id="section-logs" class="bg-hc-dark rounded-3xl border border-white/10 overflow-hidden card-shadow mb-8">
+  <div class="p-6 border-b border-white/10 flex justify-between items-center">
+    <div>
+      <h2 class="text-xl font-bold text-white">Request Logs</h2>
+      <p class="text-text-muted text-sm mt-1">
+        View all request logs across all buckets.
+      </p>
+    </div>
+    <div class="flex flex-col gap-4 items-end">
+       <div class="flex items-center gap-4">
+           <div class="text-xs text-text-muted font-mono" id="logs-stats">
+              Showing 0 logs
+           </div>
+           <div class="relative">
+              <input type="text" id="logs-search" placeholder="Search logs..." class="bg-black/30 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red font-mono placeholder-white/20 transition-colors text-sm w-64" onkeydown="if(event.key === 'Enter') loadLogs(true)">
+           </div>
+           <button onclick="loadLogs(true)" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors">
+              Search
+           </button>
+           <button onclick="toggleFilters()" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              Filters
+           </button>
+       </div>
+       
+       <!-- Advanced Filters -->
+       <div id="logs-filters" class="hidden flex-wrap gap-2 items-center bg-black/20 p-3 rounded-xl border border-white/5 w-full justify-end">
+          <input type="text" id="filter-bucket" placeholder="Bucket Name" class="bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-hc-red w-32">
+          <select id="filter-method" class="bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-hc-red cursor-pointer">
+              <option value="">All Methods</option>
+              <option value="GET">GET</option>
+              <option value="PUT">PUT</option>
+              <option value="DELETE">DELETE</option>
+              <option value="HEAD">HEAD</option>
+              <option value="POST">POST</option>
+          </select>
+          <input type="number" id="filter-status" placeholder="Status Code" class="bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-hc-red w-24">
+          <input type="text" id="filter-ip" placeholder="IP Address" class="bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-hc-red w-32">
+          <button onclick="loadLogs(true)" class="bg-hc-blue hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">Apply</button>
+          <button onclick="clearFilters()" class="text-text-muted hover:text-white text-xs underline ml-2">Clear</button>
+       </div>
+    </div>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
+        <tr>
+          <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors" onclick="sortLogs('createdAt')">Time <span id="sort-createdAt" class="ml-1">↓</span></th>
+          <th class="px-6 py-4">Method</th>
+          <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors" onclick="sortLogs('statusCode')">Status <span id="sort-statusCode" class="ml-1"></span></th>
+          <th class="px-6 py-4">Path</th>
+          <th class="px-6 py-4">Bucket</th>
+          <th class="px-6 py-4">User</th>
+          <th class="px-6 py-4">IP</th>
+          <th class="px-6 py-4">User Agent</th>
+          <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors" onclick="sortLogs('ingressBytes')">Ingress <span id="sort-ingressBytes" class="ml-1"></span></th>
+          <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors" onclick="sortLogs('egressBytes')">Egress <span id="sort-egressBytes" class="ml-1"></span></th>
+          <th class="px-6 py-4 text-right cursor-pointer hover:text-white transition-colors" onclick="sortLogs('latencyMs')">Latency <span id="sort-latencyMs" class="ml-1"></span></th>
+          <th class="px-6 py-4 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/5" id="logs-table">
+        <!-- Logs will be inserted here -->
+      </tbody>
+    </table>
+  </div>
+  <div class="p-4 border-t border-white/10 flex justify-center">
+      <button id="load-more-logs-btn" onclick="loadMoreLogs()" class="text-text-muted hover:text-white text-sm font-bold transition-colors hidden">
+          Load More
+      </button>
+  </div>
+</div>
+
+<!-- Log Details Modal -->
+<div id="log-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+  <div class="bg-hc-dark rounded-3xl border border-white/10 w-full max-w-3xl card-shadow transform transition-all flex flex-col max-h-[90vh]">
+    <div class="p-6 border-b border-white/10 flex justify-between items-center shrink-0">
+        <h3 class="text-xl font-bold text-white">Log Details</h3>
+        <button onclick="closeLogModal()" class="text-text-muted hover:text-white transition-colors p-1">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+    </div>
+
+    <div class="p-6 overflow-y-auto custom-scrollbar">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                <div class="text-xs text-text-muted uppercase font-bold mb-1">Method</div>
+                <div class="text-white font-mono text-lg" id="modal-log-method"></div>
+            </div>
+            <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                <div class="text-xs text-text-muted uppercase font-bold mb-1">Status Code</div>
+                <div class="text-white font-mono text-lg" id="modal-log-status"></div>
+            </div>
+        </div>
+
+        <div class="bg-black/30 p-4 rounded-xl border border-white/10 mb-4">
+            <div class="text-xs text-text-muted uppercase font-bold mb-1">Path</div>
+            <div class="text-white font-mono break-all text-sm" id="modal-log-path"></div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                <div class="text-xs text-text-muted uppercase font-bold mb-1">Bucket</div>
+                <div class="text-white font-mono" id="modal-log-bucket"></div>
+            </div>
+            <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                <div class="text-xs text-text-muted uppercase font-bold mb-1">Owner</div>
+                <div class="text-white font-mono truncate" id="modal-log-owner"></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                <div class="text-xs text-text-muted uppercase font-bold mb-1">Ingress</div>
+                <div class="text-white font-mono" id="modal-log-ingress"></div>
+            </div>
+            <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                <div class="text-xs text-text-muted uppercase font-bold mb-1">Egress</div>
+                <div class="text-white font-mono" id="modal-log-egress"></div>
+            </div>
+        </div>
+
+        <div class="bg-black/30 p-4 rounded-xl border border-white/10 mb-4">
+            <div class="text-xs text-text-muted uppercase font-bold mb-1">User Agent</div>
+            <div class="text-white font-mono text-xs break-all max-h-32 overflow-y-auto custom-scrollbar" id="modal-log-ua"></div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                <div class="text-xs text-text-muted uppercase font-bold mb-1">IP Address</div>
+                <div class="text-white font-mono" id="modal-log-ip"></div>
+            </div>
+            <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                <div class="text-xs text-text-muted uppercase font-bold mb-1">Latency</div>
+                <div class="text-white font-mono" id="modal-log-latency"></div>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                <div class="text-xs text-text-muted uppercase font-bold mb-1">Requester ID</div>
+                <div class="text-white font-mono text-xs break-all" id="modal-log-requester"></div>
+            </div>
+             <div class="bg-black/30 p-4 rounded-xl border border-white/10">
+                <div class="text-xs text-text-muted uppercase font-bold mb-1">Timestamp</div>
+                <div class="text-white font-mono text-xs" id="modal-log-time"></div>
+            </div>
+        </div>
+        
+        <div class="mt-4 bg-black/30 p-4 rounded-xl border border-white/10">
+            <div class="text-xs text-text-muted uppercase font-bold mb-1">Request ID</div>
+            <div class="text-white font-mono text-xs break-all" id="modal-log-id"></div>
+        </div>
+    </div>
+    
+    <div class="p-6 border-t border-white/10 shrink-0 flex justify-end">
+        <button onclick="closeLogModal()" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+    function escapeHtml(unsafe) {
+        if (unsafe === null || unsafe === undefined) return "";
+        return String(unsafe)
+          .replace(/&/g, "&")
+          .replace(/</g, "<")
+          .replace(/>/g, ">")
+          .replace(/\"/g, """)
+          .replace(/'/g, "&#039;");
+    }
+
+    function formatBytes(bytes, decimals = 2) {
+        if (!+bytes) return "0 Bytes";
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`;
+    }
+
+    let currentLogs = [];
+
+    function openLogModal(index) {
+        const log = currentLogs[index];
+        if (!log) return;
+
+        document.getElementById("modal-log-method").textContent = log.method;
+        document.getElementById("modal-log-status").textContent = log.statusCode;
+        document.getElementById("modal-log-path").textContent = log.path;
+        document.getElementById("modal-log-bucket").textContent = log.bucketName || '-';
+        document.getElementById("modal-log-owner").textContent = log.ownerEmail || '-';
+        document.getElementById("modal-log-ingress").textContent = formatBytes(log.ingressBytes);
+        document.getElementById("modal-log-egress").textContent = formatBytes(log.egressBytes);
+        document.getElementById("modal-log-ua").textContent = log.userAgent || '-';
+        document.getElementById("modal-log-ip").textContent = log.ipAddress || '-';
+        document.getElementById("modal-log-latency").textContent = log.latencyMs ? log.latencyMs + 'ms' : '-';
+        document.getElementById("modal-log-requester").textContent = log.requesterId || '-';
+        document.getElementById("modal-log-time").textContent = new Date(log.createdAt).toLocaleString();
+        document.getElementById("modal-log-id").textContent = log.id || '-';
+
+        document.getElementById("log-modal").classList.remove("hidden");
+        document.getElementById("log-modal").classList.add("flex");
+    }
+
+    function closeLogModal() {
+        document.getElementById("log-modal").classList.add("hidden");
+        document.getElementById("log-modal").classList.remove("flex");
+    }
+
+    // Pagination & Filter State
+    let logsOffset = 0;
+    const logsLimit = 50;
+    let logsLoading = false;
+    let logsSortBy = 'createdAt';
+    let logsSortOrder = 'desc';
+
+    function toggleFilters() {
+        const filters = document.getElementById("logs-filters");
+        filters.classList.toggle("hidden");
+        filters.classList.toggle("flex");
+    }
+
+    function clearFilters() {
+        document.getElementById("filter-bucket").value = "";
+        document.getElementById("filter-method").value = "";
+        document.getElementById("filter-status").value = "";
+        document.getElementById("filter-ip").value = "";
+        document.getElementById("logs-search").value = "";
+        loadLogs(true);
+    }
+
+    function sortLogs(field) {
+        if (logsSortBy === field) {
+            logsSortOrder = logsSortOrder === 'desc' ? 'asc' : 'desc';
+        } else {
+            logsSortBy = field;
+            logsSortOrder = 'desc';
+        }
+
+        // Update UI indicators
+        ['createdAt', 'statusCode', 'ingressBytes', 'egressBytes', 'latencyMs'].forEach(f => {
+            const el = document.getElementById(`sort-${f}`);
+            if (el) el.textContent = '';
+        });
+        const currentEl = document.getElementById(`sort-${field}`);
+        if (currentEl) currentEl.textContent = logsSortOrder === 'asc' ? '↑' : '↓';
+
+        loadLogs(true);
+    }
+
+    async function loadLogs(reset = false) {
+        if (logsLoading) return;
+        logsLoading = true;
+
+        if (reset) {
+            logsOffset = 0;
+            document.getElementById("logs-table").innerHTML = "";
+        }
+
+        const search = document.getElementById("logs-search").value;
+        const bucket = document.getElementById("filter-bucket").value;
+        const method = document.getElementById("filter-method").value;
+        const status = document.getElementById("filter-status").value;
+        const ip = document.getElementById("filter-ip").value;
+
+        const query = new URLSearchParams({
+            limit: logsLimit,
+            offset: logsOffset,
+            search: search,
+            sortBy: logsSortBy,
+            sortOrder: logsSortOrder
+        });
+
+        if (bucket) query.set("bucket", bucket);
+        if (method) query.set("method", method);
+        if (status) query.set("status", status);
+        if (ip) query.set("ip", ip);
+
+        try {
+            const res = await fetch(`/api/admin/logs?${query.toString()}`);
+            if (!res.ok) throw new Error("Failed to load logs");
+            const data = await res.json();
+
+            if (reset) {
+                currentLogs = data.logs;
+            } else {
+                currentLogs = [...currentLogs, ...data.logs];
+            }
+
+            renderLogs(data.logs, reset);
+
+            logsOffset += data.logs.length;
+
+            // Update stats
+            const total = data.total;
+            document.getElementById("logs-stats").textContent = `Showing ${logsOffset} of ${total} logs`;
+
+            // Show/hide load more button
+            const loadMoreBtn = document.getElementById("load-more-logs-btn");
+            if (logsOffset < total) {
+                loadMoreBtn.classList.remove("hidden");
+            } else {
+                loadMoreBtn.classList.add("hidden");
+            }
+
+        } catch (e) {
+            console.error("Failed to load logs", e);
+        } finally {
+            logsLoading = false;
+        }
+    }
+
+    function loadMoreLogs() {
+        loadLogs(false);
+    }
+
+    function renderLogs(logs, reset) {
+        const tbody = document.getElementById("logs-table");
+        const startIndex = reset ? 0 : currentLogs.length - logs.length;
+
+        const html = logs.map((log, i) => {
+            const globalIndex = startIndex + i;
+            let methodColor = "text-white";
+            if (log.method === "GET") methodColor = "text-blue-400";
+            if (log.method === "PUT") methodColor = "text-yellow-400";
+            if (log.method === "DELETE") methodColor = "text-red-400";
+
+            let statusColor = "text-emerald-400";
+            if (log.statusCode >= 400) statusColor = "text-yellow-400";
+            if (log.statusCode >= 500) statusColor = "text-red-400";
+
+            return `
+            <tr class="hover:bg-white/5 transition-colors">
+                <td class="px-6 py-4 font-mono text-xs text-text-muted whitespace-nowrap">
+                    ${new Date(log.createdAt).toLocaleString()}
+                </td>
+                <td class="px-6 py-4 font-bold text-xs ${methodColor}">
+                    ${escapeHtml(log.method)}
+                </td>
+                <td class="px-6 py-4 font-bold text-xs ${statusColor}">
+                    ${escapeHtml(log.statusCode)}
+                </td>
+                <td class="px-6 py-4 font-mono text-xs text-white truncate max-w-xs" title="${escapeHtml(log.path)}">
+                    ${escapeHtml(log.path)}
+                </td>
+                <td class="px-6 py-4 font-mono text-xs text-text-muted">
+                    ${escapeHtml(log.bucketName || '-')}
+                </td>
+                <td class="px-6 py-4 font-mono text-xs text-text-muted truncate max-w-[150px]" title="${escapeHtml(log.ownerEmail)}">
+                    ${escapeHtml(log.ownerEmail || '-')}
+                </td>
+                <td class="px-6 py-4 font-mono text-xs text-text-muted">
+                    ${escapeHtml(log.ipAddress || '-')}
+                </td>
+                <td class="px-6 py-4 font-mono text-xs text-text-muted truncate max-w-[150px]" title="${escapeHtml(log.userAgent || '')}">
+                    ${log.userAgent ? escapeHtml(log.userAgent.substring(0, 20) + (log.userAgent.length > 20 ? '...' : '')) : '-'}
+                </td>
+                <td class="px-6 py-4 font-mono text-xs text-text-muted">
+                    ${formatBytes(log.ingressBytes)}
+                </td>
+                <td class="px-6 py-4 font-mono text-xs text-text-muted">
+                    ${formatBytes(log.egressBytes)}
+                </td>
+                <td class="px-6 py-4 text-right font-mono text-xs text-text-muted">
+                    ${log.latencyMs ? log.latencyMs + 'ms' : '-'}
+                </td>
+                <td class="px-6 py-4 text-right">
+                    <button onclick='openLogModal(${globalIndex})' class="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider">View</button>
+                </td>
+            </tr>
+            `;
+        }).join("");
+
+        tbody.insertAdjacentHTML('beforeend', html);
+    }
+
+    loadLogs(true);
+</script>
