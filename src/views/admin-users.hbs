@@ -233,9 +233,9 @@
     function escapeJs(unsafe) {
         if (unsafe === null || unsafe === undefined) return "";
         return String(unsafe)
-            .replace(/\\/g, '\\\\')
+            .replace(/\\/g, "\\\\")
             .replace(/'/g, "\\'")
-            .replace(/\"/g, '\\"');
+            .replace(/\"/g, "\\\"");
     }
 
     function formatBytes(bytes, decimals = 2) {
