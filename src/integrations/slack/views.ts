@@ -194,7 +194,10 @@ export const manageKeysModal = (
 				text: "Here are the keys :ms-wrench:",
 			}).accessory(
 				Button({
-					text: keys.length >= 20 ? "Key Limit Reached" : "Make New Key :blobby-lock:",
+					text:
+						keys.length >= 20
+							? "Key Limit Reached"
+							: "Make New Key :blobby-lock:",
 					actionId: "generate_key",
 					value: bucket.id,
 				}).primary(),

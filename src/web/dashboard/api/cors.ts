@@ -1,7 +1,10 @@
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import { getCurrentUser } from "../../../lib/session";
 import { updateCorsSchema } from "../../../lib/validation";
-import { BucketService } from "../../../services/bucket-service";
+import {
+	deleteCorsConfig,
+	updateCorsConfig,
+} from "../../../services/bucket-service";
 
 export async function handleCors(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
@@ -27,12 +30,7 @@ export async function handleCors(req: Request): Promise<Response> {
 
 				const { rules: corsRules } = result.data;
 
-				await BucketService.updateCorsConfig(
-					bucketName,
-					user.id,
-					corsRules,
-					user.isAdmin,
-				);
+				await updateCorsConfig(bucketName, user.id, corsRules, user.isAdmin);
 
 				return jsonResponse({ message: "Updated" });
 			} catch (e) {
@@ -43,7 +41,7 @@ export async function handleCors(req: Request): Promise<Response> {
 
 		if (req.method === "DELETE") {
 			try {
-				await BucketService.deleteCorsConfig(bucketName, user.id, user.isAdmin);
+				await deleteCorsConfig(bucketName, user.id, user.isAdmin);
 				return jsonResponse({ message: "Deleted" });
 			} catch (e) {
 				const message = e instanceof Error ? e.message : "Unknown error";

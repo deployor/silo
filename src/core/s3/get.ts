@@ -26,8 +26,21 @@ export async function handleGetRequest(
 			return S3Errors.NoSuchCORSConfiguration().toResponse();
 		}
 
-		const config = JSON.parse(bucket.corsConfig);
-		const rulesXml = config.CORSRules.map((r: any) => {
+		type StoredCorsRule = {
+			ID?: string;
+			AllowedOrigins: string | string[];
+			AllowedMethods: string | string[];
+			AllowedHeaders?: string | string[];
+			ExposeHeaders?: string | string[];
+			MaxAgeSeconds?: number;
+		};
+
+		type StoredCorsConfig = {
+			CORSRules: StoredCorsRule[];
+		};
+
+		const config = JSON.parse(bucket.corsConfig) as StoredCorsConfig;
+		const rulesXml = config.CORSRules.map((r) => {
 			let rule = "<CORSRule>";
 			if (r.ID) rule += `<ID>${r.ID}</ID>`;
 

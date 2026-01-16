@@ -13,7 +13,7 @@ import { getInternalPath, isReservedBucketName } from "../../core/s3/utils";
 import { db } from "../../db";
 import { bucketKeys, buckets } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
-import { UserService } from "../../services/user-service";
+import { getStorageUsage, getUserBySlackId } from "../../services/user-service";
 import { openModal, publishView } from "./client";
 import {
 	createBucketModal,
@@ -25,10 +25,10 @@ import {
 export async function handleAppHomeOpened(event: { user: string }) {
 	const slackId = event.user;
 
-	const user = await UserService.getUserBySlackId(slackId);
+	const user = await getUserBySlackId(slackId);
 
 	if (user) {
-		user.storageUsageBytes = await UserService.getStorageUsage(user.id);
+		user.storageUsageBytes = await getStorageUsage(user.id);
 	}
 
 	if (user?.isLocked) {
@@ -79,7 +79,9 @@ export async function handleAppHomeOpened(event: { user: string }) {
 	await publishView(slackId, homeView(user, userBuckets));
 }
 
-interface SlackInteractionPayload {
+type SlackBlock = Record<string, unknown>;
+
+type SlackInteractionPayload = {
 	type: string;
 	user: {
 		id: string;
@@ -105,12 +107,12 @@ interface SlackInteractionPayload {
 		message_ts: string;
 	};
 	message?: {
-		blocks: any[];
+		blocks: SlackBlock[];
 	};
-}
+};
 
 export async function handleInteraction(payload: SlackInteractionPayload) {
-	const user = await UserService.getUserBySlackId(payload.user.id);
+	const user = await getUserBySlackId(payload.user.id);
 
 	if (!user) return; // Should not happen if they are interacting
 
@@ -140,7 +142,11 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 		const bucketName =
 			payload.view.state.values.bucket_name_block.bucket_name_input.value;
 
-		if (!bucketName || !/^[a-z0-9-]+$/.test(bucketName) || bucketName.length < 3) {
+		if (
+			!bucketName ||
+			!/^[a-z0-9-]+$/.test(bucketName) ||
+			bucketName.length < 3
+		) {
 			return {
 				response_action: "errors",
 				errors: {
@@ -443,28 +449,52 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			await s3Client.fetch(internalPath, { method: "DELETE" });
 
 			if (payload.message?.blocks) {
-				const newBlocks = payload.message.blocks.map((block: any) => {
+				const newBlocks = payload.message.blocks.map((block) => {
+					const maybeAccessory = (block as { accessory?: unknown }).accessory;
+					const maybeText = (block as { text?: unknown }).text;
+
 					if (
-						block.accessory &&
-						block.accessory.action_id === "delete_cdn_file" &&
-						block.accessory.value === actionValue
+						!maybeAccessory ||
+						typeof maybeAccessory !== "object" ||
+						!("action_id" in maybeAccessory) ||
+						!("value" in maybeAccessory)
 					) {
-						return {
-							type: "section",
-							text: {
-								type: "mrkdwn",
-								text: `~${block.text.text.split("\n")[0]}~\n_Deleted_`,
-							},
-							accessory: {
-								type: "button",
-								text: { type: "plain_text", text: "Deleted", emoji: true },
-								style: "danger",
-								action_id: "delete_cdn_file_done",
-								value: actionValue,
-							},
-						};
+						return block;
 					}
-					return block;
+
+					const accessory = maybeAccessory as {
+						action_id?: unknown;
+						value?: unknown;
+					};
+
+					if (
+						accessory.action_id !== "delete_cdn_file" ||
+						accessory.value !== actionValue
+					) {
+						return block;
+					}
+
+					const displayName =
+						typeof maybeText === "object" && maybeText && "text" in maybeText
+							? typeof (maybeText as { text?: unknown }).text === "string"
+								? (maybeText as { text: string }).text.split("\n")[0]
+								: "(file)"
+							: "(file)";
+
+					return {
+						type: "section",
+						text: {
+							type: "mrkdwn",
+							text: `~${displayName}~\n_Deleted_`,
+						},
+						accessory: {
+							type: "button",
+							text: { type: "plain_text", text: "Deleted", emoji: true },
+							style: "danger",
+							action_id: "delete_cdn_file_done",
+							value: actionValue,
+						},
+					} satisfies SlackBlock;
 				});
 
 				await fetch(

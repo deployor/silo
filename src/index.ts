@@ -114,7 +114,9 @@ Bun.serve({
 				path: url.pathname,
 			},
 			async () => {
-				let response: Response = new Response("Internal Error", { status: 500 });
+				let response: Response = new Response("Internal Error", {
+					status: 500,
+				});
 
 				if (isDashboardRequest(req, url)) {
 					// Rate Limiting

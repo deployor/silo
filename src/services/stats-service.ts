@@ -6,7 +6,8 @@ import { getContext } from "../lib/context";
 class StatsService {
 	public async recordUsage(ingress: number, egress: number) {
 		const ctx = getContext();
-		if (!ctx || !ctx.user) return;
+		const userId = ctx?.user?.id;
+		if (!userId) return;
 
 		try {
 			await db.transaction(async (tx) => {
@@ -17,9 +18,9 @@ class StatsService {
 						egressBytes: sql`COALESCE(${users.egressBytes}, 0) + ${egress}`,
 						totalRequests: sql`COALESCE(${users.totalRequests}, 0) + 1`,
 					})
-					.where(eq(users.id, ctx.user!.id));
+					.where(eq(users.id, userId));
 
-				if (ctx.bucket) {
+				if (ctx?.bucket) {
 					await tx
 						.update(buckets)
 						.set({

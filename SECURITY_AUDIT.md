@@ -1,67 +1,118 @@
 # Security Audit Report
 
-**Date:** 2025-12-25
+**Date:** 2026-01-15
 **Target:** Silo Codebase (S3 Gateway & Dashboard)
 **Auditor:** Roo
 
 ## 1. Executive Summary
 
-This document outlines the findings of a security audit performed on the Silo codebase. The audit focused on authentication mechanisms, S3 core logic implementation, web dashboard security, and the Slack integration.
+This audit is an update to the previous report (2025-12-25). It incorporates a fresh dependency vulnerability scan and a targeted static review of the highest-risk paths: session/cookie handling, auth callbacks, SigV4 verification, CORS behavior, security headers/CSP, and rate limiting.
 
-**Overall Security Posture:** **Strong**
-The application demonstrates a high level of security awareness. Core critical paths such as S3 signature verification, path traversal protection, and user authentication are implemented with robust checks. Access controls are consistently applied across both the S3 gateway and the web dashboard.
+**Overall Security Posture:** **Strong**, with actionable hardening work in dependencies and a few defense-in-depth improvements.
+
+Key changes since the last audit:
+- **Dependency vulnerabilities detected via `npm audit`** (1 high, 4 moderate). The high severity finding is in [`hono`](src/middleware/security-headers.ts:1) (indirect risk depends on whether JWT/JWK middleware is used).
+- Several **defense-in-depth items** remain relevant: explicit CSRF protection for browser endpoints, tightening CSP, and improving rate limiting accuracy behind proxies.
 
 ## 2. Methodology
 
-The audit was conducted through static code analysis, focusing on the following areas:
-*   **Entry Points:** `src/index.ts`, `src/middleware/auth.ts`
-*   **Core Logic:** `src/core/s3/`, `src/services/`
-*   **Authentication:** `src/lib/auth-v4.ts`, `src/web/dashboard/auth.ts`
-*   **Web Interface:** `src/web/dashboard/`, `src/web/admin/`
-*   **Integrations:** `src/integrations/slack/`
-*   **Database:** `src/db/`
+The audit was conducted through:
+- Static code review
+- `npm audit --audit-level=low`
 
-## 3. Key Findings
+Focus areas:
+- **Authentication:** [`src/lib/auth-v4.ts`](src/lib/auth-v4.ts:1), [`src/web/dashboard/auth.ts`](src/web/dashboard/auth.ts:1)
+- **Sessions/Cookies:** [`src/lib/session.ts`](src/lib/session.ts:1)
+- **Web security headers / CSP:** [`src/middleware/security-headers.ts`](src/middleware/security-headers.ts:1)
+- **CORS:** [`src/core/s3/cors.ts`](src/core/s3/cors.ts:1), [`src/web/dashboard/api/cors.ts`](src/web/dashboard/api/cors.ts:1)
+- **Rate limiting:** [`src/middleware/rate-limit.ts`](src/middleware/rate-limit.ts:1)
+- **Env/config:** [`src/config.ts`](src/config.ts:1)
 
-### 3.1 Authentication & Authorization
-*   **AWS Signature V4:** The implementation in `src/lib/auth-v4.ts` correctly handles canonicalization and signature verification. It supports both header-based and query-based (presigned URL) authentication.
-*   **Session Management:** The dashboard uses `HttpOnly`, `Secure`, and `SameSite=Lax` cookies for session management, mitigating XSS-based session theft.
-*   **Slack Verification:** Request signing verification (`src/integrations/slack/verify.ts`) uses `timingSafeEqual` to prevent timing attacks and checks timestamps to prevent replay attacks.
-*   **Access Control:** Middleware (`src/middleware/auth.ts`) consistently enforces checks for:
-    *   User existence
-    *   Account lock status
-    *   Bucket pause status
-    *   Key pause status
-    *   Public vs. Authenticated access
+## 3. Automated Findings (Dependencies)
 
-### 3.2 Data Protection & S3 Logic
-*   **Path Traversal:** `src/core/s3/utils.ts` implements dual-layer protection against path traversal (`../`) attacks. It decodes the URI component before checking, preventing encoded traversal attacks (e.g., `%2e%2e/`).
-*   **Internal Path Construction:** Files are stored using a deterministic internal path structure (`users/{userId}/{bucketName}/{key}`), ensuring complete isolation between users' data.
-*   **Bucket Naming:** Strict validation (`/^[a-z0-9-]+$/`) and reserved name checks prevent namespace collisions and potential injection vectors.
+Command executed:
+- `npm audit --audit-level=low`
 
-### 3.3 Web Security
-*   **XSS:** The use of Handlebars with default escaping (`{{ }}`) mitigates Cross-Site Scripting (XSS) risks in HTML views.
-*   **CSRF:** The application relies on `SameSite=Lax` cookies for Cross-Site Request Forgery (CSRF) protection. While generally effective for modern browsers, explicit CSRF tokens would provide better depth-in-defense, especially for the file upload endpoint.
-*   **SQL Injection:** The use of Drizzle ORM with parameterized queries effectively mitigates SQL injection risks.
+Findings:
 
-### 3.4 Slack Integration
-*   **User Validation:** The bot refuses to process files from users who have not linked their Silo account, preventing unauthorized usage.
-*   **Input Sanitization:** File extensions are sanitized before storage to prevent execution of malicious file types if served directly (though S3 usually serves as static content).
-*   **Download Verification:** The bot validates that file downloads originate from `https://files.slack.com/`.
+### 3.1 High Severity
 
-## 4. Recommendations
+- **hono <= 4.11.3** – JWT/JWK algorithm confusion vulnerabilities (token forgery/auth bypass) per advisories.
+  - `npm audit` indicates a fix is available via `npm audit fix`.
+  - **Impact in this codebase:** a repo-wide search did not show direct usage of JWT/JWK middleware, but the dependency is still present. If added later (or used indirectly), this becomes high risk.
+
+### 3.2 Moderate Severity
+
+- **esbuild <= 0.24.2** – dev server request/response exposure advisory.
+  - `npm audit` indicates a fix is available via `npm audit fix --force` but it would upgrade `drizzle-kit` with breaking changes.
+  - **Impact:** primarily affects developer workstations / dev server usage, not prod runtime, but should still be remediated to reduce supply-chain/developer-env exposure.
+
+## 4. Manual Review Findings
+
+### 4.1 Authentication & Sessions
+
+- Session cookies are issued with `HttpOnly; Secure; SameSite=Lax` in [`handleAuthRequest()`](src/web/dashboard/auth.ts:8), which is a solid baseline.
+- Token refresh logic in [`getCurrentUser()`](src/lib/session.ts:7) is server-side and does not expose secrets to the browser.
+
+**Risk / hardening:**
+- Cookie parsing is implemented via naive `split("=")` logic in multiple places (e.g. [`getCurrentUser()`](src/lib/session.ts:7), [`handleAuthRequest()`](src/web/dashboard/auth.ts:8)). This can mis-parse cookie values containing `=` and can lead to inconsistent auth behavior. This is more reliability than exploitability, but auth-adjacent parsing should be robust.
+
+### 4.2 Rate Limiting
+
+- [`rateLimit()`](src/middleware/rate-limit.ts:25) uses `x-forwarded-for` directly or falls back to `127.0.0.1`.
+
+**Risk / hardening:**
+- If the app is deployed behind a proxy/CDN, `x-forwarded-for` can contain a comma-separated list of IPs; using the full header value as a key can break limiting.
+- If the service is *not* behind a trusted proxy, accepting client-controlled `x-forwarded-for` allows trivial bypass.
+
+### 4.3 CORS
+
+- S3 preflight handling in [`handleCorsPreflight()`](src/core/s3/cors.ts:38) and response header inference in [`getCorsHeaders()`](src/core/s3/cors.ts:119) are generally correct.
+
+**Risk / hardening:**
+- If a bucket’s CORS config allows `AllowedOrigins: ["*"]`, responses may be readable cross-origin. That is expected S3 behavior, but it should be clearly documented as user-configurable risk.
+
+### 4.4 Security Headers / CSP
+
+- [`securityHeaders()`](src/middleware/security-headers.ts:1) sets HSTS, nosniff, frame protection and a CSP.
+
+**Risk / hardening:**
+- CSP currently allows `'unsafe-inline'` for scripts. This preserves compatibility but reduces XSS blast-radius. Moving to nonces/hashes would provide more meaningful protection.
+- `X-XSS-Protection` is legacy and can be removed or left; it’s not harmful, but not relied upon.
+
+### 4.5 Origin Validation
+
+- [`validateOrigin()`](src/lib/security.ts:3) exists and restricts origins/referers to `config.s3Domain` or `localhost`, but it is not obviously applied as a global check.
+
+## 5. Recommendations
 
 ### High Priority
-*   **None identified.** The critical security controls are in place and appear correct.
+
+1) **Remediate `hono` high severity vulnerability**
+   - Run `npm audit fix` and confirm the locked version of `hono` is patched.
+   - Ensure no JWT/JWK features are enabled with unsafe defaults.
 
 ### Medium Priority
-*   **CSRF Tokens:** Consider implementing explicit CSRF tokens (e.g., using the "Double Submit Cookie" pattern or a synchronized token pattern) for state-changing operations in the dashboard, particularly for the file upload endpoint (`/api/cdn/upload`). While `SameSite=Lax` offers significant protection, it is not a complete replacement for CSRF tokens in all scenarios.
-*   **WIP Bypass:** The `/auth/wip` endpoint allows bypassing the waitlist with a shared secret (`config.devAccessCode`). Ensure this code is strong and rotated if shared. Consider removing this endpoint in production or restricting it to specific IP addresses.
+
+1) **Address `esbuild` moderate vulnerability**
+   - Prefer upgrading `drizzle-kit` / the esbuild chain; validate `drizzle-kit` breaking changes in CI.
+   - If postponing, document a policy: do not expose dev servers to untrusted networks.
+
+2) **Implement explicit CSRF protection for dashboard state-changing endpoints**
+   - `SameSite=Lax` is helpful but not a full CSRF strategy. Add CSRF tokens (synchronizer token or double-submit).
+
+3) **Harden rate limiting behind proxies**
+   - Parse `x-forwarded-for` safely (take the left-most IP only when behind trusted proxy).
+   - Consider using a trusted header from your edge (e.g. `CF-Connecting-IP`) and ignore untrusted forwarded headers.
 
 ### Low Priority
-*   **Rate Limiting:** While user quotas limit storage and request counts, explicit rate limiting (requests per second) on API endpoints would prevent abuse and Denial of Service (DoS) attempts.
-*   **Origin Validation:** The `validateOrigin` function in `src/lib/security.ts` exists but does not appear to be globally enforced. Consider applying it to API routes to strictly enforce CORS policies.
 
-## 5. Conclusion
+1) **Tighten CSP**
+   - Reduce/avoid `'unsafe-inline'` for scripts; use nonces/hashes for inline blocks.
 
-The Silo codebase is well-architected from a security perspective. The developers have proactively addressed common web and storage vulnerabilities. The recommendations provided above are primarily for hardening and defense-in-depth.
+2) **Apply origin validation consistently**
+   - Apply [`validateOrigin()`](src/lib/security.ts:3) (or a stricter equivalent) to the dashboard API surface if the threat model expects browser-only access.
+
+## 6. Conclusion
+
+The codebase remains in good shape overall. The main actionable items are dependency remediation (notably `hono`) and incremental hardening around CSRF, CSP, and proxy-aware rate limiting.

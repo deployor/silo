@@ -6,7 +6,7 @@ import { buckets, requestLogs, users } from "../../../db/schema";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import { s3Client } from "../../../lib/s3-client";
 import { getCurrentUser } from "../../../lib/session";
-import { BucketService } from "../../../services/bucket-service";
+import { getBucketsForUser } from "../../../services/bucket-service";
 import { handleBucketOperations, handleBuckets } from "./buckets";
 import { handleCors } from "./cors";
 import { handleFiles } from "./files";
@@ -140,7 +140,7 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 		}
 
 		if (path === "/api/dashboard/stats") {
-			const bucketsWithKeys = await BucketService.getBucketsForUser(user.id);
+			const bucketsWithKeys = await getBucketsForUser(user.id);
 
 			const responseData = {
 				user: {

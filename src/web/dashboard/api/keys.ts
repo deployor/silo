@@ -5,7 +5,7 @@ import { buckets } from "../../../db/schema";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import { getCurrentUser } from "../../../lib/session";
 import { bucketNameSchema } from "../../../lib/validation";
-import { KeyService } from "../../../services/key-service";
+import { createKey, deleteKey } from "../../../services/key-service";
 
 export async function handleKeys(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
@@ -41,7 +41,7 @@ export async function handleKeys(req: Request): Promise<Response> {
 			return errorResponse("Cannot create keys for CDN bucket", 403);
 
 		try {
-			const keys = await KeyService.createKey(bucket[0].id);
+			const keys = await createKey(bucket[0].id);
 			const publicUrl = `https://${config.s3Domain}/${bucketName}/file.png`;
 			return jsonResponse({ ...keys, publicUrl });
 		} catch (e) {
@@ -61,7 +61,7 @@ export async function handleKeys(req: Request): Promise<Response> {
 		const keyId = deleteKeyMatch[2];
 
 		try {
-			await KeyService.deleteKey(keyId, bucketName, user.id, user.isAdmin);
+			await deleteKey(keyId, bucketName, user.id, user.isAdmin);
 			return jsonResponse({ message: "Deleted" });
 		} catch (e) {
 			const message = e instanceof Error ? e.message : "Unknown error";

@@ -1,197 +1,229 @@
 import { eq } from "drizzle-orm";
-import { deleteBucketContents, getInternalPath, isReservedBucketName } from "../core/s3/utils";
+import {
+	deleteBucketContents,
+	getInternalPath,
+	isReservedBucketName,
+} from "../core/s3/utils";
 import { db } from "../db";
 import { bucketKeys, buckets, users } from "../db/schema";
 
-export class BucketService {
-	static async getBucketsForUser(userId: string) {
-		const userBuckets = await db
-			.select()
-			.from(buckets)
-			.where(eq(buckets.userId, userId));
+export type CorsRule = {
+	ID?: string;
+	AllowedOrigins: string[];
+	AllowedMethods: string[];
+	AllowedHeaders?: string[];
+	ExposeHeaders?: string[];
+	MaxAgeSeconds?: number;
+};
 
-		const bucketsWithKeys = await Promise.all(
-			userBuckets.map(async (b) => {
-				const keys = await db
-					.select()
-					.from(bucketKeys)
-					.where(eq(bucketKeys.bucketId, b.id));
-				return {
-					...b,
-					keys: keys.map((k) => ({
-						id: k.id,
-						accessKey: k.accessKey,
-					})),
-				};
-			}),
-		);
+export async function getBucketsForUser(userId: string) {
+	const userBuckets = await db
+		.select()
+		.from(buckets)
+		.where(eq(buckets.userId, userId));
 
-		return bucketsWithKeys;
+	const bucketsWithKeys = await Promise.all(
+		userBuckets.map(async (b) => {
+			const keys = await db
+				.select()
+				.from(bucketKeys)
+				.where(eq(bucketKeys.bucketId, b.id));
+			return {
+				...b,
+				keys: keys.map((k) => ({
+					id: k.id,
+					accessKey: k.accessKey,
+				})),
+			};
+		}),
+	);
+
+	return bucketsWithKeys;
+}
+
+export async function createBucket(
+	userId: string,
+	name: string,
+	isCdn = false,
+) {
+	if (!name || !/^[a-z0-9-]+$/.test(name)) {
+		throw new Error("Invalid bucket name");
 	}
 
-	static async createBucket(userId: string, name: string, isCdn = false) {
-		if (!name || !/^[a-z0-9-]+$/.test(name)) {
-			throw new Error("Invalid bucket name");
-		}
-
-		if (isReservedBucketName(name)) {
-			throw new Error("Bucket name is reserved for system use");
-		}
-
-		const userBuckets = await db
-			.select()
-			.from(buckets)
-			.where(eq(buckets.userId, userId));
-		if (userBuckets.length >= 50) {
-			throw new Error("Bucket limit reached");
-		}
-
-		const existing = await db
-			.select()
-			.from(buckets)
-			.where(eq(buckets.name, name))
-			.limit(1);
-		if (existing.length > 0) {
-			throw new Error("Bucket name already taken");
-		}
-
-		const newBucket = await db
-			.insert(buckets)
-			.values({
-				name,
-				userId,
-				isPublic: isCdn,
-				isCdn,
-			})
-			.returning();
-
-		return newBucket[0];
+	if (isReservedBucketName(name)) {
+		throw new Error("Bucket name is reserved for system use");
 	}
 
-	static async emptyBucket(name: string, userId: string, isAdmin = false) {
-		const bucket = await db
-			.select()
-			.from(buckets)
-			.where(eq(buckets.name, name))
-			.limit(1);
+	const userBuckets = await db
+		.select()
+		.from(buckets)
+		.where(eq(buckets.userId, userId));
+	if (userBuckets.length >= 50) {
+		throw new Error("Bucket limit reached");
+	}
 
-		if (bucket.length === 0) throw new Error("Bucket not found");
-		if (bucket[0].userId !== userId && !isAdmin)
-			throw new Error("Unauthorized");
-		if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
+	const existing = await db
+		.select()
+		.from(buckets)
+		.where(eq(buckets.name, name))
+		.limit(1);
+	if (existing.length > 0) {
+		throw new Error("Bucket name already taken");
+	}
 
+	const newBucket = await db
+		.insert(buckets)
+		.values({
+			name,
+			userId,
+			isPublic: isCdn,
+			isCdn,
+		})
+		.returning();
+
+	return newBucket[0];
+}
+
+export async function emptyBucket(
+	name: string,
+	userId: string,
+	isAdmin = false,
+) {
+	const bucket = await db
+		.select()
+		.from(buckets)
+		.where(eq(buckets.name, name))
+		.limit(1);
+
+	if (bucket.length === 0) throw new Error("Bucket not found");
+	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
+	if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
+
+	const owner = await db
+		.select()
+		.from(users)
+		.where(eq(users.id, bucket[0].userId))
+		.limit(1);
+	if (owner.length === 0) throw new Error("Owner not found");
+
+	const internalPrefix = getInternalPath("", owner[0], bucket[0]);
+	await deleteBucketContents(internalPrefix);
+
+	// Reset usage stats for the bucket
+	await db
+		.update(buckets)
+		.set({ totalBytes: 0 })
+		.where(eq(buckets.id, bucket[0].id));
+}
+
+export async function deleteBucket(
+	name: string,
+	userId: string,
+	isAdmin = false,
+) {
+	const bucket = await db
+		.select()
+		.from(buckets)
+		.where(eq(buckets.name, name))
+		.limit(1);
+
+	if (bucket.length === 0) throw new Error("Bucket not found");
+	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
+	if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
+
+	// Best-effort: remove all objects first so upstream storage doesn't leak
+	try {
 		const owner = await db
 			.select()
 			.from(users)
 			.where(eq(users.id, bucket[0].userId))
 			.limit(1);
-		if (owner.length === 0) throw new Error("Owner not found");
-
-		const internalPrefix = getInternalPath("", owner[0], bucket[0]);
-		await deleteBucketContents(internalPrefix);
-
-		// Reset usage stats for the bucket
-		await db
-			.update(buckets)
-			.set({ totalBytes: 0 })
-			.where(eq(buckets.id, bucket[0].id));
-	}
-
-	static async deleteBucket(name: string, userId: string, isAdmin = false) {
-		const bucket = await db
-			.select()
-			.from(buckets)
-			.where(eq(buckets.name, name))
-			.limit(1);
-
-		if (bucket.length === 0) throw new Error("Bucket not found");
-		if (bucket[0].userId !== userId && !isAdmin)
-			throw new Error("Unauthorized");
-		if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
-
-		// Best-effort: remove all objects first so upstream storage doesn't leak
-		try {
-			const owner = await db
-				.select()
-				.from(users)
-				.where(eq(users.id, bucket[0].userId))
-				.limit(1);
-			if (owner.length > 0) {
-				const internalPrefix = getInternalPath("", owner[0], bucket[0]);
-				await deleteBucketContents(internalPrefix);
-			}
-		} catch (e) {
-			console.error("Failed to empty bucket during delete:", e);
+		if (owner.length > 0) {
+			const internalPrefix = getInternalPath("", owner[0], bucket[0]);
+			await deleteBucketContents(internalPrefix);
 		}
-
-		await db.delete(buckets).where(eq(buckets.name, name));
+	} catch (e) {
+		console.error("Failed to empty bucket during delete:", e);
 	}
 
-	static async updateBucketVisibility(
-		name: string,
-		userId: string,
-		isPublic: boolean,
-		isAdmin = false,
-	) {
-		const bucket = await db
-			.select()
-			.from(buckets)
-			.where(eq(buckets.name, name))
-			.limit(1);
-
-		if (bucket.length === 0) throw new Error("Bucket not found");
-		if (bucket[0].userId !== userId && !isAdmin)
-			throw new Error("Unauthorized");
-		if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
-		if (bucket[0].isCdn) throw new Error("Cannot modify CDN bucket");
-
-		await db.update(buckets).set({ isPublic }).where(eq(buckets.name, name));
-	}
-
-	static async updateCorsConfig(
-		name: string,
-		userId: string,
-		corsRules: any[],
-		isAdmin = false,
-	) {
-		const bucket = await db
-			.select()
-			.from(buckets)
-			.where(eq(buckets.name, name))
-			.limit(1);
-
-		if (bucket.length === 0) throw new Error("Bucket not found");
-		if (bucket[0].userId !== userId && !isAdmin)
-			throw new Error("Unauthorized");
-		if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
-		if (bucket[0].isCdn) throw new Error("Cannot modify CDN bucket CORS");
-
-		const corsConfig = {
-			CORSRules: corsRules,
-		};
-
-		await db
-			.update(buckets)
-			.set({ corsConfig: JSON.stringify(corsConfig) })
-			.where(eq(buckets.name, name));
-	}
-
-	static async deleteCorsConfig(name: string, userId: string, isAdmin = false) {
-		const bucket = await db
-			.select()
-			.from(buckets)
-			.where(eq(buckets.name, name))
-			.limit(1);
-
-		if (bucket.length === 0) throw new Error("Bucket not found");
-		if (bucket[0].userId !== userId && !isAdmin)
-			throw new Error("Unauthorized");
-		if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
-		if (bucket[0].isCdn) throw new Error("Cannot modify CDN bucket CORS");
-
-		await db
-			.update(buckets)
-			.set({ corsConfig: null })
-			.where(eq(buckets.name, name));
-	}
+	await db.delete(buckets).where(eq(buckets.name, name));
 }
+
+export async function updateBucketVisibility(
+	name: string,
+	userId: string,
+	isPublic: boolean,
+	isAdmin = false,
+) {
+	const bucket = await db
+		.select()
+		.from(buckets)
+		.where(eq(buckets.name, name))
+		.limit(1);
+
+	if (bucket.length === 0) throw new Error("Bucket not found");
+	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
+	if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
+	if (bucket[0].isCdn) throw new Error("Cannot modify CDN bucket");
+
+	await db.update(buckets).set({ isPublic }).where(eq(buckets.name, name));
+}
+
+export async function updateCorsConfig(
+	name: string,
+	userId: string,
+	corsRules: CorsRule[],
+	isAdmin = false,
+) {
+	const bucket = await db
+		.select()
+		.from(buckets)
+		.where(eq(buckets.name, name))
+		.limit(1);
+
+	if (bucket.length === 0) throw new Error("Bucket not found");
+	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
+	if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
+	if (bucket[0].isCdn) throw new Error("Cannot modify CDN bucket CORS");
+
+	const corsConfig = {
+		CORSRules: corsRules,
+	};
+
+	await db
+		.update(buckets)
+		.set({ corsConfig: JSON.stringify(corsConfig) })
+		.where(eq(buckets.name, name));
+}
+
+export async function deleteCorsConfig(
+	name: string,
+	userId: string,
+	isAdmin = false,
+) {
+	const bucket = await db
+		.select()
+		.from(buckets)
+		.where(eq(buckets.name, name))
+		.limit(1);
+
+	if (bucket.length === 0) throw new Error("Bucket not found");
+	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
+	if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
+	if (bucket[0].isCdn) throw new Error("Cannot modify CDN bucket CORS");
+
+	await db
+		.update(buckets)
+		.set({ corsConfig: null })
+		.where(eq(buckets.name, name));
+}
+
+export const BucketService = {
+	getBucketsForUser,
+	createBucket,
+	emptyBucket,
+	deleteBucket,
+	updateBucketVisibility,
+	updateCorsConfig,
+	deleteCorsConfig,
+};

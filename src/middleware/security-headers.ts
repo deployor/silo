@@ -1,4 +1,4 @@
-export function securityHeaders(req: Request, res: Response): Response {
+export function securityHeaders(_req: Request, res: Response): Response {
 	const headers = new Headers(res.headers);
 
 	// HSTS - Force HTTPS
@@ -26,7 +26,7 @@ export function securityHeaders(req: Request, res: Response): Response {
 	// We also allow data: images for the dashboard.
 	headers.set(
 		"Content-Security-Policy",
-		[
+		`${[
 			"default-src 'self'",
 			"img-src 'self' data: https:",
 			// Allow third-party script tags used by our templates.
@@ -41,7 +41,7 @@ export function securityHeaders(req: Request, res: Response): Response {
 			"style-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
 			// Allow fonts from CDNs used by icon libraries.
 			"font-src 'self' data: https://cdn.jsdelivr.net",
-		].join("; ") + ";",
+		].join("; ")};`,
 	);
 
 	return new Response(res.body, {

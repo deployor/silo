@@ -40,9 +40,10 @@ export async function getCurrentUser(req: Request) {
 				// - sessions.impersonatedUserId is the effective user for dashboard actions
 				// - Only allow if the real user is admin AND impersonation is not expired.
 				let u = directUser;
+				const impersonatedUserId = s.impersonatedUserId;
 				const hasActiveImpersonation =
 					!!s.impersonatorUserId &&
-					!!s.impersonatedUserId &&
+					!!impersonatedUserId &&
 					directUser.isAdmin === true &&
 					!!s.impersonationExpiresAt &&
 					s.impersonationExpiresAt > new Date();
@@ -51,7 +52,7 @@ export async function getCurrentUser(req: Request) {
 					const impersonated = await db
 						.select()
 						.from(users)
-						.where(eq(users.id, s.impersonatedUserId!))
+						.where(eq(users.id, impersonatedUserId))
 						.limit(1);
 
 					if (impersonated.length > 0) {
