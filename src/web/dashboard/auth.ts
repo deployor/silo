@@ -180,7 +180,11 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 				.where(eq(sessions.id, cookies.silo_session))
 				.limit(1);
 
-			if (sess.length > 0 && sess[0].impersonatorUserId && sess[0].impersonatedUserId) {
+			if (
+				sess.length > 0 &&
+				sess[0].impersonatorUserId &&
+				sess[0].impersonatedUserId
+			) {
 				await db
 					.update(sessions)
 					.set({

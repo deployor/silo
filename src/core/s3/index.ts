@@ -9,13 +9,13 @@ import { handleDeleteRequest } from "./delete";
 import { handleGetRequest } from "./get";
 import { handlePostRequest } from "./post";
 import { handlePutRequest } from "./put";
+import { determineAction, S3Action } from "./types";
 import {
 	filterUpstreamHeaders,
 	getInternalPath,
 	getKeyFromRequest,
 	stripAuthQueryParams,
 } from "./utils";
-import { S3Action, determineAction } from "./types";
 
 export async function handleS3Request(
 	req: Request,

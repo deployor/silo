@@ -5,8 +5,13 @@ import {
 	createBucketSchema,
 	updateBucketVisibilitySchema,
 } from "../../../lib/validation";
-import { BucketService } from "../../../services/bucket-service";
-import { KeyService } from "../../../services/key-service";
+import {
+	createBucket,
+	deleteBucket,
+	emptyBucket,
+	updateBucketVisibility,
+} from "../../../services/bucket-service";
+import { createKey } from "../../../services/key-service";
 
 export async function handleBuckets(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
@@ -23,15 +28,16 @@ export async function handleBuckets(req: Request): Promise<Response> {
 
 			const { name: bucketName } = result.data;
 
-			const newBucket = await BucketService.createBucket(user.id, bucketName);
-			const keys = await KeyService.createKey(newBucket.id);
+			const newBucket = await createBucket(user.id, bucketName);
+			const keys = await createKey(newBucket.id);
 
 			const publicUrl = `https://${config.s3Domain}/${bucketName}/file.png`;
 
 			return jsonResponse({ ...keys, publicUrl });
-		} catch (e: any) {
+		} catch (e: unknown) {
 			console.error(e);
-			return errorResponse(e.message || "Internal Error", 500);
+			const message = e instanceof Error ? e.message : "Internal Error";
+			return errorResponse(message, 500);
 		}
 	}
 
@@ -56,14 +62,15 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 
 		try {
 			if (isEmpty) {
-				await BucketService.emptyBucket(bucketName, user.id, user.isAdmin);
+				await emptyBucket(bucketName, user.id, user.isAdmin);
 				return jsonResponse({ message: "Emptied" });
 			}
 
-			await BucketService.deleteBucket(bucketName, user.id, user.isAdmin);
+			await deleteBucket(bucketName, user.id, user.isAdmin);
 			return jsonResponse({ message: "Deleted" });
-		} catch (e: any) {
-			return errorResponse(e.message, 500);
+		} catch (e: unknown) {
+			const message = e instanceof Error ? e.message : "Internal Error";
+			return errorResponse(message, 500);
 		}
 	}
 
@@ -78,15 +85,11 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 
 			const { isPublic } = result.data;
 
-			await BucketService.updateBucketVisibility(
-				bucketName,
-				user.id,
-				isPublic,
-				user.isAdmin,
-			);
+			await updateBucketVisibility(bucketName, user.id, isPublic, user.isAdmin);
 			return jsonResponse({ message: "Updated" });
-		} catch (e: any) {
-			return errorResponse(e.message || "Internal Error", 500);
+		} catch (e: unknown) {
+			const message = e instanceof Error ? e.message : "Internal Error";
+			return errorResponse(message, 500);
 		}
 	}
 

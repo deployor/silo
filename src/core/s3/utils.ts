@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { config } from "../../config";
 import { db } from "../../db";
-import { buckets, users } from "../../db/schema";
+import { buckets, type users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 
 export function getKeyFromRequest(req: Request, bucketName: string): string {
@@ -58,7 +58,11 @@ export function getKeyFromRequest(req: Request, bucketName: string): string {
 		// 2) Block any *encoded* dot-segments that might be normalized later.
 		// We check case-insensitively on the raw key too, to stop bypasses like "%2E%2E".
 		const lowerRaw = rawKey.toLowerCase();
-		if (lowerRaw.includes("%2e%2e") || lowerRaw.includes("%2e.") || lowerRaw.includes(".%2e")) {
+		if (
+			lowerRaw.includes("%2e%2e") ||
+			lowerRaw.includes("%2e.") ||
+			lowerRaw.includes(".%2e")
+		) {
 			throw new Error("Invalid Key: Path traversal detected");
 		}
 	};
@@ -214,6 +218,10 @@ export async function rewriteCopySourceHeader(
 	currentUser: typeof users.$inferSelect,
 	targetBucket: typeof buckets.$inferSelect,
 ): Promise<string | null> {
+	// Used for auth: when copying across buckets, only allow copying from public buckets
+	// (unless you own the bucket). We'll use the current user's id later in the function.
+	const requesterId = currentUser.id;
+
 	const clean = headerValue.startsWith("/")
 		? headerValue.slice(1)
 		: headerValue;
@@ -242,9 +250,14 @@ export async function rewriteCopySourceHeader(
 
 	// Security Check:
 	// 1. Same bucket (Self-Copy) -> Allowed
-	// 2. Different bucket -> Only if source is Public
-	if (sourceBucket.id !== targetBucket.id && !sourceBucket.isPublic) {
-		return null;
+	// 2. Different bucket -> Allowed only if:
+	//    - source bucket is public, OR
+	//    - requester owns the source bucket
+	if (sourceBucket.id !== targetBucket.id) {
+		const requesterOwnsSourceBucket = sourceBucket.userId === requesterId;
+		if (!sourceBucket.isPublic && !requesterOwnsSourceBucket) {
+			return null;
+		}
 	}
 
 	const sanitizedUserId = sourceBucket.userId.replace(/[^a-zA-Z0-9-]/g, "_");

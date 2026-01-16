@@ -2,10 +2,26 @@ import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { deleteBucketContents, getInternalPath } from "../../core/s3/utils";
 import { db } from "../../db";
-import { bucketKeys, buckets, requestLogs, sessions, users } from "../../db/schema";
+import {
+	bucketKeys,
+	buckets,
+	requestLogs,
+	sessions,
+	users,
+} from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
+
+type AdminUpdateUserQuotaBody = {
+	storageLimitBytes?: unknown;
+	egressLimitBytes?: unknown;
+};
+
+type S3ListContentsItem = {
+	Key: string;
+	Size: number;
+};
 
 // --- Handlers ---
 
@@ -111,12 +127,21 @@ async function getUserBuckets(userId: string) {
 }
 
 async function updateUserQuota(userId: string, req: Request) {
-	const body = await req.json();
-	const updateData: any = {};
-	if (body.storageLimitBytes !== undefined)
+	const body = (await req.json()) as AdminUpdateUserQuotaBody;
+	const updateData: Partial<
+		Pick<typeof users.$inferInsert, "storageLimitBytes" | "egressLimitBytes">
+	> = {};
+
+	if (typeof body.storageLimitBytes === "number") {
 		updateData.storageLimitBytes = body.storageLimitBytes;
-	if (body.egressLimitBytes !== undefined)
+	}
+	if (typeof body.egressLimitBytes === "number") {
 		updateData.egressLimitBytes = body.egressLimitBytes;
+	}
+
+	if (Object.keys(updateData).length === 0) {
+		return new Response("No valid quota fields", { status: 400 });
+	}
 
 	await db.update(users).set(updateData).where(eq(users.id, userId));
 	return new Response("Updated", { status: 200 });
@@ -146,7 +171,7 @@ async function getBucketDetails(bucketName: string) {
 		.where(eq(bucketKeys.bucketId, bucket[0].id));
 
 	// List files from S3 (limit 50 for preview)
-	let files = [];
+	let files: Array<{ key: string; size: number; url: string }> = [];
 	try {
 		const owner = await db
 			.select()
@@ -168,10 +193,10 @@ async function getBucketDetails(bucketName: string) {
 				const parser = new XMLParser();
 				const result = parser.parse(xml).ListBucketResult;
 				if (result.Contents) {
-					const contents = Array.isArray(result.Contents)
-						? result.Contents
-						: [result.Contents];
-					files = contents.map((contentItem: any) => ({
+					const contents: S3ListContentsItem[] = Array.isArray(result.Contents)
+						? (result.Contents as S3ListContentsItem[])
+						: ([result.Contents] as S3ListContentsItem[]);
+					files = contents.map((contentItem) => ({
 						key: contentItem.Key.replace(internalPrefix, ""),
 						size: contentItem.Size,
 						url: `/api/admin/buckets/${bucketName}/files/preview?key=${encodeURIComponent(contentItem.Key.replace(internalPrefix, ""))}`,
@@ -432,39 +457,21 @@ async function listLogs(url: URL) {
 
 	const conditions = filters.length > 0 ? and(...filters) : undefined;
 
-	let orderBy: any;
-	switch (sortBy) {
-		case "latencyMs":
-			orderBy =
-				sortOrder === "asc"
-					? asc(requestLogs.latencyMs)
-					: desc(requestLogs.latencyMs);
-			break;
-		case "ingressBytes":
-			orderBy =
-				sortOrder === "asc"
-					? asc(requestLogs.ingressBytes)
-					: desc(requestLogs.ingressBytes);
-			break;
-		case "egressBytes":
-			orderBy =
-				sortOrder === "asc"
-					? asc(requestLogs.egressBytes)
-					: desc(requestLogs.egressBytes);
-			break;
-		case "statusCode":
-			orderBy =
-				sortOrder === "asc"
-					? asc(requestLogs.statusCode)
-					: desc(requestLogs.statusCode);
-			break;
-		default:
-			orderBy =
-				sortOrder === "asc"
-					? asc(requestLogs.createdAt)
-					: desc(requestLogs.createdAt);
-			break;
-	}
+	const orderFn = sortOrder === "asc" ? asc : desc;
+	const orderBy = (() => {
+		switch (sortBy) {
+			case "latencyMs":
+				return orderFn(requestLogs.latencyMs);
+			case "ingressBytes":
+				return orderFn(requestLogs.ingressBytes);
+			case "egressBytes":
+				return orderFn(requestLogs.egressBytes);
+			case "statusCode":
+				return orderFn(requestLogs.statusCode);
+			default:
+				return orderFn(requestLogs.createdAt);
+		}
+	})();
 
 	const logsQuery = db
 		.select({
@@ -573,7 +580,8 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					.where(eq(users.id, targetUserId))
 					.limit(1);
 
-				if (target.length === 0) return new Response("User not found", { status: 404 });
+				if (target.length === 0)
+					return new Response("User not found", { status: 404 });
 
 				// Best-practice: keep session owner in sessions.userId; store impersonation overlay separately.
 				await db
@@ -612,7 +620,11 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				);
 
 				return new Response(
-					JSON.stringify({ ok: true, userId: targetUserId, expiresAt: impersonationExpiresAt.toISOString() }),
+					JSON.stringify({
+						ok: true,
+						userId: targetUserId,
+						expiresAt: impersonationExpiresAt.toISOString(),
+					}),
 					{ headers },
 				);
 			} catch (e) {
@@ -648,7 +660,8 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					.where(eq(sessions.id, sessionId))
 					.limit(1);
 
-				if (sess.length === 0) return new Response("Not found", { status: 404 });
+				if (sess.length === 0)
+					return new Response("Not found", { status: 404 });
 				if (!sess[0].impersonatorUserId || !sess[0].impersonatedUserId) {
 					return new Response("Not impersonating", { status: 400 });
 				}

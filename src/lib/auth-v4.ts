@@ -97,23 +97,39 @@ export async function verifyAwsV4Signature(
 	// - must be sorted by encoded key, then by encoded value
 	// - must preserve duplicate keys (URLSearchParams.get() loses duplicates)
 	// - must percent-encode spaces as %20 (NOT '+')
-	const rawSearch = url.search.startsWith("?") ? url.search.slice(1) : url.search;
+	const rawSearch = url.search.startsWith("?")
+		? url.search.slice(1)
+		: url.search;
 	const pairs: Array<[string, string]> = rawSearch
 		? rawSearch.split("&").map((kv) => {
-			const i = kv.indexOf("=");
-			const k = i === -1 ? kv : kv.slice(0, i);
-			const v = i === -1 ? "" : kv.slice(i + 1);
-			// decode '+' as space for query params
-			const decode = (s: string) => decodeURIComponent(s.replace(/\+/g, "%20"));
-			return [decode(k), decode(v)] as [string, string];
-		})
+				const i = kv.indexOf("=");
+				const k = i === -1 ? kv : kv.slice(0, i);
+				const v = i === -1 ? "" : kv.slice(i + 1);
+				// decode '+' as space for query params
+				const decode = (s: string) =>
+					decodeURIComponent(s.replace(/\+/g, "%20"));
+				return [decode(k), decode(v)] as [string, string];
+			})
 		: [];
 
 	const filtered = pairs.filter(([k]) => k !== "X-Amz-Signature");
 
 	const canonicalQueryString = filtered
-		.map(([k, v]) => [awsUriEncode(k, true), awsUriEncode(v, true)] as [string, string])
-		.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0))
+		.map(
+			([k, v]) =>
+				[awsUriEncode(k, true), awsUriEncode(v, true)] as [string, string],
+		)
+		.sort((a, b) =>
+			a[0] < b[0]
+				? -1
+				: a[0] > b[0]
+					? 1
+					: a[1] < b[1]
+						? -1
+						: a[1] > b[1]
+							? 1
+							: 0,
+		)
 		.map(([k, v]) => `${k}=${v}`)
 		.join("&");
 

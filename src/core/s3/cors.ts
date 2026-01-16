@@ -1,18 +1,33 @@
 import type { buckets } from "../../db/schema";
-import type { CORSConfiguration } from "./types";
+import type { CORSConfiguration, CORSRule } from "./types";
 
-function matchOrigin(origin: string, allowedOrigins: string[]): boolean {
-	return allowedOrigins.some((allowed) => {
-		if (allowed === "*") return true;
-		return allowed === origin;
-	});
+type CorsParseResult =
+	| { ok: true; config: CORSConfiguration }
+	| { ok: false; error: string };
+
+function parseCorsConfig(corsConfigJson: string | null): CorsParseResult {
+	if (!corsConfigJson) return { ok: false, error: "missing" };
+	try {
+		const parsed = JSON.parse(corsConfigJson) as unknown;
+		if (
+			!parsed ||
+			typeof parsed !== "object" ||
+			!("CORSRules" in parsed) ||
+			!Array.isArray((parsed as { CORSRules?: unknown }).CORSRules)
+		) {
+			return { ok: false, error: "invalid" };
+		}
+		return { ok: true, config: parsed as CORSConfiguration };
+	} catch {
+		return { ok: false, error: "invalid_json" };
+	}
 }
 
-function matchMethod(method: string, allowedMethods: string[]): boolean {
-	return allowedMethods.some((allowed) => {
-		if (allowed === "*") return true;
-		return allowed === method;
-	});
+function matchExactOrWildcard(
+	value: string,
+	allowed: readonly string[],
+): boolean {
+	return allowed.some((a) => a === "*" || a === value);
 }
 
 function matchHeaders(
@@ -24,14 +39,45 @@ function matchHeaders(
 
 	const requested = requestHeaders
 		.split(",")
-		.map((h) => h.trim().toLowerCase());
+		.map((h) => h.trim())
+		.filter(Boolean)
+		.map((h) => h.toLowerCase());
 	const allowed = allowedHeaders.map((h) => h.toLowerCase());
 
-	return requested.every((reqHeader) => {
-		return allowed.some((allowedHeader) => {
-			if (allowedHeader === "*") return true;
-			return allowedHeader === reqHeader;
-		});
+	return requested.every((reqHeader) =>
+		matchExactOrWildcard(reqHeader, allowed),
+	);
+}
+
+function varyForCorsPreflight(headers: Headers) {
+	headers.set(
+		"Vary",
+		"Origin, Access-Control-Request-Headers, Access-Control-Request-Method",
+	);
+}
+
+function setAllowOrigin(headers: Headers, origin: string, rule: CORSRule) {
+	// If AllowedOrigins is exactly "*" then allow any origin.
+	// Otherwise echo the Request Origin.
+	if (rule.AllowedOrigins.includes("*") && rule.AllowedOrigins.length === 1) {
+		headers.set("Access-Control-Allow-Origin", "*");
+		return;
+	}
+	headers.set("Access-Control-Allow-Origin", origin);
+}
+
+function findPreflightRule(params: {
+	origin: string;
+	requestMethod: string;
+	requestHeaders: string | null;
+	rules: CORSRule[];
+}): CORSRule | undefined {
+	const { origin, requestMethod, requestHeaders, rules } = params;
+	return rules.find((r) => {
+		const originMatch = matchExactOrWildcard(origin, r.AllowedOrigins);
+		const methodMatch = matchExactOrWildcard(requestMethod, r.AllowedMethods);
+		const headerMatch = matchHeaders(requestHeaders, r.AllowedHeaders);
+		return originMatch && methodMatch && headerMatch;
 	});
 }
 
@@ -39,57 +85,29 @@ export async function handleCorsPreflight(
 	req: Request,
 	bucket: typeof buckets.$inferSelect,
 ) {
-	const corsConfig = bucket.corsConfig
-		? (JSON.parse(bucket.corsConfig) as CORSConfiguration)
-		: null;
-
-	if (!corsConfig || !Array.isArray(corsConfig.CORSRules)) {
-		return new Response(null, { status: 403 });
-	}
+	const parsed = parseCorsConfig(bucket.corsConfig);
+	if (!parsed.ok) return new Response(null, { status: 403 });
 
 	const origin = req.headers.get("Origin");
 	const requestMethod = req.headers.get("Access-Control-Request-Method");
 	const requestHeaders = req.headers.get("Access-Control-Request-Headers");
 
-	if (!origin || !requestMethod) {
-		return new Response(null, { status: 403 });
-	}
+	if (!origin || !requestMethod) return new Response(null, { status: 403 });
 
-	// Find the first matching rule
-	const rule = corsConfig.CORSRules.find((r) => {
-		const originMatch = matchOrigin(origin, r.AllowedOrigins);
-		const methodMatch = matchMethod(requestMethod, r.AllowedMethods);
-		const headerMatch = matchHeaders(requestHeaders, r.AllowedHeaders);
-
-		return originMatch && methodMatch && headerMatch;
+	const rule = findPreflightRule({
+		origin,
+		requestMethod,
+		requestHeaders,
+		rules: parsed.config.CORSRules,
 	});
-
-	if (!rule) {
-		return new Response(null, { status: 403 });
-	}
+	if (!rule) return new Response(null, { status: 403 });
 
 	const headers = new Headers();
-	// S3 returns the specific origin, or "*" if the rule allows "*" and the client didn't send credentials
-	// But typically for S3, it echoes the origin if it matches.
-	// If AllowedOrigins contains "*", we can return "*" OR the origin.
-	// Safest is to return the Origin if it matches.
-	// Security: If the rule allows "*", we should return "*" unless credentials are required.
-	// However, S3 behavior is often to echo the origin.
-	// We must ensure we don't return "*" if Access-Control-Allow-Credentials is true (not supported here yet but good practice).
-
-	if (rule.AllowedOrigins.includes("*") && rule.AllowedOrigins.length === 1) {
-		headers.set("Access-Control-Allow-Origin", "*");
-	} else {
-		headers.set("Access-Control-Allow-Origin", origin);
-	}
+	setAllowOrigin(headers, origin, rule);
 
 	headers.set("Access-Control-Allow-Methods", rule.AllowedMethods.join(", "));
 
 	if (rule.AllowedHeaders && rule.AllowedHeaders.length > 0) {
-		// If the rule has wildcards, we might want to echo the requested headers
-		// But standard S3 often returns the allowed headers list.
-		// However, if the request had Access-Control-Request-Headers, we should probably return what was requested if allowed.
-		// For simplicity and compatibility, let's return the allowed headers from the rule, or if it's *, return requested.
 		if (rule.AllowedHeaders.includes("*") && requestHeaders) {
 			headers.set("Access-Control-Allow-Headers", requestHeaders);
 		} else {
@@ -108,11 +126,7 @@ export async function handleCorsPreflight(
 		headers.set("Access-Control-Max-Age", rule.MaxAgeSeconds.toString());
 	}
 
-	headers.set(
-		"Vary",
-		"Origin, Access-Control-Request-Headers, Access-Control-Request-Method",
-	);
-
+	varyForCorsPreflight(headers);
 	return new Response(null, { status: 200, headers });
 }
 
@@ -122,40 +136,28 @@ export function getCorsHeaders(
 ): Headers {
 	const origin = req.headers.get("Origin");
 	const corsHeaders = new Headers();
+	if (!origin) return corsHeaders;
 
-	if (origin && bucket.corsConfig) {
-		try {
-			const corsConfig = JSON.parse(bucket.corsConfig) as CORSConfiguration;
-			if (Array.isArray(corsConfig.CORSRules)) {
-				const rule = corsConfig.CORSRules.find((r) => {
-					const originMatch = matchOrigin(origin, r.AllowedOrigins);
-					// For actual requests, we check the method of the request itself
-					const methodMatch = matchMethod(req.method, r.AllowedMethods);
-					return originMatch && methodMatch;
-				});
+	const parsed = parseCorsConfig(bucket.corsConfig);
+	if (!parsed.ok) return corsHeaders;
 
-				if (rule) {
-					if (
-						rule.AllowedOrigins.includes("*") &&
-						rule.AllowedOrigins.length === 1
-					) {
-						corsHeaders.set("Access-Control-Allow-Origin", "*");
-					} else {
-						corsHeaders.set("Access-Control-Allow-Origin", origin);
-					}
+	const rule = parsed.config.CORSRules.find((r) => {
+		const originMatch = matchExactOrWildcard(origin, r.AllowedOrigins);
+		const methodMatch = matchExactOrWildcard(req.method, r.AllowedMethods);
+		return originMatch && methodMatch;
+	});
 
-					if (rule.ExposeHeaders && rule.ExposeHeaders.length > 0) {
-						corsHeaders.set(
-							"Access-Control-Expose-Headers",
-							rule.ExposeHeaders.join(", "),
-						);
-					}
-					corsHeaders.set("Vary", "Origin");
-				}
-			}
-		} catch (e) {
-			console.error("Failed to parse CORS config", e);
-		}
+	if (!rule) return corsHeaders;
+
+	setAllowOrigin(corsHeaders, origin, rule);
+
+	if (rule.ExposeHeaders && rule.ExposeHeaders.length > 0) {
+		corsHeaders.set(
+			"Access-Control-Expose-Headers",
+			rule.ExposeHeaders.join(", "),
+		);
 	}
+
+	corsHeaders.set("Vary", "Origin");
 	return corsHeaders;
 }

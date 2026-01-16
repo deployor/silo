@@ -1,16 +1,16 @@
 import {
-	S3Client,
-	PutObjectCommand,
-	GetObjectCommand,
-	ListObjectsV2Command,
-	GetBucketAclCommand,
-	PutBucketAclCommand,
-	GetBucketPolicyCommand,
-	PutBucketPolicyCommand,
-	GetBucketVersioningCommand,
-	PutBucketVersioningCommand,
 	CreateBucketCommand,
 	DeleteBucketCommand,
+	GetBucketAclCommand,
+	GetBucketPolicyCommand,
+	GetBucketVersioningCommand,
+	GetObjectCommand,
+	ListObjectsV2Command,
+	PutBucketAclCommand,
+	PutBucketPolicyCommand,
+	PutBucketVersioningCommand,
+	PutObjectCommand,
+	S3Client,
 } from "@aws-sdk/client-s3";
 
 async function runTest() {

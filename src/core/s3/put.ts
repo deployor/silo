@@ -56,11 +56,22 @@ export async function handlePutRequest(
 				throw new Error("Invalid CORS Configuration");
 			}
 
-			const rulesArray = Array.isArray(parsed.CORSConfiguration.CORSRule)
+			type ParsedCorsRule = {
+				ID?: string;
+				AllowedOrigin?: string | string[];
+				AllowedMethod?: string | string[];
+				AllowedHeader?: string | string[];
+				ExposeHeader?: string | string[];
+				MaxAgeSeconds?: number;
+			};
+
+			const rulesArray: ParsedCorsRule[] = Array.isArray(
+				parsed.CORSConfiguration.CORSRule,
+			)
 				? parsed.CORSConfiguration.CORSRule
 				: [parsed.CORSConfiguration.CORSRule];
 
-			const rules = rulesArray.map((r: any) => {
+			const rules = rulesArray.map((r) => {
 				const allowedOrigins = r.AllowedOrigin
 					? Array.isArray(r.AllowedOrigin)
 						? r.AllowedOrigin
@@ -154,12 +165,16 @@ export async function handlePutRequest(
 			const contentLengthHeader = req.headers.get("content-length");
 			const declared = contentLengthHeader ? Number(contentLengthHeader) : null;
 			if (declared !== null && (!Number.isFinite(declared) || declared < 0)) {
-				return S3Errors.InvalidRequest("Invalid Content-Length header").toResponse();
+				return S3Errors.InvalidRequest(
+					"Invalid Content-Length header",
+				).toResponse();
 			}
 
 			if (declared !== null) {
 				actualSize = declared;
-				upstreamHeaders.set("Content-Length", contentLengthHeader!);
+				if (contentLengthHeader) {
+					upstreamHeaders.set("Content-Length", contentLengthHeader);
+				}
 
 				if (limit !== null) {
 					if (
