@@ -166,7 +166,8 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 					maxBucketsPerUser: settings.defaultMaxBucketsPerUser,
 					maxKeysPerBucket: settings.defaultMaxKeysPerBucket,
 					defaultStorageLimitBytes: settings.defaultStorageLimitBytes,
-					defaultEgressLimitBytes: settings.defaultEgressLimitBytes,
+					egressMultiplier: settings.egressMultiplier,
+					minEgressBytes: settings.minEgressBytes,
 				},
 				buckets: bucketsWithKeys.map((b) => ({
 					name: b.name,

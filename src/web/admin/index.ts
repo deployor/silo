@@ -773,7 +773,8 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 
 			const schema = z.object({
 				defaultStorageLimitBytes: z.number().int().min(0),
-				defaultEgressLimitBytes: z.number().int().min(0),
+				egressMultiplier: z.number().int().min(0).max(1000),
+				minEgressBytes: z.number().int().min(0),
 				defaultMaxBucketsPerUser: z.number().int().min(1).max(10000),
 				defaultMaxKeysPerBucket: z.number().int().min(1).max(10000),
 			});

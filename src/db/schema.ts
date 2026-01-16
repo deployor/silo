@@ -12,12 +12,12 @@ export const users = pgTable("users", {
 	id: text("id").primaryKey(),
 	email: text("email").notNull().unique(),
 	slackId: text("slack_id"),
-	storageLimitBytes: bigint("storage_limit_bytes", { mode: "number" }).default(
-		1073741824,
-	),
+	// Null means "use global default".
+	storageLimitBytes: bigint("storage_limit_bytes", { mode: "number" }),
 	storageUsageBytes: bigint("storage_usage_bytes", { mode: "number" })
 		.notNull()
 		.default(0),
+	// Null means "use global default formula".
 	egressLimitBytes: bigint("egress_limit_bytes", { mode: "number" }),
 	ingressBytes: bigint("ingress_bytes", { mode: "number" })
 		.notNull()
@@ -148,9 +148,13 @@ export const appSettings = pgTable("app_settings", {
 	defaultStorageLimitBytes: bigint("default_storage_limit_bytes", {
 		mode: "number",
 	}).notNull().default(1073741824),
-	defaultEgressLimitBytes: bigint("default_egress_limit_bytes", {
-		mode: "number",
-	}).notNull().default(0),
+	// Egress default is formula-based: max(minEgressBytes, storageBytes * egressMultiplier)
+	egressMultiplier: bigint("egress_multiplier", { mode: "number" })
+		.notNull()
+		.default(3),
+	minEgressBytes: bigint("min_egress_bytes", { mode: "number" })
+		.notNull()
+		.default(10737418240),
 	defaultMaxBucketsPerUser: bigint("default_max_buckets_per_user", {
 		mode: "number",
 	}).notNull().default(50),
