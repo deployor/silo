@@ -46,21 +46,33 @@
       </div>
 
       <div class="bg-black/30 p-6 rounded-xl border border-white/10">
-        <h4 class="text-white font-bold mb-1">Default Egress Quota</h4>
-        <p class="text-xs text-text-muted mb-4">Used when a user does not have an explicit per-user egress limit.</p>
-        <div class="flex gap-2 items-center">
-          <input id="defaultEgressLimitAmount" type="number" min="0" step="0.01" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono" placeholder="Amount" />
-          <select id="defaultEgressLimitUnit" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white cursor-pointer font-mono">
-            <option value="1">Bytes</option>
-            <option value="1024">KB</option>
-            <option value="1048576">MB</option>
-            <option value="1073741824">GB</option>
-            <option value="1099511627776">TB</option>
-            <option value="1125899906842624">PB</option>
-          </select>
+        <h4 class="text-white font-bold mb-1">Default Egress Limit (formula)</h4>
+        <p class="text-xs text-text-muted mb-4">When a user has no explicit egress limit, we compute: <span class="font-mono">max(minEgress, storage × multiplier)</span>.</p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <div class="text-xs text-text-muted mb-1 font-bold uppercase tracking-wider">Multiplier</div>
+            <input id="egressMultiplier" type="number" min="0" step="1" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono" placeholder="3" />
+          </div>
+
+          <div>
+            <div class="text-xs text-text-muted mb-1 font-bold uppercase tracking-wider">Minimum Egress</div>
+            <div class="flex gap-2 items-center">
+              <input id="minEgressAmount" type="number" min="0" step="0.01" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono" placeholder="10" />
+              <select id="minEgressUnit" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white cursor-pointer font-mono">
+                <option value="1">Bytes</option>
+                <option value="1024">KB</option>
+                <option value="1048576">MB</option>
+                <option value="1073741824">GB</option>
+                <option value="1099511627776">TB</option>
+                <option value="1125899906842624">PB</option>
+              </select>
+            </div>
+            <input id="minEgressBytes" type="hidden" />
+          </div>
         </div>
-        <input id="defaultEgressLimitBytes" type="hidden" />
-        <p class="text-[11px] text-text-muted mt-2">Stored as bytes.</p>
+
+        <p class="text-[11px] text-text-muted mt-3">Example: if storage is <span class="font-mono">1GB</span>, multiplier is <span class="font-mono">3</span>, and min is <span class="font-mono">10GB</span>, default egress becomes <span class="font-mono">10GB</span>.</p>
       </div>
 
       <div class="bg-black/30 p-6 rounded-xl border border-white/10">
@@ -88,9 +100,10 @@
     defaultStorageLimitAmount: document.getElementById('defaultStorageLimitAmount'),
     defaultStorageLimitUnit: document.getElementById('defaultStorageLimitUnit'),
 
-    defaultEgressLimitBytes: document.getElementById('defaultEgressLimitBytes'),
-    defaultEgressLimitAmount: document.getElementById('defaultEgressLimitAmount'),
-    defaultEgressLimitUnit: document.getElementById('defaultEgressLimitUnit'),
+    egressMultiplier: document.getElementById('egressMultiplier'),
+    minEgressBytes: document.getElementById('minEgressBytes'),
+    minEgressAmount: document.getElementById('minEgressAmount'),
+    minEgressUnit: document.getElementById('minEgressUnit'),
 
     defaultMaxBucketsPerUser: document.getElementById('defaultMaxBucketsPerUser'),
     defaultMaxKeysPerBucket: document.getElementById('defaultMaxKeysPerBucket'),
@@ -139,10 +152,11 @@
     fields.defaultStorageLimitAmount.value = String(bestStorage.value);
     fields.defaultStorageLimitUnit.value = String(bestStorage.unit);
 
-    fields.defaultEgressLimitBytes.value = String(data.defaultEgressLimitBytes);
-    const bestEgress = getBestUnit(Number(data.defaultEgressLimitBytes));
-    fields.defaultEgressLimitAmount.value = String(bestEgress.value);
-    fields.defaultEgressLimitUnit.value = String(bestEgress.unit);
+    fields.egressMultiplier.value = String(data.egressMultiplier);
+    fields.minEgressBytes.value = String(data.minEgressBytes);
+    const bestMinEgress = getBestUnit(Number(data.minEgressBytes));
+    fields.minEgressAmount.value = String(bestMinEgress.value);
+    fields.minEgressUnit.value = String(bestMinEgress.unit);
 
     fields.defaultMaxBucketsPerUser.value = data.defaultMaxBucketsPerUser;
     fields.defaultMaxKeysPerBucket.value = data.defaultMaxKeysPerBucket;
@@ -155,11 +169,12 @@
     saveBtn.disabled = true;
 
     syncBytes(fields.defaultStorageLimitAmount, fields.defaultStorageLimitUnit, fields.defaultStorageLimitBytes);
-    syncBytes(fields.defaultEgressLimitAmount, fields.defaultEgressLimitUnit, fields.defaultEgressLimitBytes);
+    syncBytes(fields.minEgressAmount, fields.minEgressUnit, fields.minEgressBytes);
 
     const payload = {
       defaultStorageLimitBytes: Number(fields.defaultStorageLimitBytes.value),
-      defaultEgressLimitBytes: Number(fields.defaultEgressLimitBytes.value),
+      egressMultiplier: Number(fields.egressMultiplier.value),
+      minEgressBytes: Number(fields.minEgressBytes.value),
       defaultMaxBucketsPerUser: Number(fields.defaultMaxBucketsPerUser.value),
       defaultMaxKeysPerBucket: Number(fields.defaultMaxKeysPerBucket.value),
     };
@@ -184,8 +199,8 @@
   fields.defaultStorageLimitAmount.addEventListener('input', () => syncBytes(fields.defaultStorageLimitAmount, fields.defaultStorageLimitUnit, fields.defaultStorageLimitBytes));
   fields.defaultStorageLimitUnit.addEventListener('change', () => syncBytes(fields.defaultStorageLimitAmount, fields.defaultStorageLimitUnit, fields.defaultStorageLimitBytes));
 
-  fields.defaultEgressLimitAmount.addEventListener('input', () => syncBytes(fields.defaultEgressLimitAmount, fields.defaultEgressLimitUnit, fields.defaultEgressLimitBytes));
-  fields.defaultEgressLimitUnit.addEventListener('change', () => syncBytes(fields.defaultEgressLimitAmount, fields.defaultEgressLimitUnit, fields.defaultEgressLimitBytes));
+  fields.minEgressAmount.addEventListener('input', () => syncBytes(fields.minEgressAmount, fields.minEgressUnit, fields.minEgressBytes));
+  fields.minEgressUnit.addEventListener('change', () => syncBytes(fields.minEgressAmount, fields.minEgressUnit, fields.minEgressBytes));
 
   saveBtn.addEventListener('click', saveSettings);
   reloadBtn.addEventListener('click', loadSettings);

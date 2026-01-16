@@ -4,14 +4,16 @@ import { appSettings } from "../db/schema";
 
 export type AppSettings = {
 	defaultStorageLimitBytes: number;
-	defaultEgressLimitBytes: number;
+	egressMultiplier: number;
+	minEgressBytes: number;
 	defaultMaxBucketsPerUser: number;
 	defaultMaxKeysPerBucket: number;
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
 	defaultStorageLimitBytes: 1_073_741_824, // 1GB
-	defaultEgressLimitBytes: 0,
+	egressMultiplier: 3,
+	minEgressBytes: 10 * 1024 * 1024 * 1024, // 10GB
 	defaultMaxBucketsPerUser: 50,
 	defaultMaxKeysPerBucket: 20,
 };
@@ -27,7 +29,8 @@ async function ensureRowExists() {
 		.values({
 			id: "global",
 			defaultStorageLimitBytes: DEFAULT_APP_SETTINGS.defaultStorageLimitBytes,
-			defaultEgressLimitBytes: DEFAULT_APP_SETTINGS.defaultEgressLimitBytes,
+			egressMultiplier: DEFAULT_APP_SETTINGS.egressMultiplier,
+			minEgressBytes: DEFAULT_APP_SETTINGS.minEgressBytes,
 			defaultMaxBucketsPerUser: DEFAULT_APP_SETTINGS.defaultMaxBucketsPerUser,
 			defaultMaxKeysPerBucket: DEFAULT_APP_SETTINGS.defaultMaxKeysPerBucket,
 		})
@@ -47,7 +50,8 @@ export async function getAppSettings(force = false): Promise<AppSettings> {
 	const value: AppSettings = row
 		? {
 			defaultStorageLimitBytes: Number(row.defaultStorageLimitBytes),
-			defaultEgressLimitBytes: Number(row.defaultEgressLimitBytes),
+			egressMultiplier: Number(row.egressMultiplier),
+			minEgressBytes: Number(row.minEgressBytes),
 			defaultMaxBucketsPerUser: Number(row.defaultMaxBucketsPerUser),
 			defaultMaxKeysPerBucket: Number(row.defaultMaxKeysPerBucket),
 		}
@@ -69,7 +73,8 @@ export async function updateAppSettings(patch: Partial<AppSettings>) {
 		.update(appSettings)
 		.set({
 			defaultStorageLimitBytes: next.defaultStorageLimitBytes,
-			defaultEgressLimitBytes: next.defaultEgressLimitBytes,
+			egressMultiplier: next.egressMultiplier,
+			minEgressBytes: next.minEgressBytes,
 			defaultMaxBucketsPerUser: next.defaultMaxBucketsPerUser,
 			defaultMaxKeysPerBucket: next.defaultMaxKeysPerBucket,
 			updatedAt: new Date(),
