@@ -25,10 +25,22 @@ type S3ListContentsItem = {
 
 // --- Handlers ---
 
-async function serveAdminDashboard(req: Request) {
+async function serveAdminUsersPage(req: Request) {
 	const user = await getCurrentUser(req);
-	const html = await render("admin", {
-		title: "Admin Dashboard",
+	const html = await render("admin-users", {
+		title: "Admin Users",
+		user,
+		pageTitle: "ADMIN",
+	});
+	return new Response(html, {
+		headers: { "Content-Type": "text/html" },
+	});
+}
+
+async function serveAdminLogsPage(req: Request) {
+	const user = await getCurrentUser(req);
+	const html = await render("admin-logs", {
+		title: "Admin Logs",
 		user,
 		pageTitle: "ADMIN",
 	});
@@ -539,9 +551,19 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	const url = new URL(req.url);
 	const path = url.pathname;
 
-	// Serve Admin Dashboard
+	// Admin UI Pages
+	// Keep /admin as a convenience redirect to the Users page.
 	if (path === "/admin" || path === "/admin/") {
-		return serveAdminDashboard(req);
+		return new Response(null, {
+			status: 302,
+			headers: { Location: "/admin/users" },
+		});
+	}
+	if (path === "/admin/users") {
+		return serveAdminUsersPage(req);
+	}
+	if (path === "/admin/logs") {
+		return serveAdminLogsPage(req);
 	}
 
 	// API Routes
