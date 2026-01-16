@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { config } from "../../../config";
+import { getAppSettings } from "../../../services/settings-service";
 import { getInternalPath } from "../../../core/s3/utils";
 import { db } from "../../../db";
 import { buckets, requestLogs, users } from "../../../db/schema";
@@ -75,7 +76,7 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 				.from(buckets)
 				.where(eq(buckets.userId, user.id));
 			const currentUsage = Number(usageResult[0]?.total) || 0;
-			const limit = user.storageLimitBytes || 1073741824; // Default 1GB
+			const limit = user.storageLimitBytes || (await getAppSettings()).defaultStorageLimitBytes;
 
 			if (currentUsage + file.size > limit) {
 				return errorResponse("Quota exceeded", 403);
@@ -142,12 +143,14 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 		if (path === "/api/dashboard/stats") {
 			const bucketsWithKeys = await getBucketsForUser(user.id);
 
+			const settings = await getAppSettings();
 			const responseData = {
 				user: {
 					id: user.id,
 					slackId: user.slackId,
 					storageUsage: Number(user.storageUsageBytes) || 0,
-					storageLimit: Number(user.storageLimitBytes) || 1073741824,
+					storageLimit:
+						Number(user.storageLimitBytes) || settings.defaultStorageLimitBytes,
 					egressLimit:
 						user.egressLimitBytes !== null
 							? Number(user.egressLimitBytes)
@@ -158,6 +161,12 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 						(Number(user.ingressBytes) || 0) + (Number(user.egressBytes) || 0),
 					totalRequests: Number(user.totalRequests) || 0,
 					isAdmin: user.isAdmin,
+				},
+				limits: {
+					maxBucketsPerUser: settings.defaultMaxBucketsPerUser,
+					maxKeysPerBucket: settings.defaultMaxKeysPerBucket,
+					defaultStorageLimitBytes: settings.defaultStorageLimitBytes,
+					defaultEgressLimitBytes: settings.defaultEgressLimitBytes,
 				},
 				buckets: bucketsWithKeys.map((b) => ({
 					name: b.name,

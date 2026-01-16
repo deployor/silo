@@ -6,6 +6,7 @@ import {
 } from "../core/s3/utils";
 import { db } from "../db";
 import { bucketKeys, buckets, users } from "../db/schema";
+import { getAppSettings } from "./settings-service";
 
 export type CorsRule = {
 	ID?: string;
@@ -54,12 +55,15 @@ export async function createBucket(
 		throw new Error("Bucket name is reserved for system use");
 	}
 
+	const settings = await getAppSettings();
+	const maxBuckets = settings.defaultMaxBucketsPerUser;
+
 	const userBuckets = await db
 		.select()
 		.from(buckets)
 		.where(eq(buckets.userId, userId));
-	if (userBuckets.length >= 50) {
-		throw new Error("Bucket limit reached");
+	if (userBuckets.length >= maxBuckets) {
+		throw new Error(`Bucket limit reached (${maxBuckets})`);
 	}
 
 	const existing = await db

@@ -2,6 +2,7 @@ import { and, eq, gt, sql } from "drizzle-orm";
 import { config } from "../config";
 import { db } from "../db";
 import { buckets, sessions, users } from "../db/schema";
+import { getAppSettings } from "../services/settings-service";
 import { context } from "./context";
 
 export async function getCurrentUser(req: Request) {
@@ -127,7 +128,13 @@ export async function getCurrentUser(req: Request) {
 				u.ingressBytes = Number(u.ingressBytes) || 0;
 				u.egressBytes = Number(u.egressBytes) || 0;
 				u.totalRequests = Number(u.totalRequests) || 0;
-				u.storageLimitBytes = Number(u.storageLimitBytes) || 1073741824;
+
+				const settings = await getAppSettings();
+				u.storageLimitBytes =
+					u.storageLimitBytes === null
+						? settings.defaultStorageLimitBytes
+						: Number(u.storageLimitBytes) || settings.defaultStorageLimitBytes;
+
 				if (u.egressLimitBytes !== null) {
 					u.egressLimitBytes = Number(u.egressLimitBytes);
 				}

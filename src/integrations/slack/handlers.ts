@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { getAppSettings } from "../../services/settings-service";
 import {
 	Actions,
 	Button,
@@ -71,12 +72,24 @@ export async function handleAppHomeOpened(event: { user: string }) {
 		return;
 	}
 
+	const settings = await getAppSettings();
+
 	const userBuckets = await db
 		.select()
 		.from(buckets)
 		.where(eq(buckets.userId, user.id));
 
-	await publishView(slackId, homeView(user, userBuckets));
+	await publishView(
+		slackId,
+		homeView(
+			user,
+			userBuckets,
+			{
+				defaultMaxBucketsPerUser: settings.defaultMaxBucketsPerUser,
+				defaultMaxKeysPerBucket: settings.defaultMaxKeysPerBucket,
+			},
+		),
+	);
 }
 
 type SlackBlock = Record<string, unknown>;
@@ -168,15 +181,17 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			};
 		}
 
+		const settings = await getAppSettings();
+
 		const userBuckets = await db
 			.select()
 			.from(buckets)
 			.where(eq(buckets.userId, user.id));
-		if (userBuckets.length >= 50) {
+		if (userBuckets.length >= settings.defaultMaxBucketsPerUser) {
 			return {
 				response_action: "errors",
 				errors: {
-					bucket_name_block: "Bucket limit reached (50).",
+					bucket_name_block: `Bucket limit reached (${settings.defaultMaxBucketsPerUser}).`,
 				},
 			};
 		}
@@ -232,7 +247,12 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 
 		return {
 			response_action: "push",
-			view: manageKeysModal(newBucket[0], keys, newKeyObj),
+			view: manageKeysModal(
+				newBucket[0],
+				keys,
+				{ defaultMaxKeysPerBucket: (await getAppSettings()).defaultMaxKeysPerBucket },
+				newKeyObj,
+			),
 		};
 	}
 
@@ -249,7 +269,14 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 				.select()
 				.from(bucketKeys)
 				.where(eq(bucketKeys.bucketId, bucketId));
-			await openModal(payload.trigger_id, manageKeysModal(bucket[0], keys));
+			await openModal(
+				payload.trigger_id,
+				manageKeysModal(
+					bucket[0],
+					keys,
+					{ defaultMaxKeysPerBucket: (await getAppSettings()).defaultMaxKeysPerBucket },
+				),
+			);
 		}
 	}
 
@@ -268,7 +295,8 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 				.from(bucketKeys)
 				.where(eq(bucketKeys.bucketId, bucketId));
 
-			const MAX_KEYS_PER_BUCKET = 20;
+			const settings = await getAppSettings();
+			const MAX_KEYS_PER_BUCKET = settings.defaultMaxKeysPerBucket;
 			if (keysBefore.length >= MAX_KEYS_PER_BUCKET) {
 				await openModal(
 					payload.trigger_id,
@@ -315,7 +343,12 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 				},
 				body: JSON.stringify({
 					view_id: payload.view.id,
-					view: manageKeysModal(bucket[0], keys, newKeyObj),
+					view: manageKeysModal(
+						bucket[0],
+						keys,
+						{ defaultMaxKeysPerBucket: (await getAppSettings()).defaultMaxKeysPerBucket },
+						newKeyObj,
+					),
 				}),
 			});
 		}
@@ -347,7 +380,11 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 				},
 				body: JSON.stringify({
 					view_id: payload.view.id,
-					view: manageKeysModal(bucket[0], keys),
+					view: manageKeysModal(
+						bucket[0],
+						keys,
+						{ defaultMaxKeysPerBucket: (await getAppSettings()).defaultMaxKeysPerBucket },
+					),
 				}),
 			});
 		}
@@ -409,12 +446,25 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 		actionValue
 	) {
 		const page = parseInt(actionValue, 10);
+		const settings = await getAppSettings();
+
 		const userBuckets = await db
 			.select()
 			.from(buckets)
 			.where(eq(buckets.userId, user.id));
 
-		await publishView(payload.user.id, homeView(user, userBuckets, page));
+		await publishView(
+			payload.user.id,
+			homeView(
+				user,
+				userBuckets,
+				{
+					defaultMaxBucketsPerUser: settings.defaultMaxBucketsPerUser,
+					defaultMaxKeysPerBucket: settings.defaultMaxKeysPerBucket,
+				},
+				page,
+			),
+		);
 	}
 
 	if (actionId === "delete_cdn_file" && actionValue) {

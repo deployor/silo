@@ -29,7 +29,12 @@ function formatBytes(bytes: number) {
 	return `${parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
 }
 
-export const homeView = (user: User, buckets: Bucket[], page = 0) => {
+export const homeView = (
+	user: User,
+	buckets: Bucket[],
+	settings: { defaultMaxBucketsPerUser: number; defaultMaxKeysPerBucket: number },
+	page = 0,
+) => {
 	const limit = user.storageLimitBytes ?? 0;
 	const usagePercent = limit > 0 ? (user.storageUsageBytes / limit) * 100 : 0;
 
@@ -62,7 +67,7 @@ export const homeView = (user: User, buckets: Bucket[], page = 0) => {
 			Section({ text: "*:ms-increasing-graph: Usage Overview*" }),
 			Section().fields(
 				`*Storage Used*\n${formatBytes(user.storageUsageBytes)} / ${formatBytes(user.storageLimitBytes ?? 0)} (${usagePercent.toFixed(1)}%)`,
-				`*Active Buckets*\n${buckets.length} / 50`,
+				`*Active Buckets*\n${buckets.length} / ${settings.defaultMaxBucketsPerUser}`,
 			),
 			Section().fields(
 				`*Total Requests*\n${user.totalRequests.toLocaleString()}`,
@@ -181,6 +186,7 @@ export const createBucketModal = () => {
 export const manageKeysModal = (
 	bucket: Bucket,
 	keys: BucketKey[],
+	settings: { defaultMaxKeysPerBucket: number },
 	newKey?: { accessKey: string; secretKey: string },
 ) => {
 	return Modal({
@@ -195,7 +201,7 @@ export const manageKeysModal = (
 			}).accessory(
 				Button({
 					text:
-						keys.length >= 20
+						keys.length >= settings.defaultMaxKeysPerBucket
 							? "Key Limit Reached"
 							: "Make New Key :blobby-lock:",
 					actionId: "generate_key",
@@ -203,9 +209,9 @@ export const manageKeysModal = (
 				}).primary(),
 			),
 			Context().elements(
-				keys.length >= 20
-					? `Keys: ${keys.length} / 20 (limit reached… delete one to create another)`
-					: `Keys: ${keys.length} / 20`,
+				keys.length >= settings.defaultMaxKeysPerBucket
+					? `Keys: ${keys.length} / ${settings.defaultMaxKeysPerBucket} (limit reached… delete one to create another)`
+					: `Keys: ${keys.length} / ${settings.defaultMaxKeysPerBucket}`,
 			),
 			Divider(),
 			newKey

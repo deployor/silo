@@ -58,7 +58,7 @@
     <div>
       <h2 class="text-xl font-bold text-white">Your Buckets</h2>
       <p class="text-text-muted text-sm mt-1">
-        <span id="bucket-count" class="text-white font-mono">0</span> / 50
+        <span id="bucket-count" class="text-white font-mono">0</span> / <span id="bucket-limit" class="text-white font-mono">0</span>
         buckets used
       </p>
     </div>
@@ -187,7 +187,7 @@
 
       <div class="flex items-center justify-between">
         <div class="text-xs text-text-muted font-mono">
-          <span id="manage-keys-count" class="text-white">0</span><span class="text-text-muted"> / 20 keys</span>
+          <span id="manage-keys-count" class="text-white">0</span><span class="text-text-muted"> / <span id="manage-keys-limit">0</span> keys</span>
         </div>
         <button id="manage-keys-generate-btn" onclick="generateKeyFromModal()" class="bg-hc-blue hover:bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105 card-shadow">
           + Generate New Key
@@ -357,7 +357,7 @@
 
       // Update Storage Stats
       const storageUsage = Number(data.user.storageUsage) || 0;
-      const storageLimit = Number(data.user.storageLimit) || 1073741824; // 1GB default
+      const storageLimit = Number(data.user.storageLimit) || 1073741824; // fallback; server should provide default
 
       const limitGB = (storageLimit / (1024 * 1024 * 1024)).toFixed(0);
       
@@ -411,6 +411,8 @@
 
       // Update Buckets List
       document.getElementById("bucket-count").textContent = data.buckets ? data.buckets.length : 0;
+      const bucketLimitEl = document.getElementById("bucket-limit");
+      if (bucketLimitEl) bucketLimitEl.textContent = String(Number(data?.limits?.maxBucketsPerUser) || 0);
       const tbody = document.getElementById("buckets-table");
       tbody.innerHTML = data.buckets
         .map(
@@ -608,7 +610,7 @@
                 const err = await res.text();
                 // Special-case the key limit for a nicer UX.
                 if (res.status === 429 || err.includes("Key limit reached")) {
-                    alert(err || "Key limit reached (20). Delete one to create another.");
+                    alert(err || "Key limit reached. Delete one to create another.");
                     return;
                 }
                 throw new Error(err);
@@ -660,13 +662,17 @@
     const countEl = document.getElementById('manage-keys-count');
     if (countEl) countEl.textContent = String(keyCount);
 
+    const limitEl = document.getElementById('manage-keys-limit');
+    if (limitEl) limitEl.textContent = String(Number(currentDashboardData?.limits?.maxKeysPerBucket) || 0);
+
     const genBtn = document.getElementById('manage-keys-generate-btn');
     if (genBtn) {
-        const atLimit = keyCount >= 20;
+        const keyLimit = Number(currentDashboardData?.limits?.maxKeysPerBucket) || 0;
+        const atLimit = keyLimit > 0 ? keyCount >= keyLimit : false;
         genBtn.disabled = atLimit;
         genBtn.classList.toggle('opacity-50', atLimit);
         genBtn.classList.toggle('cursor-not-allowed', atLimit);
-        genBtn.title = atLimit ? 'Key limit reached (20). Delete one to create another.' : '';
+        genBtn.title = atLimit ? `Key limit reached (${keyLimit}). Delete one to create another.` : '';
     }
 
     renderManageKeysTable(bucket);

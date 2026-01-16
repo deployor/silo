@@ -141,3 +141,21 @@ export const requestLogs = pgTable(
 		};
 	},
 );
+
+// Global settings (single-row table)
+export const appSettings = pgTable("app_settings", {
+	id: text("id").primaryKey().default("global"),
+	defaultStorageLimitBytes: bigint("default_storage_limit_bytes", {
+		mode: "number",
+	}).notNull().default(1073741824),
+	defaultEgressLimitBytes: bigint("default_egress_limit_bytes", {
+		mode: "number",
+	}).notNull().default(0),
+	defaultMaxBucketsPerUser: bigint("default_max_buckets_per_user", {
+		mode: "number",
+	}).notNull().default(50),
+	defaultMaxKeysPerBucket: bigint("default_max_keys_per_bucket", {
+		mode: "number",
+	}).notNull().default(20),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});

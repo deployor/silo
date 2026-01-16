@@ -1,18 +1,20 @@
 import { count, eq } from "drizzle-orm";
 import { db } from "../db";
 import { bucketKeys, buckets } from "../db/schema";
-
-const MAX_KEYS_PER_BUCKET = 20;
+import { getAppSettings } from "./settings-service";
 
 export async function createKey(bucketId: string) {
+	const settings = await getAppSettings();
+	const maxKeys = settings.defaultMaxKeysPerBucket;
+
 	const existingCount = await db
 		.select({ count: count() })
 		.from(bucketKeys)
 		.where(eq(bucketKeys.bucketId, bucketId));
 
-	if ((existingCount[0]?.count ?? 0) >= MAX_KEYS_PER_BUCKET) {
+	if ((existingCount[0]?.count ?? 0) >= maxKeys) {
 		throw new Error(
-			`Key limit reached (${MAX_KEYS_PER_BUCKET}). Delete an existing key to create a new one.`,
+			`Key limit reached (${maxKeys}). Delete an existing key to create a new one.`,
 		);
 	}
 
