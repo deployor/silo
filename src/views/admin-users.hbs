@@ -94,7 +94,7 @@
             <h4 class="text-white font-bold mb-4">Egress Limit</h4>
             <div class="flex flex-col gap-3">
                 <select id="modal-egress-mode" class="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white cursor-pointer w-full" onchange="toggleEgressInput()">
-                    <option value="default">Default (Max(10GB, 3x Storage))</option>
+                    <option value="default">Default (max(minEgress, storage × multiplier))</option>
                     <option value="unlimited">Unlimited</option>
                     <option value="custom">Custom Amount</option>
                 </select>
@@ -364,7 +364,7 @@
                         <span class="text-white">${formatBytes(u.egressBytes)}</span>
                         <span class="text-text-muted">/ ${
                             u.egressLimitBytes === null
-                                ? formatBytes(Math.max(u.storageLimitBytes * 3, 10 * 1024 * 1024 * 1024)) + ' (Def)'
+                                ? 'Default (formula)'
                                 : u.egressLimitBytes === -1
                                     ? 'Unlimited'
                                     : formatBytes(u.egressLimitBytes)
@@ -372,9 +372,9 @@
                     </div>
                     <div class="w-24 bg-white/10 rounded-full h-1.5 mt-1 overflow-hidden">
                         <div class="bg-hc-red h-1.5 rounded-full" style="width: ${
-                            u.egressLimitBytes === -1
+                            (u.egressLimitBytes === -1 || u.egressLimitBytes === null)
                                 ? 0
-                                : Math.min((u.egressBytes / (u.egressLimitBytes === null ? Math.max(u.storageLimitBytes * 3, 10 * 1024 * 1024 * 1024) : u.egressLimitBytes)) * 100, 100)
+                                : Math.min((u.egressBytes / u.egressLimitBytes) * 100, 100)
                         }%"></div>
                     </div>
                 </td>
@@ -520,7 +520,7 @@
             } else {
                 // Default
                 limit = null;
-                message = "Egress limit set to Default (Max(10GB, 3x Storage))";
+                message = "Egress limit set to Default (formula)";
             }
             body = { egressLimitBytes: limit };
         }
