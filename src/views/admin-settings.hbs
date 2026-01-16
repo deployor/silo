@@ -1,0 +1,112 @@
+<div class="admin-container" style="max-width: 900px; margin: 0 auto;">
+  <div style="display:flex; align-items:center; justify-content:space-between; gap: 16px; margin-bottom: 16px;">
+    <div>
+      <h2 style="margin:0;">Admin Settings</h2>
+      <div class="text-muted" style="margin-top: 4px;">Global defaults used across Dashboard + Slack + backend.</div>
+    </div>
+    <div style="display:flex; gap: 8px;">
+      <a class="button secondary" href="/admin/users">Users</a>
+      <a class="button secondary" href="/admin/logs">Logs</a>
+      <a class="button" href="/admin/settings">Settings</a>
+    </div>
+  </div>
+
+  <div class="card" style="padding: 16px;">
+    <div id="status" class="text-muted" style="margin-bottom: 12px;"></div>
+
+    <div class="grid" style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+      <label>
+        <div style="font-weight:600;">Default Storage Quota (bytes)</div>
+        <input id="defaultStorageLimitBytes" type="number" min="0" step="1" style="width:100%;" />
+        <div class="text-muted" style="font-size: 12px;">Used when a user does not have an explicit per-user quota.</div>
+      </label>
+
+      <label>
+        <div style="font-weight:600;">Default Egress Quota (bytes)</div>
+        <input id="defaultEgressLimitBytes" type="number" min="0" step="1" style="width:100%;" />
+        <div class="text-muted" style="font-size: 12px;">0 means "unlimited" only if your backend interprets it that way.</div>
+      </label>
+
+      <label>
+        <div style="font-weight:600;">Max Buckets per User</div>
+        <input id="defaultMaxBucketsPerUser" type="number" min="1" step="1" style="width:100%;" />
+      </label>
+
+      <label>
+        <div style="font-weight:600;">Max Keys per Bucket</div>
+        <input id="defaultMaxKeysPerBucket" type="number" min="1" step="1" style="width:100%;" />
+      </label>
+    </div>
+
+    <div style="display:flex; gap: 8px; margin-top: 16px;">
+      <button class="button" id="saveBtn">Save</button>
+      <button class="button secondary" id="reloadBtn">Reload</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const statusEl = document.getElementById('status');
+  const saveBtn = document.getElementById('saveBtn');
+  const reloadBtn = document.getElementById('reloadBtn');
+
+  const fields = {
+    defaultStorageLimitBytes: document.getElementById('defaultStorageLimitBytes'),
+    defaultEgressLimitBytes: document.getElementById('defaultEgressLimitBytes'),
+    defaultMaxBucketsPerUser: document.getElementById('defaultMaxBucketsPerUser'),
+    defaultMaxKeysPerBucket: document.getElementById('defaultMaxKeysPerBucket'),
+  };
+
+  function setStatus(text, isError = false) {
+    statusEl.textContent = text;
+    statusEl.style.color = isError ? '#ff6b6b' : '';
+  }
+
+  async function loadSettings() {
+    setStatus('Loading...');
+    const res = await fetch('/api/admin/settings');
+    if (!res.ok) {
+      setStatus('Failed to load settings', true);
+      return;
+    }
+    const data = await res.json();
+    fields.defaultStorageLimitBytes.value = data.defaultStorageLimitBytes;
+    fields.defaultEgressLimitBytes.value = data.defaultEgressLimitBytes;
+    fields.defaultMaxBucketsPerUser.value = data.defaultMaxBucketsPerUser;
+    fields.defaultMaxKeysPerBucket.value = data.defaultMaxKeysPerBucket;
+    setStatus('Loaded');
+  }
+
+  async function saveSettings() {
+    setStatus('Saving...');
+    saveBtn.disabled = true;
+
+    const payload = {
+      defaultStorageLimitBytes: Number(fields.defaultStorageLimitBytes.value),
+      defaultEgressLimitBytes: Number(fields.defaultEgressLimitBytes.value),
+      defaultMaxBucketsPerUser: Number(fields.defaultMaxBucketsPerUser.value),
+      defaultMaxKeysPerBucket: Number(fields.defaultMaxKeysPerBucket.value),
+    };
+
+    const res = await fetch('/api/admin/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    saveBtn.disabled = false;
+
+    if (!res.ok) {
+      const msg = await res.text().catch(() => 'Failed to save');
+      setStatus(msg || 'Failed to save', true);
+      return;
+    }
+
+    setStatus('Saved');
+  }
+
+  saveBtn.addEventListener('click', saveSettings);
+  reloadBtn.addEventListener('click', loadSettings);
+
+  loadSettings();
+</script>

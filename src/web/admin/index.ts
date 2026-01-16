@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
+import { z } from "zod";
 import { deleteBucketContents, getInternalPath } from "../../core/s3/utils";
 import { db } from "../../db";
 import {
@@ -9,7 +10,9 @@ import {
 	sessions,
 	users,
 } from "../../db/schema";
+import { jsonResponse } from "../../lib/api-utils";
 import { s3Client } from "../../lib/s3-client";
+import { getAppSettings, updateAppSettings } from "../../services/settings-service";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
 
@@ -41,6 +44,18 @@ async function serveAdminLogsPage(req: Request) {
 	const user = await getCurrentUser(req);
 	const html = await render("admin-logs", {
 		title: "Admin Logs",
+		user,
+		pageTitle: "ADMIN",
+	});
+	return new Response(html, {
+		headers: { "Content-Type": "text/html" },
+	});
+}
+
+async function serveAdminSettingsPage(req: Request) {
+	const user = await getCurrentUser(req);
+	const html = await render("admin-settings", {
+		title: "Admin Settings",
 		user,
 		pageTitle: "ADMIN",
 	});
@@ -565,6 +580,9 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	if (path === "/admin/logs") {
 		return serveAdminLogsPage(req);
 	}
+	if (path === "/admin/settings") {
+		return serveAdminSettingsPage(req);
+	}
 
 	// API Routes
 	if (path.startsWith("/api/admin/")) {
@@ -740,6 +758,37 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		);
 		if (userBucketsMatch && req.method === "GET") {
 			return getUserBuckets(userBucketsMatch[1]);
+		}
+
+		// Global Settings API
+		if (path === "/api/admin/settings" && req.method === "GET") {
+			const user = await getCurrentUser(req);
+			if (!user || !user.isAdmin) return new Response("Forbidden", { status: 403 });
+			return jsonResponse(await getAppSettings());
+		}
+
+		if (path === "/api/admin/settings" && req.method === "POST") {
+			const user = await getCurrentUser(req);
+			if (!user || !user.isAdmin) return new Response("Forbidden", { status: 403 });
+
+			const schema = z.object({
+				defaultStorageLimitBytes: z.number().int().min(0),
+				defaultEgressLimitBytes: z.number().int().min(0),
+				defaultMaxBucketsPerUser: z.number().int().min(1).max(10000),
+				defaultMaxKeysPerBucket: z.number().int().min(1).max(10000),
+			});
+
+			const body = await req.json().catch(() => null);
+			const parsed = schema.safeParse(body);
+			if (!parsed.success) {
+				return new Response(parsed.error.issues[0]?.message ?? "Invalid body", {
+					status: 400,
+				});
+			}
+
+			const updated = await updateAppSettings(parsed.data);
+			// TODO: add admin audit log entry
+			return jsonResponse(updated);
 		}
 
 		// Update User Quota

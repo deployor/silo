@@ -1,4 +1,6 @@
 import { config } from "../../config";
+import { formatBytes } from "../../lib/format";
+import { getAppSettings } from "../../services/settings-service";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
 import { handleApiRequest } from "./api/index";
@@ -37,11 +39,14 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		if (user.onboarded) {
 			return Response.redirect("/");
 		}
+
+		const settings = await getAppSettings();
 		const html = await render("onboarding", {
 			title: "Silo - Welcome",
 			layout: "main",
 			hideNavLinks: true,
 			mainClass: "flex flex-col items-center justify-center",
+			defaultStorageLimitHuman: formatBytes(settings.defaultStorageLimitBytes),
 		});
 		return new Response(html, {
 			headers: { "Content-Type": "text/html" },
