@@ -23,6 +23,12 @@ export async function handleBuckets(req: Request): Promise<Response> {
 			403,
 		);
 	}
+	if (user.dataExported) {
+		return errorResponse(
+			"Account is frozen due to data export. New buckets cannot be created.",
+			403,
+		);
+	}
 
 	if (req.method === "POST") {
 		try {
@@ -65,6 +71,12 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 	// - DELETE /api/dashboard/buckets/:name           => delete bucket
 	// - DELETE /api/dashboard/buckets/:name?empty=true => empty bucket (delete all files only)
 	if (req.method === "DELETE") {
+		if (user.dataExported) {
+			return errorResponse(
+				"Account is frozen. Buckets cannot be deleted.",
+				403,
+			);
+		}
 		const isEmpty = url.searchParams.get("empty") === "true";
 
 		try {
@@ -82,6 +94,12 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 	}
 
 	if (req.method === "PATCH") {
+		if (user.dataExported) {
+			return errorResponse(
+				"Account is frozen. Bucket settings cannot be updated.",
+				403,
+			);
+		}
 		try {
 			const body = await req.json();
 			const result = updateBucketVisibilitySchema.safeParse(body);

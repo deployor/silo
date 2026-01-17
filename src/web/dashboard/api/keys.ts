@@ -47,6 +47,13 @@ export async function handleKeys(req: Request): Promise<Response> {
 			);
 		}
 
+		if (user.dataExported) {
+			return errorResponse(
+				"Account is frozen. New keys cannot be created.",
+				403,
+			);
+		}
+
 		try {
 			const keys = await createKey(bucket[0].id);
 			const publicUrl = `https://${config.s3Domain}/${bucketName}/file.png`;
@@ -64,6 +71,12 @@ export async function handleKeys(req: Request): Promise<Response> {
 		/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/keys\/([^/]+)$/,
 	);
 	if (deleteKeyMatch && req.method === "DELETE") {
+		if (user.dataExported) {
+			return errorResponse(
+				"Account is frozen. Keys cannot be deleted.",
+				403,
+			);
+		}
 		const bucketName = deleteKeyMatch[1];
 		const keyId = deleteKeyMatch[2];
 
