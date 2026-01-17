@@ -192,6 +192,58 @@ Please sign in with Hack Club Auth so we can match this Slack user to your recor
 			return;
 		}
 
+		if (user.filesDeleted) {
+			if (user.dataExported) {
+				await postMessage(
+					channelId,
+					"Bro your over 18 im sorry to tell you but you also cant use CDN sowwy! As you know all your fiels and S3 and all got paused before too and you downlaoded them in time!",
+					threadTs,
+				);
+			} else {
+				await postMessage(
+					channelId,
+					"Hey uh how do i tell you but...\n\nYour files got forever deletedf and you werent in time to actually download them- Your over 18 and to save budget and mroe hackclub doesnt actually run this for over 18 year olds... Sorry",
+					threadTs,
+				);
+			}
+			await addReaction(channelId, messageTs, "wave");
+			return;
+		}
+
+		const usageGB = (
+			(Number(user.storageUsageBytes) || 0) /
+			(1024 * 1024 * 1024)
+		).toFixed(2);
+		const daysLeft = user.overAgeGracePeriodEndsAt
+			? Math.ceil(
+					(new Date(user.overAgeGracePeriodEndsAt).getTime() - Date.now()) /
+						(1000 * 60 * 60 * 24),
+				)
+			: 0;
+		const endDate = user.overAgeGracePeriodEndsAt
+			? new Date(user.overAgeGracePeriodEndsAt).toLocaleDateString()
+			: "soon";
+
+		if (user.dataExported) {
+			await postMessage(
+				channelId,
+				`Heyho sorry your over 18 and ur files are also soon to be deleted soooooo no new files and old ones gone soon too :C\n\nYou already downlaoded your files but if you nbeed to again <https://${config.s3Domain}/dashboard/offboarding|HERE> your old files soooo ${usageGB} GB will be deleted ion ${daysLeft} days on the ${endDate}`,
+				threadTs,
+			);
+			await addReaction(channelId, messageTs, "no_entry");
+			return;
+		}
+
+		if (user.markedAsOverAge) {
+			await postMessage(
+				channelId,
+				`Hey... Sorry but your over 18- You seem to store ${usageGB} GB of data tho! WHICH YOU HAVE STILL NOT DOWNLOADED!!!!! Please download it <https://${config.s3Domain}/dashboard/offboarding|HERE> and m,igrate to soemthing like cloduflare r2 ASAPi will delete everyhting in ${daysLeft} days on the ${endDate} th so  HURRY! I wont upload the files u provided me with :(`,
+				threadTs,
+			);
+			await addReaction(channelId, messageTs, "graduate");
+			return;
+		}
+
 		if (user.isLocked) {
 			await postMessage(
 				channelId,

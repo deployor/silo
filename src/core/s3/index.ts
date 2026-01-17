@@ -105,6 +105,20 @@ export async function handleS3Request(
 
 	const internalPath = getInternalPath(key, user, bucket);
 
+	if (user.dataExported) {
+		return S3Errors.AccessDenied(
+			"Account is frozen due to data export. No new modifications allowed.",
+		).toResponse();
+	}
+
+	if (user.markedAsOverAge) {
+		if (method === "PUT" || method === "POST" || method === "DELETE") {
+			return S3Errors.AccessDenied(
+				"Account is in graduation grace period. New uploads are disabled.",
+			).toResponse();
+		}
+	}
+
 	// Explicitly block Bucket Creation/Deletion (handled by Dashboard)
 	// Although determineAction maps them to Unknown if not CORS, we double check here for safety if logic changes
 	if (key === "") {
