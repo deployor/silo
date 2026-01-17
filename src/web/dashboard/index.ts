@@ -5,6 +5,7 @@ import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
 import { handleApiRequest } from "./api/index";
 import { handleAuthRequest } from "./auth";
+import { handleOffboardingRequest } from "./offboarding";
 
 export async function handleDashboardRequest(req: Request): Promise<Response> {
 	const url = new URL(req.url);
@@ -12,6 +13,10 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 	if (path.startsWith("/auth/")) {
 		return handleAuthRequest(req);
+	}
+
+	if (path.startsWith("/dashboard/offboarding")) {
+		return handleOffboardingRequest(req);
 	}
 
 	if (path.startsWith("/api/")) {
@@ -96,6 +101,18 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		});
 	}
 
+	// 1. Check for deletion (Aged Out) - Redirect to landing page explanation
+	if (user.filesDeleted) {
+		const html = await render("aged-out", {
+			title: "Silo - Graduation",
+			layout: "blank",
+			user,
+		});
+		return new Response(html, {
+			headers: { "Content-Type": "text/html" },
+		});
+	}
+
 	if (!user.onboarded) {
 		return Response.redirect("/onboarding");
 	}
@@ -114,6 +131,12 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			headers: { "Content-Type": "text/html" },
 		});
 	}
+
+	// 2. Check for Offboarding Required (Marked as over age)
+	// If they are marked, show a banner or redirect if critical?
+	// Spec says: "put liek a warning on the normal page dashbaord page"
+	// and "redirect them to a landing page explaining... if files deleted"
+	// So if NOT deleted but marked, they can still access dashboard but with warnings.
 
 	const fileExplorerMatch = path.match(/^\/dashboard\/buckets\/([a-z0-9-]+)$/);
 	if (fileExplorerMatch) {

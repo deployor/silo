@@ -32,6 +32,12 @@ export const users = pgTable("users", {
 	isLocked: boolean("is_locked").default(false).notNull(),
 	lockReason: text("lock_reason"),
 	onboarded: boolean("onboarded").default(false).notNull(),
+
+	// Offboarding / Age-out fields
+	markedAsOverAge: boolean("marked_as_over_age").default(false).notNull(),
+	overAgeGracePeriodEndsAt: timestamp("over_age_grace_period_ends_at"),
+	dataExported: boolean("data_exported").default(false).notNull(), // Locks account immediately upon download
+	filesDeleted: boolean("files_deleted").default(false).notNull(), // Set after permanent deletion
 });
 
 export const sessions = pgTable("sessions", {

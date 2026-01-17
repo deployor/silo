@@ -40,6 +40,13 @@ export async function handleKeys(req: Request): Promise<Response> {
 		if (bucket[0].isCdn)
 			return errorResponse("Cannot create keys for CDN bucket", 403);
 
+		if (user.markedAsOverAge) {
+			return errorResponse(
+				"Account is in grace period. New keys cannot be created.",
+				403,
+			);
+		}
+
 		try {
 			const keys = await createKey(bucket[0].id);
 			const publicUrl = `https://${config.s3Domain}/${bucketName}/file.png`;
