@@ -491,14 +491,29 @@
         // Age Out UI state
         const ageOutBtn = document.getElementById("btn-age-out");
         const ageOutStatus = document.getElementById("age-out-status");
+        
+        // Remove existing click listeners to prevent duplicates (though typical usage shouldn't cause this with simple onclick)
+        // Reset state first
+        
         if (user.markedAsOverAge) {
              ageOutBtn.disabled = true;
+             ageOutBtn.onclick = null; // Remove handler
              ageOutBtn.classList.add("opacity-50", "cursor-not-allowed");
+             ageOutBtn.classList.remove("hover:bg-red-500/30"); // Remove hover effect
              ageOutStatus.classList.remove("hidden");
+             
+             // Update text to show status
+             const statusText = document.querySelector("#btn-age-out span:first-child");
+             if (statusText) statusText.textContent = "User marked as Over-Age";
         } else {
              ageOutBtn.disabled = false;
+             ageOutBtn.onclick = markAsOverAge; // Re-attach handler
              ageOutBtn.classList.remove("opacity-50", "cursor-not-allowed");
+             ageOutBtn.classList.add("hover:bg-red-500/30");
              ageOutStatus.classList.add("hidden");
+             
+             const statusText = document.querySelector("#btn-age-out span:first-child");
+             if (statusText) statusText.textContent = "Mark as Over-Age (Offboarding)";
         }
 
         // Show lock reason in modal if locked
