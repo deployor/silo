@@ -103,6 +103,7 @@ async function listUsers(url: URL, user: typeof users.$inferSelect) {
 			isAdmin: users.isAdmin,
 			isLocked: users.isLocked,
 			lockReason: users.lockReason,
+			markedAsOverAge: users.markedAsOverAge,
 		})
 		.from(users)
 		.leftJoin(buckets, eq(users.id, buckets.userId))
