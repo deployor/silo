@@ -133,10 +133,28 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	}
 
 	// 2. Check for Offboarding Required (Marked as over age)
-	// If they are marked, show a banner or redirect if critical?
-	// Spec says: "put liek a warning on the normal page dashbaord page"
-	// and "redirect them to a landing page explaining... if files deleted"
-	// So if NOT deleted but marked, they can still access dashboard but with warnings.
+	// If data is exported (frozen), redirect to offboarding page so they can re-download if needed.
+	// We allow them to see the offboarding page again.
+	if (user.dataExported) {
+		const html = await render("offboarding", {
+			title: "Silo - Graduation Export",
+			layout: "main",
+			user,
+			hideNavLinks: true, // Hide nav to emphasize frozen state
+			daysRemaining: user.overAgeGracePeriodEndsAt
+				? Math.ceil(
+						(new Date(user.overAgeGracePeriodEndsAt).getTime() - Date.now()) /
+							(1000 * 60 * 60 * 24),
+					)
+				: 0,
+			gracePeriodEndsAt: user.overAgeGracePeriodEndsAt
+				? new Date(user.overAgeGracePeriodEndsAt).toLocaleDateString()
+				: "Unknown",
+		});
+		return new Response(html, {
+			headers: { "Content-Type": "text/html" },
+		});
+	}
 
 	const fileExplorerMatch = path.match(/^\/dashboard\/buckets\/([a-z0-9-]+)$/);
 	if (fileExplorerMatch) {

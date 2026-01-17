@@ -9,6 +9,27 @@ import { s3Client } from "../../lib/s3-client";
 import { getInternalPath } from "../../core/s3/utils";
 import { buckets, bucketKeys } from "../../db/schema";
 
+// Simple in-memory rate limiting for exports
+// In a production environment with multiple instances, this should be in Redis
+const EXPORT_LIMITS = new Map<string, number[]>();
+const MAX_EXPORTS_PER_HOUR = 3;
+
+function checkExportRateLimit(userId: string): boolean {
+	const now = Date.now();
+	const timestamps = EXPORT_LIMITS.get(userId) || [];
+	
+	// Filter out timestamps older than 1 hour
+	const recent = timestamps.filter(t => now - t < 60 * 60 * 1000);
+	
+	if (recent.length >= MAX_EXPORTS_PER_HOUR) {
+		return false;
+	}
+	
+	recent.push(now);
+	EXPORT_LIMITS.set(userId, recent);
+	return true;
+}
+
 export async function handleOffboardingRequest(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
 	if (!user) {
@@ -58,6 +79,13 @@ export async function handleOffboardingRequest(req: Request): Promise<Response> 
 		req.method === "POST" &&
 		url.pathname === "/dashboard/offboarding/download"
 	) {
+		if (!checkExportRateLimit(user.id)) {
+			return new Response(
+				"Export rate limit exceeded. You can only generate 3 exports per hour. Please try again later.",
+				{ status: 429 }
+			);
+		}
+
 		// 1. Mark as data exported (Freezes account)
 		await db
 			.update(users)

@@ -56,9 +56,20 @@
     function confirmDownload() {
         if (confirm("Are you sure? This will freeze your account immediately to ensure data consistency during export.")) {
             const btn = document.getElementById('download-btn');
+            const originalContent = btn.innerHTML;
             btn.innerHTML = 'Preparing Archive... <svg class="animate-spin h-5 w-5 ml-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
             btn.disabled = true;
             btn.classList.add('opacity-75', 'cursor-not-allowed');
+
+            // Re-enable button after a short delay to allow retry if download fails to start or for next download
+            // Note: The download itself is a navigation/POST, but if it's an attachment, the page might not unload.
+            // A simple timeout is a basic fix; robust solution requires cookie tracking.
+            setTimeout(() => {
+                 btn.innerHTML = originalContent;
+                 btn.disabled = false;
+                 btn.classList.remove('opacity-75', 'cursor-not-allowed');
+            }, 5000);
+
             return true;
         }
         return false;
