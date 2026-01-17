@@ -1,17 +1,33 @@
-{{#if user.markedAsOverAge}}
-<div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-8 flex items-start gap-4">
-   <div class="text-3xl">🎓</div>
+{{#if user.dataExported}}
+<div class="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-8 flex items-start gap-4">
+   <div class="text-3xl">🧊</div>
    <div>
-      <h3 class="text-red-400 font-bold text-lg">Graduation Grace Period Active</h3>
-      <p class="text-red-300 text-sm mt-1">
-         Your account has been marked for graduation. Creation of new buckets and keys is disabled.
-         Your data will be available until 2 months from notice.
+      <h3 class="text-blue-400 font-bold text-lg">Account Frozen (Export Complete)</h3>
+      <p class="text-blue-300 text-sm mt-1">
+         You have successfully exported your data. As a security measure, your account is now frozen.
+         You cannot upload files, create buckets, or modify settings. Your account will be permanently closed soon.
       </p>
-      <a href="/dashboard/offboarding" class="inline-block mt-3 bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-600 transition-colors">
-         Export Data & Close Account &rarr;
-      </a>
+      <p class="text-blue-300 text-sm mt-2 font-bold">
+         No further action is required from you. Good luck with your future endeavors!
+      </p>
    </div>
 </div>
+{{else}}
+  {{#if user.markedAsOverAge}}
+  <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-8 flex items-start gap-4">
+    <div class="text-3xl">🎓</div>
+    <div>
+        <h3 class="text-red-400 font-bold text-lg">Graduation Grace Period Active</h3>
+        <p class="text-red-300 text-sm mt-1">
+          Your account has been marked for graduation. Creation of new buckets and keys is disabled.
+          Your data will be available until 2 months from notice.
+        </p>
+        <a href="/dashboard/offboarding" class="inline-block mt-3 bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-600 transition-colors">
+          Export Data & Close Account &rarr;
+        </a>
+    </div>
+  </div>
+  {{/if}}
 {{/if}}
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
