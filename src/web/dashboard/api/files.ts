@@ -281,6 +281,12 @@ export async function handleFiles(req: Request): Promise<Response> {
 	}
 
 	if (listFilesMatch && req.method === "DELETE") {
+		if (user.dataExported) {
+			return errorResponse(
+				"Account is frozen. Files cannot be deleted.",
+				403,
+			);
+		}
 		const bucketName = listFilesMatch[1];
 		const key = url.searchParams.get("key");
 
