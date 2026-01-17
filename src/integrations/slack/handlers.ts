@@ -48,6 +48,24 @@ export async function handleAppHomeOpened(event: { user: string }) {
 		return;
 	}
 
+	if (user.filesDeleted) {
+		await publishView(
+			slackId,
+			HomeTab()
+				.blocks(
+					Header({ text: "Happy Graduation! 🎓" }),
+					Section({
+						text: "You have officially aged out of the Silo service. Your files have been deleted according to our data retention policy for graduates.",
+					}),
+					Section({
+						text: "We hope Silo was helpful during your time at Hack Club!",
+					}),
+				)
+				.buildToObject(),
+		);
+		return;
+	}
+
 	if (!user) {
 		await publishView(
 			slackId,
@@ -379,6 +397,20 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 	}
 
 	if (actionId === "delete_key" && actionValue) {
+		if (user.dataExported) {
+			await openModal(
+				payload.trigger_id,
+				Modal({ title: "Account Frozen" })
+					.blocks(
+						Section({
+							text: "Your account is frozen due to data export. You cannot modify keys.",
+						}),
+					)
+					.buildToObject(),
+			);
+			return;
+		}
+
 		const keyId = actionValue;
 		const bucketId = payload.view.private_metadata;
 
@@ -415,6 +447,20 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 	}
 
 	if (actionId === "delete_bucket") {
+		if (user.dataExported) {
+			await openModal(
+				payload.trigger_id,
+				Modal({ title: "Account Frozen" })
+					.blocks(
+						Section({
+							text: "Your account is frozen due to data export. You cannot delete buckets.",
+						}),
+					)
+					.buildToObject(),
+			);
+			return;
+		}
+
 		const bucketId = actionValue;
 		if (bucketId) {
 			const bucket = await db
@@ -492,6 +538,20 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 	}
 
 	if (actionId === "delete_cdn_file" && actionValue) {
+		if (user.dataExported) {
+			await openModal(
+				payload.trigger_id,
+				Modal({ title: "Account Frozen" })
+					.blocks(
+						Section({
+							text: "Your account is frozen due to data export. You cannot delete files.",
+						}),
+					)
+					.buildToObject(),
+			);
+			return;
+		}
+
 		const parts = actionValue.split(":");
 		const bucketId = parts[1];
 		const key = parts[2];
