@@ -27,15 +27,30 @@
                 </div>
             </div>
 
+            {{#if user.dataExported}}
+            <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-8">
+                <p class="text-blue-200 text-sm flex gap-3">
+                    <span class="text-xl">🧊</span>
+                    <span>
+                        <strong>Account Frozen:</strong> You have already initiated an export. Your account is now frozen.
+                        <br/><br/>
+                        • No new files can be uploaded (PUT/POST disabled).<br/>
+                        • Buckets and keys cannot be modified.<br/>
+                        • You can re-download your data below if needed.
+                    </span>
+                </p>
+            </div>
+            {{else}}
             <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-8">
                 <p class="text-yellow-200 text-sm flex gap-3">
                     <span class="text-xl">⚠️</span>
                     <span>
-                        <strong>Important:</strong> Clicking the download button below will <span class="underline">immediately freeze your account</span>. 
+                        <strong>Important:</strong> Clicking the download button below will <span class="underline">immediately freeze your account</span>.
                         You will not be able to upload new files or create new buckets after starting the export.
                     </span>
                 </p>
             </div>
+            {{/if}}
 
             <form action="/dashboard/offboarding/download" method="POST" onsubmit="return confirmDownload()">
                 <button type="submit" id="download-btn" class="w-full bg-hc-red hover:bg-red-600 text-white text-lg font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] flex items-center justify-center gap-3">
