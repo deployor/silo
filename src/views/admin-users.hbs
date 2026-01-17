@@ -391,12 +391,55 @@
                     </div>
                 </td>
                 <td class="px-6 py-4">
-                    ${u.isLocked
-                        ? `<div class="flex flex-col items-start gap-1">
-                            <span class="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-bold border border-red-500/30">LOCKED</span>
-                            ${u.lockReason ? `<span class="text-[10px] text-red-300 max-w-[150px] truncate" title="${escapeHtml(u.lockReason)}">${escapeHtml(u.lockReason)}</span>` : ''}
-                           </div>`
-                        : '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-bold border border-emerald-500/30">ACTIVE</span>'}
+                    ${(() => {
+                        const now = new Date();
+                        const graceEnd = u.overAgeGracePeriodEndsAt ? new Date(u.overAgeGracePeriodEndsAt) : null;
+                        
+                        // Offboarding Status Dots
+                        if (u.filesDeleted) {
+                            return `<div class="group relative flex items-center w-fit">
+                                <div class="w-3 h-3 rounded-full bg-red-500 cursor-help"></div>
+                                <div class="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-max bg-black/90 text-white text-xs rounded px-2 py-1 border border-white/10 z-10 shadow-xl">
+                                    Aged Out (Files Deleted)
+                                </div>
+                            </div>`;
+                        }
+                        
+                        if (u.markedAsOverAge) {
+                            if (graceEnd && now > graceEnd) {
+                                return `<div class="group relative flex items-center w-fit">
+                                    <div class="w-3 h-3 rounded-full bg-orange-500 cursor-help"></div>
+                                    <div class="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-max bg-black/90 text-white text-xs rounded px-2 py-1 border border-white/10 z-10 shadow-xl">
+                                        Grace Period Expired
+                                    </div>
+                                </div>`;
+                            }
+                            
+                            if (u.dataExported) {
+                                return `<div class="group relative flex items-center w-fit">
+                                    <div class="w-3 h-3 rounded-full bg-emerald-500 cursor-help"></div>
+                                    <div class="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-max bg-black/90 text-white text-xs rounded px-2 py-1 border border-white/10 z-10 shadow-xl">
+                                        Frozen (Data Exported)
+                                    </div>
+                                </div>`;
+                            }
+                            
+                            return `<div class="group relative flex items-center w-fit">
+                                <div class="w-3 h-3 rounded-full bg-yellow-500 cursor-help"></div>
+                                <div class="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-max bg-black/90 text-white text-xs rounded px-2 py-1 border border-white/10 z-10 shadow-xl">
+                                    In Grace Period
+                                </div>
+                            </div>`;
+                        }
+
+                        // Standard Status
+                        return u.isLocked
+                            ? `<div class="flex flex-col items-start gap-1">
+                                <span class="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-bold border border-red-500/30">LOCKED</span>
+                                ${u.lockReason ? `<span class="text-[10px] text-red-300 max-w-[150px] truncate" title="${escapeHtml(u.lockReason)}">${escapeHtml(u.lockReason)}</span>` : ''}
+                            </div>`
+                            : '<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-bold border border-emerald-500/30">ACTIVE</span>';
+                    })()}
                 </td>
                 <td class="px-6 py-4 text-right">
                     <button class="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider">Manage</button>
