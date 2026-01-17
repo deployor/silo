@@ -175,16 +175,17 @@ export async function deleteBucketContents(prefix: string) {
 		if (!res.ok) throw new Error(`Failed to list objects: ${res.status}`);
 
 		const xml = await res.text();
-		const parser = new XMLParser();
+		// Ensure array handling is consistent
+		const parser = new XMLParser({
+			isArray: (name) => name === "Contents"
+		});
 		const result = parser.parse(xml).ListBucketResult;
 
-		if (!result.Contents) break;
+		if (!result.Contents || result.Contents.length === 0) break;
 
-		const contents = Array.isArray(result.Contents)
-			? result.Contents
-			: [result.Contents];
+		const contents = result.Contents;
 
-		if (contents.length === 0) break;
+		console.log(`[deleteBucketContents] Found ${contents.length} objects to delete for prefix: ${prefix}`);
 
 		const objects = contents
 			.map(
