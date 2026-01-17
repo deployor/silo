@@ -196,6 +196,16 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			};
 		}
 
+		if (user.markedAsOverAge) {
+			return {
+				response_action: "errors",
+				errors: {
+					bucket_name_block:
+						"Your account is in graduation grace period. You cannot create new buckets.",
+				},
+			};
+		}
+
 		const existing = await db
 			.select()
 			.from(buckets)
@@ -304,6 +314,20 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 						.blocks(
 							Section({
 								text: `This bucket already has ${MAX_KEYS_PER_BUCKET} keys. Delete an existing key to create a new one.`,
+							}),
+						)
+						.buildToObject(),
+				);
+				return;
+			}
+
+			if (user.markedAsOverAge) {
+				await openModal(
+					payload.trigger_id,
+					Modal({ title: "Graduation Mode" })
+						.blocks(
+							Section({
+								text: "Your account is in graduation grace period. You cannot create new keys.",
 							}),
 						)
 						.buildToObject(),

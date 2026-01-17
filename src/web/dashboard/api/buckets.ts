@@ -17,6 +17,13 @@ export async function handleBuckets(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
 	if (!user) return errorResponse("Unauthorized", 401);
 
+	if (user.markedAsOverAge) {
+		return errorResponse(
+			"Account is in grace period. New buckets cannot be created.",
+			403,
+		);
+	}
+
 	if (req.method === "POST") {
 		try {
 			const body = await req.json();

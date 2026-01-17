@@ -183,6 +183,66 @@ async function lockUser(userId: string, req: Request) {
 	return new Response("Updated", { status: 200 });
 }
 
+async function ageOutUser(userId: string, req: Request) {
+	const user = await db
+		.select()
+		.from(users)
+		.where(eq(users.id, userId))
+		.limit(1);
+
+	if (user.length === 0) return new Response("User not found", { status: 404 });
+
+	if (user[0].markedAsOverAge) {
+		return new Response("User is already marked as over-age", { status: 400 });
+	}
+
+	const gracePeriodEndsAt = new Date();
+	gracePeriodEndsAt.setMonth(gracePeriodEndsAt.getMonth() + 2);
+
+	await db
+		.update(users)
+		.set({
+			markedAsOverAge: true,
+			overAgeGracePeriodEndsAt: gracePeriodEndsAt,
+		})
+		.where(eq(users.id, userId));
+
+	// Send Slack Notification
+	if (user[0].slackId) {
+		const { Blocks, Header, Section, Button, Actions } = await import(
+			"slack-block-builder"
+		);
+		const { publishView } = await import("../../integrations/slack/client");
+		const { config } = await import("../../config");
+
+		await publishView(
+			user[0].slackId,
+			(await import("slack-block-builder")).HomeTab({
+				privateMetaData: "age_out_notification",
+			})
+				.blocks(
+					Header({ text: "Important Account Update: Graduation Time 🎓" }),
+					Section({
+						text: "Hey there! We've received notice that you've turned 18. Since Hack Club and Silo are for teenagers, your account is now in a graduation grace period.",
+					}),
+					Section({
+						text: `Your files will be available for download until *${gracePeriodEndsAt.toLocaleDateString()}*. After this date, your data will be permanently deleted.\n\nPlease visit the export portal to download all your files in one click.`,
+					}),
+					Actions().elements(
+						Button({
+							text: "⬇️ Go to Export Portal",
+							url: `https://${config.s3Domain}/dashboard/offboarding`,
+							actionId: "open_export_portal",
+						}).primary(),
+					),
+				)
+				.buildToObject(),
+		);
+	}
+
+	return new Response("User marked as over-age", { status: 200 });
+}
+
 async function getBucketDetails(bucketName: string) {
 	const bucket = await db
 		.select()
@@ -802,6 +862,12 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		const userLockMatch = path.match(/^\/api\/admin\/users\/([^/]+)\/lock$/);
 		if (userLockMatch && req.method === "POST") {
 			return lockUser(userLockMatch[1], req);
+		}
+
+		// Age Out User
+		const userAgeOutMatch = path.match(/^\/api\/admin\/users\/([^/]+)\/age-out$/);
+		if (userAgeOutMatch && req.method === "POST") {
+			return ageOutUser(userAgeOutMatch[1], req);
 		}
 
 		// Get Bucket Details (with keys and files)

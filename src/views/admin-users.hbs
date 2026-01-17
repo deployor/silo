@@ -136,6 +136,18 @@
 
              <p class="text-[11px] text-text-muted mt-3">Impersonation lasts 30 minutes. To stop impersonating, simply log out.</p>
          </div>
+
+         <!-- Danger Zone -->
+          <div class="bg-red-500/10 p-6 rounded-xl border border-red-500/20">
+             <h4 class="text-red-400 font-bold mb-4">Danger Zone</h4>
+             <div class="flex flex-col gap-2">
+                 <button id="btn-age-out" onclick="markAsOverAge()" class="bg-red-500/20 hover:bg-red-500/30 text-red-300 px-4 py-2 rounded-lg text-sm font-bold transition-colors border border-red-500/30 w-full text-left flex justify-between items-center">
+                    <span>Mark as Over-Age (Offboarding)</span>
+                    <span id="age-out-status" class="text-xs uppercase bg-black/30 px-2 py-0.5 rounded hidden">Marked</span>
+                 </button>
+                 <p class="text-[11px] text-red-300/60">Triggers offboarding flow: Slack notification, 2-month grace period, then deletion.</p>
+             </div>
+         </div>
      </div>
 
     <!-- User Buckets -->
@@ -433,6 +445,19 @@
 
         document.getElementById("modal-is-locked").checked = user.isLocked;
 
+        // Age Out UI state
+        const ageOutBtn = document.getElementById("btn-age-out");
+        const ageOutStatus = document.getElementById("age-out-status");
+        if (user.markedAsOverAge) {
+             ageOutBtn.disabled = true;
+             ageOutBtn.classList.add("opacity-50", "cursor-not-allowed");
+             ageOutStatus.classList.remove("hidden");
+        } else {
+             ageOutBtn.disabled = false;
+             ageOutBtn.classList.remove("opacity-50", "cursor-not-allowed");
+             ageOutStatus.classList.add("hidden");
+        }
+
         // Show lock reason in modal if locked
         const lockReasonContainer = document.getElementById("modal-lock-reason-container");
         if (lockReasonContainer) lockReasonContainer.remove(); // Clean up previous
@@ -550,6 +575,24 @@
         });
 
         loadUsers();
+    }
+
+    async function markAsOverAge() {
+        if (!currentUser) return;
+        if (!confirm(`Mark ${currentUser.email} as over-age? This will immediately notify them via Slack and start the 2-month deletion countdown.`)) return;
+
+        const res = await fetch(`/api/admin/users/${currentUser.id}/age-out`, {
+            method: "POST"
+        });
+
+        if (res.ok) {
+            alert("User marked as over-age. Notification sent.");
+            loadUsers(); // Refresh data
+            // Close modal to refresh state properly when re-opened (simplest way)
+            closeUserModal();
+        } else {
+            alert("Failed to mark user as over-age.");
+        }
     }
 
     async function openAdminBucketModal(bucketName) {
