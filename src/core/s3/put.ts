@@ -269,6 +269,8 @@ export async function handlePutRequest(
 
 				requestBody = combined;
 				actualSize = totalLength;
+				
+				// Explicitly set the Content-Length header for the upstream request
 				upstreamHeaders.set("Content-Length", totalLength.toString());
 
 				if (limit !== null) {
