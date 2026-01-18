@@ -1,37 +1,20 @@
 {{#if user.dataExported}}
-<div class="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-8 flex items-start gap-4">
-   <div class="text-blue-400 p-1">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-      </svg>
-   </div>
-   <div>
-      <h3 class="text-blue-400 font-bold text-lg">Your account is frozen</h3>
-      <p class="text-blue-300 text-sm mt-1">
-         You've downloaded your data, so we've locked your account to keep everything consistent. You can't upload new files or change settings anymore, and your data will be permanently deleted soon.
-      </p>
-      <p class="text-blue-300 text-sm mt-2 font-bold">
-         You're all set. Good luck with whatever comes next!
-      </p>
-   </div>
+<div class="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-8 text-center">
+    <h3 class="text-blue-400 font-bold text-lg">Your account is frozen</h3>
+    <p class="text-blue-300 text-sm mt-1 max-w-2xl mx-auto">
+        You've downloaded your data, so we've locked your account to keep everything consistent. You can't upload new files or change settings anymore, and your data will be permanently deleted soon.
+    </p>
 </div>
 {{else}}
   {{#if user.markedAsOverAge}}
-  <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-8 flex items-start gap-4">
-    <div class="text-red-400 p-1">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-      </svg>
-    </div>
-    <div>
-        <h3 class="text-red-400 font-bold text-lg">It's time to move on</h3>
-        <p class="text-red-300 text-sm mt-1">
-          Since you're over 18, you need to move your files off Silo. We've disabled creating new buckets or keys, and your existing data will be deleted in 2 months.
-        </p>
-        <a href="/dashboard/offboarding" class="inline-block mt-3 bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-600 transition-colors">
-          Migrate off Silo &rarr;
-        </a>
-    </div>
+  <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-8 text-center">
+      <h3 class="text-red-400 font-bold text-lg">It's time to move on</h3>
+      <p class="text-red-300 text-sm mt-1 max-w-2xl mx-auto">
+        Since you're over 18, you need to move your files off Silo. We've disabled creating new buckets or keys, and your existing data will be deleted in 2 months.
+      </p>
+      <a href="/dashboard/offboarding" class="inline-block mt-3 bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-600 transition-colors">
+        Migrate off Silo &rarr;
+      </a>
   </div>
   {{/if}}
 {{/if}}
