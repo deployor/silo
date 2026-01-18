@@ -1,4 +1,5 @@
 import { count, eq } from "drizzle-orm";
+import { config } from "../config";
 import { db } from "../db";
 import { bucketKeys, buckets } from "../db/schema";
 import { getAppSettings } from "./settings-service";
