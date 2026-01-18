@@ -2,13 +2,6 @@
 
 <div class="min-h-[80vh] flex flex-col items-center justify-center py-12 px-4">
     <div class="max-w-2xl w-full text-center">
-        <div class="flex justify-center mb-6">
-            <div class="text-hc-red p-4 bg-hc-red/10 rounded-full border border-hc-red/20">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-            </div>
-        </div>
         <h1 class="text-4xl font-bold text-white mb-2">It's time to move on</h1>
         <p class="text-xl text-text-muted mb-8">It's time to say goodbye to Silo.</p>
 
@@ -101,35 +94,20 @@
             </div>
 
             {{#if user.dataExported}}
-            <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-8">
-                <div class="text-blue-200 text-sm flex gap-3">
-                    <div class="shrink-0">
-                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                         </svg>
-                    </div>
-                    <div>
-                        <strong>Account Frozen:</strong> You have already initiated an export. Your account is now frozen.
-                        <br/><br/>
-                        • No new files can be uploaded.<br/>
-                        • Buckets and keys cannot be modified.<br/>
-                        • You can re-download your data below if needed.
-                    </div>
-                </div>
+            <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-6 mb-8 text-center">
+                <h3 class="text-blue-200 font-bold text-lg mb-2">Account Frozen</h3>
+                <p class="text-blue-200/80 text-sm max-w-xl mx-auto">
+                    You have already initiated an export. Your account is now frozen to ensure data consistency.
+                    No new files can be uploaded and buckets/keys cannot be modified.
+                </p>
             </div>
             {{else}}
-            <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-8">
-                <div class="text-yellow-200 text-sm flex gap-3">
-                    <div class="shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <strong>Important:</strong> Clicking the download button below will <span class="underline">immediately freeze your account</span>.
-                        You won't be able to upload new files or create new buckets after starting the export.
-                    </div>
-                </div>
+            <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-6 mb-8 text-center">
+                <h3 class="text-yellow-200 font-bold text-lg mb-2">Important Notice</h3>
+                <p class="text-yellow-200/80 text-sm max-w-xl mx-auto">
+                    Clicking the download button below will <span class="font-bold underline">immediately freeze your account</span>.
+                    You won't be able to upload new files or create new buckets after starting the export.
+                </p>
             </div>
             {{/if}}
 
