@@ -20,23 +20,6 @@ const config = {
 
 const client = new S3Client(config);
 
-client.middlewareStack.add(
-	(next, _context) => async (args) => {
-		const result = await next(args);
-		const { request } = args;
-		const r = request as any;
-		// Simple duck typing check for HttpRequest properties
-		if (r && typeof r.method === "string" && typeof r.headers === "object") {
-			console.log(`\n[DEBUG] Method: ${r.method}, Path: ${r.path}`);
-			console.log("[DEBUG] Headers:", JSON.stringify(r.headers, null, 2));
-		}
-		return result;
-	},
-	{
-		step: "finalizeRequest",
-	},
-);
-
 async function runTest() {
 	console.log("🚀 Starting intense S3 key validation test...");
 	console.log(`Target: ${config.endpoint}/${config.bucket}`);
