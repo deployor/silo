@@ -60,15 +60,15 @@
         <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow text-left mb-8 relative overflow-hidden">
 
             {{#if showSuccess}}
-                <div class="mb-8 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-6 flex flex-col items-center text-center">
-                    <div class="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center text-white mb-4 shadow-lg shadow-emerald-500/20">
+                <div class="mb-8 bg-hc-dark border-2 border-emerald-500 rounded-xl p-6 flex flex-col items-center text-center card-shadow">
+                    <div class="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center text-white mb-4 border-4 border-hc-dark">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
                         </svg>
                     </div>
                     <h2 class="text-2xl font-bold text-white mb-2">Export Started!</h2>
-                    <p class="text-emerald-200 text-sm mb-4">
-                        Your download should begin automatically. If it doesn't, <a href="/dashboard/offboarding/archive" class="underline hover:text-white">click here</a>.
+                    <p class="text-emerald-400 text-sm mb-4 font-bold">
+                        Your download should begin automatically. <a href="/dashboard/offboarding/archive" class="underline hover:text-white">Click here if it doesn't</a>.
                     </p>
                     <div class="text-text-muted text-xs max-w-md">
                         Your account is now frozen. Please keep your archive safe! You can download it again from this page until your grace period ends.
@@ -101,15 +101,15 @@
             </div>
 
             {{#if user.dataExported}}
-            <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-8">
-                <div class="text-blue-200 text-sm flex gap-3">
+            <div class="bg-hc-dark border-2 border-blue-500 rounded-xl p-4 mb-8">
+                <div class="text-blue-500 text-sm flex gap-3">
                     <div class="shrink-0">
                          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                          </svg>
                     </div>
                     <div>
-                        <strong>Account Frozen:</strong> You have already initiated an export. Your account is now frozen.
+                        <strong class="font-bold">Account Frozen:</strong> You have already initiated an export. Your account is now frozen.
                         <br/><br/>
                         • No new files can be uploaded.<br/>
                         • Buckets and keys cannot be modified.<br/>
@@ -118,15 +118,15 @@
                 </div>
             </div>
             {{else}}
-            <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 mb-8">
-                <div class="text-yellow-200 text-sm flex gap-3">
+            <div class="bg-hc-dark border-2 border-yellow-500 rounded-xl p-4 mb-8">
+                <div class="text-yellow-500 text-sm flex gap-3">
                     <div class="shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                     </div>
                     <div>
-                        <strong>Important:</strong> Clicking the download button below will <span class="underline">immediately freeze your account</span>.
+                        <strong class="font-bold">Important:</strong> Clicking the download button below will <span class="underline">immediately freeze your account</span>.
                         You won't be able to upload new files or create new buckets after starting the export.
                     </div>
                 </div>
