@@ -171,18 +171,43 @@
 </div>
 
 <script>
+    let countdownInterval;
+
     function openConfirmModal(title, message, onConfirm) {
         document.getElementById("confirm-title").textContent = title;
         document.getElementById("confirm-message").textContent = message;
         
         const btn = document.getElementById("confirm-btn");
+        const btnText = document.getElementById("confirm-btn-text");
+        
+        // Reset Button State
+        btn.className = "bg-white/10 text-white/50 cursor-not-allowed px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2";
+        btn.disabled = true;
+        btnText.textContent = "Confirm (3)";
+
         // Remove old listener to avoid stacking (simple way)
         const newBtn = btn.cloneNode(true);
         btn.parentNode.replaceChild(newBtn, btn);
         
+        // Countdown Logic
+        let seconds = 3;
+        if (countdownInterval) clearInterval(countdownInterval);
+        
+        countdownInterval = setInterval(() => {
+            seconds--;
+            if (seconds <= 0) {
+                clearInterval(countdownInterval);
+                newBtn.disabled = false;
+                newBtn.className = "bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105 card-shadow flex items-center gap-2";
+                newBtn.querySelector("#confirm-btn-text").textContent = "Confirm";
+            } else {
+                newBtn.querySelector("#confirm-btn-text").textContent = `Confirm (${seconds})`;
+            }
+        }, 1000);
+
         newBtn.onclick = async () => {
             const spinner = document.getElementById("confirm-spinner");
-            const btnText = document.getElementById("confirm-btn-text");
+            const btnText = newBtn.querySelector("#confirm-btn-text");
             
             newBtn.disabled = true;
             spinner.classList.remove("hidden");
@@ -195,6 +220,7 @@
                 console.error(e);
                 alert("Action failed");
             } finally {
+                // If the modal isn't closed (e.g. error), reset state partially
                 newBtn.disabled = false;
                 spinner.classList.add("hidden");
                 btnText.textContent = "Confirm";
@@ -206,6 +232,7 @@
     }
 
     function closeConfirmModal() {
+        if (countdownInterval) clearInterval(countdownInterval);
         document.getElementById("confirm-modal").classList.add("hidden");
         document.getElementById("confirm-modal").classList.remove("flex");
     }
