@@ -37,10 +37,10 @@
         </div>
 
         {{#if showSuccess}}
-            <div class="bg-emerald-500 text-black rounded-xl p-8 mb-8 text-center animate-fade-in card-shadow border border-emerald-400">
-                <h2 class="text-2xl font-bold mb-2">Export Started</h2>
+            <div class="bg-emerald-500 text-black rounded-3xl p-8 mb-8 text-center animate-fade-in card-shadow border border-emerald-400">
+                <h2 class="text-2xl font-black uppercase tracking-wider mb-2">Export Started</h2>
                 <p class="mb-6 font-medium">Your download should begin automatically.</p>
-                <a href="/dashboard/offboarding/archive" class="underline hover:no-underline font-mono text-sm">
+                <a href="/dashboard/offboarding/archive" class="underline hover:no-underline font-mono text-sm font-bold uppercase tracking-wider">
                     Click here if it doesn't start
                 </a>
                 
@@ -52,28 +52,28 @@
             </div>
         {{else}}
             {{#if user.dataExported}}
-                <div class="bg-white/5 rounded-xl p-6 mb-8 border border-white/10 card-shadow flex gap-4 items-start">
-                    <div class="shrink-0 text-blue-400">
-                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div class="bg-hc-dark rounded-3xl p-8 mb-8 border border-white/10 card-shadow flex flex-col md:flex-row gap-6 items-center text-center md:text-left">
+                    <div class="shrink-0 p-4 bg-blue-500/10 text-blue-400 rounded-2xl">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
                     </div>
                     <div>
-                        <h3 class="text-white font-bold text-lg mb-1">Account Frozen</h3>
+                        <h3 class="text-white font-black uppercase tracking-wider text-xl mb-2">Account Frozen</h3>
                         <p class="text-text-muted text-sm leading-relaxed">
                             You've already started an export, so your account is locked to prevent changes. You can re-download your archive below.
                         </p>
                     </div>
                 </div>
             {{else}}
-                <div class="bg-white/5 rounded-xl p-6 mb-8 border border-white/10 card-shadow flex gap-4 items-start">
-                    <div class="shrink-0 text-yellow-400">
-                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div class="bg-hc-dark rounded-3xl p-8 mb-8 border border-white/10 card-shadow flex flex-col md:flex-row gap-6 items-center text-center md:text-left">
+                    <div class="shrink-0 p-4 bg-yellow-500/10 text-yellow-400 rounded-2xl">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                     </div>
-                     <div>
-                        <h3 class="text-white font-bold text-lg mb-1">Heads up</h3>
+                    <div>
+                        <h3 class="text-white font-black uppercase tracking-wider text-xl mb-2">Heads up</h3>
                         <p class="text-text-muted text-sm leading-relaxed">
                             Downloading your data will <span class="text-white font-bold">immediately freeze your account</span>. You won't be able to upload new files or create buckets afterwards.
                         </p>
