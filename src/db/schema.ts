@@ -12,12 +12,10 @@ export const users = pgTable("users", {
 	id: text("id").primaryKey(),
 	email: text("email").notNull().unique(),
 	slackId: text("slack_id"),
-	// Null means "use global default".
 	storageLimitBytes: bigint("storage_limit_bytes", { mode: "number" }),
 	storageUsageBytes: bigint("storage_usage_bytes", { mode: "number" })
 		.notNull()
 		.default(0),
-	// Null means "use global default formula".
 	egressLimitBytes: bigint("egress_limit_bytes", { mode: "number" }),
 	ingressBytes: bigint("ingress_bytes", { mode: "number" })
 		.notNull()
@@ -33,7 +31,6 @@ export const users = pgTable("users", {
 	lockReason: text("lock_reason"),
 	onboarded: boolean("onboarded").default(false).notNull(),
 
-	// Offboarding / Age-out fields
 	markedAsOverAge: boolean("marked_as_over_age").default(false).notNull(),
 	overAgeGracePeriodEndsAt: timestamp("over_age_grace_period_ends_at"),
 	dataExported: boolean("data_exported").default(false).notNull(), // Locks account immediately upon download
@@ -51,9 +48,6 @@ export const sessions = pgTable("sessions", {
 	refreshToken: text("refresh_token"),
 	tokenExpiresAt: timestamp("token_expires_at"),
 	scope: text("scope"),
-	// Admin impersonation support (best-practice):
-	// - userId always remains the real session owner (admin)
-	// - impersonatedUserId is the effective "current user" for dashboard actions
 	impersonatorUserId: text("impersonator_user_id").references(() => users.id, {
 		onDelete: "set null",
 	}),
@@ -121,11 +115,9 @@ export const requestLogs = pgTable(
 			onDelete: "set null",
 		}),
 		bucketName: text("bucket_name"),
-		// The owner of the bucket (for billing/quota)
 		ownerId: text("owner_id").references(() => users.id, {
 			onDelete: "set null",
 		}),
-		// The user who performed the action (might be null for public)
 		requesterId: text("requester_id").references(() => users.id, {
 			onDelete: "set null",
 		}),

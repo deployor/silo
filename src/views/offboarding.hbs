@@ -5,23 +5,21 @@
         
         <!-- Header -->
         <div class="mb-12">
-            <h1 class="text-6xl font-black text-white mb-6 uppercase tracking-tighter" style="font-family: 'Phantom Sans', system-ui, -apple-system, sans-serif;">
-                <span class="text-hc-red">System</span> Update
+            <h1 class="text-5xl font-bold text-white mb-6 tracking-tight">
+                Account Status
             </h1>
-            <p class="text-xl text-text-muted leading-relaxed max-w-lg mx-auto font-medium">
+            <p class="text-xl text-text-muted leading-relaxed max-w-lg mx-auto">
                 You've turned 18, so you've aged out of Silo. <br/>
                 Please download your files before your account is closed.
             </p>
         </div>
 
         <!-- Status Bar -->
-        <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 mb-12 card-shadow relative overflow-hidden group">
-            <div class="absolute top-0 right-0 p-32 bg-hc-red/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-            
-            <div class="flex items-end justify-between font-mono relative z-10 mb-6">
+        <div class="bg-white/5 border border-white/10 rounded-3xl p-8 mb-12">
+            <div class="flex items-end justify-between font-mono mb-6">
                 <div>
-                    <div class="text-xs text-hc-red font-bold uppercase tracking-widest mb-2">Time Remaining</div>
-                    <div class="text-4xl font-bold text-white tracking-tighter">{{daysRemaining}} Days</div>
+                    <div class="text-xs text-text-muted font-bold uppercase tracking-widest mb-2">Time Remaining</div>
+                    <div class="text-4xl font-bold text-white tracking-tight">{{daysRemaining}} Days</div>
                 </div>
                 <div class="text-right">
                     <div class="text-xs text-text-muted uppercase font-bold tracking-widest mb-2">Deadline</div>
@@ -29,18 +27,16 @@
                 </div>
             </div>
             <!-- Progress Bar -->
-            <div class="w-full bg-black/50 rounded-full h-4 overflow-hidden border border-white/5">
-                <div class="bg-hc-red h-full rounded-full transition-all duration-1000 ease-out relative" style="width: {{progressPercentage}}%">
-                    <div class="absolute inset-0 bg-white/20 animate-[pulse_2s_infinite]"></div>
-                </div>
+            <div class="w-full bg-black/30 rounded-full h-2 overflow-hidden">
+                <div class="bg-white h-full rounded-full" style="width: {{progressPercentage}}%"></div>
             </div>
         </div>
 
         {{#if showSuccess}}
-            <div class="bg-emerald-500 text-black rounded-xl p-8 mb-8 text-center animate-fade-in card-shadow border border-emerald-400">
-                <h2 class="text-2xl font-bold mb-2">Export Started</h2>
-                <p class="mb-6 font-medium">Your download should begin automatically.</p>
-                <a href="/dashboard/offboarding/archive" class="underline hover:no-underline font-mono text-sm">
+            <div class="bg-white/10 rounded-3xl p-8 mb-8 text-center border border-white/10">
+                <h2 class="text-2xl font-bold mb-2 text-white">Export Started</h2>
+                <p class="mb-6 text-text-muted">Your download should begin automatically.</p>
+                <a href="/dashboard/offboarding/archive" class="text-white underline hover:no-underline font-mono text-sm">
                     Click here if it doesn't start
                 </a>
                 
@@ -52,37 +48,23 @@
             </div>
         {{else}}
             {{#if user.dataExported}}
-                <div class="bg-hc-dark rounded-3xl p-8 mb-8 border border-white/10 card-shadow flex flex-col md:flex-row gap-6 items-center text-center md:text-left">
-                    <div class="shrink-0 p-4 bg-blue-500/10 text-blue-400 rounded-2xl">
-                         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-white font-bold text-xl mb-2">Account Frozen</h3>
-                        <p class="text-text-muted text-sm leading-relaxed">
-                            You've already started an export, so your account is locked to prevent changes. You can re-download your archive below.
-                        </p>
-                    </div>
+                <div class="bg-white/5 rounded-3xl p-8 mb-8 border border-white/10 text-center">
+                    <h3 class="text-white font-bold text-xl mb-2">Account Frozen</h3>
+                    <p class="text-text-muted text-sm leading-relaxed">
+                        You've already started an export, so your account is locked to prevent changes. You can re-download your archive below.
+                    </p>
                 </div>
             {{else}}
-                <div class="bg-hc-dark rounded-3xl p-8 mb-8 border border-white/10 card-shadow flex flex-col md:flex-row gap-6 items-center text-center md:text-left">
-                    <div class="shrink-0 p-4 bg-yellow-500/10 text-yellow-400 rounded-2xl">
-                         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="text-white font-bold text-xl mb-2">Heads up</h3>
-                        <p class="text-text-muted text-sm leading-relaxed">
-                            Downloading your data will <span class="text-white font-bold">immediately freeze your account</span>. You won't be able to upload new files or create buckets afterwards.
-                        </p>
-                    </div>
+                <div class="bg-white/5 rounded-3xl p-8 mb-8 border border-white/10 text-center">
+                    <h3 class="text-white font-bold text-xl mb-2">Heads up</h3>
+                    <p class="text-text-muted text-sm leading-relaxed">
+                        Downloading your data will <span class="text-white font-bold">immediately freeze your account</span>. You won't be able to upload new files or create buckets afterwards.
+                    </p>
                 </div>
             {{/if}}
 
             <form action="/dashboard/offboarding/download" method="POST" id="download-form">
-                <button type="button" onclick="triggerDownloadConfirm()" id="download-btn" class="group relative w-full bg-hc-red hover:bg-red-600 text-white text-lg font-bold py-4 rounded-xl transition-all hover:scale-[1.01] active:scale-[0.99] shadow-lg hover:shadow-red-900/50">
+                <button type="button" onclick="triggerDownloadConfirm()" id="download-btn" class="group relative w-full bg-white text-black hover:bg-gray-200 text-lg font-bold py-4 rounded-xl transition-all">
                     <span id="btn-content" class="flex items-center justify-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -90,7 +72,7 @@
                         {{#if user.dataExported}}Download Archive Again{{else}}Download Everything (.zip){{/if}}
                     </span>
                     <div id="btn-spinner" class="hidden absolute inset-0 flex items-center justify-center">
-                        <svg class="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg class="animate-spin h-6 w-6 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
