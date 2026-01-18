@@ -36,10 +36,6 @@ class LogService {
 			bucketId: ctx.bucket.id,
 			bucketName: ctx.bucket.name,
 			ownerId: ctx.user.id,
-			// requesterId is the actor.
-			// If an admin is impersonating in the dashboard, ctx.user is the target user,
-			// so requesterId remains the target user for S3-style request logs.
-			// (Admin impersonation events are logged separately in admin endpoints.)
 			requesterId: ctx.mode === "authenticated" ? ctx.user.id : null,
 			method: ctx.method,
 			path: ctx.path,

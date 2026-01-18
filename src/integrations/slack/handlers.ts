@@ -14,6 +14,7 @@ import { getInternalPath, isReservedBucketName } from "../../core/s3/utils";
 import { db } from "../../db";
 import { bucketKeys, buckets } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
+import { createKey } from "../../services/key-service";
 import { getStorageUsage, getUserBySlackId } from "../../services/user-service";
 import { openModal, publishView } from "./client";
 import {
@@ -247,23 +248,10 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			})
 			.returning();
 
-		const accessKey =
-			"CK" +
-			Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) =>
-				b.toString(16).padStart(2, "0"),
-			)
-				.join("")
-				.toUpperCase();
-		const secretKey = Array.from(
-			crypto.getRandomValues(new Uint8Array(20)),
-			(b) => b.toString(16).padStart(2, "0"),
-		).join("");
-
-		await db.insert(bucketKeys).values({
-			bucketId: newBucket[0].id,
-			accessKey,
-			secretKey,
-		});
+		const { accessKey, secretKey } = await createKey(
+			newBucket[0].id,
+			"slack",
+		);
 
 		handleAppHomeOpened({ user: payload.user.id });
 
@@ -353,23 +341,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 				return;
 			}
 
-			const accessKey =
-				"CK" +
-				Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) =>
-					b.toString(16).padStart(2, "0"),
-				)
-					.join("")
-					.toUpperCase();
-			const secretKey = Array.from(
-				crypto.getRandomValues(new Uint8Array(20)),
-				(b) => b.toString(16).padStart(2, "0"),
-			).join("");
-
-			await db.insert(bucketKeys).values({
-				bucketId: bucketId,
-				accessKey,
-				secretKey,
-			});
+			const { accessKey, secretKey } = await createKey(bucketId, "slack");
 
 			const keys = await db
 				.select()

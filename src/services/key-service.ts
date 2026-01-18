@@ -3,7 +3,10 @@ import { db } from "../db";
 import { bucketKeys, buckets } from "../db/schema";
 import { getAppSettings } from "./settings-service";
 
-export async function createKey(bucketId: string) {
+export async function createKey(
+	bucketId: string,
+	source: "dashboard" | "slack" = "dashboard",
+) {
 	const settings = await getAppSettings();
 	const maxKeys = settings.defaultMaxKeysPerBucket;
 
@@ -18,13 +21,20 @@ export async function createKey(bucketId: string) {
 		);
 	}
 
-	const accessKey =
-		"CK" +
-		Array.from(crypto.getRandomValues(new Uint8Array(10)), (b) =>
-			b.toString(16).padStart(2, "0"),
-		)
-			.join("")
-			.toUpperCase();
+	const envPrefix =
+		process.env.NODE_ENV === "production" ? "SILO_PROD" : "SILO_DEV";
+	const sourcePrefix = source === "dashboard" ? "DK" : "SK"; // DK = Dashboard Key, SK = Slack Key
+
+	const randomPart = Array.from(
+		crypto.getRandomValues(new Uint8Array(10)),
+		(b) => b.toString(16).padStart(2, "0"),
+	)
+		.join("")
+		.toUpperCase();
+
+	// Format: SILO_PROD_DK_7F3A9B...
+	const accessKey = `${envPrefix}_${sourcePrefix}_${randomPart}`;
+
 	const secretKey = Array.from(
 		crypto.getRandomValues(new Uint8Array(20)),
 		(b) => b.toString(16).padStart(2, "0"),
