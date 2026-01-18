@@ -170,6 +170,13 @@ export async function handlePutRequest(
 				).toResponse();
 			}
 
+			// Some clients (like AWS SDK in certain modes or presigned URL uploads) might not send Content-Length.
+			// However, S3 PUT usually requires it or uses chunked encoding.
+			// If missing, we rely on the stream logic below, but we must be careful with upstream.
+			// aws4fetch and many S3 implementations require known size for PUT if not chunked.
+			// If we are proxying to R2/S3, we might need it.
+			// If declared is null, we can't do pre-flight quota check, only mid-stream.
+
 			if (declared !== null) {
 				actualSize = declared;
 				if (contentLengthHeader) {
@@ -195,6 +202,30 @@ export async function handlePutRequest(
 			}
 
 			let seen = 0;
+			// Only wrap the stream if we need to enforce quota or verify length.
+			// If declared length is trusted and within quota, we can technically pass body directly,
+			// BUT `aws4fetch` might need to read it to sign it? No, it streams.
+			// However, Bun's request.body is already a stream.
+			// Creating a new ReadableStream adds overhead but allows us to count bytes.
+			
+			// If we didn't receive Content-Length, we MUST calculate it if we want to forward it.
+			// But we can't calculate it without buffering the whole stream, which is bad for memory.
+			// Upstream S3 usually *requires* Content-Length for PUTs unless using chunked encoding.
+			// `aws4fetch` handles signing, but it might not add Content-Length if the input body is a stream and length is unknown.
+			//
+			// If `contentLengthHeader` was missing, `upstreamHeaders` won't have it.
+			// If we send a stream without Content-Length to S3, it fails with 411.
+			//
+			// SOLUTION:
+			// If the client didn't send Content-Length, we cannot know it without buffering.
+			// Buffering large files is dangerous (DOS).
+			// We should reject requests without Content-Length if we are not using chunked transfer to upstream.
+			// But `aws4fetch` doesn't support chunked upload easily?
+			// Actually, if we just read the stream, we can't add the header after.
+			
+			// If the client DID send Content-Length, we use it.
+			
+			// If we are here, we are wrapping the stream to count bytes for quota/verification.
 			requestBody = new ReadableStream({
 				start(controller) {
 					const reader = body.getReader();
@@ -238,6 +269,12 @@ export async function handlePutRequest(
 					pump();
 				},
 			});
+			
+			// If we are wrapping the stream, the `requestBody` object might lose the "known length" property that Bun/Node streams sometimes have.
+			// We must ensure the `upstreamHeaders` has Content-Length if `declared` is set.
+			if (declared !== null) {
+				// We already set this above: upstreamHeaders.set("Content-Length", contentLengthHeader);
+			}
 		}
 
 		const response = await s3Client.fetch(

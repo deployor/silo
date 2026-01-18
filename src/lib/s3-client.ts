@@ -22,6 +22,7 @@ export class HetznerS3Client {
 			secretAccessKey,
 			service: "s3",
 			region,
+			// Allow passing options like forcePathStyle if needed later, but aws4fetch doesn't use it directly
 		});
 	}
 
