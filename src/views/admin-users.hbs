@@ -394,33 +394,37 @@
                     ${(() => {
                         const now = new Date();
                         const graceEnd = u.overAgeGracePeriodEndsAt ? new Date(u.overAgeGracePeriodEndsAt) : null;
-                        
-                        // Offboarding Statuses (Badges)
+                        const timeUntil = graceEnd ? Math.ceil((graceEnd - now) / (1000 * 60 * 60 * 24)) : 0;
+                        const dateStr = graceEnd ? graceEnd.toLocaleDateString() : '';
+
                         if (u.filesDeleted) {
-                             return '<span class="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-bold border border-red-500/30" title="Files Deleted">AGED OUT</span>';
+                            if (u.dataExported) {
+                                return `<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-bold border border-emerald-500/30 cursor-help" title="User successfully exported data. Files have been deleted.">MIGRATED</span>`;
+                            } else {
+                                return `<span class="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-bold border border-red-500/30 cursor-help" title="Files deleted. User did NOT export data in time.">TOO LATE</span>`;
+                            }
                         }
                         
                         if (u.markedAsOverAge) {
-                            if (graceEnd && now > graceEnd) {
-                                return '<span class="bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded text-xs font-bold border border-orange-500/30" title="Grace Period Expired">EXPIRED</span>';
-                            }
-                            
                             if (u.dataExported) {
-                                return '<span class="bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded text-xs font-bold border border-cyan-500/30" title="Frozen (Data Exported)">FROZEN</span>';
+                                return `<span class="bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded text-xs font-bold border border-cyan-500/30 cursor-help" title="User has initiated export. Account frozen. Files pending deletion.">EXPORTED</span>`;
                             }
                             
-                            return '<span class="bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded text-xs font-bold border border-yellow-500/30" title="In Grace Period">GRACE</span>';
+                            if (graceEnd && now > graceEnd) {
+                                 return `<span class="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-xs font-bold border border-red-500/30 cursor-help" title="Grace period expired on ${dateStr}. Pending deletion.">EXPIRED</span>`;
+                            }
+
+                            return `<span class="bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded text-xs font-bold border border-yellow-500/30 cursor-help" title="In Grace Period. Ends: ${dateStr} (${timeUntil} days left). User has NOT exported yet.">NO EXPORT</span>`;
                         }
 
                         // Standard Status
                         if (u.isLocked) {
-                            return `<div class="flex flex-col items-start gap-1">
+                            return `<div class="flex flex-col items-start gap-1 cursor-help" title="Account Manually Locked${u.lockReason ? ': ' + escapeHtml(u.lockReason) : ''}">
                                 <span class="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded text-xs font-bold border border-blue-500/30">LOCKED</span>
-                                ${u.lockReason ? `<span class="text-[10px] text-blue-300 max-w-[150px] truncate" title="${escapeHtml(u.lockReason)}">${escapeHtml(u.lockReason)}</span>` : ''}
                             </div>`;
                         }
 
-                        return '<span class="bg-white/10 text-white px-2 py-0.5 rounded text-xs font-bold border border-white/20">ACTIVE</span>';
+                        return `<span class="bg-white/10 text-white px-2 py-0.5 rounded text-xs font-bold border border-white/20 cursor-help" title="Normal Active Account">ACTIVE</span>`;
                     })()}
                 </td>
                 <td class="px-6 py-4 text-right">
