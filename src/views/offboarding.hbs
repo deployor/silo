@@ -12,6 +12,48 @@
         <h1 class="text-4xl font-bold text-white mb-2">It's time to move on</h1>
         <p class="text-xl text-text-muted mb-8">It's time to say goodbye to Silo.</p>
 
+        <!-- Stepper -->
+        <div class="w-full max-w-3xl mb-12">
+            <div class="flex items-center justify-between relative">
+                <!-- Line Background -->
+                <div class="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-white/10 -z-10"></div>
+                <!-- Line Progress -->
+                <div class="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 bg-hc-red -z-10 transition-all duration-500" style="width: {{#if user.dataExported}}50%{{else}}25%{{/if}}"></div>
+
+                <!-- Step 1: Notice -->
+                <div class="flex flex-col items-center gap-2">
+                    <div class="w-10 h-10 rounded-full bg-hc-red flex items-center justify-center text-white font-bold border-4 border-hc-dark">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <span class="text-xs font-bold text-white uppercase tracking-wider">Graduation</span>
+                </div>
+
+                <!-- Step 2: Export -->
+                <div class="flex flex-col items-center gap-2">
+                    <div class="w-10 h-10 rounded-full {{#if user.dataExported}}bg-hc-red{{else}}bg-white/10 border-2 border-hc-red text-hc-red{{/if}} flex items-center justify-center font-bold border-4 border-hc-dark transition-colors">
+                         {{#if user.dataExported}}
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                         {{else}}
+                            2
+                         {{/if}}
+                    </div>
+                    <span class="text-xs font-bold {{#if user.dataExported}}text-white{{else}}text-hc-red{{/if}} uppercase tracking-wider">Export</span>
+                </div>
+
+                <!-- Step 3: Deletion -->
+                <div class="flex flex-col items-center gap-2">
+                    <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-text-muted font-bold border-4 border-hc-dark">
+                        3
+                    </div>
+                    <span class="text-xs font-bold text-text-muted uppercase tracking-wider">Deletion</span>
+                </div>
+            </div>
+        </div>
+
         <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow text-left mb-8 relative overflow-hidden">
 
             <h2 class="text-2xl font-bold text-white mb-4">Export Your Data</h2>
@@ -64,8 +106,8 @@
             </div>
             {{/if}}
 
-            <form action="/dashboard/offboarding/download" method="POST" onsubmit="return confirmDownload()">
-                <button type="submit" id="download-btn" class="w-full bg-hc-red hover:bg-red-600 text-white text-lg font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] flex items-center justify-center gap-3">
+            <form action="/dashboard/offboarding/download" method="POST" id="download-form">
+                <button type="button" onclick="triggerDownloadConfirm()" id="download-btn" class="w-full bg-hc-red hover:bg-red-600 text-white text-lg font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] flex items-center justify-center gap-3">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
@@ -99,25 +141,29 @@
 </div>
 
 <script>
-    function confirmDownload() {
-        if (confirm("Are you sure? This will freeze your account immediately to ensure data consistency during export.")) {
+    function triggerDownloadConfirm() {
+        const title = "Ready to Migrate?";
+        const message = "Please store this archive carefully! By proceeding, you confirm that you are migrating your data. Your account will be frozen to prevent further changes, and your files will be queued for deletion at the end of the grace period. \n\nDon't worry: You can re-download this archive at any time before your grace period ends.";
+        
+        openConfirmModal(title, message, async () => {
+            const form = document.getElementById('download-form');
             const btn = document.getElementById('download-btn');
             const originalContent = btn.innerHTML;
+            
+            // Visual feedback on button
             btn.innerHTML = 'Preparing Archive... <svg class="animate-spin h-5 w-5 ml-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
             btn.disabled = true;
             btn.classList.add('opacity-75', 'cursor-not-allowed');
 
-            // Re-enable button after a short delay to allow retry if download fails to start or for next download
-            // Note: The download itself is a navigation/POST, but if it's an attachment, the page might not unload.
-            // A simple timeout is a basic fix; robust solution requires cookie tracking.
+            // Submit the form
+            form.submit();
+
+            // Re-enable button logic (simple timeout fallback)
             setTimeout(() => {
                  btn.innerHTML = originalContent;
                  btn.disabled = false;
                  btn.classList.remove('opacity-75', 'cursor-not-allowed');
-            }, 5000);
-
-            return true;
-        }
-        return false;
+            }, 8000);
+        });
     }
 </script>
