@@ -62,12 +62,18 @@ export async function handleOffboardingRequest(req: Request): Promise<Response> 
 			: now;
 		const diffTime = Math.max(0, ends.getTime() - now.getTime());
 		const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+		      
+		      // Calculate progress percentage (assuming 60 day window)
+		      // 100% means time is UP (deletion). 0% means just started.
+		      const totalDays = 60;
+		      const progressPercentage = Math.min(100, Math.max(0, ((totalDays - daysRemaining) / totalDays) * 100));
 
 		const html = await render("offboarding", {
 			title: "Export Your Data - Silo",
 			layout: "main",
 			user,
 			daysRemaining,
+		          progressPercentage: progressPercentage.toFixed(1),
 			gracePeriodEndsAt: ends.toLocaleDateString(),
 			hideNavLinks: true,
 			showSuccess: url.searchParams.get("success") === "1",
