@@ -196,17 +196,18 @@ Please sign in with Hack Club Auth so we can match this Slack user to your recor
 			if (user.dataExported) {
 				await postMessage(
 					channelId,
-					"Bro, you're over 18. I'm sorry to tell you, but you also can't use the CDN anymore, sowwy! As you know, all your files and S3 and everything got paused before too, and you downloaded them in time!",
+					"Bro, you're over 18. :ms-raised-eyebrow: I'm sorry to tell you, but you also can't use the CDN anymore, sowwy! As you know, all your files and S3 and everything got paused before too, and you downloaded them in time!",
 					threadTs,
 				);
+				await addReaction(channelId, messageTs, "ms-raised-eyebrow");
 			} else {
 				await postMessage(
 					channelId,
-					"Hey uh, how do I tell you this but...\n\nYour files got forever deleted and you weren't in time to actually download them. You're over 18, and to save budget and more, Hack Club doesn't actually run this for over 18-year-olds... Sorry.",
+					"Hey uh, how do I tell you this but... :panic:\n\nYour files got forever deleted and you weren't in time to actually download them. You're over 18, and to save budget and more, Hack Club doesn't actually run this for over 18-year-olds... Sorry.",
 					threadTs,
 				);
+				await addReaction(channelId, messageTs, "panic");
 			}
-			await addReaction(channelId, messageTs, "ms-mild-panic");
 			return;
 		}
 
@@ -227,20 +228,20 @@ Please sign in with Hack Club Auth so we can match this Slack user to your recor
 		if (user.dataExported) {
 			await postMessage(
 				channelId,
-				`Heyho, sorry you're over 18 and your files are also soon to be deleted, soooooo no new files and old ones gone soon too :C\n\nYou already downloaded your files, but if you need to again, <https://${config.s3Domain}/dashboard/offboarding|HERE> are your old files. Soooo ${usageGB} GB will be deleted in ${daysLeft} days on ${endDate}.`,
+				`Heyho, sorry you're over 18 and your files are also soon to be deleted :sad-pf:, soooooo no new files and old ones gone soon too :C\n\nYou already downloaded your files, but if you need to again, <https://${config.s3Domain}/dashboard/offboarding|HERE> are your old files. Soooo ${usageGB} GB will be deleted in ${daysLeft} days on ${endDate}.`,
 				threadTs,
 			);
-			await addReaction(channelId, messageTs, "no_entry");
+			await addReaction(channelId, messageTs, "sad-pf");
 			return;
 		}
 
 		if (user.markedAsOverAge) {
 			await postMessage(
 				channelId,
-				`Hey... Sorry but you're over 18- You seem to store ${usageGB} GB of data though! WHICH YOU HAVE STILL NOT DOWNLOADED!!!!! Please download it <https://${config.s3Domain}/dashboard/offboarding|HERE> and migrate to something like Cloudflare R2 ASAP! I will delete everything in ${daysLeft} days on ${endDate}, so HURRY! I won't upload the files you provided me with :(`,
+				`Hey... Sorry but you're over 18- You seem to store ${usageGB} GB of data though! WHICH YOU HAVE STILL NOT DOWNLOADED!!!!! :siren1::siren1::siren1::siren1::siren1::siren1::siren1::siren1::siren1::siren1: Please download it <https://${config.s3Domain}/dashboard/offboarding|HERE> and migrate to something like Cloudflare R2 ASAP! :catalarm: I will delete everything in ${daysLeft} days on ${endDate}, so HURRY! I won't upload the files you provided me with :(`,
 				threadTs,
 			);
-			await addReaction(channelId, messageTs, "ms-mild-panic");
+			await addReaction(channelId, messageTs, "siren1");
 			return;
 		}
 
