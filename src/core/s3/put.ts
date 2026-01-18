@@ -222,6 +222,64 @@ export async function handlePutRequest(
 			// SOLUTION:
 			// If the client didn't send Content-Length, we cannot know it without buffering.
 			// Buffering large files is dangerous (DOS).
+			
+			// HACK: For scripts sending small payloads (like our tests), allow reading even if no content-length
+			// But for real S3 usage, we usually require it.
+			// If we are here, and declared is null, we can try to guess or just buffer if it's small?
+			// Actually, the issue in the test script is that `PutObjectCommand` in AWS SDK v3
+			// DOES calculate Content-Length for string bodies.
+			// So why is it missing?
+			// Ah, the test script is sending `ContentLength` in the command, so `req.headers.get("content-length")` SHOULD be present.
+			//
+			// Wait, in `scripts/test-new-key-format.ts`, we added `ContentLength: Buffer.byteLength(file.body)`.
+			// So the SDK *should* be sending it.
+			// The server sees: `[DEBUG] PUT request incoming headers: ... "content-length": "12" ...`
+			// So `declared` should be 12.
+			//
+			// Then we go to:
+			// if (declared !== null) { ... upstreamHeaders.set("Content-Length", contentLengthHeader); }
+			//
+			// So `upstreamHeaders` HAS Content-Length.
+			//
+			// Then we create `requestBody`:
+			// `requestBody = new ReadableStream({ ... })`
+			//
+			// Then we call `s3Client.fetch(..., { headers: upstreamHeaders, body: requestBody })`.
+			//
+			// `s3Client` is `HetznerS3Client` wrapping `AwsClient` from `aws4fetch`.
+			// `AwsClient.fetch` takes the headers and body.
+			//
+			// ISSUE: `aws4fetch` might be stripping Content-Length if the body is a stream?
+			// Or maybe `bun`'s `fetch` (which `aws4fetch` uses under the hood) is doing something?
+			//
+			// When passing a `ReadableStream` as body to `fetch`, the browser/runtime often sets `Transfer-Encoding: chunked`
+			// and ignores `Content-Length`.
+			// S3 often dislikes `Transfer-Encoding: chunked` for PUTs unless properly signed as chunked upload (which aws4fetch might not do for streams?).
+			//
+			// FIX: We need to ensure that if we have a known length, we pass it in a way that `fetch` respects it,
+			// OR we use a Buffer/Blob instead of a Stream if possible.
+			// Since we are proxying, we used Stream to avoid buffering.
+			//
+			// BUT `aws4fetch` documentation says:
+			// "If you are using a ReadableStream as body, you should provide the size in the headers or the Content-Length header will be missing."
+			// We ARE providing it in `upstreamHeaders`.
+			//
+			// However, Bun's `fetch` with a `ReadableStream` might be forcing chunked encoding.
+			// If we are just proxying small files, buffering is safer.
+			// If we are proxying large files, we need `duplex: 'half'` (which we have).
+			//
+			// Let's try to verify if `aws4fetch` preserves the header.
+			//
+			// Actually, if `actualSize` is known (declared !== null), we are still creating a `ReadableStream`.
+			// Maybe we should just read the body into a buffer if it's small enough?
+			// No, that defeats the purpose of streaming.
+			//
+			// Let's try to set `Content-Length` explicitly in the `fetch` call again, maybe `aws4fetch` clobbers it?
+			// No, we saw `s3Client.ts` doing `headersObj`.
+			//
+			// Maybe the issue is case sensitivity? "Content-Length" vs "content-length"?
+			// We are setting "Content-Length".
+			
 			// We should reject requests without Content-Length if we are not using chunked transfer to upstream.
 			// But `aws4fetch` doesn't support chunked upload easily?
 			// Actually, if we just read the stream, we can't add the header after.
@@ -241,6 +299,13 @@ export async function handlePutRequest(
 			//
 			// The issue might be that we are modifying the body (by wrapping it) but not buffering it,
 			// so the runtime doesn't know the length anymore.
+
+			         // HACK: If we have a declared length, we can try to "trick" Bun/fetch into thinking
+			         // the stream has a known length if we use a Blob or ArrayBuffer?
+			         // But we want to stream.
+			         //
+			         // If `declared` is set, we added `Content-Length` to `upstreamHeaders`.
+			         // But `aws4fetch` or `fetch` might drop it if body is a stream.
 			//
 			// For untrusted clients: We DO verify `seen` vs `declared` at the end of the stream.
 			// If they mismatch, we error the controller, which should abort the upstream connection.
@@ -288,48 +353,96 @@ export async function handlePutRequest(
 					}
 				}
 			} else {
-				// Standard stream processing if we trust the declared length
-				requestBody = new ReadableStream({
-					start(controller) {
-						const reader = body.getReader();
-						const pump = (): void => {
-							reader
-								.read()
-								.then(({ value, done }) => {
-									if (done) {
-										if (declared !== null && seen !== declared) {
-											controller.error(
-												new Error(
-													`Content-Length mismatch: declared=${declared} actual=${seen}`,
-												),
-											);
-										} else {
-											actualSize = seen;
-											controller.close();
-										}
-										return;
-									}
+				// Special optimization:
+				// If `declared` length is small (e.g., < 10MB), buffer it to ensure upstream S3 gets a clean Content-Length.
+				// This avoids issues where streaming bodies drop the Content-Length header in some runtimes/proxies.
+				// 10MB is a reasonable tradeoff for memory vs reliability.
+				const BUFFER_THRESHOLD = 10 * 1024 * 1024; // 10 MB
 
-									seen += value?.byteLength ?? 0;
+				if (declared !== null && declared < BUFFER_THRESHOLD) {
+					const chunks: Uint8Array[] = [];
+					const reader = body.getReader();
+					let totalLength = 0;
 
-									if (limit !== null) {
-										if (
-											BigInt(user.storageUsageBytes) + BigInt(seen) >
-											BigInt(limit)
-										) {
-											controller.error(new Error("QuotaExceeded"));
+					while (true) {
+						const { done, value } = await reader.read();
+						if (done) break;
+						chunks.push(value);
+						totalLength += value.byteLength;
+					}
+
+					const combined = new Uint8Array(totalLength);
+					let offset = 0;
+					for (const chunk of chunks) {
+						combined.set(chunk, offset);
+						offset += chunk.byteLength;
+					}
+
+					if (totalLength !== declared) {
+						return S3Errors.InvalidRequest(
+							`Content-Length mismatch: declared=${declared} actual=${totalLength}`,
+						).toResponse();
+					}
+					
+					// Update quota check just in case
+					if (limit !== null) {
+						if (
+							BigInt(user.storageUsageBytes) + BigInt(totalLength) >
+							BigInt(limit)
+						) {
+							return S3Errors.QuotaExceeded(
+								"You have exceeded your storage quota.",
+								key,
+							).toResponse();
+						}
+					}
+
+					requestBody = combined;
+					actualSize = totalLength;
+				} else {
+					// Fallback to streaming for large files
+					requestBody = new ReadableStream({
+						start(controller) {
+							const reader = body.getReader();
+							const pump = (): void => {
+								reader
+									.read()
+									.then(({ value, done }) => {
+										if (done) {
+											if (declared !== null && seen !== declared) {
+												controller.error(
+													new Error(
+														`Content-Length mismatch: declared=${declared} actual=${seen}`,
+													),
+												);
+											} else {
+												actualSize = seen;
+												controller.close();
+											}
 											return;
 										}
-									}
 
-									controller.enqueue(value);
-									pump();
-								})
-								.catch((err) => controller.error(err));
-						};
-						pump();
-					},
-				});
+										seen += value?.byteLength ?? 0;
+
+										if (limit !== null) {
+											if (
+												BigInt(user.storageUsageBytes) + BigInt(seen) >
+												BigInt(limit)
+											) {
+												controller.error(new Error("QuotaExceeded"));
+												return;
+											}
+										}
+
+										controller.enqueue(value);
+										pump();
+									})
+									.catch((err) => controller.error(err));
+							};
+							pump();
+						},
+					});
+				}
 			}
 		}
 
