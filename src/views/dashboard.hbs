@@ -7,13 +7,22 @@
 </div>
 {{else}}
   {{#if user.markedAsOverAge}}
-  <div class="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-8 text-center">
-      <h3 class="text-white font-bold text-lg">It's time to move on</h3>
-      <p class="text-white/80 text-sm mt-1 max-w-2xl mx-auto">
-        Since you're over 18, you need to move your files off Silo. We've disabled creating new buckets or keys, and your existing data will be deleted in 2 months.
-      </p>
-      <a href="/dashboard/offboarding" class="inline-block mt-3 bg-white/10 border border-white/20 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-white/20 transition-colors">
-        Migrate off Silo &rarr;
+  <div class="bg-hc-dark border border-white/10 rounded-3xl p-6 mb-8 card-shadow flex flex-col md:flex-row items-center justify-between gap-6">
+      <div class="flex items-start gap-4">
+          <div class="shrink-0 p-3 bg-white/10 rounded-xl text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+          </div>
+          <div>
+              <h3 class="text-white font-bold text-lg">Your account is closing soon.</h3>
+              <p class="text-text-muted text-sm mt-1 max-w-xl">
+                  Since you're 18, you've aged out of Silo. We've disabled creating new resources, and your existing data will be permanently deleted in 2 months.
+              </p>
+          </div>
+      </div>
+      <a href="/dashboard/offboarding" class="shrink-0 bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105 card-shadow whitespace-nowrap">
+        Start Migration &rarr;
       </a>
   </div>
   {{/if}}
