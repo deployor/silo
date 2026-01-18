@@ -1,29 +1,47 @@
 {{#if user.dataExported}}
-<div class="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-8 text-center">
-    <h3 class="text-blue-400 font-bold text-lg">Your account is frozen</h3>
-    <p class="text-blue-300 text-sm mt-1 max-w-2xl mx-auto">
-        You've downloaded your data, so we've locked your account to keep everything consistent. You can't upload new files or change settings anymore, and your data will be permanently deleted soon.
-    </p>
+<div class="bg-hc-dark border border-white/10 rounded-3xl p-8 mb-8 card-shadow text-center relative overflow-hidden">
+    <div class="absolute top-0 right-0 p-32 bg-emerald-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+    
+    <div class="relative z-10 flex flex-col items-center">
+        <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-2xl mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <h3 class="text-white font-black uppercase tracking-wider text-xl mb-2">Account Frozen</h3>
+        <p class="text-text-muted text-sm max-w-2xl mx-auto leading-relaxed">
+            You've successfully downloaded your archive. To ensure data consistency, your account is now read-only. <br/>
+            Your files will be automatically deleted when your grace period ends.
+        </p>
+    </div>
 </div>
 {{else}}
   {{#if user.markedAsOverAge}}
-  <div class="bg-hc-dark border border-white/10 rounded-3xl p-6 mb-8 card-shadow flex flex-col md:flex-row items-center justify-between gap-6">
-      <div class="flex items-start gap-4">
-          <div class="shrink-0 p-3 bg-white/10 rounded-xl text-white">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+  <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 mb-8 card-shadow relative overflow-hidden group">
+      <div class="absolute top-0 left-0 p-32 bg-hc-red/5 rounded-full blur-3xl -ml-16 -mt-16 pointer-events-none"></div>
+      
+      <div class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+          <div class="flex items-start gap-6">
+              <div class="shrink-0 p-4 bg-hc-red/10 text-hc-red rounded-2xl">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+              </div>
+              <div>
+                  <h3 class="text-white font-black uppercase tracking-wider text-xl mb-2">Action Required</h3>
+                  <p class="text-text-muted text-sm leading-relaxed max-w-xl">
+                      It looks like you've turned 18! Happy birthday! 🎂 <br/>
+                      Since Silo is for teenagers, you'll need to move your files. You have a <strong>2-month grace period</strong> before your data is deleted.
+                  </p>
+              </div>
           </div>
-          <div>
-              <h3 class="text-white font-bold text-lg">Your account is closing soon.</h3>
-              <p class="text-text-muted text-sm mt-1 max-w-xl">
-                  Since you're 18, you've aged out of Silo. We've disabled creating new resources, and your existing data will be permanently deleted in 2 months.
-              </p>
-          </div>
+          <a href="/dashboard/offboarding" class="shrink-0 bg-hc-red hover:bg-red-600 text-white px-8 py-4 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all hover:scale-105 hover:shadow-lg hover:shadow-red-900/20 whitespace-nowrap flex items-center gap-2 group-hover:animate-pulse">
+            <span>Download Data</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+          </a>
       </div>
-      <a href="/dashboard/offboarding" class="shrink-0 bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105 card-shadow whitespace-nowrap">
-        Start Migration &rarr;
-      </a>
   </div>
   {{/if}}
 {{/if}}
