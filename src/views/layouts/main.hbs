@@ -69,6 +69,26 @@
     </nav>
 
     <main class="max-w-7xl mx-auto w-full px-6 py-8 {{mainClass}}">
+      {{#if user.markedAsOverAge}}
+        {{#unless hideNavLinks}}
+        <div class="bg-hc-red/10 border border-hc-red/20 rounded-xl p-4 mb-6 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                 <div class="p-2 bg-hc-red/20 text-hc-red rounded-lg shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                 </div>
+                 <div>
+                     <div class="font-bold text-white text-sm">Action Required</div>
+                     <div class="text-text-muted text-xs">You've aged out of Silo. Please download your data before it's deleted.</div>
+                 </div>
+            </div>
+            <a href="/dashboard/offboarding" class="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors whitespace-nowrap">
+                View Details
+            </a>
+        </div>
+        {{/unless}}
+      {{/if}}
       {{{body}}}
     </main>
 
