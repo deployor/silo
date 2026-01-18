@@ -5,20 +5,18 @@
         
         <!-- Header -->
         <div class="mb-12">
-            <h1 class="text-6xl font-black text-white mb-6 uppercase tracking-tighter" style="font-family: 'Phantom Sans', system-ui, -apple-system, sans-serif;">
-                <span class="text-hc-red">System</span> Update
+            <h1 class="text-5xl font-bold text-white mb-6 tracking-tight">
+                Time to move your files
             </h1>
-            <p class="text-xl text-text-muted leading-relaxed max-w-lg mx-auto font-medium">
+            <p class="text-xl text-text-muted leading-relaxed max-w-lg mx-auto">
                 You've turned 18, so you've aged out of Silo. <br/>
                 Please download your files before your account is closed.
             </p>
         </div>
 
         <!-- Status Bar -->
-        <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 mb-12 card-shadow relative overflow-hidden group">
-            <div class="absolute top-0 right-0 p-32 bg-hc-red/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
-            
-            <div class="flex items-end justify-between font-mono relative z-10 mb-6">
+        <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 mb-12 card-shadow">
+            <div class="flex items-end justify-between font-mono mb-6">
                 <div>
                     <div class="text-xs text-hc-red font-bold uppercase tracking-widest mb-2">Time Remaining</div>
                     <div class="text-4xl font-bold text-white tracking-tighter">{{daysRemaining}} Days</div>
@@ -30,9 +28,7 @@
             </div>
             <!-- Progress Bar -->
             <div class="w-full bg-black/50 rounded-full h-4 overflow-hidden border border-white/5">
-                <div class="bg-hc-red h-full rounded-full transition-all duration-1000 ease-out relative" style="width: {{progressPercentage}}%">
-                    <div class="absolute inset-0 bg-white/20 animate-[pulse_2s_infinite]"></div>
-                </div>
+                <div class="bg-hc-red h-full rounded-full" style="width: {{progressPercentage}}%"></div>
             </div>
         </div>
 
