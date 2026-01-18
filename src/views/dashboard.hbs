@@ -7,7 +7,7 @@
 </div>
 {{else}}
   {{#if user.markedAsOverAge}}
-  <div class="bg-white/5 border border-white/10 rounded-3xl p-6 mb-8 flex flex-col md:flex-row items-center justify-between gap-6">
+  <div class="bg-hc-dark border border-white/10 rounded-3xl p-6 mb-8 card-shadow flex flex-col md:flex-row items-center justify-between gap-6">
       <div class="flex items-start gap-4">
           <div class="shrink-0 p-3 bg-white/10 rounded-xl text-white">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -21,7 +21,7 @@
               </p>
           </div>
       </div>
-      <a href="/dashboard/offboarding" class="shrink-0 bg-white hover:bg-gray-200 text-black px-6 py-3 rounded-xl text-sm font-bold transition-all whitespace-nowrap">
+      <a href="/dashboard/offboarding" class="shrink-0 bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105 card-shadow whitespace-nowrap">
         Start Migration &rarr;
       </a>
   </div>
