@@ -76,6 +76,25 @@
                 This may take a while depending on your storage usage. Please do not close this tab.
             </p>
         </div>
+
+        <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow text-left mb-8">
+             <h2 class="text-2xl font-bold text-white mb-4">How to Migrate to Cloudflare R2</h2>
+             <p class="text-text-muted mb-4">
+                Since you're moving on, we recommend Cloudflare R2 as a great alternative. It's S3-compatible and has a generous free tier.
+             </p>
+             <ol class="list-decimal list-inside text-text-muted space-y-2 mb-6">
+                <li>Create a Cloudflare account and enable R2.</li>
+                <li>Create a new bucket in R2.</li>
+                <li>Generate S3 API tokens (Access Key ID and Secret Access Key) in R2.</li>
+                <li>Download your data from Silo using the button above.</li>
+                <li>Unzip the archive.</li>
+                <li>Use a tool like <code class="text-white">rclone</code> or the AWS CLI to upload your files to R2.</li>
+             </ol>
+             <div class="bg-black/30 p-4 rounded-xl border border-white/10 font-mono text-xs text-white overflow-x-auto">
+                # Example using AWS CLI with R2<br/>
+                aws s3 sync ./my-silo-export s3://my-new-r2-bucket --endpoint-url https://<accountid>.r2.cloudflarestorage.com
+             </div>
+        </div>
     </div>
 </div>
 
