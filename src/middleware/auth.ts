@@ -140,11 +140,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 			).toResponse();
 		}
 
-		// Prevent modifications if data exported or user deleted (although deleted users won't be found)
-		// Or if markedAsOverAge, prevent PUT/POST/DELETE (read-only)?
-		// "The moment the user initiates this download, the system must freeze their account so no new files"
 		if (user.dataExported || user.filesDeleted) {
-			// Allow reading files even if exported, but deny all modifications.
 			if (req.method !== "GET" && req.method !== "HEAD") {
 				return S3Errors.AccessDenied(
 					"Account is frozen. Modifications are disabled.",
@@ -209,7 +205,6 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 	}
 
 	if (user.dataExported || user.filesDeleted) {
-		// Allow reading files even if exported, but deny all modifications.
 		if (req.method !== "GET" && req.method !== "HEAD") {
 			return S3Errors.AccessDenied(
 				"Account is frozen. Modifications are disabled.",
