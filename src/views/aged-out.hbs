@@ -8,16 +8,74 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
 </head>
 <body class="bg-hc-dark text-text-main min-h-screen flex flex-col items-center justify-center p-6">
-    <div class="max-w-xl w-full text-center">
-        <div class="flex justify-center mb-6">
-            <div class="text-hc-red p-4 bg-hc-red/10 rounded-full border border-hc-red/20">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
+    <div class="max-w-2xl w-full text-center">
+        <!-- Stepper (Final State) -->
+        <div class="w-full max-w-3xl mb-12">
+            <div class="flex items-center justify-between relative">
+                 <!-- Line Background -->
+                <div class="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-white/10 -z-10"></div>
+                <!-- Line Progress (Full) -->
+                <div class="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 bg-hc-red -z-10 w-full"></div>
+
+                <!-- Step 1: Graduation (Done) -->
+                <div class="flex flex-col items-center gap-2">
+                    <div class="w-10 h-10 rounded-full bg-hc-red flex items-center justify-center text-white font-bold border-4 border-hc-dark">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <span class="text-xs font-bold text-white uppercase tracking-wider">Graduation</span>
+                </div>
+
+                <!-- Step 2: Export (Conditional) -->
+                <div class="flex flex-col items-center gap-2">
+                     {{#if user.dataExported}}
+                    <div class="w-10 h-10 rounded-full bg-hc-red flex items-center justify-center text-white font-bold border-4 border-hc-dark">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <span class="text-xs font-bold text-white uppercase tracking-wider">Exported</span>
+                    {{else}}
+                    <div class="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center text-white font-bold border-4 border-hc-dark">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </div>
+                    <span class="text-xs font-bold text-red-500 uppercase tracking-wider">Missed</span>
+                    {{/if}}
+                </div>
+
+                <!-- Step 3: Deletion (Done) -->
+                <div class="flex flex-col items-center gap-2">
+                    <div class="w-10 h-10 rounded-full bg-hc-red flex items-center justify-center text-white font-bold border-4 border-hc-dark">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <span class="text-xs font-bold text-white uppercase tracking-wider">Deleted</span>
+                </div>
             </div>
         </div>
+
         <h1 class="text-4xl font-bold text-white mb-4">It's time to move on</h1>
         <div class="bg-white/5 border border-white/10 rounded-2xl p-8 card-shadow">
+            {{#unless user.dataExported}}
+            <div class="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6 text-left">
+                <div class="text-red-300 text-sm flex gap-3">
+                    <div class="shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <strong>You missed the export window.</strong><br/>
+                        You did not download your data during the grace period. Unfortunately, your files have now been permanently deleted and cannot be recovered.
+                    </div>
+                </div>
+            </div>
+            {{/unless}}
+
             <p class="text-lg text-text-muted mb-6">
                 You've officially aged out of Hack Club's Silo service.
             </p>
