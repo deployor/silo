@@ -22,8 +22,7 @@ export async function createKey(
 		);
 	}
 
-	const envPrefix =
-		process.env.NODE_ENV === "production" ? "SILO_PROD" : "SILO_DEV";
+	const envPrefix = config.isProduction ? "SILO_PROD" : "SILO_DEV";
 	const sourcePrefix = source === "dashboard" ? "DK" : "SK"; // DK = Dashboard Key, SK = Slack Key
 
 	const randomPart = Array.from(
