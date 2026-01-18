@@ -10,50 +10,56 @@
 <body class="bg-hc-dark text-text-main min-h-screen flex flex-col items-center justify-center p-6">
     <div class="max-w-2xl w-full text-center">
         <!-- Stepper (Final State) -->
-        <div class="w-full max-w-3xl mb-12">
-            <div class="flex items-center justify-between relative">
-                 <!-- Line Background -->
-                <div class="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-white/10 -z-10"></div>
-                <!-- Line Progress (Full) -->
-                <div class="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 bg-hc-red -z-10 w-full"></div>
+        <div class="w-full max-w-3xl mx-auto mb-16 px-4">
+            <div class="relative">
+                <!-- Simple Track -->
+                <div class="absolute top-6 left-0 w-full h-1 bg-white/10"></div>
+                
+                <div class="relative flex justify-between w-full">
+                    <!-- Step 1: Notification -->
+                    <div class="flex flex-col items-center group cursor-default w-32">
+                        <div class="w-12 h-12 rounded-full bg-emerald-500 border-4 border-hc-dark flex items-center justify-center z-10 mb-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                        <h3 class="text-white font-bold text-sm uppercase tracking-wide">1. Notify</h3>
+                        <p class="text-emerald-500/80 text-[10px] mt-1 font-mono uppercase font-bold">Completed</p>
+                    </div>
 
-                <!-- Step 1: Graduation (Done) -->
-                <div class="flex flex-col items-center gap-2">
-                    <div class="w-10 h-10 rounded-full bg-hc-red flex items-center justify-center text-white font-bold border-4 border-hc-dark">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                        </svg>
+                    <!-- Step 2: Export Data -->
+                    <div class="flex flex-col items-center group cursor-default w-32">
+                        {{#if user.dataExported}}
+                        <div class="w-12 h-12 rounded-full bg-emerald-500 border-4 border-hc-dark flex items-center justify-center z-10 mb-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                        <h3 class="text-emerald-500 font-bold text-sm uppercase tracking-wide">2. Export</h3>
+                        <p class="text-emerald-500/80 text-[10px] mt-1 font-mono uppercase font-bold">Done</p>
+                        {{else}}
+                        <div class="w-12 h-12 rounded-full bg-red-500 border-4 border-hc-dark flex items-center justify-center z-10 mb-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </div>
+                        <h3 class="text-red-500 font-bold text-sm uppercase tracking-wide">2. Export</h3>
+                        <p class="text-red-500/80 text-[10px] mt-1 font-mono uppercase font-bold">Missed</p>
+                        {{/if}}
                     </div>
-                    <span class="text-xs font-bold text-white uppercase tracking-wider">Over Age</span>
-                </div>
 
-                <!-- Step 2: Export (Conditional) -->
-                <div class="flex flex-col items-center gap-2">
-                     {{#if user.dataExported}}
-                    <div class="w-10 h-10 rounded-full bg-hc-red flex items-center justify-center text-white font-bold border-4 border-hc-dark">
-                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                        </svg>
+                    <!-- Step 3: Deletion -->
+                    <div class="flex flex-col items-center group cursor-default w-32">
+                        <div class="w-12 h-12 rounded-full {{#if user.dataExported}}bg-emerald-500{{else}}bg-red-500{{/if}} border-4 border-hc-dark flex items-center justify-center z-10 mb-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+                        <h3 class="{{#if user.dataExported}}text-emerald-500{{else}}text-red-500{{/if}} font-bold text-sm uppercase tracking-wide">3. Deletion</h3>
+                        <p class="{{#if user.dataExported}}text-emerald-500/80{{else}}text-red-500/80{{/if}} text-[10px] mt-1 font-mono uppercase font-bold">
+                            Finalized
+                        </p>
                     </div>
-                    <span class="text-xs font-bold text-white uppercase tracking-wider">Exported</span>
-                    {{else}}
-                    <div class="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center text-white font-bold border-4 border-hc-dark">
-                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </div>
-                    <span class="text-xs font-bold text-red-500 uppercase tracking-wider">Missed</span>
-                    {{/if}}
-                </div>
-
-                <!-- Step 3: Deletion (Done) -->
-                <div class="flex flex-col items-center gap-2">
-                    <div class="w-10 h-10 rounded-full bg-hc-red flex items-center justify-center text-white font-bold border-4 border-hc-dark">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </div>
-                    <span class="text-xs font-bold text-white uppercase tracking-wider">Deleted</span>
                 </div>
             </div>
         </div>
