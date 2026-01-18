@@ -68,6 +68,7 @@ export class HetznerS3Client {
 
 				const res = await this.client.fetch(baseUrl.toString(), {
 					...init,
+					headers: headersObj,
 					signal: controller.signal,
 				});
 

@@ -23,8 +23,7 @@ export async function createKey(
 	}
 
 	const envPrefix = config.isProduction ? "SILO_PROD" : "SILO_DEV";
-	const sourcePrefix = source === "dashboard" ? "DK" : "SK"; // DK = Dashboard Key, SK = Slack Key
-
+	const sourcePrefix = source === "dashboard" ? "DK" : "SK"; // SK = SlackKey DK = DashboardKey
 	const randomPart = Array.from(
 		crypto.getRandomValues(new Uint8Array(10)),
 		(b) => b.toString(16).padStart(2, "0"),
