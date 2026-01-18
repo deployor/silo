@@ -15,11 +15,14 @@ const envSchema = z.object({
 	SLACK_SIGNING_SECRET: z.string().min(1, "SLACK_SIGNING_SECRET is required"),
 	SLACK_FILE_UPLOAD_CHANNEL_ID: z.string().optional(),
 	DEV_ACCESS_CODE: z.string().optional(),
+	NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 
 const env = envSchema.parse(process.env);
 
 export const config = {
+	env: env.NODE_ENV,
+	isProduction: env.NODE_ENV === "production",
 	s3Domain: env.S3_DOMAIN,
 	databaseUrl: env.DATABASE_URL,
 	s3: {
