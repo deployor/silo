@@ -51,7 +51,7 @@ async function runTest() {
 					Body: file.body,
 					ContentType: file.type,
 					Metadata: { "x-test-meta": "silo-verification" },
-					ContentLength: Buffer.byteLength(file.body),
+					// Intentionally NOT sending ContentLength to test auto-calculation
 				}),
 			);
 			console.log(`   ✅ Uploaded ${file.key}`);
