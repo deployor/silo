@@ -66,6 +66,8 @@ export class HetznerS3Client {
 					}
 				}
 
+				console.log(`[DEBUG] S3Client outgoing headers to ${baseUrl.toString()}:`, JSON.stringify(headersObj, null, 2));
+
 				const res = await this.client.fetch(baseUrl.toString(), {
 					...init,
 					headers: headersObj,
