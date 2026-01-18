@@ -55,7 +55,7 @@ export async function handleKeys(req: Request): Promise<Response> {
 		}
 
 		try {
-			const keys = await createKey(bucket[0].id);
+			const keys = await createKey(bucket[0].id, "dashboard");
 			const publicUrl = `https://${config.s3Domain}/${bucketName}/file.png`;
 			return jsonResponse({ ...keys, publicUrl });
 		} catch (e) {
