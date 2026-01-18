@@ -132,9 +132,6 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		});
 	}
 
-	// 2. Check for Offboarding Required (Marked as over age)
-	// If data is exported (frozen), redirect to offboarding page so they can re-download if needed.
-	// We allow them to see the offboarding page again.
 	if (user.dataExported) {
 		const html = await render("offboarding", {
 			title: "Silo - Offboarding Export",

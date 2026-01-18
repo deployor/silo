@@ -12,36 +12,26 @@
         
         <!-- Header -->
         <div class="mb-12">
-            <h1 class="text-6xl font-black text-white mb-6 uppercase tracking-tighter" style="font-family: 'Phantom Sans', system-ui, -apple-system, sans-serif;">
-                <span class="text-hc-red">Account</span> Closed
+            <h1 class="text-5xl font-bold text-white mb-6 tracking-tight">
+                Account Closed
             </h1>
-            <p class="text-xl text-text-muted leading-relaxed max-w-lg mx-auto font-medium">
+            <p class="text-xl text-text-muted leading-relaxed">
                 Your Silo account has been permanently closed because you've aged out.
             </p>
         </div>
 
         {{#if user.dataExported}}
-            <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 mb-8 card-shadow">
-                <div class="flex items-center justify-center w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-2xl mx-auto mb-6">
-                     <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                    </svg>
-                </div>
-                <h3 class="text-white font-bold text-xl mb-3">You're all set</h3>
-                <p class="text-text-muted leading-relaxed">
+            <div class="bg-white/5 border border-white/10 rounded-3xl p-8 mb-8">
+                <h3 class="text-white font-bold text-xl mb-2">You're all set</h3>
+                <p class="text-text-muted text-lg">
                     You downloaded your data before the deadline. <br/>
                     We've deleted your files from our servers to save space.
                 </p>
             </div>
         {{else}}
-             <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 mb-8 card-shadow">
-                <div class="flex items-center justify-center w-16 h-16 bg-hc-red/20 text-hc-red rounded-2xl mx-auto mb-6">
-                     <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </div>
-                <h3 class="text-white font-bold text-xl mb-3">Data Deleted</h3>
-                <p class="text-text-muted leading-relaxed">
+             <div class="bg-white/5 border border-white/10 rounded-3xl p-8 mb-8">
+                <h3 class="text-white font-bold text-xl mb-2">Data Deleted</h3>
+                <p class="text-text-muted text-lg">
                     You didn't download your data before the deadline, so we've had to delete it to make room for new hackers.
                 </p>
             </div>
