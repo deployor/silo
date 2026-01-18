@@ -246,49 +246,86 @@ export async function handlePutRequest(
 			// If they send NO Content-Length, we can't send one upstream either unless we buffer.
 			// Buffering is dangerous. We will rely on S3 411 response in that case.
 			
-			requestBody = new ReadableStream({
-				start(controller) {
-					const reader = body.getReader();
-					const pump = (): void => {
-						reader
-							.read()
-							.then(({ value, done }) => {
-								if (done) {
-									// If we had a declared length, verify it.
-									if (declared !== null && seen !== declared) {
-										controller.error(
-											new Error(
-												`Content-Length mismatch: declared=${declared} actual=${seen}`,
-											),
-										);
-									} else {
-										actualSize = seen;
-										controller.close();
-									}
-									return;
-								}
+			// We must buffer if Content-Length is missing to calculate it for upstream.
+			// Upstream requires Content-Length for PUT.
+			if (declared === null) {
+				const chunks: Uint8Array[] = [];
+				const reader = body.getReader();
+				let totalLength = 0;
 
-								seen += value?.byteLength ?? 0;
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) break;
+					chunks.push(value);
+					totalLength += value.byteLength;
+				}
 
-								// Enforce quota without relying on Content-Length.
-								if (limit !== null) {
-									if (
-										BigInt(user.storageUsageBytes) + BigInt(seen) >
-										BigInt(limit)
-									) {
-										controller.error(new Error("QuotaExceeded"));
+				const combined = new Uint8Array(totalLength);
+				let offset = 0;
+				for (const chunk of chunks) {
+					combined.set(chunk, offset);
+					offset += chunk.byteLength;
+				}
+
+				requestBody = combined;
+				actualSize = totalLength;
+				upstreamHeaders.set("Content-Length", totalLength.toString());
+
+				if (limit !== null) {
+					if (
+						BigInt(user.storageUsageBytes) + BigInt(actualSize) >
+						BigInt(limit)
+					) {
+						return S3Errors.QuotaExceeded(
+							"You have exceeded your storage quota.",
+							key,
+						).toResponse();
+					}
+				}
+			} else {
+				// Standard stream processing if we trust the declared length
+				requestBody = new ReadableStream({
+					start(controller) {
+						const reader = body.getReader();
+						const pump = (): void => {
+							reader
+								.read()
+								.then(({ value, done }) => {
+									if (done) {
+										if (declared !== null && seen !== declared) {
+											controller.error(
+												new Error(
+													`Content-Length mismatch: declared=${declared} actual=${seen}`,
+												),
+											);
+										} else {
+											actualSize = seen;
+											controller.close();
+										}
 										return;
 									}
-								}
 
-								controller.enqueue(value);
-								pump();
-							})
-							.catch((err) => controller.error(err));
-					};
-					pump();
-				},
-			});
+									seen += value?.byteLength ?? 0;
+
+									if (limit !== null) {
+										if (
+											BigInt(user.storageUsageBytes) + BigInt(seen) >
+											BigInt(limit)
+										) {
+											controller.error(new Error("QuotaExceeded"));
+											return;
+										}
+									}
+
+									controller.enqueue(value);
+									pump();
+								})
+								.catch((err) => controller.error(err));
+						};
+						pump();
+					},
+				});
+			}
 		}
 
 		const response = await s3Client.fetch(
