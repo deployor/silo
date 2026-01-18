@@ -114,7 +114,7 @@ export async function handleS3Request(
 	if (user.markedAsOverAge) {
 		if (method === "PUT" || method === "POST" || method === "DELETE") {
 			return S3Errors.AccessDenied(
-				"Account is in graduation grace period. New uploads are disabled.",
+				"Account is in migration grace period. New uploads are disabled.",
 			).toResponse();
 		}
 	}

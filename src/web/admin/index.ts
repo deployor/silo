@@ -225,19 +225,19 @@ async function ageOutUser(userId: string, req: Request) {
 				privateMetaData: "age_out_notification",
 			})
 				.blocks(
-					Header({ text: "Important Account Update: Graduation Time 🎓" }),
+					Header({ text: "It's time to move on from Silo." }),
 					Section({
-						text: "Hey there! We've received notice that you've turned 18. Since Hack Club and Silo are for teenagers, your account is now in a graduation grace period.",
+						text: "Hey there. Since you're 18 now, you've aged out of Silo. Hack Club is a space for teenagers, so we need you to move your files to another provider.",
 					}),
 					Section({
-						text: `Your files will be available for download until *${gracePeriodEndsAt.toLocaleDateString()}*. After this date, your data will be permanently deleted.\n\nPlease visit the export portal to download all your files in one click.`,
+						text: `You have until *${gracePeriodEndsAt.toLocaleDateString()}* to download everything. After that, we'll permanently delete your files.\n\nWe've built an export tool to make this easy. Click below to download a ZIP of all your buckets.`,
 					}),
 					Actions().elements(
 						Button({
-							text: "⬇️ Go to Export Portal",
+							text: "Export Your Data",
 							url: `https://${config.s3Domain}/dashboard/offboarding`,
 							actionId: "open_export_portal",
-						}).primary(),
+						}).danger(),
 					),
 				)
 				.buildToObject(),

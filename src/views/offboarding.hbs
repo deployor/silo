@@ -1,166 +1,127 @@
 {{!< main}}
 
-<div class="min-h-[80vh] flex flex-col items-center justify-center py-12 px-4">
-    <div class="max-w-2xl w-full text-center">
-        <h1 class="text-4xl font-bold text-white mb-2">It's time to move on</h1>
-        <p class="text-xl text-text-muted mb-8">It's time to say goodbye to Silo.</p>
+<div class="min-h-[80vh] flex flex-col items-center justify-center py-16 px-4">
+    <div class="max-w-xl w-full">
+        
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl font-bold text-white mb-6 tracking-tight">It's time to move on.</h1>
+            <p class="text-xl text-text-muted leading-relaxed">
+                You've turned 18, so you've aged out of Silo. <br/>
+                Please download your files before your account is closed.
+            </p>
+        </div>
 
-        <!-- Stepper -->
-        <div class="w-full max-w-3xl mx-auto mb-16 px-4">
-            <div class="relative">
-                <!-- Progress Track -->
-                <div class="absolute top-6 left-0 w-full h-3 bg-white/10 rounded-full overflow-hidden">
-                     <!-- Progress Fill (Solid Color) -->
-                    <div class="h-full bg-hc-red transition-all duration-1000 ease-out" style="width: {{progressPercentage}}%"></div>
-                </div>
-                
-                <div class="relative flex justify-between w-full">
-                    <!-- Step 1: Notification -->
-                    <div class="flex flex-col items-center group cursor-default w-32">
-                        <div class="w-12 h-12 rounded-full bg-white text-black border-4 border-hc-dark flex items-center justify-center z-10 mb-3">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                            </svg>
-                        </div>
-                        <h3 class="text-white font-bold text-sm uppercase tracking-wide">Notify</h3>
-                    </div>
-
-                    <!-- Step 2: Export Data -->
-                    <div class="flex flex-col items-center group cursor-default w-32">
-                        <div class="w-12 h-12 rounded-full {{#if user.dataExported}}bg-white text-black{{else}}bg-hc-red text-white{{/if}} border-4 border-hc-dark flex items-center justify-center z-10 mb-3 transition-colors">
-                            {{#if user.dataExported}}
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                            </svg>
-                            {{else}}
-                            <span class="font-bold text-lg">2</span>
-                            {{/if}}
-                        </div>
-                        <h3 class="{{#if user.dataExported}}text-white{{else}}text-hc-red{{/if}} font-bold text-sm uppercase tracking-wide">Export</h3>
-                    </div>
-
-                    <!-- Step 3: Deletion -->
-                    <div class="flex flex-col items-center group cursor-default w-32">
-                        <div class="w-12 h-12 rounded-full bg-hc-dark border-2 border-white/10 flex items-center justify-center z-10 mb-3">
-                            <span class="text-text-muted font-bold text-lg">3</span>
-                        </div>
-                        <h3 class="text-text-muted font-bold text-sm uppercase tracking-wide">Deletion</h3>
-                    </div>
-                </div>
+        <!-- Status Bar -->
+        <div class="mb-12 flex items-center justify-between text-sm font-mono border-b border-white/10 pb-4">
+            <div class="text-text-muted">
+                <span class="text-white block text-lg mb-1">{{daysRemaining}}</span>
+                days remaining
+            </div>
+            <div class="text-right text-text-muted">
+                <span class="text-white block text-lg mb-1">{{gracePeriodEndsAt}}</span>
+                deadline
             </div>
         </div>
 
-        <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow text-left mb-8 relative overflow-hidden">
-
-            {{#if showSuccess}}
-                <div class="mb-8 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-6 flex flex-col items-center text-center">
-                    <div class="w-16 h-16 bg-emerald-500 rounded-full flex items-center justify-center text-white mb-4 border-4 border-hc-dark">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
-                        </svg>
-                    </div>
-                    <h2 class="text-2xl font-bold text-white mb-2">Export Started!</h2>
-                    <p class="text-emerald-200 text-sm mb-4 font-bold">
-                        Your download should begin automatically. <a href="/dashboard/offboarding/archive" class="underline hover:text-white">Click here if it doesn't</a>.
-                    </p>
-                    <div class="text-text-muted text-xs max-w-md">
-                        Your account is now frozen. Please keep your archive safe! You can download it again from this page until your grace period ends.
-                    </div>
-                    
-                    <!-- Auto-trigger download for fallback -->
-                    <script>
-                        setTimeout(() => {
-                            window.location.href = "/dashboard/offboarding/archive";
-                        }, 1000);
-                    </script>
-                </div>
-            {{/if}}
-
-            <h2 class="text-2xl font-bold text-white mb-4">Export Your Data</h2>
-            <p class="text-text-muted mb-6">
-                Since you're over 18, it's time to move off Hack Club Silo.
-                We've prepared a complete archive of all your buckets and files.
-            </p>
-
-            <div class="bg-white/5 rounded-xl p-4 mb-6 border border-white/10 flex items-center justify-between">
-                <div>
-                    <div class="text-xs text-text-muted uppercase font-bold tracking-wider mb-1">Time Remaining</div>
-                    <div class="text-2xl font-mono text-white">{{daysRemaining}} Days</div>
-                </div>
-                 <div class="text-right">
-                    <div class="text-xs text-text-muted uppercase font-bold tracking-wider mb-1">Deadline</div>
-                    <div class="text-sm font-mono text-white">{{gracePeriodEndsAt}}</div>
-                </div>
+        {{#if showSuccess}}
+            <div class="bg-emerald-500 text-black rounded-xl p-8 mb-8 text-center animate-fade-in">
+                <h2 class="text-2xl font-bold mb-2">Export Started</h2>
+                <p class="mb-6 font-medium">Your download should begin automatically.</p>
+                <a href="/dashboard/offboarding/archive" class="underline hover:no-underline font-mono text-sm">
+                    Click here if it doesn't start
+                </a>
+                
+                <script>
+                    setTimeout(() => {
+                        window.location.href = "/dashboard/offboarding/archive";
+                    }, 1000);
+                </script>
             </div>
-
+        {{else}}
             {{#if user.dataExported}}
-            <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-6 mb-8 text-center">
-                <h3 class="text-blue-200 font-bold text-lg mb-2">Account Frozen</h3>
-                <p class="text-blue-200/80 text-sm max-w-xl mx-auto">
-                    You have already initiated an export. Your account is now frozen to ensure data consistency.
-                    No new files can be uploaded and buckets/keys cannot be modified.
-                </p>
-            </div>
+                <div class="bg-white/5 rounded-xl p-6 mb-8 border border-white/10">
+                    <h3 class="text-white font-bold text-lg mb-2">Account Frozen</h3>
+                    <p class="text-text-muted text-sm">
+                        You've already started an export, so your account is frozen. You can re-download your archive below.
+                    </p>
+                </div>
             {{else}}
-            <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-6 mb-8 text-center">
-                <h3 class="text-yellow-200 font-bold text-lg mb-2">Important!!!</h3>
-                <p class="text-yellow-200/80 text-sm max-w-xl mx-auto">
-                    Clicking the download button below will <span class="font-bold underline">immediately freeze your account</span>.
-                    You won't be able to upload new files or create new buckets after starting the export. This may break your prod!
-                </p>
-            </div>
+                <div class="bg-white/5 rounded-xl p-6 mb-8 border border-white/10">
+                    <h3 class="text-white font-bold text-lg mb-2">Heads up</h3>
+                    <p class="text-text-muted text-sm">
+                        Downloading your data will <span class="text-white font-bold">immediately freeze your account</span>. You won't be able to upload new files afterwards.
+                    </p>
+                </div>
             {{/if}}
 
             <form action="/dashboard/offboarding/download" method="POST" id="download-form">
-                <button type="button" onclick="triggerDownloadConfirm()" id="download-btn" class="w-full bg-hc-red hover:bg-red-600 text-white text-lg font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all hover:scale-[1.02] flex items-center justify-center gap-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    {{#if user.dataExported}}Download Archive Again{{else}}Download All Data (.zip){{/if}}
+                <button type="button" onclick="triggerDownloadConfirm()" id="download-btn" class="group relative w-full bg-white hover:bg-gray-200 text-black text-xl font-bold py-6 rounded-xl transition-all hover:scale-[1.01] active:scale-[0.99]">
+                    <span id="btn-content">
+                        {{#if user.dataExported}}Download Archive Again{{else}}Download Everything (.zip){{/if}}
+                    </span>
+                    <div id="btn-spinner" class="hidden absolute inset-0 flex items-center justify-center">
+                        <svg class="animate-spin h-6 w-6 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
                 </button>
             </form>
-            <p class="text-center text-xs text-text-muted mt-4">
-                This may take a while depending on your storage usage. Please do not close this tab.
+            <p class="text-center text-xs text-text-muted mt-4 font-mono opacity-60">
+                This wraps up all your buckets into one file.
             </p>
+        {{/if}}
+
+        <!-- Migration Guide -->
+        <div class="mt-24 pt-12 border-t border-white/10">
+            <h2 class="text-2xl font-bold text-white mb-8">Where to go next</h2>
+            
+            <div class="space-y-8">
+                <div class="flex gap-6">
+                    <div class="shrink-0 w-8 h-8 rounded-full bg-white text-black flex items-center justify-center font-bold text-sm">1</div>
+                    <div>
+                        <h3 class="text-white font-bold text-lg">Set up Cloudflare R2</h3>
+                        <p class="text-text-muted mt-2 leading-relaxed">
+                            It's the best alternative to Silo (S3-compatible) and has a massive free tier. Create an account, enable R2, and generate "S3 API Tokens".
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex gap-6">
+                    <div class="shrink-0 w-8 h-8 rounded-full bg-white text-black flex items-center justify-center font-bold text-sm">2</div>
+                    <div>
+                        <h3 class="text-white font-bold text-lg">Move your files</h3>
+                        <p class="text-text-muted mt-2 leading-relaxed mb-4">
+                            Unzip your archive, then use the AWS CLI to sync it to R2:
+                        </p>
+                        <div class="bg-black rounded-lg p-4 border border-white/10 font-mono text-xs text-emerald-400 overflow-x-auto">
+                            aws s3 sync ./silo-export s3://new-bucket-name --endpoint-url https://<account_id>.r2.cloudflarestorage.com
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow text-left mb-8">
-             <h2 class="text-2xl font-bold text-white mb-4">How to Migrate to Cloudflare R2</h2>
-             <p class="text-text-muted mb-4">
-                Since you're moving on, we recommend Cloudflare R2 as a great alternative. It's S3-compatible and has a generous free tier.
-             </p>
-             <ol class="list-decimal list-inside text-text-muted space-y-2 mb-6">
-                <li>Create a Cloudflare account and enable R2.</li>
-                <li>Create a new bucket in R2.</li>
-                <li>Generate S3 API tokens (Access Key ID and Secret Access Key) in R2.</li>
-                <li>Download your data from Silo using the button above.</li>
-                <li>Unzip the archive.</li>
-                <li>Use a tool like <code class="text-white">rclone</code> or the AWS CLI to upload your files to R2.</li>
-             </ol>
-             <div class="bg-black/30 p-4 rounded-xl border border-white/10 font-mono text-xs text-white overflow-x-auto">
-                # Example using AWS CLI with R2<br/>
-                aws s3 sync ./my-silo-export s3://my-new-r2-bucket --endpoint-url https://<accountid>.r2.cloudflarestorage.com
-             </div>
-        </div>
     </div>
 </div>
 
 <!-- Confirmation Modal -->
-<div id="confirm-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50">
-    <div class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-md card-shadow transform transition-all">
+<div id="confirm-modal" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+    <div class="bg-hc-dark rounded-2xl border border-white/10 p-8 w-full max-w-md card-shadow transform transition-all">
         <h3 class="text-2xl font-bold mb-4 text-white" id="confirm-title">
             Confirm Action
         </h3>
-        <p class="text-text-muted mb-8" id="confirm-message">
+        <p class="text-text-muted mb-8 leading-relaxed" id="confirm-message">
             Are you sure you want to proceed?
         </p>
 
         <div class="flex justify-end gap-3">
-            <button onclick="closeConfirmModal()" class="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors">
+            <button onclick="closeConfirmModal()" class="text-text-muted hover:text-white px-4 py-3 text-sm font-bold transition-colors">
                 Cancel
             </button>
-            <button id="confirm-btn" disabled class="bg-white/10 text-white/50 cursor-not-allowed px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2">
-                <span id="confirm-btn-text">Confirm (3s)</span>
+            <button id="confirm-btn" disabled class="bg-white/5 text-white/40 cursor-not-allowed px-6 py-3 rounded-xl text-sm font-bold transition-all border border-white/5 flex items-center gap-2">
+                <span id="confirm-btn-text">Confirm (3)</span>
                 <svg id="confirm-spinner" class="animate-spin h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -181,11 +142,11 @@
         const btnText = document.getElementById("confirm-btn-text");
         
         // Reset Button State
-        btn.className = "bg-white/10 text-white/50 cursor-not-allowed px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2";
+        btn.className = "bg-white/5 text-white/40 cursor-not-allowed px-6 py-3 rounded-xl text-sm font-bold transition-all border border-white/5 flex items-center gap-2";
         btn.disabled = true;
         btnText.textContent = "Confirm (3)";
 
-        // Remove old listener to avoid stacking (simple way)
+        // Remove old listener to avoid stacking
         const newBtn = btn.cloneNode(true);
         btn.parentNode.replaceChild(newBtn, btn);
         
@@ -220,7 +181,6 @@
                 console.error(e);
                 alert("Action failed");
             } finally {
-                // If the modal isn't closed (e.g. error), reset state partially
                 newBtn.disabled = false;
                 spinner.classList.add("hidden");
                 btnText.textContent = "Confirm";
@@ -238,27 +198,30 @@
     }
 
     function triggerDownloadConfirm() {
-        const title = "Ready to Migrate?";
-        const message = "Please store this archive carefully! By proceeding, you confirm that you are migrating your data. Your account will be frozen to prevent further changes, and your files will be queued for deletion at the end of the grace period. \n\nDon't worry: You can re-download this archive at any time before your grace period ends.";
+        const title = "Final Check";
+        const message = "This will freeze your account immediately to ensure your backup is complete. You won't be able to upload files afterwards. \n\nYou can always re-download this archive until your grace period ends.";
         
         openConfirmModal(title, message, async () => {
             const form = document.getElementById('download-form');
             const btn = document.getElementById('download-btn');
-            const originalContent = btn.innerHTML;
+            const content = document.getElementById('btn-content');
+            const spinner = document.getElementById('btn-spinner');
             
             // Visual feedback on button
-            btn.innerHTML = 'Preparing Archive... <svg class="animate-spin h-5 w-5 ml-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+            content.classList.add('opacity-0');
+            spinner.classList.remove('hidden');
             btn.disabled = true;
-            btn.classList.add('opacity-75', 'cursor-not-allowed');
+            btn.classList.add('cursor-not-allowed', 'bg-gray-200');
 
             // Submit the form
             form.submit();
 
-            // Re-enable button logic (simple timeout fallback)
+            // Re-enable button logic (fallback)
             setTimeout(() => {
-                 btn.innerHTML = originalContent;
+                 content.classList.remove('opacity-0');
+                 spinner.classList.add('hidden');
                  btn.disabled = false;
-                 btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                 btn.classList.remove('cursor-not-allowed', 'bg-gray-200');
             }, 8000);
         });
     }

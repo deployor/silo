@@ -48,7 +48,7 @@ export async function handleOffboardingRequest(req: Request): Promise<Response> 
 		// If files already deleted, show "Aged Out" page
 		if (user.filesDeleted) {
 			const html = await render("aged-out", {
-				title: "Silo - Graduation",
+				title: "Silo - Offboarding",
 				layout: "blank",
 				user,
 			});

@@ -104,7 +104,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	// 1. Check for deletion (Aged Out) - Redirect to landing page explanation
 	if (user.filesDeleted) {
 		const html = await render("aged-out", {
-			title: "Silo - Graduation",
+			title: "Silo - Offboarding",
 			layout: "blank",
 			user,
 		});
@@ -137,7 +137,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	// We allow them to see the offboarding page again.
 	if (user.dataExported) {
 		const html = await render("offboarding", {
-			title: "Silo - Graduation Export",
+			title: "Silo - Offboarding Export",
 			layout: "main",
 			user,
 			hideNavLinks: true, // Hide nav to emphasize frozen state

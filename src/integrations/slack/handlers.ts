@@ -53,9 +53,9 @@ export async function handleAppHomeOpened(event: { user: string }) {
 			slackId,
 			HomeTab()
 				.blocks(
-					Header({ text: "Happy Graduation! 🎓" }),
+					Header({ text: "Happy HS Graduation!" }),
 					Section({
-						text: "You have officially aged out of the Silo service. Your files have been deleted according to our data retention policy for graduates.",
+						text: "You have officially aged out of the Silo service. Your files have been deleted.",
 					}),
 					Section({
 						text: "We hope Silo was helpful during your time at Hack Club!",
@@ -219,7 +219,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 				response_action: "errors",
 				errors: {
 					bucket_name_block:
-						"Your account is in graduation grace period. You cannot create new buckets.",
+						"Your account is in migration grace period. You cannot create new buckets.",
 				},
 			};
 		}
@@ -342,10 +342,10 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			if (user.markedAsOverAge) {
 				await openModal(
 					payload.trigger_id,
-					Modal({ title: "Graduation Mode" })
+					Modal({ title: "Offboarding" })
 						.blocks(
 							Section({
-								text: "Your account is in graduation grace period. You cannot create new keys.",
+								text: "Your account is in migration grace period. You cannot create new keys.",
 							}),
 						)
 						.buildToObject(),
