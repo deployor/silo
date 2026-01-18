@@ -226,6 +226,26 @@ export async function handlePutRequest(
 			// If the client DID send Content-Length, we use it.
 			
 			// If we are here, we are wrapping the stream to count bytes for quota/verification.
+			//
+			// CRITICAL FOR UPSTREAM S3:
+			// When we wrap the stream, we lose the "known length" property.
+			// S3 requires Content-Length. If we are proxying, we MUST ensure the upstream request has it.
+			// If the client provided it (`declared`), we used it.
+			// If the client did NOT provide it, we have a problem: we can't calculate it without buffering.
+			//
+			// However, Bun's `fetch` implementation handles `ReadableStream` upload.
+			// If `upstreamHeaders` has `Content-Length`, it should work.
+			//
+			// The issue might be that we are modifying the body (by wrapping it) but not buffering it,
+			// so the runtime doesn't know the length anymore.
+			//
+			// For untrusted clients: We DO verify `seen` vs `declared` at the end of the stream.
+			// If they mismatch, we error the controller, which should abort the upstream connection.
+			// But for the START of the request, we rely on the `Content-Length` header they sent.
+			//
+			// If they send NO Content-Length, we can't send one upstream either unless we buffer.
+			// Buffering is dangerous. We will rely on S3 411 response in that case.
+			
 			requestBody = new ReadableStream({
 				start(controller) {
 					const reader = body.getReader();
@@ -269,12 +289,6 @@ export async function handlePutRequest(
 					pump();
 				},
 			});
-			
-			// If we are wrapping the stream, the `requestBody` object might lose the "known length" property that Bun/Node streams sometimes have.
-			// We must ensure the `upstreamHeaders` has Content-Length if `declared` is set.
-			if (declared !== null) {
-				// We already set this above: upstreamHeaders.set("Content-Length", contentLengthHeader);
-			}
 		}
 
 		const response = await s3Client.fetch(
