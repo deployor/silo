@@ -124,9 +124,6 @@ export async function handlePutRequest(
 	const limit = user.storageLimitBytes;
 	const upstreamHeaders = filterUpstreamHeaders(req.headers);
 
-	console.log("[DEBUG] PUT request incoming headers:", JSON.stringify(Object.fromEntries(req.headers.entries()), null, 2));
-	console.log("[DEBUG] Filtered upstream headers:", JSON.stringify(Object.fromEntries(upstreamHeaders.entries()), null, 2));
-
 	if (!upstreamHeaders.has("x-amz-content-sha256")) {
 		upstreamHeaders.set("x-amz-content-sha256", "UNSIGNED-PAYLOAD");
 	}
