@@ -238,7 +238,7 @@ Please sign in with Hack Club Auth so we can match this Slack user to your recor
 		if (user.markedAsOverAge) {
 			await postMessage(
 				channelId,
-				`Hey... Sorry but you're over 18- You seem to store ${usageGB} GB of data though! WHICH YOU HAVE STILL NOT DOWNLOADED!!!!! :siren1::siren1::siren1::siren1::siren1::siren1::siren1::siren1::siren1::siren1: Please download it <https://${config.s3Domain}/dashboard/offboarding|HERE> and migrate to something like Cloudflare R2 ASAP! :catalarm: I will delete everything in ${daysLeft} days on ${endDate}, so HURRY! I won't upload the files you provided me with :(`,
+				`Hey... Sorry but you're over 18- You seem to store ${usageGB} GB of data though! WHICH YOU HAVE STILL NOT DOWNLOADED!!!!! :siren1::siren1::siren1::siren1::siren1::siren1::siren1::siren1::siren1::siren1: Please download them <https://${config.s3Domain}/dashboard/offboarding|HERE> and migrate to something like Cloudflare R2 ASAP! :catalarm: I will delete everything in ${daysLeft} days on ${endDate}, so HURRY! I won't upload the files you provided me with :(`,
 				threadTs,
 			);
 			await addReaction(channelId, messageTs, "siren1");
