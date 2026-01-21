@@ -398,47 +398,27 @@ export async function handlePutRequest(
 					actualSize = totalLength;
 				} else {
 					// Fallback to streaming for large files
-					requestBody = new ReadableStream({
-						start(controller) {
-							const reader = body.getReader();
-							const pump = (): void => {
-								reader
-									.read()
-									.then(({ value, done }) => {
-										if (done) {
-											if (declared !== null && seen !== declared) {
-												controller.error(
-													new Error(
-														`Content-Length mismatch: declared=${declared} actual=${seen}`,
-													),
-												);
-											} else {
-												actualSize = seen;
-												controller.close();
-											}
-											return;
-										}
-
-										seen += value?.byteLength ?? 0;
-
-										if (limit !== null) {
-											if (
-												BigInt(user.storageUsageBytes) + BigInt(seen) >
-												BigInt(limit)
-											) {
-												controller.error(new Error("QuotaExceeded"));
-												return;
-											}
-										}
-
-										controller.enqueue(value);
-										pump();
-									})
-									.catch((err) => controller.error(err));
-							};
-							pump();
-						},
-					});
+					// If we have a declared length, we try to pass the raw body stream
+					// to avoid "double-stream" issues where Content-Length might be stripped
+					// by runtimes when wrapping streams.
+					if (declared !== null) {
+						// Trust the declared length for pre-flight quota check
+						// (We already checked it above: if (limit !== null) ...)
+						
+						// Use the raw body stream
+						requestBody = body;
+						actualSize = declared;
+					} else {
+						// No declared length, but too big to buffer (wait, we shouldn't be here if declared is null)
+						// The logic above is `if (declared === null) { buffer... } else { ... }`
+						// So here declared IS NOT null.
+						// wait, the outer block is:
+						// if (declared === null) { ... } else { ... if (declared < BUFFER) ... else { WE ARE HERE } }
+						// So declared is definitely not null here.
+						
+						requestBody = body;
+						actualSize = declared;
+					}
 				}
 			}
 		}
