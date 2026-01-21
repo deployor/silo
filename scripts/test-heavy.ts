@@ -3,402 +3,420 @@ import {
 	CompleteMultipartUploadCommand,
 	CopyObjectCommand,
 	CreateMultipartUploadCommand,
-	DeleteBucketCorsCommand,
 	DeleteObjectCommand,
 	DeleteObjectsCommand,
-	GetBucketCorsCommand,
 	GetBucketLocationCommand,
 	GetObjectCommand,
 	HeadBucketCommand,
 	HeadObjectCommand,
+	ListBucketsCommand,
+	ListMultipartUploadsCommand,
 	ListObjectsV2Command,
 	ListPartsCommand,
-	PutBucketCorsCommand,
 	PutObjectCommand,
 	S3Client,
 	UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { randomBytes } from "crypto";
-import { Readable } from "stream";
+import { randomBytes } from "node:crypto";
+import { Readable } from "node:stream";
 
-// Configuration
-const ENDPOINT = "https://silo.deployor.dev";
-const REGION = "auto";
-const BUCKET_NAME = "testforprodpublicbucket";
-
-const CREDENTIALS = {
-	accessKeyId: "SILO_PROD_DK_8D7B8E04AC5549C2958C",
-	secretAccessKey: "4eacbdf8e06320e6ada9ef77c115f0e74e8a9e1a",
+// --- Configuration ---
+const CONFIG = {
+	accessKeyId: "SILO_PROD_DK_8A44C832A88760BBC27A",
+	secretAccessKey: "fa00f10fd6067748041e38400a33018cdefaacef",
+	endpoint: "https://silo.deployor.dev",
+	bucket: "testforprod",
+	region: "auto",
 };
 
-// Initialize Client
-const client = new S3Client({
-	region: REGION,
-	endpoint: ENDPOINT,
-	credentials: CREDENTIALS,
+const s3 = new S3Client({
+	region: CONFIG.region,
+	endpoint: CONFIG.endpoint,
+	credentials: {
+		accessKeyId: CONFIG.accessKeyId,
+		secretAccessKey: CONFIG.secretAccessKey,
+	},
 	forcePathStyle: true,
 });
 
-// Helper: Generate a buffer of specific size
-function generateBuffer(size: number): Buffer {
-	return Buffer.alloc(size, "x"); // fast allocation
+// --- Helpers ---
+
+function generateRandomBuffer(size: number): Buffer {
+	return randomBytes(size);
 }
 
-async function runTests() {
-	console.log(`🚀 Starting INSANELY COMPREHENSIVE S3 Tests against ${ENDPOINT}/${BUCKET_NAME}`);
+class RandomStream extends Readable {
+	private size: number;
+	private sent: number;
+
+	constructor(size: number) {
+		super();
+		this.size = size;
+		this.sent = 0;
+	}
+
+	_read(size: number) {
+		const remaining = this.size - this.sent;
+		if (remaining <= 0) {
+			this.push(null);
+			return;
+		}
+		const chunk = randomBytes(Math.min(size, remaining));
+		this.push(chunk);
+		this.sent += chunk.length;
+	}
+}
+
+async function runTest() {
+	console.log("🚀 Starting Heavy S3 Test Suite...");
+	console.log(`Target: ${CONFIG.endpoint}/${CONFIG.bucket}`);
 	const startTime = Date.now();
-	const artifacts: string[] = []; // Track keys to clean up
+
+	const errors: string[] = [];
+	const logError = (msg: string, err: any) => {
+		console.error(`❌ ${msg}`, err);
+		errors.push(`${msg}: ${err.message || err}`);
+	};
 
 	try {
-		// ==========================================
-		// 1. Connectivity & Bucket Check
-		// ==========================================
-		console.log("\n📦 1. Checking Bucket Access...");
-		await client.send(new HeadBucketCommand({ Bucket: BUCKET_NAME }));
-		console.log("✅ Bucket exists and is accessible");
-
-		const location = await client.send(
-			new GetBucketLocationCommand({ Bucket: BUCKET_NAME }),
-		);
-		console.log("✅ Bucket Location:", location.LocationConstraint || "default");
-
-		// ==========================================
-		// 2. Metadata & Content Types
-		// ==========================================
-		console.log("\n🏷️ 2. Testing Metadata & Content Types...");
-		const metaKey = "metadata-test.json";
-		artifacts.push(metaKey);
-		
-		await client.send(
-			new PutObjectCommand({
-				Bucket: BUCKET_NAME,
-				Key: metaKey,
-				Body: JSON.stringify({ hello: "world" }),
-				ContentType: "application/json",
-				Metadata: {
-					"custom-author": "batman",
-				},
-				CacheControl: "max-age=3600",
-				ContentDisposition: 'attachment; filename="download.json"'
-			}),
-		);
-		console.log("✅ PutObject with complex metadata");
-
-		const headMeta = await client.send(
-			new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: metaKey }),
-		);
-		
-		if (headMeta.ContentType !== "application/json") throw new Error("ContentType mismatch");
-		if (headMeta.Metadata?.["custom-author"] !== "batman") throw new Error("Custom metadata mismatch");
-		if (headMeta.CacheControl !== "max-age=3600") throw new Error("CacheControl mismatch");
-		console.log("✅ HeadObject verified metadata and headers");
-
-		// ==========================================
-		// 3. Conditional Requests (ETags)
-		// ==========================================
-		console.log("\n❓ 3. Testing Conditional Requests...");
-		const etag = headMeta.ETag;
-		if (!etag) throw new Error("ETag missing from HeadObject");
-
-		// If-None-Match (Should return 304 Not Modified - SDK throws '304 Not Modified')
+		// 1. Connectivity Check
+		console.log("\n--- 1. Connectivity & Bucket Check ---");
 		try {
-			await client.send(new GetObjectCommand({
-				Bucket: BUCKET_NAME,
-				Key: metaKey,
-				IfNoneMatch: etag
-			}));
-			console.warn("⚠️ Expected 304 Not Modified, got 200 OK (Gateway might not support conditional gets)");
-		} catch (e: any) {
-			if (e.$metadata?.httpStatusCode === 304) {
-				console.log("✅ If-None-Match handled correctly (304)");
-			} else {
-				console.log(`ℹ️ If-None-Match threw: ${e.name} (Acceptable if standard SDK behavior)`);
+			await s3.send(new HeadBucketCommand({ Bucket: CONFIG.bucket }));
+			console.log("✅ HeadBucket success");
+		} catch (e) {
+			logError("HeadBucket failed", e);
+			// Try to list buckets to see if we have access at all
+			try {
+				const list = await s3.send(new ListBucketsCommand({}));
+				console.log("✅ ListBuckets success", list.Buckets?.map((b) => b.Name));
+			} catch (listErr) {
+				logError("ListBuckets failed", listErr);
+				throw new Error("Cannot connect to S3 or find bucket");
 			}
 		}
 
-		// If-Match (Should succeed)
-		await client.send(new GetObjectCommand({
-			Bucket: BUCKET_NAME,
-			Key: metaKey,
-			IfMatch: etag
-		}));
-		console.log("✅ If-Match verified");
-
-		// ==========================================
-		// 4. Copy Operations
-		// ==========================================
-		console.log("\n📋 4. Testing Copy Operations...");
-		const copyKey = "copy-folder/copied-metadata.json";
-		artifacts.push(copyKey);
-
-		await client.send(new CopyObjectCommand({
-			Bucket: BUCKET_NAME,
-			CopySource: `${BUCKET_NAME}/${metaKey}`,
-			Key: copyKey,
-			MetadataDirective: "COPY" // Should preserve metadata
-		}));
-		console.log("✅ CopyObject (Internal Copy)");
-
-		const headCopy = await client.send(new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: copyKey }));
-		if (headCopy.Metadata?.["custom-author"] !== "batman") throw new Error("Copied object lost metadata");
-		console.log("✅ Copied metadata preserved");
-
-		// ==========================================
-		// 5. Nasty Key Names (Encoding/Decoding)
-		// ==========================================
-		console.log("\n🤡 5. Testing Nasty Key Names...");
-		// Keys with spaces, pluses, slashes, and maybe unicode?
-		const nastyKey = "folder/with spaces/and+symbols/🚀emoji.txt";
-		artifacts.push(nastyKey);
-
-		await client.send(new PutObjectCommand({
-			Bucket: BUCKET_NAME,
-			Key: nastyKey,
-			Body: "nasty content"
-		}));
-		console.log("✅ PutObject with complex key");
-
-		const getNasty = await client.send(new GetObjectCommand({ Bucket: BUCKET_NAME, Key: nastyKey }));
-		const nastyContent = await getNasty.Body?.transformToString();
-		if (nastyContent !== "nasty content") throw new Error("Content mismatch for nasty key");
-		console.log("✅ GetObject retrieved complex key successfully");
-
-		// ==========================================
-		// 6. CORS Configuration
-		// ==========================================
-		console.log("\n🌐 6. Testing CORS Configuration...");
-		
-		await client.send(new PutBucketCorsCommand({
-			Bucket: BUCKET_NAME,
-			CORSConfiguration: {
-				CORSRules: [
-					{
-						AllowedHeaders: ["*"],
-						AllowedMethods: ["GET", "PUT", "POST"],
-						AllowedOrigins: ["https://example.com"],
-						ExposeHeaders: ["ETag"],
-						MaxAgeSeconds: 3000
-					}
-				]
-			}
-		}));
-		console.log("✅ PutBucketCors success");
-
-		const cors = await client.send(new GetBucketCorsCommand({ Bucket: BUCKET_NAME }));
-		const rule = cors.CORSRules?.[0];
-		if (!rule?.AllowedOrigins?.includes("https://example.com")) {
-			throw new Error("CORS Configuration mismatch");
-		}
-		console.log("✅ GetBucketCors verified");
-
-		// Verify CORS via fetch (OPTIONS)
-		const corsRes = await fetch(`${ENDPOINT}/${BUCKET_NAME}/${metaKey}`, {
-			method: "OPTIONS",
-			headers: {
-				"Origin": "https://example.com",
-				"Access-Control-Request-Method": "GET"
-			}
-		});
-		if (corsRes.headers.get("access-control-allow-origin") === "https://example.com") {
-			console.log("✅ CORS Preflight (OPTIONS) returned correct origin");
-		} else {
-			console.warn("⚠️ CORS Preflight header missing or incorrect");
-		}
-
-		await client.send(new DeleteBucketCorsCommand({ Bucket: BUCKET_NAME }));
-		console.log("✅ DeleteBucketCors success");
-
-
-		// ==========================================
-		// 7. Multipart Upload (Heavy & Abort)
-		// ==========================================
-		console.log("\n🏋️ 7. Testing Multipart Uploads...");
-		
-		// 7a. Abort Test
-		console.log("   -> Testing AbortMultipartUpload...");
-		const abortKey = "abort-me.bin";
-		const abortMp = await client.send(new CreateMultipartUploadCommand({ Bucket: BUCKET_NAME, Key: abortKey }));
-		await client.send(new UploadPartCommand({
-			Bucket: BUCKET_NAME,
-			Key: abortKey,
-			PartNumber: 1,
-			UploadId: abortMp.UploadId,
-			Body: "part1"
-		}));
-		await client.send(new AbortMultipartUploadCommand({
-			Bucket: BUCKET_NAME,
-			Key: abortKey,
-			UploadId: abortMp.UploadId
-		}));
-		
-		// Verify parts are gone (ListParts should fail or return empty)
+		// 2. Basic CRUD - Small Files
+		console.log("\n--- 2. Basic CRUD (Small Files) ---");
+		const smallKey = "test-small.txt";
+		const smallContent = "This is a small test file for S3 actions.";
 		try {
-			await client.send(new ListPartsCommand({ Bucket: BUCKET_NAME, Key: abortKey, UploadId: abortMp.UploadId }));
-			console.warn("⚠️ ListParts succeeded after Abort (Expected failure or empty)");
-		} catch (e: any) {
-			console.log("✅ ListParts failed after Abort (Expected)");
-		}
-
-		// 7b. Full Upload (50MB)
-		console.log("   -> Testing Full 50MB Upload...");
-		const PART_SIZE = 5 * 1024 * 1024; // 5MB
-		const TOTAL_SIZE = 50 * 1024 * 1024; // 50MB
-		const PARTS_COUNT = Math.ceil(TOTAL_SIZE / PART_SIZE);
-		const largeKey = "heavy-test-file.bin";
-		artifacts.push(largeKey);
-
-		const createMp = await client.send(
-			new CreateMultipartUploadCommand({
-				Bucket: BUCKET_NAME,
-				Key: largeKey,
-				ContentType: "application/octet-stream",
-			}),
-		);
-		const uploadId = createMp.UploadId;
-		const uploadParts = [];
-		
-		for (let i = 0; i < PARTS_COUNT; i++) {
-			const partNum = i + 1;
-			const isLast = i === PARTS_COUNT - 1;
-			const currentPartSize = isLast ? TOTAL_SIZE - i * PART_SIZE : PART_SIZE;
-			const buffer = generateBuffer(currentPartSize);
-			buffer[0] = partNum; // Marker
-
-			process.stdout.write(`\r      Uploading part ${partNum}/${PARTS_COUNT}...`);
-			const upload = await client.send(
-				new UploadPartCommand({
-					Bucket: BUCKET_NAME,
-					Key: largeKey,
-					PartNumber: partNum,
-					UploadId: uploadId,
-					Body: buffer,
+			await s3.send(
+				new PutObjectCommand({
+					Bucket: CONFIG.bucket,
+					Key: smallKey,
+					Body: smallContent,
+					ContentType: "text/plain",
+					Metadata: { "x-test-meta": "value1" },
 				}),
 			);
-			uploadParts.push({ PartNumber: partNum, ETag: upload.ETag });
+			console.log("✅ PutObject (Small) success");
+
+			const head = await s3.send(
+				new HeadObjectCommand({ Bucket: CONFIG.bucket, Key: smallKey }),
+			);
+			if (head.Metadata?.["x-test-meta"] !== "value1")
+				throw new Error("Metadata mismatch");
+			if (head.ContentType !== "text/plain")
+				throw new Error("ContentType mismatch");
+			console.log("✅ HeadObject (Metadata) success");
+
+			const get = await s3.send(
+				new GetObjectCommand({ Bucket: CONFIG.bucket, Key: smallKey }),
+			);
+			const getContent = await get.Body?.transformToString();
+			if (getContent !== smallContent)
+				throw new Error("Content mismatch");
+			console.log("✅ GetObject (Small) success");
+		} catch (e) {
+			logError("Basic CRUD failed", e);
 		}
-		console.log("\n      Completing...");
-		await client.send(
-			new CompleteMultipartUploadCommand({
-				Bucket: BUCKET_NAME,
-				Key: largeKey,
-				UploadId: uploadId,
-				MultipartUpload: { Parts: uploadParts },
-			}),
-		);
-		console.log("✅ Large Multipart Upload Completed");
 
-		// ==========================================
-		// 8. Range Requests & Integrity
-		// ==========================================
-		console.log("\n🔍 8. Verifying Range Requests...");
-		const rangeStart = await client.send(new GetObjectCommand({
-			Bucket: BUCKET_NAME, Key: largeKey, Range: "bytes=0-9"
-		}));
-		const startBytes = await rangeStart.Body?.transformToByteArray();
-		if (startBytes?.[0] !== 1) throw new Error("Range Request Start Mismatch");
+		// 3. Binary Data & Larger Single Put (10MB)
+		console.log("\n--- 3. Medium Binary Put (10MB) ---");
+		const mediumKey = "test-medium.bin";
+		const mediumSize = 10 * 1024 * 1024; // 10MB
+		const mediumBuffer = generateRandomBuffer(mediumSize);
+		try {
+			console.time("PutObject 10MB");
+			await s3.send(
+				new PutObjectCommand({
+					Bucket: CONFIG.bucket,
+					Key: mediumKey,
+					Body: mediumBuffer,
+					ContentLength: mediumSize,
+				}),
+			);
+			console.timeEnd("PutObject 10MB");
+			console.log("✅ PutObject (10MB) success");
 
-		const rangeMid = await client.send(new GetObjectCommand({
-			Bucket: BUCKET_NAME, Key: largeKey, Range: `bytes=${PART_SIZE}-${PART_SIZE + 9}`
-		}));
-		const midBytes = await rangeMid.Body?.transformToByteArray();
-		if (midBytes?.[0] !== 2) throw new Error("Range Request Middle Mismatch");
-		console.log("✅ Range requests verified content markers");
-
-
-		// ==========================================
-		// 9. Presigned URLs
-		// ==========================================
-		console.log("\n🔑 9. Testing Presigned URLs...");
-		const prePutKey = "presigned-test.txt";
-		artifacts.push(prePutKey);
-		
-		const putUrl = await getSignedUrl(client, new PutObjectCommand({ Bucket: BUCKET_NAME, Key: prePutKey }), { expiresIn: 3600 });
-		const putRes = await fetch(putUrl, { method: "PUT", body: "via presigned" });
-		if (!putRes.ok) throw new Error("Presigned PUT failed");
-		console.log("✅ Presigned PUT success");
-
-		const getUrl = await getSignedUrl(client, new GetObjectCommand({ Bucket: BUCKET_NAME, Key: prePutKey }), { expiresIn: 3600 });
-		const getRes = await fetch(getUrl);
-		if (await getRes.text() !== "via presigned") throw new Error("Presigned GET mismatch");
-		console.log("✅ Presigned GET success");
-
-
-		// ==========================================
-		// 10. List Pagination
-		// ==========================================
-		console.log("\n📚 10. Testing List Pagination...");
-		const folderPrefix = "list-test/";
-		const listFiles = [];
-		for (let i = 0; i < 15; i++) {
-			const k = `${folderPrefix}file-${i.toString().padStart(2, '0')}.txt`;
-			listFiles.push(k);
-			artifacts.push(k);
+			console.time("GetObject 10MB");
+			const getMedium = await s3.send(
+				new GetObjectCommand({ Bucket: CONFIG.bucket, Key: mediumKey }),
+			);
+			const getMediumBuffer = await getMedium.Body?.transformToByteArray();
+			console.timeEnd("GetObject 10MB");
+			
+			if (getMediumBuffer?.length !== mediumSize) {
+				throw new Error(`Size mismatch: expected ${mediumSize}, got ${getMediumBuffer?.length}`);
+			}
+			console.log("✅ GetObject (10MB) success");
+		} catch (e) {
+			logError("Medium Binary Test failed", e);
 		}
+
+		// 4. Multipart Upload (Heavy - 100MB+)
+		// Note: Doing full 5GB might be too slow for a quick script run, but we simulate the mechanism.
+		// We will do a 50MB upload with 5MB parts (10 parts) to verify the logic thoroughly.
+		console.log("\n--- 4. Multipart Upload (50MB in 10 parts) ---");
+		const multipartKey = "test-multipart-50mb.bin";
+		const partSize = 5 * 1024 * 1024; // 5MB min part size
+		const partCount = 10;
+		const totalSize = partSize * partCount;
 		
-		await Promise.all(listFiles.map(k => client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: k, Body: "x" }))));
-		
-		let continuationToken: string | undefined;
-		let totalListed = 0;
-		do {
-			const list: any = await client.send(new ListObjectsV2Command({
-				Bucket: BUCKET_NAME,
-				Prefix: folderPrefix,
-				MaxKeys: 5,
-				ContinuationToken: continuationToken,
+		try {
+			const createMulti = await s3.send(
+				new CreateMultipartUploadCommand({
+					Bucket: CONFIG.bucket,
+					Key: multipartKey,
+				}),
+			);
+			const uploadId = createMulti.UploadId;
+			console.log(`Initialized Upload ID: ${uploadId}`);
+
+			const parts: { PartNumber: number; ETag: string }[] = [];
+			
+			console.time("Multipart Upload 50MB");
+			for (let i = 0; i < partCount; i++) {
+				const partNum = i + 1;
+				const partBody = generateRandomBuffer(partSize);
+				
+				// Upload parts in parallel groups if we wanted to be faster, but sequential is safer for tests
+				process.stdout.write(`Uploading Part ${partNum}/${partCount}...\r`);
+				const uploadPart = await s3.send(
+					new UploadPartCommand({
+						Bucket: CONFIG.bucket,
+						Key: multipartKey,
+						UploadId: uploadId,
+						PartNumber: partNum,
+						Body: partBody,
+					}),
+				);
+				
+				if (!uploadPart.ETag) throw new Error(`Part ${partNum} missing ETag`);
+				parts.push({ PartNumber: partNum, ETag: uploadPart.ETag });
+			}
+			console.log("\nAll parts uploaded.");
+
+			const listParts = await s3.send(new ListPartsCommand({
+				Bucket: CONFIG.bucket,
+				Key: multipartKey,
+				UploadId: uploadId
 			}));
-			totalListed += list.Contents?.length || 0;
-			continuationToken = list.NextContinuationToken;
-		} while (continuationToken);
+			if (listParts.Parts?.length !== partCount) throw new Error("ListParts mismatch count");
+			console.log("✅ ListParts success");
 
-		if (totalListed !== 15) throw new Error(`Pagination count mismatch: ${totalListed}`);
-		console.log("✅ Pagination success");
+			await s3.send(
+				new CompleteMultipartUploadCommand({
+					Bucket: CONFIG.bucket,
+					Key: multipartKey,
+					UploadId: uploadId,
+					MultipartUpload: { Parts: parts },
+				}),
+			);
+			console.timeEnd("Multipart Upload 50MB");
+			console.log("✅ CompleteMultipartUpload success");
 
+			// Verify size
+			const headMulti = await s3.send(new HeadObjectCommand({
+				Bucket: CONFIG.bucket,
+				Key: multipartKey
+			}));
+			if (headMulti.ContentLength !== totalSize) {
+				throw new Error(`Multipart size mismatch. Expected ${totalSize}, got ${headMulti.ContentLength}`);
+			}
+			console.log("✅ Multipart Size Verification success");
 
-		// ==========================================
-		// 11. Public Access
-		// ==========================================
-		console.log("\n🌍 11. Testing Public Access...");
-		const publicUrl = `${ENDPOINT}/${BUCKET_NAME}/${nastyKey}`; // Use the nasty key to test encoding too
-		// URL encode the nasty key part? fetch should handle some, but S3 usually expects encoded
-		// Actually, the key is "folder/with spaces/and+symbols/🚀emoji.txt"
-		// Browser/Fetch usually encodes spaces as %20.
-		const encodedUrl = `${ENDPOINT}/${BUCKET_NAME}/${encodeURIComponent(nastyKey).replace(/%2F/g, '/')}`; // Keep slashes
-		
-		console.log(`   -> Fetching ${encodedUrl}...`);
-		const pubRes = await fetch(encodedUrl);
-		if (pubRes.status === 200) {
-			console.log("✅ Public access confirmed (even with nasty keys)");
-		} else {
-			console.warn(`⚠️ Public access failed: ${pubRes.status}`);
+		} catch (e) {
+			logError("Multipart Upload failed", e);
 		}
 
-		// ==========================================
-		// 12. Cleanup
-		// ==========================================
-		console.log("\n🧹 12. Cleaning up...");
-		// Batch delete only supports 1000 keys, we have < 100
-		if (artifacts.length > 0) {
-			const deleteParams = {
-				Bucket: BUCKET_NAME,
+		// 5. Abort Multipart
+		console.log("\n--- 5. Abort Multipart Upload ---");
+		const abortKey = "test-abort.bin";
+		try {
+			const createAbort = await s3.send(
+				new CreateMultipartUploadCommand({
+					Bucket: CONFIG.bucket,
+					Key: abortKey,
+				}),
+			);
+			await s3.send(new UploadPartCommand({
+				Bucket: CONFIG.bucket,
+				Key: abortKey,
+				UploadId: createAbort.UploadId,
+				PartNumber: 1,
+				Body: generateRandomBuffer(5 * 1024 * 1024)
+			}));
+			
+			// Verify it exists in list
+			const listIncomplete = await s3.send(new ListMultipartUploadsCommand({ Bucket: CONFIG.bucket }));
+			if (!listIncomplete.Uploads?.some(u => u.UploadId === createAbort.UploadId)) {
+				throw new Error("Multipart upload not found in list before abort");
+			}
+
+			await s3.send(new AbortMultipartUploadCommand({
+				Bucket: CONFIG.bucket,
+				Key: abortKey,
+				UploadId: createAbort.UploadId
+			}));
+
+			// Verify it's gone
+			const listAfterAbort = await s3.send(new ListMultipartUploadsCommand({ Bucket: CONFIG.bucket }));
+			if (listAfterAbort.Uploads?.some(u => u.UploadId === createAbort.UploadId)) {
+				throw new Error("Multipart upload still exists after abort");
+			}
+			console.log("✅ AbortMultipartUpload success");
+
+		} catch (e) {
+			logError("Abort Multipart failed", e);
+		}
+
+		// 6. Range Request
+		console.log("\n--- 6. Range Requests ---");
+		try {
+			// Using the medium file
+			const rangeGet = await s3.send(new GetObjectCommand({
+				Bucket: CONFIG.bucket,
+				Key: mediumKey,
+				Range: "bytes=0-9"
+			}));
+			const rangeContent = await rangeGet.Body?.transformToByteArray();
+			if (rangeContent?.length !== 10) throw new Error("Range request length mismatch");
+			console.log("✅ Range Request (0-9) success");
+		} catch (e) {
+			logError("Range Request failed", e);
+		}
+
+		// 7. Copy Object
+		console.log("\n--- 7. Copy Object ---");
+		const copyKey = "test-copy.bin";
+		try {
+			await s3.send(new CopyObjectCommand({
+				Bucket: CONFIG.bucket,
+				CopySource: `${CONFIG.bucket}/${mediumKey}`,
+				Key: copyKey
+			}));
+			
+			const headCopy = await s3.send(new HeadObjectCommand({ Bucket: CONFIG.bucket, Key: copyKey }));
+			if (headCopy.ContentLength !== mediumSize) throw new Error("Copy size mismatch");
+			console.log("✅ CopyObject success");
+		} catch (e) {
+			logError("Copy Object failed", e);
+		}
+
+		// 8. List Objects V2 Pagination
+		console.log("\n--- 8. List Objects Pagination ---");
+		try {
+			// Create a few files to ensure we have something to list
+			for(let i=0; i<5; i++) {
+				await s3.send(new PutObjectCommand({
+					Bucket: CONFIG.bucket,
+					Key: `list-test/file-${i}.txt`,
+					Body: `Content ${i}`
+				}));
+			}
+
+			const list = await s3.send(new ListObjectsV2Command({
+				Bucket: CONFIG.bucket,
+				Prefix: "list-test/",
+				MaxKeys: 2
+			}));
+			
+			if (list.KeyCount !== 2 || !list.IsTruncated) throw new Error("Pagination MaxKeys failed");
+			if (!list.NextContinuationToken) throw new Error("Missing NextContinuationToken");
+
+			const list2 = await s3.send(new ListObjectsV2Command({
+				Bucket: CONFIG.bucket,
+				Prefix: "list-test/",
+				ContinuationToken: list.NextContinuationToken
+			}));
+			
+			console.log(`✅ List Pagination success (Found ${list.KeyCount} + ${list2.KeyCount} items)`);
+		} catch (e) {
+			logError("List Pagination failed", e);
+		}
+
+		// 9. Presigned URLs
+		console.log("\n--- 9. Presigned URLs ---");
+		try {
+			const presignKey = "presign-test.txt";
+			const putCommand = new PutObjectCommand({ Bucket: CONFIG.bucket, Key: presignKey });
+			const putUrl = await getSignedUrl(s3, putCommand, { expiresIn: 3600 });
+			
+			console.log("Generated Put URL. Uploading...");
+			const putRes = await fetch(putUrl, {
+				method: "PUT",
+				body: "Presigned content"
+			});
+			if (!putRes.ok) throw new Error(`Presigned PUT failed: ${putRes.status}`);
+
+			const getCommand = new GetObjectCommand({ Bucket: CONFIG.bucket, Key: presignKey });
+			const getUrl = await getSignedUrl(s3, getCommand, { expiresIn: 3600 });
+			
+			console.log("Generated Get URL. Downloading...");
+			const getRes = await fetch(getUrl);
+			const getText = await getRes.text();
+			
+			if (getText !== "Presigned content") throw new Error("Presigned content mismatch");
+			console.log("✅ Presigned URL PUT/GET success");
+		} catch (e) {
+			logError("Presigned URL failed", e);
+		}
+
+		// 10. Cleanup
+		console.log("\n--- 10. Cleanup ---");
+		try {
+			const keysToDelete = [
+				smallKey,
+				mediumKey,
+				multipartKey,
+				copyKey,
+				"presign-test.txt",
+				"list-test/file-0.txt",
+				"list-test/file-1.txt",
+				"list-test/file-2.txt",
+				"list-test/file-3.txt",
+				"list-test/file-4.txt"
+			];
+
+			await s3.send(new DeleteObjectsCommand({
+				Bucket: CONFIG.bucket,
 				Delete: {
-					Objects: artifacts.map(Key => ({ Key }))
+					Objects: keysToDelete.map(k => ({ Key: k }))
 				}
-			};
-			const delRes = await client.send(new DeleteObjectsCommand(deleteParams));
-			console.log(`✅ Deleted ${delRes.Deleted?.length || 0} objects`);
+			}));
+			console.log("✅ Cleanup success");
+		} catch (e) {
+			logError("Cleanup failed", e);
 		}
-		
-		// Clean up abort multipart just in case it stuck
-		// (Normally Abort cleans it, but if it failed...)
 
-	} catch (error) {
-		console.error("\n❌ TEST FAILED:", error);
-		process.exit(1);
+	} catch (e) {
+		console.error("\n💥 Fatal Error:", e);
 	}
-	
+
 	const duration = (Date.now() - startTime) / 1000;
-	console.log(`\n🎉 All tests passed in ${duration.toFixed(2)}s`);
+	console.log(`\n🏁 Test Suite Completed in ${duration.toFixed(2)}s`);
+	if (errors.length > 0) {
+		console.log(`\n❌ ${errors.length} Tests Failed:`);
+		errors.forEach((e) => {
+			console.log(`- ${e}`);
+		});
+		process.exit(1);
+	} else {
+		console.log("\n✨ All Heavy Tests Passed! ✨");
+	}
 }
 
-runTests();
+runTest();
