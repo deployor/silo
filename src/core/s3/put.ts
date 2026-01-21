@@ -473,6 +473,12 @@ export async function handlePutRequest(
 			});
 		}
 
+		// Important: Pass through ETag and other headers from the upstream PUT response
+		// This is critical for clients relying on ETag to verify upload (e.g. Terraform backend)
+		// But note that some upstream S3 implementations might return the ETag in quotes, others not.
+		// AWS usually returns it in quotes.
+		// We should just proxy the headers.
+
 		return new Response(response.body, {
 			status: response.status,
 			headers: response.headers,
