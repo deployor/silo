@@ -145,6 +145,14 @@ export function filterUpstreamHeaders(reqHeaders: Headers): Headers {
 		"if-none-match",
 		"if-modified-since",
 		"if-unmodified-since",
+		"x-amz-tagging",
+		"x-amz-storage-class",
+		"x-amz-acl",
+		"x-amz-grant-read",
+		"x-amz-grant-write",
+		"x-amz-grant-read-acp",
+		"x-amz-grant-write-acp",
+		"x-amz-grant-full-control",
 	];
 
 	reqHeaders.forEach((value, key) => {

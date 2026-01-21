@@ -175,9 +175,16 @@ export async function handleS3Request(
 				headers: filterUpstreamHeaders(req.headers),
 			});
 
+			const headers = new Headers(response.headers);
+			// Apply CORS for HEAD too
+			const corsHeaders = getCorsHeaders(req, bucket);
+			for (const [k, v] of corsHeaders.entries()) {
+				headers.set(k, v);
+			}
+
 			return new Response(null, {
 				status: response.status,
-				headers: response.headers,
+				headers: headers,
 			});
 		} catch (_e) {
 			return S3Errors.InternalError().toResponse();
