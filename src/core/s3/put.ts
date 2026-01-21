@@ -443,6 +443,13 @@ export async function handlePutRequest(
 			}
 		}
 
+		// Debug logging for Content-Length
+		if (upstreamHeaders.has("Content-Length") || upstreamHeaders.has("content-length")) {
+			console.log(`[PUT] Content-Length present in upstreamHeaders: ${upstreamHeaders.get("Content-Length") || upstreamHeaders.get("content-length")}`);
+		} else {
+			console.log("[PUT] Content-Length MISSING in upstreamHeaders");
+		}
+		
 		const response = await s3Client.fetch(
 			pathWithQuery,
 			{
