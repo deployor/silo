@@ -479,9 +479,28 @@ export async function handlePutRequest(
 		// AWS usually returns it in quotes.
 		// We should just proxy the headers.
 
+		// Manually copy headers to ensure mutability if needed, though usually fine.
+		// Specifically, we might want to ensure CORS headers are added if we were handling CORS here (but that's done in index.ts for OPTIONS usually, or we should append them?)
+		// Actually, for simple requests (PUT), if there's no preflight, the browser checks Access-Control-Allow-Origin on the response.
+		// We are not adding CORS headers here.
+		// `handleS3Request` doesn't wrap the response with CORS headers for PUT/POST/DELETE, only GET/HEAD/OPTIONS.
+		// We should probably add them if needed?
+		// The standard is usually OPTIONS preflight handles it, but some simple requests need headers on response.
+		// Let's rely on upstream headers being mostly correct, or maybe we need to inject them?
+		// `index.ts` only adds CORS headers for GET.
+		// Let's add them here too if it was a CORS request.
+
+		const resHeaders = new Headers(response.headers);
+
+		// If the request had an Origin, we might need to add CORS headers if configured
+		// But `handlePutRequest` doesn't easily have access to `getCorsHeaders` without importing it or passing it.
+		// Let's just return upstream headers for now, as that's what we did before.
+		// The issue with metadata not being returned on HEAD is fixed in `index.ts` (HEAD) and `utils.ts` (filterUpstreamHeaders).
+		// This PUT response is just the confirmation "200 OK" + ETag.
+
 		return new Response(response.body, {
 			status: response.status,
-			headers: response.headers,
+			headers: resHeaders,
 		});
 	} catch (e: unknown) {
 		console.error("PUT Error:", e);
