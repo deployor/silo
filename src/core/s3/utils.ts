@@ -149,7 +149,7 @@ export function filterUpstreamHeaders(reqHeaders: Headers): Headers {
 
 	reqHeaders.forEach((value, key) => {
 		const lowerKey = key.toLowerCase();
-		if (allowedHeaders.includes(lowerKey)) {
+		if (allowedHeaders.includes(lowerKey) || lowerKey.startsWith("x-amz-meta-")) {
 			upstreamHeaders.set(key, value);
 		}
 	});
