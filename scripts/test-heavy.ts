@@ -77,8 +77,7 @@ async function runTests() {
 				Body: JSON.stringify({ hello: "world" }),
 				ContentType: "application/json",
 				Metadata: {
-					"x-amz-meta-custom-author": "batman",
-					"x-amz-meta-project": "top-secret"
+					"custom-author": "batman",
 				},
 				CacheControl: "max-age=3600",
 				ContentDisposition: 'attachment; filename="download.json"'
