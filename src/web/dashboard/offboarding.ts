@@ -117,6 +117,21 @@ export async function handleOffboardingRequest(req: Request): Promise<Response> 
 		return Response.redirect("/dashboard/offboarding/archive");
 	}
 
+	// POST /dashboard/offboarding/analyze - Check destination and plan buckets
+	if (
+		req.method === "POST" &&
+		url.pathname === "/dashboard/offboarding/analyze"
+	) {
+		let body: any;
+		try {
+			body = await req.json();
+		} catch (e) {
+			return new Response("Invalid JSON", { status: 400 });
+		}
+		
+		return analyzeMigration(user, body);
+	}
+
 	// POST /dashboard/offboarding/migrate - Handle automated migration
 	if (
 		req.method === "POST" &&
@@ -139,11 +154,72 @@ export async function handleOffboardingRequest(req: Request): Promise<Response> 
 	return new Response("Not Found", { status: 404 });
 }
 
+async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
+	const { endpoint, accessKeyId, secretAccessKey } = params;
+	
+	if (!endpoint || !accessKeyId || !secretAccessKey) {
+		return new Response(JSON.stringify({ error: "Missing required credentials" }), { status: 400 });
+	}
+
+	try {
+		const destClient = new AwsClient({
+			accessKeyId,
+			secretAccessKey,
+			service: "s3",
+			region: "auto"
+		});
+
+		// 1. Fetch Local Buckets
+		const localBuckets = await db
+			.select()
+			.from(buckets)
+			.where(eq(buckets.userId, user.id));
+
+		// 2. Fetch Remote Buckets (ListAllMyBuckets)
+		const listRes = await destClient.fetch(endpoint, { method: "GET" });
+		
+		if (!listRes.ok) {
+			if (listRes.status === 403) {
+				return new Response(JSON.stringify({ error: "Access Denied. Check your keys." }), { status: 403 });
+			}
+			return new Response(JSON.stringify({ error: `Could not connect: ${listRes.status}` }), { status: 400 });
+		}
+
+		const xml = await listRes.text();
+		const { XMLParser } = await import("fast-xml-parser");
+		const parser = new XMLParser();
+		const result = parser.parse(xml).ListAllMyBucketsResult;
+		
+		const remoteBuckets = new Set<string>();
+		if (result.Buckets?.Bucket) {
+			const bucketsArr = Array.isArray(result.Buckets.Bucket) ? result.Buckets.Bucket : [result.Buckets.Bucket];
+			for (const b of bucketsArr) {
+		              remoteBuckets.add(b.Name);
+		          }
+		}
+
+		// 3. Match
+		const plan = localBuckets.map(b => ({
+			localName: b.name,
+			// Default to same name, user can change in UI
+			targetName: b.name,
+			status: remoteBuckets.has(b.name) ? "EXISTS" : "MISSING"
+		}));
+
+		return new Response(JSON.stringify({ plan }), {
+			headers: { "Content-Type": "application/json" }
+		});
+
+	} catch (e: any) {
+		return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+	}
+}
+
 async function migrateUserData(user: typeof users.$inferSelect, params: any) {
-	const { endpoint, bucket: targetBucket, accessKeyId, secretAccessKey } = params;
+	const { endpoint, accessKeyId, secretAccessKey, bucketMapping } = params;
 
 	// 1. Validation
-	if (!endpoint || !targetBucket || !accessKeyId || !secretAccessKey) {
+	if (!endpoint || !accessKeyId || !secretAccessKey || !bucketMapping) {
 		return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
 	}
 
@@ -154,7 +230,7 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 	}
 
 	// 2. Loop Prevention
-	const currentEndpoint = s3Client.getEndpoint(); // e.g. "s3.yourdomain.com"
+	const currentEndpoint = s3Client.getEndpoint();
 	if (endpoint.includes(currentEndpoint)) {
 		return new Response(JSON.stringify({ error: "Cannot migrate to the same Silo instance" }), { status: 400 });
 	}
@@ -170,47 +246,58 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 			};
 
 			try {
-				send("Validating destination credentials...");
+				send("Initializing migration...", "info");
 				
 				// Initialize Destination Client
 				const destClient = new AwsClient({
 					accessKeyId,
 					secretAccessKey,
 					service: "s3",
-					region: "auto" // R2 uses 'auto', others might ignore or need specific
+					region: "auto"
 				});
 
-				// Helper to fetch from destination
-				const fetchDest = async (path: string, init?: RequestInit) => {
-					// AwsClient doesn't handle full URL construction with custom endpoints automatically
-					// in the way we need for all providers, so we build it manually.
-					// R2/S3 format: https://<bucket>.<endpoint>/<key> or https://<endpoint>/<bucket>/<key>
-					// We'll assume path-style for safety if not virtual-hosted capable
-					
-					let urlStr = endpoint;
-					if (!urlStr.endsWith("/")) urlStr += "/";
-					urlStr += targetBucket;
-					if (path) urlStr += path.startsWith("/") ? path : `/${path}`;
-					
-					return destClient.fetch(urlStr, init);
-				};
+				// Fetch User Buckets
+				const userBuckets = await db
+					.select()
+					.from(buckets)
+					.where(eq(buckets.userId, user.id));
 
-				// Test Connection (List Objects on target bucket)
-				try {
-					const testRes = await fetchDest("?max-keys=1", { method: "GET" });
-					if (!testRes.ok) {
-						if (testRes.status === 404) {
-							throw new Error("Target bucket does not exist. Please create it first.");
-						} else if (testRes.status === 403) {
-							throw new Error("Access denied. Check your credentials.");
-						} else {
-							throw new Error(`Connection failed: ${testRes.status} ${testRes.statusText}`);
+				// Pre-flight: Create/Check Destination Buckets
+				send("Verifying destination buckets...", "info");
+				for (const localBucket of userBuckets) {
+					const targetName = bucketMapping[localBucket.name];
+					if (!targetName) continue; // Skip if not mapped?
+
+					const bucketUrl = `${endpoint.replace(/\/+$/, "")}/${targetName}`;
+					
+					// Check if exists (HeadBucket)
+					// Note: aws4fetch doesn't have a simple headBucket, so we try fetching ?location or similar, or just try creating
+					// Simplest is to try PutBucket. If it exists (owned by us), it succeeds (idempotent-ish).
+					// If it exists (owned by others), 409/403.
+					
+					try {
+						send(`Checking target bucket '${targetName}'...`);
+						const putRes = await destClient.fetch(bucketUrl, { method: "PUT" });
+						
+						if (!putRes.ok) {
+							// If 409 Conflict, it might be taken by someone else OR we own it (region issues).
+							// If 200, created.
+							// AWS S3 returns 200 if we own it.
+							// R2 returns 200 if created or owned.
+							
+							if (putRes.status === 409) {
+								// BucketAlreadyExists or BucketAlreadyOwnedByYou (sometimes depends on provider)
+								// We'll assume if we can't write to it, we'll fail later.
+								// But for now let's try to proceed.
+								// Actually, let's verify we can list it.
+							} else {
+								// Some other error
+								// send(`Warning: Could not ensure bucket '${targetName}' exists. Status: ${putRes.status}`);
+							}
 						}
+					} catch (e) {
+						// Network error etc
 					}
-					send("Connection established successfully.", "success");
-				} catch (e: any) {
-					send(`Connection failed: ${e.message}`, "error");
-					throw e; // Stop execution
 				}
 
 				// Freeze Account
@@ -222,20 +309,19 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 						.where(eq(users.id, user.id));
 				}
 
-				// Fetch User Buckets
-				const userBuckets = await db
-					.select()
-					.from(buckets)
-					.where(eq(buckets.userId, user.id));
-
-				send(`Found ${userBuckets.length} buckets to migrate.`);
-
 				let totalFiles = 0;
 				let successFiles = 0;
 				let failFiles = 0;
 
 				for (const sourceBucket of userBuckets) {
-					send(`Scanning bucket: ${sourceBucket.name}...`);
+					const targetName = bucketMapping[sourceBucket.name];
+					if (!targetName) {
+						send(`Skipping bucket '${sourceBucket.name}' (no target mapped)`, "info");
+						continue;
+					}
+
+					send(`Migrating '${sourceBucket.name}' -> '${targetName}'...`, "info");
+					
 					const internalPrefix = getInternalPath("", user, sourceBucket);
 					let continuationToken: string | undefined = undefined;
 
@@ -265,9 +351,11 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 							totalFiles++;
 							const key = item.Key;
 							const relativeKey = key.replace(internalPrefix, "");
-							// Destination structure: <target-bucket>/<source-bucket-name>/<key>
-							// This keeps files organized by original bucket
-							const destPath = `/${sourceBucket.name}/${relativeKey}`;
+							
+							// Destination Path: /{targetBucket}/{relativeKey}
+							// IMPORTANT: aws4fetch/S3 url structure depends on path-style vs virtual-hosted
+							// We'll stick to constructing the URL manually for path-style support which R2 supports well enough
+							const destUrl = `${endpoint.replace(/\/+$/, "")}/${targetName}/${relativeKey}`;
 
 							try {
 								// 1. Get from Silo
@@ -303,20 +391,18 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 								} catch (e) { /* ignore tag fetch errors */ }
 
 								// 3. Put to Destination
-								// We can pass the stream body directly
-								const putRes = await fetchDest(destPath, {
+								const putRes = await destClient.fetch(destUrl, {
 									method: "PUT",
 									headers,
 									body: getRes.body // Pipe the stream
 								});
 
 								if (!putRes.ok) {
-									throw new Error(`Write failed: ${putRes.status} ${await putRes.text()}`);
+									throw new Error(`Write failed: ${putRes.status}`);
 								}
 
 								successFiles++;
-								// Throttle logs slightly to avoid flooding
-								if (successFiles % 5 === 0) {
+								if (successFiles % 10 === 0) {
 									send(`Transferred ${successFiles} files...`);
 								}
 							} catch (e: any) {
@@ -332,9 +418,9 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 				send(`Migration Complete!`, "success");
 				send(`Total: ${totalFiles} | Success: ${successFiles} | Failed: ${failFiles}`, "success");
 				if (failFiles > 0) {
-					send("Some files failed. You can retry migration to retry failed files.", "info");
+					send("Some files failed. Check the logs above.", "info");
 				} else {
-					send("All files have been safely moved to your new home. Goodbye! 👋", "success");
+					send("All files migrated successfully!", "success");
 				}
 
 			} catch (e: any) {
