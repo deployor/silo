@@ -540,6 +540,9 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 								if (getRes.headers.get("content-type")) {
 									headers["Content-Type"] = getRes.headers.get("content-type")!;
 								}
+								                        if (getRes.headers.get("content-length")) {
+								                            headers["Content-Length"] = getRes.headers.get("content-length")!;
+								                        }
 								
 								// Copy User Metadata
 								getRes.headers.forEach((val, name) => {
