@@ -81,40 +81,69 @@
                     </div>
                 </details>
 
-                <form id="migration-form" class="space-y-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="space-y-2">
-                            <label class="text-sm font-bold text-text-muted uppercase tracking-wider">S3 Endpoint URL</label>
-                            <input type="text" name="endpoint" placeholder="https://<account>.r2.cloudflarestorage.com" required
-                                class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm">
+                <div id="wizard-step-1">
+                    <form id="migration-credentials-form" class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="space-y-2 col-span-2">
+                                <label class="text-sm font-bold text-text-muted uppercase tracking-wider">S3 Endpoint URL</label>
+                                <input type="text" name="endpoint" placeholder="https://<account>.r2.cloudflarestorage.com" required
+                                    class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-sm font-bold text-text-muted uppercase tracking-wider">Access Key ID</label>
+                                <input type="text" name="accessKeyId" placeholder="Values are encrypted" required
+                                    class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-sm font-bold text-text-muted uppercase tracking-wider">Secret Access Key</label>
+                                <input type="password" name="secretAccessKey" placeholder="••••••••••••••••" required
+                                    class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm">
+                            </div>
                         </div>
-                        <div class="space-y-2">
-                            <label class="text-sm font-bold text-text-muted uppercase tracking-wider">Target Bucket Name</label>
-                            <input type="text" name="bucket" placeholder="my-backup-bucket" required
-                                class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm">
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-sm font-bold text-text-muted uppercase tracking-wider">Access Key ID</label>
-                            <input type="text" name="accessKeyId" placeholder="Values are encrypted" required
-                                class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm">
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-sm font-bold text-text-muted uppercase tracking-wider">Secret Access Key</label>
-                            <input type="password" name="secretAccessKey" placeholder="••••••••••••••••" required
-                                class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm">
-                        </div>
-                    </div>
 
-                    <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex gap-3 text-sm text-yellow-200/80">
-                         <i class="ph-fill ph-warning text-lg shrink-0 mt-0.5"></i>
-                         <p>Warning: This will transfer all your files to the destination. Ensure the bucket exists and is empty to avoid overwriting data. Your Silo account will be frozen after migration starts.</p>
-                    </div>
+                        <button type="submit" id="analyze-btn" class="w-full bg-white text-black hover:bg-gray-100 font-bold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2">
+                            <span>Analyze Buckets</span>
+                            <i class="ph-bold ph-arrow-right"></i>
+                        </button>
+                    </form>
+                </div>
 
-                    <button type="submit" id="start-migration-btn" class="w-full bg-white text-black hover:bg-gray-100 font-bold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2">
-                        <span>Start Transfer</span>
-                        <i class="ph-bold ph-arrow-right"></i>
-                    </button>
-                </form>
+                <div id="wizard-step-2" class="hidden space-y-6">
+                     <div class="flex items-center gap-2 text-text-muted mb-4">
+                        <button onclick="resetWizard()" class="hover:text-white transition-colors flex items-center gap-1">
+                            <i class="ph-bold ph-arrow-left"></i> Back
+                        </button>
+                        <span class="text-white/20">|</span>
+                        <span class="font-bold text-white">Review Plan</span>
+                     </div>
+
+                     <form id="migration-plan-form">
+                        <div class="bg-black/40 rounded-xl border border-white/10 overflow-hidden">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-white/5 text-text-muted font-bold uppercase tracking-wider">
+                                    <tr>
+                                        <th class="p-4">Local Bucket</th>
+                                        <th class="p-4">Target Bucket</th>
+                                        <th class="p-4 text-right">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="plan-table-body" class="divide-y divide-white/10 text-white/80">
+                                    <!-- Rows injected via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="mt-6 bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex gap-3 text-sm text-yellow-200/80">
+                             <i class="ph-fill ph-warning text-lg shrink-0 mt-0.5"></i>
+                             <p>This will migrate your files to the mapped buckets. If "Status" is Missing, we will attempt to create the bucket. Account will be frozen.</p>
+                        </div>
+
+                        <button type="submit" id="start-migration-btn" class="w-full mt-6 bg-hc-red text-white hover:bg-red-600 font-bold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-900/20">
+                            <span>Start Migration</span>
+                            <i class="ph-bold ph-rocket-launch"></i>
+                        </button>
+                     </form>
+                </div>
 
                 <!-- Terminal Output -->
                 <div id="migration-terminal" class="hidden mt-8 bg-black rounded-xl border border-white/10 p-4 font-mono text-sm h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
@@ -148,10 +177,78 @@
 
     <!-- Scripts for Migration -->
     <script>
-        const migrationForm = document.getElementById('migration-form');
+        const step1 = document.getElementById('wizard-step-1');
+        const step2 = document.getElementById('wizard-step-2');
+        const credsForm = document.getElementById('migration-credentials-form');
+        const planForm = document.getElementById('migration-plan-form');
         const terminal = document.getElementById('migration-terminal');
         const terminalContent = document.getElementById('terminal-content');
-        const startBtn = document.getElementById('start-migration-btn');
+        
+        let storedCredentials = {};
+
+        function resetWizard() {
+            step1.classList.remove('hidden');
+            step2.classList.add('hidden');
+            terminal.classList.add('hidden');
+        }
+
+        credsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('analyze-btn');
+            const originalText = btn.innerHTML;
+            
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Connecting...';
+
+            const formData = new FormData(credsForm);
+            storedCredentials = Object.fromEntries(formData.entries());
+
+            try {
+                const res = await fetch('/dashboard/offboarding/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(storedCredentials)
+                });
+
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.error || 'Connection failed');
+
+                // Populate Table
+                const tbody = document.getElementById('plan-table-body');
+                tbody.innerHTML = '';
+                
+                data.plan.forEach(row => {
+                    const tr = document.createElement('tr');
+                    const statusColor = row.status === 'EXISTS' ? 'text-green-400' : 'text-yellow-400';
+                    const statusIcon = row.status === 'EXISTS' ? 'ph-check-circle' : 'ph-plus-circle';
+                    
+                    tr.innerHTML = `
+                        <td class="p-4 font-mono">${row.localName}</td>
+                        <td class="p-4">
+                            <input type="text" name="map_${row.localName}" value="${row.targetName}"
+                                class="bg-black/20 border border-white/10 rounded px-2 py-1 w-full text-sm font-mono focus:border-blue-500 outline-none text-white">
+                        </td>
+                        <td class="p-4 text-right ${statusColor} font-bold text-xs uppercase tracking-wide">
+                            <span class="flex items-center justify-end gap-1">
+                                <i class="ph-bold ${statusIcon}"></i>
+                                ${row.status}
+                            </span>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                step1.classList.add('hidden');
+                step2.classList.remove('hidden');
+
+            } catch (err) {
+                alert(err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        });
 
         function log(msg, type = 'info') {
             const line = document.createElement('div');
@@ -166,26 +263,37 @@
             terminal.scrollTop = terminal.scrollHeight;
         }
 
-        migrationForm.addEventListener('submit', async (e) => {
+        planForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
             if (!confirm('Are you sure you want to start the migration? This process cannot be stopped once started.')) {
                 return;
             }
 
+            // Build bucket mapping
+            const formData = new FormData(planForm);
+            const bucketMapping = {};
+            for (const [key, value] of formData.entries()) {
+                if (key.startsWith('map_')) {
+                    bucketMapping[key.replace('map_', '')] = value;
+                }
+            }
+
             // UI State
-            migrationForm.classList.add('opacity-50', 'pointer-events-none');
+            planForm.classList.add('opacity-50', 'pointer-events-none');
             terminal.classList.remove('hidden');
             log('Initializing migration agent...');
             
-            const formData = new FormData(migrationForm);
-            const data = Object.fromEntries(formData.entries());
+            const payload = {
+                ...storedCredentials,
+                bucketMapping
+            };
 
             try {
                 const response = await fetch('/dashboard/offboarding/migrate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(payload)
                 });
 
                 const reader = response.body.getReader();
@@ -205,15 +313,14 @@
                              log(msg.text, msg.type);
                              
                              if (msg.type === 'error') {
-                                 migrationForm.classList.remove('opacity-50', 'pointer-events-none');
-                                 startBtn.textContent = 'Retry Migration';
+                                 planForm.classList.remove('opacity-50', 'pointer-events-none');
                              }
                         }
                     }
                 }
             } catch (err) {
                 log('Network error occurred: ' + err.message, 'error');
-                migrationForm.classList.remove('opacity-50', 'pointer-events-none');
+                planForm.classList.remove('opacity-50', 'pointer-events-none');
             }
         });
     </script>
