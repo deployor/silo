@@ -182,6 +182,27 @@ async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
 		return new Response(JSON.stringify({ error: "Missing required credentials" }), { status: 400 });
 	}
 
+    // DEBUG BYPASS: If using the specific debug credentials, return fake data
+    if (accessKeyId === '348f6572f69435b0d014457e5b385966' && secretAccessKey === '01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d') {
+        const localBuckets = await db
+			.select()
+			.from(buckets)
+			.where(eq(buckets.userId, user.id));
+
+        const plan = localBuckets.map(b => ({
+            localName: b.name,
+            targetName: b.name,
+            status: "MISSING" // Pretend all are new
+        }));
+
+        // Simulate network delay
+        await new Promise(r => setTimeout(r, 1500));
+
+        return new Response(JSON.stringify({ plan }), {
+			headers: { "Content-Type": "application/json" }
+		});
+    }
+
 	try {
 		const destClient = new AwsClient({
 			accessKeyId,
@@ -215,8 +236,8 @@ async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
 		if (result.Buckets?.Bucket) {
 			const bucketsArr = Array.isArray(result.Buckets.Bucket) ? result.Buckets.Bucket : [result.Buckets.Bucket];
 			for (const b of bucketsArr) {
-		              remoteBuckets.add(b.Name);
-		          }
+                remoteBuckets.add(b.Name);
+            }
 		}
 
 		// 3. Match
@@ -269,6 +290,9 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 	
 	MIGRATION_LOCKS.add(user.id);
 
+    // Check for Debug Creds
+    const isDebug = accessKeyId === '348f6572f69435b0d014457e5b385966' && secretAccessKey === '01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d';
+
 	const encoder = new TextEncoder();
 	const stream = new ReadableStream({
 		async start(controller) {
@@ -277,6 +301,63 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 				controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
 			};
 
+            // DEBUG MODE MIGRATION
+            if (isDebug) {
+                try {
+                    send("[DEBUG MODE] Using mock credentials. No data will be transferred.", "info");
+                    await new Promise(r => setTimeout(r, 1000));
+
+                    // Freeze Account Mock
+                    if (!user.dataExported) {
+                        send("Freezing Silo account...", "info");
+                        await db.update(users).set({ dataExported: true }).where(eq(users.id, user.id));
+                        await new Promise(r => setTimeout(r, 800));
+                    }
+
+                    const userBuckets = await db.select().from(buckets).where(eq(buckets.userId, user.id));
+                    send(`Found ${userBuckets.length} buckets to migrate.`);
+                    
+                    let totalFiles = 0;
+
+                    for (const sourceBucket of userBuckets) {
+                        const targetName = bucketMapping[sourceBucket.name];
+                        if (!targetName) continue;
+                        
+                        send(`Migrating '${sourceBucket.name}' -> '${targetName}'...`, "info");
+                        await new Promise(r => setTimeout(r, 500));
+                        
+                        // Fake creating bucket
+                        send(`Ensuring target bucket '${targetName}' exists...`);
+                        await new Promise(r => setTimeout(r, 500));
+
+                        // Fake file list
+                        send(`Scanning bucket: ${sourceBucket.name}...`);
+                        await new Promise(r => setTimeout(r, 800));
+                        
+                        // Simulate 5 files per bucket
+                        for (let i = 1; i <= 5; i++) {
+                            const filename = `example-file-${i}.jpg`;
+                            send(`Transferred ${filename}...`);
+                            await new Promise(r => setTimeout(r, 200));
+                            totalFiles++;
+                        }
+                    }
+
+                    send("----------------------------------------");
+                    send(`Migration Complete!`, "success");
+                    send(`Total: ${totalFiles} | Success: ${totalFiles} | Failed: 0`, "success");
+                    send("All files migrated successfully! (Debug Simulation)", "success");
+
+                } catch (e: any) {
+                    send(`Debug Error: ${e.message}`, "error");
+                } finally {
+                    MIGRATION_LOCKS.delete(user.id);
+                    controller.close();
+                }
+                return;
+            }
+
+            // REAL MIGRATION
 			try {
 				send("Initializing migration...", "info");
 				
