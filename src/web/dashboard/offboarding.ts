@@ -176,7 +176,7 @@ export async function handleOffboardingRequest(req: Request): Promise<Response> 
 }
 
 async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
-	const { endpoint, accessKeyId, secretAccessKey, proposedMapping } = params;
+	const { endpoint, accessKeyId, secretAccessKey, bucketMapping } = params;
 	
 	if (!endpoint || !accessKeyId || !secretAccessKey) {
 		return new Response(JSON.stringify({ error: "Missing required credentials" }), { status: 400 });
@@ -189,14 +189,21 @@ async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
 			.from(buckets)
 			.where(eq(buckets.userId, user.id));
 
-        const plan = localBuckets.map(b => ({
-            localName: b.name,
-            targetName: b.name,
-            status: "MISSING" // Pretend all are new
-        }));
-
-        // Simulate network delay
-        await new Promise(r => setTimeout(r, 1500));
+        const plan = localBuckets.map(b => {
+            const targetName = bucketMapping && bucketMapping[b.name] ? bucketMapping[b.name] : b.name;
+            let status = "AVAILABLE";
+            if (targetName.includes("taken")) status = "TAKEN"; // Mock taken
+            if (remoteBuckets && remoteBuckets.has(targetName)) status = "EXISTS"; // Should match remote logic
+            
+            return {
+                localName: b.name,
+                targetName: targetName,
+                status: status
+            };
+        });
+        
+        // Simulating checking
+        await new Promise(r => setTimeout(r, 800));
 
         return new Response(JSON.stringify({ plan }), {
 			headers: { "Content-Type": "application/json" }
@@ -217,7 +224,7 @@ async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
 			.from(buckets)
 			.where(eq(buckets.userId, user.id));
 
-		// 2. Fetch Remote Buckets (ListAllMyBuckets)
+		// 2. Fetch Remote Buckets (ListAllMyBuckets) - Ownership Check
 		const listRes = await destClient.fetch(endpoint, { method: "GET" });
 		
 		if (!listRes.ok) {
@@ -240,21 +247,34 @@ async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
             }
 		}
 
-		// 3. Match
-		const plan = localBuckets.map(b => {
-		                // Use proposed name if available (Re-Check flow), otherwise default to local name
-		                let targetName = proposedMapping && proposedMapping[b.name]
-		                                          ? proposedMapping[b.name]
-		                                          : b.name;
+		// 3. Match & Check Availability
+		const plan = await Promise.all(localBuckets.map(async b => {
+            const targetName = bucketMapping && bucketMapping[b.name] ? bucketMapping[b.name] : b.name;
+            
+            // Status 1: Do we own it?
+            if (remoteBuckets.has(targetName)) {
+                return {
+                    localName: b.name,
+                    targetName: targetName,
+                    status: "EXISTS" // We own it, safe to merge
+                };
+            }
 
-		                let status = remoteBuckets.has(targetName) ? "EXISTS" : "MISSING";
-		                
-		                return {
-		                    localName: b.name,
-		                    targetName: targetName,
-		                    status: status
-		                };
-		            });
+            // Status 2: Is it available globally? (HEAD Check)
+            try {
+                const bucketUrl = `${endpoint.replace(/\/+$/, "")}/${targetName}`;
+                const headRes = await destClient.fetch(bucketUrl, { method: "HEAD" });
+                
+                if (headRes.status === 404) {
+                     return { localName: b.name, targetName: targetName, status: "AVAILABLE" };
+                } else {
+                     return { localName: b.name, targetName: targetName, status: "TAKEN" };
+                }
+            } catch (e) {
+                // If we can't even HEAD it (e.g. DNS error), assume available for creation
+                return { localName: b.name, targetName: targetName, status: "AVAILABLE" };
+            }
+        }));
 
 		return new Response(JSON.stringify({ plan }), {
 			headers: { "Content-Type": "application/json" }
