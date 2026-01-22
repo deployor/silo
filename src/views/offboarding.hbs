@@ -94,56 +94,56 @@
          </div>
 
          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-            <!-- R2 -->
-            <button @click="selectProvider('r2')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-[#F38020]/50 rounded-2xl p-6 transition-all flex items-center gap-6">
-                 <div class="h-16 w-16 shrink-0 rounded-xl bg-white flex items-center justify-center p-3">
-                     <img src="/assets/images/cloudflare.png" class="w-full h-full object-contain" alt="Cloudflare" />
-                 </div>
-                 <div class="flex-1">
-                     <div class="flex items-center gap-3 mb-1">
-                        <h4 class="text-white font-bold text-xl">Cloudflare R2</h4>
-                        <span class="bg-[#F38020]/20 text-[#F38020] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Recommended</span>
-                     </div>
-                     <p class="text-text-muted text-sm">Zero egress fees. S3-compatible.</p>
-                 </div>
-                 <i class="ph-bold ph-caret-right text-white/20 group-hover:text-white text-2xl"></i>
-            </button>
-            
-             <!-- AWS -->
-             <button @click="selectProvider('aws')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-[#FF9900]/50 rounded-2xl p-6 transition-all flex items-center gap-6">
-                 <div class="h-16 w-16 shrink-0 rounded-xl bg-white flex items-center justify-center p-3">
-                     <img src="/assets/images/aws.png" class="w-full h-full object-contain" alt="AWS" />
-                 </div>
-                 <div class="flex-1">
-                     <h4 class="text-white font-bold text-xl mb-1">Amazon S3</h4>
-                     <p class="text-text-muted text-sm">The industry standard.</p>
-                 </div>
-                 <i class="ph-bold ph-caret-right text-white/20 group-hover:text-white text-2xl"></i>
-            </button>
-
-            <!-- Backblaze -->
-             <button @click="selectProvider('backblaze')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-[#FF0000]/50 rounded-2xl p-6 transition-all flex items-center gap-6">
-                 <div class="h-16 w-16 shrink-0 rounded-xl bg-white flex items-center justify-center p-3">
-                     <img src="/assets/images/backblaze.png" class="w-full h-full object-contain" alt="Backblaze" />
-                 </div>
-                 <div class="flex-1">
-                     <h4 class="text-white font-bold text-xl mb-1">Backblaze B2</h4>
-                     <p class="text-text-muted text-sm">Affordable object storage.</p>
-                 </div>
-                 <i class="ph-bold ph-caret-right text-white/20 group-hover:text-white text-2xl"></i>
-            </button>
-
-            <!-- DigitalOcean -->
-             <button @click="selectProvider('digitalocean')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-[#0080FF]/50 rounded-2xl p-6 transition-all flex items-center gap-6">
-                 <div class="h-16 w-16 shrink-0 rounded-xl bg-white flex items-center justify-center p-3">
-                     <img src="/assets/images/digitalocean.png" class="w-full h-full object-contain" alt="DigitalOcean" />
-                 </div>
-                 <div class="flex-1">
-                     <h4 class="text-white font-bold text-xl mb-1">DigitalOcean</h4>
-                     <p class="text-text-muted text-sm">Simple Spaces object storage.</p>
-                 </div>
-                 <i class="ph-bold ph-caret-right text-white/20 group-hover:text-white text-2xl"></i>
-            </button>
+             <!-- R2 -->
+             <button @click="selectProvider('r2')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-[#F38020]/50 rounded-2xl p-6 transition-all flex items-center gap-6">
+                  <div class="h-16 w-16 shrink-0 rounded-xl bg-[#F38020] flex items-center justify-center p-3">
+                      <img src="/assets/images/cloudflare.png" class="w-full h-full object-contain" alt="Cloudflare" />
+                  </div>
+                  <div class="flex-1">
+                      <div class="flex items-center gap-3 mb-1">
+                         <h4 class="text-white font-bold text-xl">Cloudflare R2</h4>
+                         <span class="bg-[#F38020]/20 text-[#F38020] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Recommended</span>
+                      </div>
+                      <p class="text-text-muted text-sm">Zero egress fees. S3-compatible.</p>
+                  </div>
+                  <i class="ph-bold ph-caret-right text-white/20 group-hover:text-white text-2xl"></i>
+             </button>
+             
+              <!-- AWS -->
+              <button @click="selectProvider('aws')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-[#FF9900]/50 rounded-2xl p-6 transition-all flex items-center gap-6">
+                  <div class="h-16 w-16 shrink-0 rounded-xl bg-[#232F3E] flex items-center justify-center p-3">
+                      <img src="/assets/images/aws.png" class="w-full h-full object-contain" alt="AWS" />
+                  </div>
+                  <div class="flex-1">
+                      <h4 class="text-white font-bold text-xl mb-1">Amazon S3</h4>
+                      <p class="text-text-muted text-sm">The industry standard.</p>
+                  </div>
+                  <i class="ph-bold ph-caret-right text-white/20 group-hover:text-white text-2xl"></i>
+             </button>
+ 
+             <!-- Backblaze -->
+              <button @click="selectProvider('backblaze')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-[#FF0000]/50 rounded-2xl p-6 transition-all flex items-center gap-6">
+                  <div class="h-16 w-16 shrink-0 rounded-xl bg-white flex items-center justify-center p-3">
+                      <img src="/assets/images/backblaze.png" class="w-full h-full object-contain" alt="Backblaze" />
+                  </div>
+                  <div class="flex-1">
+                      <h4 class="text-white font-bold text-xl mb-1">Backblaze B2</h4>
+                      <p class="text-text-muted text-sm">Affordable object storage.</p>
+                  </div>
+                  <i class="ph-bold ph-caret-right text-white/20 group-hover:text-white text-2xl"></i>
+             </button>
+ 
+             <!-- DigitalOcean -->
+              <button @click="selectProvider('digitalocean')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-[#0080FF]/50 rounded-2xl p-6 transition-all flex items-center gap-6">
+                  <div class="h-16 w-16 shrink-0 rounded-xl bg-white flex items-center justify-center p-3">
+                      <img src="/assets/images/digitalocean.png" class="w-full h-full object-contain" alt="DigitalOcean" />
+                  </div>
+                  <div class="flex-1">
+                      <h4 class="text-white font-bold text-xl mb-1">DigitalOcean</h4>
+                      <p class="text-text-muted text-sm">Simple Spaces object storage.</p>
+                  </div>
+                  <i class="ph-bold ph-caret-right text-white/20 group-hover:text-white text-2xl"></i>
+             </button>
             
              <button @click="selectProvider('custom')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-white/50 rounded-2xl p-6 transition-all flex items-center gap-6 col-span-1 md:col-span-2">
                  <div class="h-16 w-16 shrink-0 rounded-xl bg-white/10 flex items-center justify-center p-3 text-3xl text-white">
