@@ -373,6 +373,11 @@
             <p class="text-text-muted text-2xl font-medium">Don't close this tab.</p>
          </div>
 
+         <div class="flex justify-end mb-2">
+            <button @click="copyLogs" class="text-xs text-text-muted hover:text-white flex items-center gap-1 transition-colors">
+                <i class="ph-bold ph-copy"></i> Copy Logs
+            </button>
+         </div>
          <div class="bg-black rounded-xl border border-white/10 p-4 h-96 font-mono text-sm overflow-y-auto shadow-2xl text-left" id="terminal-scroll">
              <template x-for="log in logs" :key="log.id">
                  <div :class="{
@@ -516,16 +521,21 @@ document.addEventListener('alpine:init', () => {
         },
 
         addLog(msg, type) {
-            this.logs.push({ 
-                id: Date.now() + Math.random(), 
-                time: new Date().toLocaleTimeString(), 
-                msg, 
-                type 
+            this.logs.push({
+                id: Date.now() + Math.random(),
+                time: new Date().toLocaleTimeString(),
+                msg,
+                type
             });
             this.$nextTick(() => {
                 const el = document.getElementById('terminal-scroll');
                 if(el) el.scrollTop = el.scrollHeight;
             });
+        },
+
+        copyLogs() {
+            const text = this.logs.map(l => `[${l.time}] ${l.type.toUpperCase()}: ${l.msg}`).join('\n');
+            navigator.clipboard.writeText(text).then(() => alert('Logs copied to clipboard'));
         }
     }));
 });
