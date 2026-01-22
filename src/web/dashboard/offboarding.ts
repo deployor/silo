@@ -151,6 +151,12 @@ export async function handleOffboardingRequest(req: Request): Promise<Response> 
 			return new Response("Invalid JSON", { status: 400 });
 		}
 		
+		      // Add default for R2
+		      if (body.endpoint && body.endpoint.includes('.r2.cloudflarestorage.com') && body.accessKeyId && !body.endpoint.includes(body.accessKeyId)) {
+		           // In some cases users might only put the account ID, but the form sends the full URL.
+		           // However, if the user leaves the placeholder <account_id> it will fail.
+		      }
+
 		return analyzeMigration(user, body);
 	}
 
@@ -178,10 +184,28 @@ export async function handleOffboardingRequest(req: Request): Promise<Response> 
 
 async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
 	const { endpoint, accessKeyId, secretAccessKey, bucketMapping } = params;
+
+    // Basic cleaning
+    const cleanEndpoint = endpoint ? endpoint.trim() : '';
+    const cleanAccessKey = accessKeyId ? accessKeyId.trim() : '';
+    const cleanSecretKey = secretAccessKey ? secretAccessKey.trim() : '';
 	
-	if (!endpoint || !accessKeyId || !secretAccessKey) {
-		return new Response(JSON.stringify({ error: "Missing required credentials" }), { status: 400 });
+	if (!cleanEndpoint || !cleanAccessKey || !cleanSecretKey) {
+        // Detailed error for debugging
+		return new Response(JSON.stringify({
+            error: "Missing required credentials",
+            details: {
+                hasEndpoint: !!cleanEndpoint,
+                hasAccessKey: !!cleanAccessKey,
+                hasSecretKey: !!cleanSecretKey
+            }
+        }), { status: 400 });
 	}
+
+    // Check for placeholder
+    if (cleanEndpoint.includes("<account_id>")) {
+        return new Response(JSON.stringify({ error: "Please replace <account_id> in the endpoint URL with your actual Cloudflare Account ID." }), { status: 400 });
+    }
 
     // DEBUG BYPASS: If using the specific debug credentials, return fake data
     if (accessKeyId === '348f6572f69435b0d014457e5b385966' && secretAccessKey === '01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d') {
