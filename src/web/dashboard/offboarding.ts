@@ -394,6 +394,8 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 
 				// Pre-flight: Create/Check Destination Buckets
 				send("Verifying destination buckets...", "info");
+				let bucketCreationErrors = 0;
+
 				for (const localBucket of userBuckets) {
 					const targetName = bucketMapping[localBucket.name];
 					if (!targetName) continue;
@@ -413,26 +415,28 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 				                            // We'll try to ListObjects to verify ownership/access.
 				                            const listRes = await destClient.fetch(`${bucketUrl}?max-keys=1`, { method: "GET" });
 				                            if (!listRes.ok) {
-				                                send(`Error: Bucket '${targetName}' exists but is not accessible (Status ${listRes.status}). Skipped.`, "error");
-				                                // Remove from mapping so we don't try to upload to it
-				                                delete bucketMapping[localBucket.name];
-				                                continue;
+				                                send(`Error: Bucket '${targetName}' exists but is not accessible (Status ${listRes.status}).`, "error");
+				                                bucketCreationErrors++;
 				                            }
 							} else if (putRes.status === 403) {
-				                            send(`Error: Access Denied creating bucket '${targetName}'. Check permissions. Skipped.`, "error");
-				                            delete bucketMapping[localBucket.name];
-				                            continue;
+				                            send(`Error: Access Denied creating bucket '${targetName}'. Check permissions.`, "error");
+				                            bucketCreationErrors++;
 				                        } else {
-				                            send(`Error: Failed to create bucket '${targetName}' (Status ${putRes.status}). Skipped.`, "error");
-				                            delete bucketMapping[localBucket.name];
-				                            continue;
+				                            send(`Error: Failed to create bucket '${targetName}' (Status ${putRes.status}).`, "error");
+				                            bucketCreationErrors++;
 							}
 						}
 					} catch (e: any) {
 				                    send(`Network Error checking bucket '${targetName}': ${e.message}`, "error");
-				                    delete bucketMapping[localBucket.name];
-				                    continue;
+				                    bucketCreationErrors++;
 					}
+				}
+
+				if (bucketCreationErrors > 0) {
+					send("----------------------------------------");
+					send(`Migration Aborted: Failed to prepare ${bucketCreationErrors} buckets.`, "error");
+					send("Please fix the naming conflicts or permissions in the table above and try again.", "info");
+					return;
 				}
 
 				// Freeze Account
