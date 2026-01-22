@@ -151,21 +151,6 @@ export async function handleOffboardingRequest(req: Request): Promise<Response> 
 			return new Response("Invalid JSON", { status: 400 });
 		}
 		
-		      // Auto-fix for R2 endpoints if they are using the default placeholder
-		      if (body.endpoint && body.endpoint.includes('<account_id>') && body.endpoint.includes('r2.cloudflarestorage.com') && body.accessKeyId) {
-		           // This is a rough heuristic, but R2 access keys are usually hex strings, while account IDs are also hex strings.
-		           // However, users often confuse them.
-		           // If we can't infer the account ID, we fail. But often the "access key" they pasted MIGHT be an API token which doesn't help with Account ID.
-		           // BUT, if they are following our guide, they have an Access Key ID and a Secret Access Key.
-		           // We can't actually infer the Account ID from the Access Key ID directly in a standard way.
-		           // Wait, the user complaint is "it uses the placeholders".
-		           // This means the frontend is SENDING the placeholder.
-		           // We should error out here, or attempt to fix it if the user pasted their account ID into the form somewhere else? No, there is no other field.
-		           
-		           // The only way to "fix" this is if the user mistakenly put their Account ID into the Access Key ID field? Unlikely.
-		           // Or if we just reject it firmly.
-		      }
-
 		return analyzeMigration(user, body);
 	}
 
@@ -218,7 +203,7 @@ async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
     }
 
     // DEBUG BYPASS: If using the specific debug credentials, return fake data
-    if (accessKeyId === '348f6572f69435b0d014457e5b385966' && secretAccessKey === '01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d') {
+    if (cleanAccessKey === '348f6572f69435b0d014457e5b385966' && cleanSecretKey === '01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d') {
         const localBuckets = await db
    .select()
    .from(buckets)
@@ -247,8 +232,8 @@ async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
 
 	try {
 		const destClient = new AwsClient({
-			accessKeyId,
-			secretAccessKey,
+			accessKeyId: cleanAccessKey,
+			secretAccessKey: cleanSecretKey,
 			service: "s3",
 			region: "auto"
 		});
@@ -260,7 +245,7 @@ async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
 			.where(eq(buckets.userId, user.id));
 
 		// 2. Fetch Remote Buckets (ListAllMyBuckets) - Ownership Check
-		const listRes = await destClient.fetch(endpoint, { method: "GET" });
+		const listRes = await destClient.fetch(cleanEndpoint, { method: "GET" });
 		
 		if (!listRes.ok) {
 			if (listRes.status === 403) {
@@ -297,7 +282,7 @@ async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
 
             // Status 2: Is it available globally? (HEAD Check)
             try {
-                const bucketUrl = `${endpoint.replace(/\/+$/, "")}/${targetName}`;
+                const bucketUrl = `${cleanEndpoint.replace(/\/+$/, "")}/${targetName}`;
                 const headRes = await destClient.fetch(bucketUrl, { method: "HEAD" });
                 
                 if (headRes.status === 404) {
@@ -323,27 +308,32 @@ async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
 async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 	const { endpoint, accessKeyId, secretAccessKey, bucketMapping } = params;
 
+    // Basic cleaning
+    const cleanEndpoint = endpoint ? endpoint.trim() : '';
+    const cleanAccessKey = accessKeyId ? accessKeyId.trim() : '';
+    const cleanSecretKey = secretAccessKey ? secretAccessKey.trim() : '';
+
 	// 1. Validation
-	if (!endpoint || !accessKeyId || !secretAccessKey || !bucketMapping) {
+	if (!cleanEndpoint || !cleanAccessKey || !cleanSecretKey || !bucketMapping) {
 		return new Response(JSON.stringify({ error: "Missing required fields" }), { status: 400 });
 	}
 
 	try {
-		new URL(endpoint);
+		new URL(cleanEndpoint);
 	} catch (e) {
 		return new Response(JSON.stringify({ error: "Invalid endpoint URL" }), { status: 400 });
 	}
 
 	// 2. Loop Prevention
 	const currentEndpoint = s3Client.getEndpoint();
-	if (endpoint.includes(currentEndpoint)) {
+	if (cleanEndpoint.includes(currentEndpoint)) {
 		return new Response(JSON.stringify({ error: "Cannot migrate to the same Silo instance" }), { status: 400 });
 	}
 	
 	MIGRATION_LOCKS.add(user.id);
 
     // Check for Debug Creds
-    const isDebug = accessKeyId === '348f6572f69435b0d014457e5b385966' && secretAccessKey === '01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d';
+    const isDebug = cleanAccessKey === '348f6572f69435b0d014457e5b385966' && cleanSecretKey === '01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d';
 
 	const encoder = new TextEncoder();
 	const stream = new ReadableStream({
@@ -419,18 +409,18 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
             }
 
             // REAL MIGRATION
-			try {
-				send("Initializing migration...", "info");
-				
-				// Initialize Destination Client
-				const destClient = new AwsClient({
-					accessKeyId,
-					secretAccessKey,
-					service: "s3",
-					region: "auto"
-				});
-
-				// Fetch User Buckets
+            try {
+            	send("Initializing migration...", "info");
+            	
+            	// Initialize Destination Client
+            	const destClient = new AwsClient({
+            		accessKeyId: cleanAccessKey,
+            		secretAccessKey: cleanSecretKey,
+            		service: "s3",
+            		region: "auto"
+            	});
+         
+            	// Fetch User Buckets
 				const userBuckets = await db
 					.select()
 					.from(buckets)
@@ -444,7 +434,7 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 					const targetName = bucketMapping[localBucket.name];
 					if (!targetName) continue;
 
-					const bucketUrl = `${endpoint.replace(/\/+$/, "")}/${targetName}`;
+					const bucketUrl = `${cleanEndpoint.replace(/\/+$/, "")}/${targetName}`;
 					
 					try {
 						send(`Ensuring target bucket '${targetName}' exists...`);
@@ -538,7 +528,7 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 							// Destination Path: /{targetBucket}/{relativeKey}
 							// IMPORTANT: aws4fetch/S3 url structure depends on path-style vs virtual-hosted
 							// We'll stick to constructing the URL manually for path-style support which R2 supports well enough
-							const destUrl = `${endpoint.replace(/\/+$/, "")}/${targetName}/${relativeKey}`;
+							const destUrl = `${cleanEndpoint.replace(/\/+$/, "")}/${targetName}/${relativeKey}`;
 
 							try {
 								// 1. Get from Silo
