@@ -17,25 +17,39 @@
          <h1 class="text-6xl md:text-8xl font-black text-white mb-8 tracking-tighter italic">
             It's time to say goodbye.
          </h1>
-         <p class="text-text-muted text-2xl max-w-3xl mx-auto font-medium mb-12 leading-relaxed">
-            You've turned 18, so you've aged out of Silo.
-            <br>
-            You have <span class="text-white font-bold">{{daysRemaining}} days</span> to export your <span class="text-white font-bold">{{totalStorageFormatted}}</span> of data.
-         </p>
+         {{#if user.dataExported}}
+             <p class="text-text-muted text-2xl max-w-3xl mx-auto font-medium mb-12 leading-relaxed">
+                It was amazing having you.
+                <br>
+                Your data has been successfully migrated. Your account is now frozen.
+             </p>
+             <div class="flex items-center justify-center gap-6">
+                 <button type="button" @click="step = 1.5" class="group bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 border border-white/10">
+                     <span>Migration Status / Download</span>
+                     <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                 </button>
+             </div>
+         {{else}}
+             <p class="text-text-muted text-2xl max-w-3xl mx-auto font-medium mb-12 leading-relaxed">
+                You've turned 18, so you've aged out of Silo.
+                <br>
+                You have <span class="text-white font-bold">{{daysRemaining}} days</span> to export your <span class="text-white font-bold">{{totalStorageFormatted}}</span> of data.
+             </p>
 
-         <div class="bg-white/5 rounded-xl p-4 mb-12 max-w-2xl mx-auto border border-white/10 flex items-start gap-4 text-left">
-            <i class="ph-fill ph-warning text-yellow-500 text-xl mt-1"></i>
-            <p class="text-text-muted/70 text-sm font-medium leading-relaxed">
-                Your grace period ends on <span class="text-white">{{gracePeriodEndsAt}}</span>. After this date, your data will be permanently deleted to free up space for new Hack Clubbers.
-            </p>
-        </div>
+             <div class="bg-white/5 rounded-xl p-4 mb-12 max-w-2xl mx-auto border border-white/10 flex items-start gap-4 text-left">
+                <i class="ph-fill ph-warning text-yellow-500 text-xl mt-1"></i>
+                <p class="text-text-muted/70 text-sm font-medium leading-relaxed">
+                    Your grace period ends on <span class="text-white">{{gracePeriodEndsAt}}</span>. After this date, your data will be permanently deleted to free up space for new Hack Clubbers.
+                </p>
+            </div>
 
-         <div class="flex items-center justify-center gap-6">
-            <button type="button" @click="step = 1.5" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
-                <span>Next: Export Data</span>
-                <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
-            </button>
-        </div>
+             <div class="flex items-center justify-center gap-6">
+                <button type="button" @click="step = 1.5" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
+                    <span>Next: Export Data</span>
+                    <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                </button>
+            </div>
+         {{/if}}
     </div>
 
     <!-- Step 1.5: Choice -->
