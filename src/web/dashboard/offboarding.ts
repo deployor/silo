@@ -540,9 +540,54 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 								if (getRes.headers.get("content-type")) {
 									headers["Content-Type"] = getRes.headers.get("content-type")!;
 								}
-								                        if (getRes.headers.get("content-length")) {
-								                            headers["Content-Length"] = getRes.headers.get("content-length")!;
-								                        }
+								
+								let body: any = getRes.body;
+								let contentLength = getRes.headers.get("content-length");
+
+								// Fix for 411 Length Required:
+								// If Content-Length is missing, we must buffer the stream to calculate it.
+								// This is resource-intensive but necessary for some providers if the source doesn't report size.
+								if (!contentLength && body) {
+									// 50MB Buffer Limit to prevent OOM
+									const LIMIT = 50 * 1024 * 1024;
+									let accumulatedSize = 0;
+									const chunks: Uint8Array[] = [];
+									
+									// @ts-ignore
+									const reader = body.getReader();
+									try {
+										while (true) {
+											const { done, value } = await reader.read();
+											if (done) break;
+											if (value) {
+												accumulatedSize += value.length;
+												if (accumulatedSize > LIMIT) {
+													throw new Error("File too large to buffer for Length calculation (>50MB). Source missing Content-Length.");
+												}
+												chunks.push(value);
+											}
+										}
+									} finally {
+										// @ts-ignore
+										// reader.releaseLock(); // Not needed if we consumed it all or if stream is closed
+									}
+									
+									// Reconstruct body from chunks
+									const combined = new Uint8Array(accumulatedSize);
+									let offset = 0;
+									for (const chunk of chunks) {
+										combined.set(chunk, offset);
+										offset += chunk.length;
+									}
+									
+									// Convert Uint8Array to ArrayBuffer for compatibility if needed, or just use it
+									body = combined;
+									contentLength = accumulatedSize.toString();
+								}
+
+								if (contentLength) {
+									headers["Content-Length"] = contentLength;
+								}
 								
 								// Copy User Metadata
 								getRes.headers.forEach((val, name) => {
@@ -578,9 +623,7 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 								}
 
 								successFiles++;
-								if (successFiles % 10 === 0) {
-									send(`Transferred ${successFiles} files...`);
-								}
+								send(`Transferred ${relativeKey}`, "success");
 							} catch (e: any) {
 								failFiles++;
 								send(`Failed to move ${relativeKey}: ${e.message}`, "error");
