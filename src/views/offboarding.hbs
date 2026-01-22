@@ -63,8 +63,8 @@
                  </div>
                  {{else}}
                  <form action="/dashboard/offboarding/download" method="POST" class="w-full">
-                     <button type="button" onclick="triggerDownloadConfirm()" class="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2">
-                         Download Archive
+                     <button type="button" onclick="triggerDownloadConfirm()" class="group w-full bg-white/10 hover:bg-white/20 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2">
+                         Download Archive <i class="ph-bold ph-download-simple group-hover:translate-y-1 transition-transform"></i>
                      </button>
                  </form>
                  {{/if}}
@@ -374,9 +374,16 @@
                 </p>
          </div>
 
-         <button @click="startMigration" class="w-full bg-hc-red text-white hover:bg-red-600 font-bold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-900/20">
-            Start Migration <i class="ph-bold ph-rocket-launch"></i>
+         <button @click="startMigration" class="group w-full bg-hc-red text-white hover:bg-red-600 font-bold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-900/20">
+            Start Migration <i class="ph-bold ph-rocket-launch group-hover:translate-x-1 transition-transform"></i>
          </button>
+
+         <div class="flex items-center justify-center mt-8">
+            <button type="button" @click="step = 3" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
+                <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
+                <span>Back</span>
+            </button>
+         </div>
     </div>
 
     <!-- Step 5: Progress -->
