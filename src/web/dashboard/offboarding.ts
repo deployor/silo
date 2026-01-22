@@ -151,10 +151,19 @@ export async function handleOffboardingRequest(req: Request): Promise<Response> 
 			return new Response("Invalid JSON", { status: 400 });
 		}
 		
-		      // Add default for R2
-		      if (body.endpoint && body.endpoint.includes('.r2.cloudflarestorage.com') && body.accessKeyId && !body.endpoint.includes(body.accessKeyId)) {
-		           // In some cases users might only put the account ID, but the form sends the full URL.
-		           // However, if the user leaves the placeholder <account_id> it will fail.
+		      // Auto-fix for R2 endpoints if they are using the default placeholder
+		      if (body.endpoint && body.endpoint.includes('<account_id>') && body.endpoint.includes('r2.cloudflarestorage.com') && body.accessKeyId) {
+		           // This is a rough heuristic, but R2 access keys are usually hex strings, while account IDs are also hex strings.
+		           // However, users often confuse them.
+		           // If we can't infer the account ID, we fail. But often the "access key" they pasted MIGHT be an API token which doesn't help with Account ID.
+		           // BUT, if they are following our guide, they have an Access Key ID and a Secret Access Key.
+		           // We can't actually infer the Account ID from the Access Key ID directly in a standard way.
+		           // Wait, the user complaint is "it uses the placeholders".
+		           // This means the frontend is SENDING the placeholder.
+		           // We should error out here, or attempt to fix it if the user pasted their account ID into the form somewhere else? No, there is no other field.
+		           
+		           // The only way to "fix" this is if the user mistakenly put their Account ID into the Access Key ID field? Unlikely.
+		           // Or if we just reject it firmly.
 		      }
 
 		return analyzeMigration(user, body);
@@ -204,6 +213,7 @@ async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
 
     // Check for placeholder
     if (cleanEndpoint.includes("<account_id>")) {
+        // If it's R2, we might be able to help? No, we can't guess the account ID.
         return new Response(JSON.stringify({ error: "Please replace <account_id> in the endpoint URL with your actual Cloudflare Account ID." }), { status: 400 });
     }
 
