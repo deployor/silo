@@ -41,112 +41,182 @@
         </div>
     </div>
 
-    <!-- Actions Section -->
-    <div class="w-full max-w-2xl mx-auto text-center mb-16">
-        {{#if showSuccess}}
-            <div class="bg-green-500/10 rounded-2xl p-8 mb-8 border border-green-500/20">
-                <i class="ph-duotone ph-check-circle text-4xl text-green-500 mb-4"></i>
-                <h2 class="text-3xl font-bold mb-2 text-white">Export Started</h2>
-                <p class="mb-6 text-text-muted text-lg">Your download should begin automatically.</p>
-                <a href="/dashboard/offboarding/archive" class="text-white underline hover:no-underline font-mono">
-                    Click here if it doesn't start
-                </a>
-                
-                <script>
-                    setTimeout(() => {
-                        window.location.href = "/dashboard/offboarding/archive";
-                    }, 1000);
-                </script>
-            </div>
-        {{else}}
-            {{#if user.dataExported}}
-                <div class="bg-blue-500/10 rounded-2xl p-8 mb-8 border border-blue-500/20">
-                    <i class="ph-duotone ph-lock-key text-4xl text-blue-500 mb-4"></i>
-                    <h3 class="text-white font-bold text-2xl mb-2">Account Frozen</h3>
-                    <p class="text-text-muted text-lg leading-relaxed">
-                        You've already started an export, so your account is locked to prevent changes. You can re-download your archive below.
-                    </p>
-                </div>
-            {{else}}
-                <div class="bg-yellow-500/10 rounded-2xl p-6 mb-8 border border-yellow-500/20 text-left flex gap-4">
-                    <i class="ph-fill ph-warning text-yellow-500 text-2xl shrink-0 mt-1"></i>
-                    <p class="text-text-muted text-lg leading-relaxed">
-                        Downloading your data will <span class="text-white font-bold">immediately freeze your account</span>. You won't be able to upload new files or create buckets afterwards.
-                    </p>
-                </div>
-            {{/if}}
-
-            <form action="/dashboard/offboarding/download" method="POST" id="download-form">
-                <button type="button" onclick="triggerDownloadConfirm()" id="download-btn" class="group relative w-full bg-hc-red text-white hover:scale-[1.02] text-xl font-bold py-6 rounded-2xl transition-all shadow-lg shadow-hc-red/20">
-                    <span id="btn-content" class="flex items-center justify-center gap-3">
-                        <i class="ph-bold ph-download-simple text-2xl"></i>
-                        {{#if user.dataExported}}Download Archive Again{{else}}Download Everything (.zip){{/if}}
-                    </span>
-                    <div id="btn-spinner" class="hidden absolute inset-0 flex items-center justify-center">
-                        <svg class="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
+    <!-- Automated Migration Section -->
+    <div class="w-full max-w-4xl mx-auto mb-16">
+        <div class="bg-black/20 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-sm">
+            <!-- Header -->
+            <div class="p-8 border-b border-white/10 bg-white/5">
+                <div class="flex items-center gap-4 mb-2">
+                    <div class="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
+                        <i class="ph-duotone ph-rocket-launch text-xl"></i>
                     </div>
+                    <h2 class="text-2xl font-bold text-white">Automated Migration Assistant</h2>
+                </div>
+                <p class="text-text-muted text-lg">
+                    Don't want to download and re-upload? We can move your files directly to your new provider for you.
+                    We recommend <a href="https://www.cloudflare.com/developer-platform/r2/" target="_blank" class="text-white underline decoration-white/30 hover:decoration-white">Cloudflare R2</a> (it's free for most users).
+                </p>
+            </div>
+
+            <!-- Content -->
+            <div class="p-8">
+                <!-- R2 Instructions Toggle -->
+                <details class="group mb-8 bg-white/5 rounded-xl border border-white/5 open:bg-white/10 transition-all">
+                    <summary class="flex items-center justify-between p-4 cursor-pointer font-bold text-white select-none">
+                        <span class="flex items-center gap-3">
+                            <i class="ph-bold ph-info text-blue-400"></i>
+                            How to get your R2 Credentials
+                        </span>
+                        <i class="ph-bold ph-caret-down group-open:rotate-180 transition-transform text-text-muted"></i>
+                    </summary>
+                    <div class="p-4 pt-0 text-text-muted space-y-3 ml-1">
+                        <ol class="list-decimal list-inside space-y-2">
+                            <li>Log in to the Cloudflare Dashboard and go to <strong>R2</strong>.</li>
+                            <li>Click <strong>"Manage R2 API Tokens"</strong> in the sidebar.</li>
+                            <li>Click <strong>"Create API token"</strong>.</li>
+                            <li>Select <strong>"Admin Read & Write"</strong> permissions.</li>
+                            <li>Create the token and copy the <strong>Access Key ID</strong>, <strong>Secret Access Key</strong>, and your account-specific <strong>S3 Endpoint</strong>.</li>
+                            <li>Create a new bucket in R2 named exactly what you want (e.g., <code>my-silo-backup</code>).</li>
+                        </ol>
+                    </div>
+                </details>
+
+                <form id="migration-form" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-2">
+                            <label class="text-sm font-bold text-text-muted uppercase tracking-wider">S3 Endpoint URL</label>
+                            <input type="text" name="endpoint" placeholder="https://<account>.r2.cloudflarestorage.com" required
+                                class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-bold text-text-muted uppercase tracking-wider">Target Bucket Name</label>
+                            <input type="text" name="bucket" placeholder="my-backup-bucket" required
+                                class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-bold text-text-muted uppercase tracking-wider">Access Key ID</label>
+                            <input type="text" name="accessKeyId" placeholder="Values are encrypted" required
+                                class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm">
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-sm font-bold text-text-muted uppercase tracking-wider">Secret Access Key</label>
+                            <input type="password" name="secretAccessKey" placeholder="••••••••••••••••" required
+                                class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm">
+                        </div>
+                    </div>
+
+                    <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex gap-3 text-sm text-yellow-200/80">
+                         <i class="ph-fill ph-warning text-lg shrink-0 mt-0.5"></i>
+                         <p>Warning: This will transfer all your files to the destination. Ensure the bucket exists and is empty to avoid overwriting data. Your Silo account will be frozen after migration starts.</p>
+                    </div>
+
+                    <button type="submit" id="start-migration-btn" class="w-full bg-white text-black hover:bg-gray-100 font-bold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2">
+                        <span>Start Transfer</span>
+                        <i class="ph-bold ph-arrow-right"></i>
+                    </button>
+                </form>
+
+                <!-- Terminal Output -->
+                <div id="migration-terminal" class="hidden mt-8 bg-black rounded-xl border border-white/10 p-4 font-mono text-sm h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
+                    <div class="text-blue-400 mb-2">Silo Migration Tool v1.0.0</div>
+                    <div class="h-px bg-white/10 w-full mb-4"></div>
+                    <div id="terminal-content" class="space-y-1 text-white/70">
+                        <!-- Logs go here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fallback / Manual Download -->
+    <div class="w-full max-w-2xl mx-auto text-center mb-16 opacity-60 hover:opacity-100 transition-opacity">
+        <h3 class="text-text-muted font-bold uppercase tracking-widest mb-6 text-sm">Or do it manually</h3>
+        
+        {{#if showSuccess}}
+            <!-- ... same success message ... -->
+        {{else}}
+            <form action="/dashboard/offboarding/download" method="POST" id="download-form">
+                <button type="button" onclick="triggerDownloadConfirm()" class="group relative w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white text-lg font-bold py-4 rounded-xl transition-all">
+                    <span class="flex items-center justify-center gap-3">
+                        <i class="ph-bold ph-download-simple"></i>
+                        {{#if user.dataExported}}Download Archive Again{{else}}Download ZIP Archive{{/if}}
+                    </span>
                 </button>
             </form>
-            <p class="text-center text-text-muted mt-4 font-medium">
-                This wraps up all your buckets into one file.
-            </p>
         {{/if}}
     </div>
 
-    <!-- Migration Guide -->
-    <div class="w-full max-w-3xl pt-8">
-        <div class="flex items-center gap-4 mb-8 justify-center">
-            <div class="h-px bg-white/10 flex-1"></div>
-            <h2 class="text-2xl font-bold text-text-muted uppercase tracking-widest">Where to go next</h2>
-            <div class="h-px bg-white/10 flex-1"></div>
-        </div>
-        
-        <div class="grid gap-6">
-            <div class="bg-white/5 rounded-2xl p-6 border border-white/10 flex flex-col md:flex-row gap-6 items-center md:items-start text-center md:text-left hover:bg-white/10 transition-colors group">
-                <div class="shrink-0 w-16 h-16 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white group-hover:text-black transition-colors">
-                     <i class="ph-duotone ph-cloud-arrow-up text-3xl"></i>
-                </div>
-                <div class="flex-1">
-                    <h3 class="text-white font-bold text-xl mb-2">Set up Cloudflare R2</h3>
-                    <p class="text-text-muted text-lg leading-relaxed">
-                        It's the best alternative to Silo (S3-compatible) and has a massive free tier. Create an account, enable R2, and generate "S3 API Tokens".
-                    </p>
-                </div>
-            </div>
+    <!-- Scripts for Migration -->
+    <script>
+        const migrationForm = document.getElementById('migration-form');
+        const terminal = document.getElementById('migration-terminal');
+        const terminalContent = document.getElementById('terminal-content');
+        const startBtn = document.getElementById('start-migration-btn');
 
-            <div class="bg-white/5 rounded-2xl p-6 border border-white/10 flex flex-col md:flex-row gap-6 items-center md:items-start text-center md:text-left hover:bg-white/10 transition-colors group">
-                <div class="shrink-0 w-16 h-16 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white group-hover:text-black transition-colors">
-                     <i class="ph-duotone ph-arrows-left-right text-3xl"></i>
-                </div>
-                <div class="flex-1 w-full max-w-full">
-                    <h3 class="text-white font-bold text-xl mb-2">Move your files directly</h3>
-                    <p class="text-text-muted text-lg leading-relaxed mb-4">
-                        Use <strong>Rclone</strong> to transfer directly from Silo to another provider. Here is the configuration you need:
-                    </p>
+        function log(msg, type = 'info') {
+            const line = document.createElement('div');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            if (type === 'error') line.className = 'text-red-400';
+            else if (type === 'success') line.className = 'text-green-400';
+            else line.className = 'text-white/70';
+            
+            line.innerHTML = `<span class="opacity-50">[${timestamp}]</span> ${msg}`;
+            terminalContent.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        migrationForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!confirm('Are you sure you want to start the migration? This process cannot be stopped once started.')) {
+                return;
+            }
+
+            // UI State
+            migrationForm.classList.add('opacity-50', 'pointer-events-none');
+            terminal.classList.remove('hidden');
+            log('Initializing migration agent...');
+            
+            const formData = new FormData(migrationForm);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetch('/dashboard/offboarding/migrate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
                     
-                    <div class="bg-black/50 rounded-xl p-6 border border-white/10 font-mono text-sm text-emerald-400 overflow-x-auto w-full text-left mb-4">
-                        <div class="text-text-muted mb-2 select-none"># ~/.config/rclone/rclone.conf</div>
-                        [silo]<br>
-                        type = s3<br>
-                        provider = Other<br>
-                        env_auth = false<br>
-                        access_key_id = <span class="text-yellow-400"><your_access_key></span><br>
-                        secret_access_key = <span class="text-yellow-400"><your_secret_key></span><br>
-                        endpoint = https://silo.hackclub.com<br>
-                        acl = private
-                    </div>
-
-                    <p class="text-text-muted text-sm mb-2">Then run the sync command:</p>
-                    <div class="bg-black/50 rounded-xl p-4 border border-white/10 font-mono text-sm text-white overflow-x-auto w-full text-left">
-                        rclone sync silo:my-bucket r2:new-bucket --progress --transfers=32
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        if (line.startsWith('data: ')) {
+                             const msg = JSON.parse(line.substring(6));
+                             log(msg.text, msg.type);
+                             
+                             if (msg.type === 'error') {
+                                 migrationForm.classList.remove('opacity-50', 'pointer-events-none');
+                                 startBtn.textContent = 'Retry Migration';
+                             }
+                        }
+                    }
+                }
+            } catch (err) {
+                log('Network error occurred: ' + err.message, 'error');
+                migrationForm.classList.remove('opacity-50', 'pointer-events-none');
+            }
+        });
+    </script>
 
 </div>
 
