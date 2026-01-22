@@ -635,7 +635,7 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 								const putRes = await destClient.fetch(destUrl, {
 									method: "PUT",
 									headers,
-									body: getRes.body // Pipe the stream
+									body: body // Use the prepared body (stream or buffer)
 								});
 
 								if (!putRes.ok) {
