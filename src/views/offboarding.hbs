@@ -96,8 +96,9 @@
          x-transition:enter-end="opacity-100 transform scale-100">
          
          <div class="mb-8">
-            <button @click="step = 1" class="text-text-muted hover:text-white flex items-center gap-2 mx-auto mb-4 font-bold">
-                <i class="ph-bold ph-arrow-left"></i> Back
+            <button type="button" @click="step = 1" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group mx-auto mb-4">
+                <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
+                <span>Back</span>
             </button>
             <h2 class="text-4xl md:text-6xl font-black text-white mb-4 tracking-tighter italic">Choose your new home</h2>
             <p class="text-text-muted text-2xl font-medium">Where should we move your files?</p>
