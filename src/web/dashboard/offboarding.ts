@@ -176,7 +176,7 @@ export async function handleOffboardingRequest(req: Request): Promise<Response> 
 }
 
 async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
-	const { endpoint, accessKeyId, secretAccessKey } = params;
+	const { endpoint, accessKeyId, secretAccessKey, proposedMapping } = params;
 	
 	if (!endpoint || !accessKeyId || !secretAccessKey) {
 		return new Response(JSON.stringify({ error: "Missing required credentials" }), { status: 400 });
@@ -242,24 +242,12 @@ async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
 
 		// 3. Match
 		const plan = localBuckets.map(b => {
-		                let targetName = b.name;
+		                // Use proposed name if available (Re-Check flow), otherwise default to local name
+		                let targetName = proposedMapping && proposedMapping[b.name]
+		                                          ? proposedMapping[b.name]
+		                                          : b.name;
+
 		                let status = remoteBuckets.has(targetName) ? "EXISTS" : "MISSING";
-		                
-		                // Auto-Rename Logic for R2/S3
-		                // If we don't own it (MISSING), it MIGHT be taken by someone else globally.
-		                // But we can't know for sure without trying to create it or HEAD it.
-		                // However, common pattern: if user is migrating, they might want a prefix.
-		                // But user feedback requested "force unique name".
-		                // Since we can't easily check global uniqueness without write ops,
-		                // we will rely on the "EXISTS" check (owned by user) to allow overwrite/merge.
-		                // For "MISSING", we assume it's free.
-		                
-		                // However, if the user explicitly requested ensuring it works:
-		                // We could try to HEAD the bucket. If 404 -> Free. If 403/200 -> Taken.
-		                // But standard ListAllMyBuckets is safer/faster.
-		                
-		                // Strategy: If "EXISTS" (We own it), we mark as "MERGE" (Yellow).
-		                // If "MISSING", we mark as "CREATE" (Green).
 		                
 		                return {
 		                    localName: b.name,
