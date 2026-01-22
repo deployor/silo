@@ -23,12 +23,32 @@
                 <br>
                 Your data has been successfully migrated. Your account is now frozen.
              </p>
-             <div class="flex items-center justify-center gap-6">
-                 <button type="button" @click="step = 1.5" class="group bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 border border-white/10">
-                     <span>Migration Status / Download</span>
-                     <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
-                 </button>
+             
+             <!-- Download Option for Exported Users -->
+             <div class="max-w-md mx-auto">
+                 <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow flex flex-col items-center text-center hover:border-white/30 transition-colors group">
+                    <div class="h-20 w-20 bg-white/10 rounded-full flex items-center justify-center mb-6 text-4xl text-white group-hover:scale-110 transition-transform">
+                        <i class="ph-duotone ph-download-simple"></i>
+                    </div>
+                    <h3 class="text-2xl font-bold text-white mb-2">Download ZIP</h3>
+                    <p class="text-text-muted mb-8 flex-1 text-lg">
+                        You can still download an archive of your data.
+                    </p>
+                    
+                    {{#if showSuccess}}
+                    <div class="bg-green-500/20 text-green-400 p-4 rounded-xl font-bold w-full">
+                        <i class="ph-bold ph-check-circle mr-2"></i> Archive Created
+                    </div>
+                    {{else}}
+                    <form action="/dashboard/offboarding/download" method="POST" class="w-full">
+                        <button type="button" onclick="triggerDownloadConfirm()" class="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2">
+                            Download Archive
+                        </button>
+                    </form>
+                    {{/if}}
+                 </div>
              </div>
+
          {{else}}
              <p class="text-text-muted text-2xl max-w-3xl mx-auto font-medium mb-12 leading-relaxed">
                 You've turned 18, so you've aged out of Silo.
@@ -43,68 +63,46 @@
                 </p>
             </div>
 
-             <div class="flex items-center justify-center gap-6">
-                <button type="button" @click="step = 1.5" class="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20">
-                    <span>Next: Export Data</span>
-                    <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
-                </button>
-            </div>
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                 <!-- Download Option -->
+                  <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow flex flex-col items-center text-center hover:border-white/30 transition-colors group">
+                     <div class="h-20 w-20 bg-white/10 rounded-full flex items-center justify-center mb-6 text-4xl text-white group-hover:scale-110 transition-transform">
+                         <i class="ph-duotone ph-download-simple"></i>
+                     </div>
+                     <h3 class="text-2xl font-bold text-white mb-2">Download ZIP</h3>
+                     <p class="text-text-muted mb-8 flex-1 text-lg">
+                         Get a single archive containing all your buckets and metadata. Best for local backups.
+                     </p>
+                     
+                     {{#if showSuccess}}
+                     <div class="bg-green-500/20 text-green-400 p-4 rounded-xl font-bold w-full">
+                         <i class="ph-bold ph-check-circle mr-2"></i> Archive Created
+                     </div>
+                     {{else}}
+                     <form action="/dashboard/offboarding/download" method="POST" class="w-full">
+                         <button type="button" onclick="triggerDownloadConfirm()" class="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2">
+                             Download Archive
+                         </button>
+                     </form>
+                     {{/if}}
+                  </div>
+
+                  <!-- Migration Option -->
+                  <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow flex flex-col items-center text-center hover:border-white/30 transition-colors group relative overflow-hidden">
+                     <div class="absolute top-0 right-0 bg-hc-red text-white text-xs font-bold px-3 py-1 rounded-bl-xl">RECOMMENDED</div>
+                     <div class="h-20 w-20 bg-blue-500/10 rounded-full flex items-center justify-center mb-6 text-4xl text-blue-400 group-hover:scale-110 transition-transform">
+                         <i class="ph-duotone ph-rocket-launch"></i>
+                     </div>
+                     <h3 class="text-2xl font-bold text-white mb-2">Migration Assistant</h3>
+                     <p class="text-text-muted mb-8 flex-1 text-lg">
+                         Directly transfer your files to Cloudflare R2, AWS, or Backblaze without downloading.
+                     </p>
+                     <button @click="step = 2" class="w-full bg-hc-red text-white hover:bg-red-600 font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-900/20">
+                         Start Migration
+                     </button>
+                  </div>
+             </div>
          {{/if}}
-    </div>
-
-    <!-- Step 1.5: Choice -->
-    <div x-show="step === 1.5"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0 transform scale-95"
-         x-transition:enter-end="opacity-100 transform scale-100"
-         class="w-full max-w-5xl mx-auto text-center">
-         
-         <div class="mb-8">
-            <button @click="step = 1" class="text-text-muted hover:text-white flex items-center gap-2 mx-auto mb-4 font-bold">
-                <i class="ph-bold ph-arrow-left"></i> Back
-            </button>
-            <h2 class="text-4xl md:text-6xl font-black text-white mb-4 tracking-tighter italic">How should we move your files?</h2>
-         </div>
-
-         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            <!-- Download Option -->
-             <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow flex flex-col items-center text-center hover:border-white/30 transition-colors group">
-                <div class="h-20 w-20 bg-white/10 rounded-full flex items-center justify-center mb-6 text-4xl text-white group-hover:scale-110 transition-transform">
-                    <i class="ph-duotone ph-download-simple"></i>
-                </div>
-                <h3 class="text-2xl font-bold text-white mb-2">Download ZIP</h3>
-                <p class="text-text-muted mb-8 flex-1 text-lg">
-                    Get a single archive containing all your buckets and metadata. Best for local backups.
-                </p>
-                
-                {{#if showSuccess}}
-                <div class="bg-green-500/20 text-green-400 p-4 rounded-xl font-bold w-full">
-                    <i class="ph-bold ph-check-circle mr-2"></i> Archive Created
-                </div>
-                {{else}}
-                <form action="/dashboard/offboarding/download" method="POST" class="w-full">
-                    <button type="button" onclick="triggerDownloadConfirm()" class="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2">
-                        Download Archive
-                    </button>
-                </form>
-                {{/if}}
-             </div>
-
-             <!-- Migration Option -->
-             <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow flex flex-col items-center text-center hover:border-white/30 transition-colors group relative overflow-hidden">
-                <div class="absolute top-0 right-0 bg-hc-red text-white text-xs font-bold px-3 py-1 rounded-bl-xl">RECOMMENDED</div>
-                <div class="h-20 w-20 bg-blue-500/10 rounded-full flex items-center justify-center mb-6 text-4xl text-blue-400 group-hover:scale-110 transition-transform">
-                    <i class="ph-duotone ph-rocket-launch"></i>
-                </div>
-                <h3 class="text-2xl font-bold text-white mb-2">Migration Assistant</h3>
-                <p class="text-text-muted mb-8 flex-1 text-lg">
-                    Directly transfer your files to Cloudflare R2, AWS, or Backblaze without downloading.
-                </p>
-                <button @click="step = 2" class="w-full bg-hc-red text-white hover:bg-red-600 font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-900/20">
-                    Start Migration
-                </button>
-             </div>
-         </div>
     </div>
 
     <!-- Step 2: Choose Provider -->
@@ -114,7 +112,7 @@
          x-transition:enter-end="opacity-100 transform scale-100">
          
          <div class="mb-8">
-            <button @click="step = 1.5" class="text-text-muted hover:text-white flex items-center gap-2 mx-auto mb-4 font-bold">
+            <button @click="step = 1" class="text-text-muted hover:text-white flex items-center gap-2 mx-auto mb-4 font-bold">
                 <i class="ph-bold ph-arrow-left"></i> Back
             </button>
             <h2 class="text-4xl md:text-6xl font-black text-white mb-4 tracking-tighter italic">Choose your new home</h2>
