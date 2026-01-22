@@ -152,8 +152,6 @@ async function streamUserData(user: typeof users.$inferSelect) {
             const bagitTxt = "BagIt-Version: 0.97\nTag-File-Character-Encoding: UTF-8\n";
             archive.append(bagitTxt, { name: "bagit.txt" });
 
-            const fileProcessingPromises: Promise<void>[] = [];
-
 			for (const bucket of userBuckets) {
 				const internalPrefix = getInternalPath("", user, bucket);
                 let continuationToken: string | undefined = undefined;
@@ -176,6 +174,7 @@ async function streamUserData(user: typeof users.$inferSelect) {
                         ? (Array.isArray(result.Contents) ? result.Contents : [result.Contents]) 
                         : [];
 
+                    // SEQUENTIAL PROCESSING to avoid RAM explosion with Promise.all on huge buckets
                     for (const item of contents) {
                          const key = item.Key;
                          const relativeKey = key.replace(internalPrefix, "");
@@ -241,7 +240,7 @@ async function streamUserData(user: typeof users.$inferSelect) {
                                 }
                             });
                              
-                            const processingPromise = new Promise<void>((resolve, reject) => {
+                            await new Promise<void>((resolve, reject) => {
                                 const hash = crypto.createHash('sha256');
                                 const checksumTransform = new Transform({
                                     transform(chunk, encoding, callback) {
@@ -260,18 +259,23 @@ async function streamUserData(user: typeof users.$inferSelect) {
                                 nodeStream.on('error', reject);
                                 checksumTransform.on('error', reject);
                                 
+                                // We append the TRANSFORMED stream to archive
+                                // Archiver will drain this stream before accepting the next append?
+                                // Actually, archiver queues appends. But since we await the stream completion (resolve)
+                                // inside this loop, we effectively serialize the download -> zip pipe.
+                                // This ensures we don't open 1000 connections or buffer 1TB of data.
                                 archive.append(nodeStream.pipe(checksumTransform), { name: bagPath });
+                                
+                                // IMPORTANT: We must wait for the stream to be fully consumed by archiver
+                                // before moving to the next file to prevent memory buildup?
+                                // 'flush' on checksumTransform is called when the stream ends.
+                                // So awaiting this Promise ensures the file is fully processed.
                             });
-                            
-                            fileProcessingPromises.push(processingPromise);
                          }
                     }
                     continuationToken = result.NextContinuationToken;
                 } while (continuationToken);
 			}
-
-            // Await all file streams to complete so we have all hashes
-            await Promise.all(fileProcessingPromises);
 
             // Append Manifest
             const manifestContent = manifestEntries.join("\n");
