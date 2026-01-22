@@ -75,9 +75,9 @@ export async function handleOffboardingRequest(req: Request): Promise<Response> 
 		      // This is a rough sum of all stats if available, or just a placeholder if not calculated
 		      // For now, we'll fetch stats sum
 		      const stats = await db.execute(sql`
-		          SELECT SUM(size_bytes) as total_size
-		          FROM bucket_stats
-		          WHERE bucket_id IN (SELECT id FROM buckets WHERE user_id = ${user.id})
+		          SELECT SUM(total_bytes) as total_size
+		          FROM buckets
+		          WHERE user_id = ${user.id}
 		      `);
 		      const totalBytes = Number(stats[0]?.total_size || 0);
 		      
