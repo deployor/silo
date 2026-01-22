@@ -96,15 +96,14 @@
          x-transition:enter-end="opacity-100 transform scale-100">
          
          <div class="mb-8">
-            <button type="button" @click="step = 1" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group mx-auto mb-4">
-                <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
-                <span>Back</span>
-            </button>
+             <div class="mb-8 flex justify-center">
+                 <i class="ph-duotone ph-truck text-8xl text-blue-500"></i>
+             </div>
             <h2 class="text-4xl md:text-6xl font-black text-white mb-4 tracking-tighter italic">Choose your new home</h2>
             <p class="text-text-muted text-2xl font-medium">Where should we move your files?</p>
          </div>
 
-         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left mb-12">
              <!-- R2 -->
              <button @click="selectProvider('r2')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-[#F38020]/50 rounded-2xl p-6 transition-all flex items-center gap-6">
                   <div class="h-16 w-16 shrink-0 rounded-xl bg-white flex items-center justify-center p-3">
@@ -167,6 +166,13 @@
                  <i class="ph-bold ph-caret-right text-white/20 group-hover:text-white text-2xl"></i>
             </button>
          </div>
+
+         <div class="flex items-center justify-center">
+            <button type="button" @click="step = 1" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
+                <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
+                <span>Back</span>
+            </button>
+         </div>
     </div>
 
     <!-- Step 3: Connect (Credentials) -->
@@ -179,10 +185,9 @@
          <!-- R2 Guide -->
          <div x-show="!r2GuideSeen && provider === 'r2'" class="text-center">
              <div class="mb-8">
-                <button type="button" @click="step = 2" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group mx-auto mb-4">
-                    <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
-                    <span>Back to Providers</span>
-                </button>
+                 <div class="mb-8 flex justify-center">
+                     <i class="ph-duotone ph-graduation-cap text-8xl text-orange-500"></i>
+                 </div>
                 <h2 class="text-4xl md:text-6xl font-black text-white mb-4 tracking-tighter italic">Setting up Cloudflare R2</h2>
                 <p class="text-text-muted text-2xl font-medium">Follow these steps to generate your credentials.</p>
              </div>
@@ -255,17 +260,24 @@
                  </div>
              </div>
 
-             <button @click="r2GuideSeen = true" class="bg-[#F38020] text-white hover:bg-[#d66e16] font-bold text-xl py-4 px-12 rounded-xl transition-all shadow-lg shadow-orange-900/20">
+             <button @click="r2GuideSeen = true" class="bg-[#F38020] text-white hover:bg-[#d66e16] font-bold text-xl py-4 px-12 rounded-xl transition-all shadow-lg shadow-orange-900/20 mb-8">
                  I have my credentials <i class="ph-bold ph-arrow-right ml-2"></i>
              </button>
+
+             <div class="flex items-center justify-center">
+                <button type="button" @click="step = 2" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
+                    <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
+                    <span>Back to Providers</span>
+                </button>
+             </div>
          </div>
 
          <!-- Credentials Form -->
          <div x-show="r2GuideSeen || provider !== 'r2'" x-transition:enter="transition ease-out duration-300">
             <div class="text-center mb-8">
-                <button @click="provider === 'r2' ? r2GuideSeen = false : step = 2" class="text-text-muted hover:text-white flex items-center gap-2 mx-auto mb-4 font-bold">
-                   <i class="ph-bold ph-arrow-left"></i> Back
-               </button>
+                <div class="mb-8 flex justify-center">
+                    <i class="ph-duotone ph-key text-8xl text-yellow-500"></i>
+                </div>
                <h2 class="text-4xl md:text-6xl font-black text-white mb-4 tracking-tighter italic">Connect <span x-text="providerName"></span></h2>
                <p class="text-text-muted text-2xl font-medium">Enter your credentials to allow Silo to transfer files.</p>
             </div>
@@ -292,11 +304,18 @@
             <!-- Debug Button -->
             <button type="button" @click="fillDebug" class="text-xs text-white/20 hover:text-white/50">[Debug]</button>
 
-            <button type="submit" :disabled="loading" class="w-full bg-white text-black hover:bg-gray-200 font-bold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-wait">
-                <span x-show="!loading">Connect & Analyze</span>
+            <button type="submit" :disabled="loading" class="group w-full bg-hc-red text-white hover:bg-red-600 font-bold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-900/20 disabled:opacity-50 disabled:cursor-wait">
+                <span x-show="!loading" class="flex items-center gap-2">Connect & Analyze <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i></span>
                 <span x-show="loading"><i class="ph-bold ph-spinner animate-spin"></i> Connecting...</span>
             </button>
          </form>
+
+         <div class="flex items-center justify-center mt-8">
+            <button type="button" @click="provider === 'r2' ? r2GuideSeen = false : step = 2" class="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group">
+                <i class="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform"></i>
+                <span>Back</span>
+            </button>
+         </div>
          </div>
     </div>
 
@@ -307,9 +326,9 @@
          x-transition:enter-end="opacity-100 transform scale-100">
          
          <div class="text-center mb-8">
-            <button @click="step = 3" class="text-text-muted hover:text-white flex items-center gap-2 mx-auto mb-4 font-bold">
-                <i class="ph-bold ph-arrow-left"></i> Back
-            </button>
+             <div class="mb-8 flex justify-center">
+                 <i class="ph-duotone ph-clipboard-text text-8xl text-green-500"></i>
+             </div>
             <h2 class="text-4xl md:text-6xl font-black text-white mb-4 tracking-tighter italic">Migration Plan</h2>
             <p class="text-text-muted text-2xl font-medium">Review where your buckets will go.</p>
          </div>
@@ -367,6 +386,9 @@
          x-transition:enter-end="opacity-100 transform scale-100">
          
          <div class="text-center mb-8">
+             <div class="mb-8 flex justify-center">
+                 <i class="ph-duotone ph-rocket text-8xl text-hc-red"></i>
+             </div>
             <h2 class="text-4xl md:text-6xl font-black text-white mb-4 tracking-tighter italic">Migrating...</h2>
             <p class="text-text-muted text-2xl font-medium">Don't close this tab.</p>
          </div>
