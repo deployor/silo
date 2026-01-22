@@ -392,7 +392,67 @@ async function streamUserData(user: typeof users.$inferSelect) {
                          const relativeKey = key.replace(internalPrefix, "");
                          const bagPath = `data/${bucket.name}/${relativeKey}`;
 
+                         // Fetch file stream
                          const fileRes = await s3Client.fetch(key, { method: "GET" });
+                         
+                         // Fetch Object Tags
+                         // Note: In S3, tags are a separate API call per object.
+                         // For a bulk export, this is expensive but necessary for full fidelity.
+                         // We'll try to fetch tags, but won't fail the export if it fails or returns 404 (no tags).
+                         let tags: Record<string, string> = {};
+                         try {
+                             const taggingRes = await s3Client.fetch(`${key}?tagging`, { method: "GET" });
+                             if (taggingRes.ok) {
+                                const xml = await taggingRes.text();
+                                const { XMLParser } = await import("fast-xml-parser");
+                                const parser = new XMLParser();
+                                const result = parser.parse(xml);
+                                const tagSet = result.Tagging?.TagSet?.Tag;
+                                if (tagSet) {
+                                    const tagArray = Array.isArray(tagSet) ? tagSet : [tagSet];
+                                    for (const t of tagArray) {
+                                        tags[t.Key] = t.Value;
+                                    }
+                                }
+                             }
+                         } catch (e) {
+                             // Ignore tagging errors (e.g. not implemented or no permissions)
+                         }
+
+                         // Extract User Metadata from Headers (x-amz-meta-*)
+                         const userMetadata: Record<string, string> = {};
+                         if (fileRes.headers) {
+                             fileRes.headers.forEach((value, key) => {
+                                 if (key.startsWith("x-amz-meta-")) {
+                                     userMetadata[key.replace("x-amz-meta-", "")] = value;
+                                 }
+                             });
+                         }
+
+                         // Save metadata/tags to a sidecar JSON file for each object?
+                         // Or a central metadata registry?
+                         // BagIt doesn't mandate a specific way to store object metadata.
+                         // Standard practice is often a "metadata" directory mirroring the data directory,
+                         // OR just one big JSON file.
+                         // We'll create a sidecar `.metadata.json` for each file in the zip, placed in a `metadata/` directory.
+                         if (Object.keys(tags).length > 0 || Object.keys(userMetadata).length > 0) {
+                             const metaContent = JSON.stringify({
+                                 tags,
+                                 metadata: userMetadata,
+                                 contentType: fileRes.headers.get("content-type"),
+                                 lastModified: fileRes.headers.get("last-modified"),
+                                 eTag: fileRes.headers.get("etag")
+                             }, null, 2);
+                             
+                             // We don't hash metadata files for the main manifest in strict BagIt usually,
+                             // but we can add them to the zip.
+                             archive.append(metaContent, { name: `metadata/${bucket.name}/${relativeKey}.json` });
+                             
+                             // If we want to be strict, we should hash this too.
+                             // For now, let's skip hashing the metadata sidecars to avoid complex promise chains
+                             // and because they are generated on the fly.
+                         }
+
                          if (fileRes.ok && fileRes.body) {
                             // @ts-ignore
                             const reader = fileRes.body.getReader();
