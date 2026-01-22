@@ -133,24 +133,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	}
 
 	if (user.dataExported) {
-		const html = await render("offboarding", {
-			title: "Silo - Offboarding Export",
-			layout: "main",
-			user,
-			hideNavLinks: true, // Hide nav to emphasize frozen state
-			daysRemaining: user.overAgeGracePeriodEndsAt
-				? Math.ceil(
-						(new Date(user.overAgeGracePeriodEndsAt).getTime() - Date.now()) /
-							(1000 * 60 * 60 * 24),
-					)
-				: 0,
-			gracePeriodEndsAt: user.overAgeGracePeriodEndsAt
-				? new Date(user.overAgeGracePeriodEndsAt).toLocaleDateString()
-				: "Unknown",
-		});
-		return new Response(html, {
-			headers: { "Content-Type": "text/html" },
-		});
+		return Response.redirect("/dashboard/offboarding");
 	}
 
 	const fileExplorerMatch = path.match(/^\/dashboard\/buckets\/([a-z0-9-]+)$/);
