@@ -261,15 +261,20 @@
             <form @submit.prevent="analyze" class="space-y-6 text-left">
             <div>
                 <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Endpoint URL</label>
-                <input type="text" x-model="creds.endpoint" required placeholder="https://..." class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-white font-mono focus:border-hc-red focus:outline-none transition-colors">
+                <!-- For R2, we use a placeholder instead of pre-filling to avoid confusion -->
+                <input type="text"
+                       x-model="endpoint"
+                       required
+                       :placeholder="provider === 'r2' ? 'https://<account_id>.r2.cloudflarestorage.com' : 'https://...'"
+                       class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-white font-mono focus:border-hc-red focus:outline-none transition-colors">
             </div>
             <div>
                 <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Access Key ID</label>
-                <input type="text" x-model="creds.accessKeyId" required class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-white font-mono focus:border-hc-red focus:outline-none transition-colors">
+                <input type="text" x-model="accessKeyId" required class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-white font-mono focus:border-hc-red focus:outline-none transition-colors">
             </div>
             <div>
                 <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Secret Access Key</label>
-                <input type="password" x-model="creds.secretAccessKey" required class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-white font-mono focus:border-hc-red focus:outline-none transition-colors">
+                <input type="password" x-model="secretAccessKey" required class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-white font-mono focus:border-hc-red focus:outline-none transition-colors">
             </div>
 
             <!-- Debug Button -->
@@ -378,11 +383,11 @@ document.addEventListener('alpine:init', () => {
         provider: null,
         r2GuideSeen: false,
         loading: false,
-        creds: {
-            endpoint: '',
-            accessKeyId: '',
-            secretAccessKey: ''
-        },
+        // Flattened credentials to avoid x-model binding issues with nested objects
+        endpoint: '',
+        accessKeyId: '',
+        secretAccessKey: '',
+        
         plan: [],
         logs: [],
         
@@ -401,27 +406,37 @@ document.addEventListener('alpine:init', () => {
             this.provider = p;
             this.step = 3;
             this.r2GuideSeen = p !== 'r2'; // Show guide only for R2
-            this.creds.endpoint = ''; // Reset
+            
+            // Reset fields
+            this.endpoint = '';
+            this.accessKeyId = '';
+            this.secretAccessKey = '';
 
-            if(p === 'r2') this.creds.endpoint = 'https://<account_id>.r2.cloudflarestorage.com';
-            if(p === 'aws') this.creds.endpoint = 'https://s3.us-east-1.amazonaws.com';
-            if(p === 'backblaze') this.creds.endpoint = 'https://s3.us-west-000.backblazeb2.com';
-            if(p === 'digitalocean') this.creds.endpoint = 'https://nyc3.digitaloceanspaces.com';
+            // Pre-fill only for fixed endpoints, NOT for R2 (user must paste)
+            if(p === 'aws') this.endpoint = 'https://s3.us-east-1.amazonaws.com';
+            if(p === 'backblaze') this.endpoint = 'https://s3.us-west-000.backblazeb2.com';
+            if(p === 'digitalocean') this.endpoint = 'https://nyc3.digitaloceanspaces.com';
         },
 
         fillDebug() {
-            this.creds.endpoint = 'https://03c80993959141f237f8188172909405.r2.cloudflarestorage.com';
-            this.creds.accessKeyId = '348f6572f69435b0d014457e5b385966';
-            this.creds.secretAccessKey = '01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d';
+            this.endpoint = 'https://03c80993959141f237f8188172909405.r2.cloudflarestorage.com';
+            this.accessKeyId = '348f6572f69435b0d014457e5b385966';
+            this.secretAccessKey = '01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d';
         },
 
         async analyze() {
             this.loading = true;
             try {
+                const payload = {
+                    endpoint: this.endpoint,
+                    accessKeyId: this.accessKeyId,
+                    secretAccessKey: this.secretAccessKey
+                };
+
                 const res = await fetch('/dashboard/offboarding/analyze', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(this.creds)
+                    body: JSON.stringify(payload)
                 });
                 const data = await res.json();
                 if(!res.ok) throw new Error(data.error);
@@ -450,7 +465,12 @@ document.addEventListener('alpine:init', () => {
                 if(p.selected) bucketMapping[p.localName] = p.targetName;
             });
             
-            const payload = { ...this.creds, bucketMapping };
+            const payload = {
+                endpoint: this.endpoint,
+                accessKeyId: this.accessKeyId,
+                secretAccessKey: this.secretAccessKey,
+                bucketMapping
+            };
 
             try {
                 const response = await fetch('/dashboard/offboarding/migrate', {
