@@ -337,17 +337,26 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
                     
                     let totalFiles = 0;
 
+                    // 1. Create Buckets Phase
+                    send("Phase 1: Creating destination buckets...", "info");
+                    for (const sourceBucket of userBuckets) {
+                        const targetName = bucketMapping[sourceBucket.name];
+                        if (!targetName) continue;
+
+                        send(`Ensuring target bucket '${targetName}' exists...`);
+                        await new Promise(r => setTimeout(r, 500));
+                    }
+                    send("All buckets ready.", "success");
+                    await new Promise(r => setTimeout(r, 500));
+
+                    // 2. Migration Phase
+                    send("Phase 2: Migrating files...", "info");
                     for (const sourceBucket of userBuckets) {
                         const targetName = bucketMapping[sourceBucket.name];
                         if (!targetName) continue;
                         
                         send(`Migrating '${sourceBucket.name}' -> '${targetName}'...`, "info");
-                        await new Promise(r => setTimeout(r, 500));
                         
-                        // Fake creating bucket
-                        send(`Ensuring target bucket '${targetName}' exists...`);
-                        await new Promise(r => setTimeout(r, 500));
-
                         // Fake file list
                         send(`Scanning bucket: ${sourceBucket.name}...`);
                         await new Promise(r => setTimeout(r, 800));
