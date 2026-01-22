@@ -1,396 +1,407 @@
 {{!< main}}
 
-<div class="flex-1 w-full max-w-5xl mx-auto p-6">
+<div class="max-w-4xl mx-auto px-6 py-12">
     
-    <div class="mb-8 border-b border-white/10 pb-6">
-        <h1 class="text-3xl font-bold text-white mb-4">Offboarding</h1>
-        <div class="bg-white/5 border border-white/10 rounded-lg p-4">
-            <p class="text-lg text-white mb-2">
-                Your account has aged out (Deadline: <span class="font-bold text-hc-red">{{gracePeriodEndsAt}}</span>).
-            </p>
-            <p class="text-text-muted">
-                You have <span class="text-white font-bold">{{daysRemaining}} days</span> remaining to move your data.
-                After this period, your data will be permanently deleted.
-            </p>
+    <!-- Hero Section -->
+    <div class="text-center mb-16">
+        <h1 class="text-5xl md:text-7xl font-black text-white mb-6 tracking-tighter italic">
+            It's time to say goodbye
+        </h1>
+        <p class="text-xl text-text-muted max-w-2xl mx-auto leading-relaxed">
+            You've turned 18, so you've aged out of Silo. <br/>
+            Please download your files or migrate them to a new home before your account is closed.
+        </p>
+    </div>
+
+    <!-- Status Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div class="bg-white/5 border border-white/10 rounded-xl p-6 text-center">
+             <div class="text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Time Remaining</div>
+             <div class="text-3xl font-bold text-white">{{daysRemaining}} Days</div>
+        </div>
+        <div class="bg-white/5 border border-white/10 rounded-xl p-6 text-center">
+             <div class="text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Deadline</div>
+             <div class="text-xl font-bold text-white">{{gracePeriodEndsAt}}</div>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        
-        <!-- Left Column: Manual Download -->
-        <div>
-            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <i class="ph-bold ph-download-simple"></i>
-                Download Archive
-            </h2>
-            <p class="text-text-muted mb-6">
-                Download a ZIP archive containing all your files, metadata, and tags.
-                Recommended for small to medium sized buckets.
-            </p>
+    <!-- Progress Bar -->
+    <div class="mb-16">
+        <div class="flex justify-between text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
+            <span>Grace Period Progress</span>
+            <span>{{progressPercentage}}%</span>
+        </div>
+        <div class="w-full bg-white/5 rounded-full h-2 overflow-hidden">
+            <div class="bg-hc-red h-full transition-all duration-1000" style="width: {{progressPercentage}}%"></div>
+        </div>
+    </div>
 
-            {{#if showSuccess}}
-                <div class="bg-green-500/10 border border-green-500/20 text-green-400 p-4 rounded-lg mb-4">
-                    <strong>Export Initiated!</strong> Your download should begin shortly.
+    <!-- Main Actions -->
+    <div class="grid grid-cols-1 gap-16">
+
+        <!-- Option 1: Download -->
+        <div class="border-b border-white/10 pb-16">
+            <div class="text-center">
+                <h2 class="text-2xl font-bold text-white mb-4">Option 1: Download Archive</h2>
+                <p class="text-text-muted mb-8 max-w-lg mx-auto">
+                    Get a ZIP file containing all your data, including metadata and object tags. Best for keeping a local backup or moving to a hard drive.
+                </p>
+                
+                {{#if showSuccess}}
+                    <div class="bg-green-500/10 border border-green-500/20 text-green-400 p-4 rounded-xl mb-6 max-w-md mx-auto">
+                        <strong>Export Initiated!</strong> Your download should begin shortly.
+                    </div>
+                {{/if}}
+
+                <form action="/dashboard/offboarding/download" method="POST" id="download-form">
+                     <button type="button" onclick="triggerDownloadConfirm()" class="bg-white text-black hover:bg-gray-200 px-8 py-4 rounded-xl font-bold text-lg transition-colors inline-flex items-center gap-2">
+                        <i class="ph-bold ph-download-simple"></i>
+                        {{#if user.dataExported}}Download Archive Again{{else}}Download ZIP Archive{{/if}}
+                    </button>
+                </form>
+                <div class="mt-4 text-xs text-text-muted">
+                    Total Storage: <span class="text-white font-mono">{{totalStorageFormatted}}</span>
                 </div>
-            {{/if}}
-
-            <form action="/dashboard/offboarding/download" method="POST" id="download-form">
-                <button type="button" onclick="triggerDownloadConfirm()" class="bg-white text-black hover:bg-gray-200 px-6 py-3 rounded font-bold transition-colors w-full sm:w-auto">
-                    {{#if user.dataExported}}Download Again{{else}}Download ZIP{{/if}}
-                </button>
-            </form>
-            
-            <p class="text-xs text-text-muted mt-4">
-                Total Storage: <span class="text-white">{{totalStorageFormatted}}</span>
-            </p>
+            </div>
         </div>
 
-        <!-- Right Column: Migration Tool -->
+        <!-- Option 2: Migration Assistant -->
         <div>
-            <h2 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <i class="ph-bold ph-arrows-left-right"></i>
-                Migration Assistant
-            </h2>
-            <p class="text-text-muted mb-6">
-                Transfer your data directly to another S3-compatible provider without downloading it first.
-            </p>
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-white">Option 2: Migration Assistant</h2>
+                    <p class="text-text-muted mt-1">Transfer directly to another S3 provider without downloading.</p>
+                </div>
+            </div>
 
-            <div class="border border-white/10 rounded-lg p-6 bg-black/20">
+            <div class="bg-black/20 border border-white/10 rounded-xl p-6">
                 
-                <!-- Connection Form -->
-                <form id="migration-credentials-form" class="space-y-4">
-                    
-                    <div class="space-y-1">
-                        <label class="block text-sm font-bold text-text-muted">Destination Provider</label>
-                        <select id="provider-select" onchange="selectProvider(this.value)" class="w-full bg-black border border-white/20 rounded px-3 py-2 text-white focus:outline-none focus:border-white/50">
-                            <option value="" disabled selected>Select a provider...</option>
-                            <option value="r2">Cloudflare R2 (Recommended)</option>
-                            <option value="aws">Amazon S3</option>
-                            <option value="b2">Backblaze B2</option>
-                            <option value="do">DigitalOcean Spaces</option>
-                            <option value="custom">Other / Custom</option>
-                        </select>
-                    </div>
-
-                    <!-- Dynamic Instructions -->
-                    <div id="instructions-r2" class="provider-instructions hidden text-sm text-text-muted bg-white/5 p-3 rounded">
-                        <strong>Cloudflare R2:</strong> Create an API Token with "Admin Read & Write" permissions.
-                        Endpoint: <code>https://<ACCOUNT_ID>.r2.cloudflarestorage.com</code>
-                    </div>
-                    <div id="instructions-aws" class="provider-instructions hidden text-sm text-text-muted bg-white/5 p-3 rounded">
-                        <strong>Amazon S3:</strong> Create an IAM User with "AmazonS3FullAccess".
-                    </div>
-                    <div id="instructions-b2" class="provider-instructions hidden text-sm text-text-muted bg-white/5 p-3 rounded">
-                        <strong>Backblaze B2:</strong> Create an App Key with "Read and Write" access to all buckets.
-                    </div>
-                    <div id="instructions-do" class="provider-instructions hidden text-sm text-text-muted bg-white/5 p-3 rounded">
-                        <strong>DigitalOcean Spaces:</strong> Generate a Key/Secret in the API section.
-                    </div>
-
-                    <div class="space-y-1">
-                        <label class="block text-sm font-bold text-text-muted">Endpoint URL</label>
-                        <input type="text" name="endpoint" id="input-endpoint" placeholder="https://..." required
-                            class="w-full bg-black border border-white/20 rounded px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-white/50">
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-1">
-                            <label class="block text-sm font-bold text-text-muted">Access Key ID</label>
-                            <input type="text" name="accessKeyId" id="input-accessKeyId" required
-                                class="w-full bg-black border border-white/20 rounded px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-white/50">
-                        </div>
-                        <div class="space-y-1">
-                            <label class="block text-sm font-bold text-text-muted">Secret Access Key</label>
-                            <input type="password" name="secretAccessKey" id="input-secretAccessKey" required
-                                class="w-full bg-black border border-white/20 rounded px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-white/50">
-                        </div>
-                    </div>
-
-                    <div class="pt-2">
-                         <button type="submit" id="analyze-btn" class="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded font-bold transition-colors w-full text-sm">
-                            Connect & Analyze
+                <!-- Step 0: Choose Provider -->
+                <div id="wizard-step-0">
+                    <h3 class="text-lg font-bold text-white mb-4">Select Destination</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <button onclick="selectProvider('r2')" class="group p-4 border border-white/10 rounded-lg hover:bg-white/5 text-left transition-colors bg-black/40">
+                            <div class="font-bold text-white group-hover:text-blue-400 transition-colors">Cloudflare R2</div>
+                            <div class="text-xs text-text-muted mt-1">Free egress (Recommended)</div>
+                        </button>
+                        <button onclick="selectProvider('aws')" class="group p-4 border border-white/10 rounded-lg hover:bg-white/5 text-left transition-colors bg-black/40">
+                            <div class="font-bold text-white group-hover:text-blue-400 transition-colors">Amazon S3</div>
+                            <div class="text-xs text-text-muted mt-1">Industry standard</div>
+                        </button>
+                        <button onclick="selectProvider('b2')" class="group p-4 border border-white/10 rounded-lg hover:bg-white/5 text-left transition-colors bg-black/40">
+                            <div class="font-bold text-white group-hover:text-blue-400 transition-colors">Backblaze B2</div>
+                            <div class="text-xs text-text-muted mt-1">Low cost storage</div>
+                        </button>
+                        <button onclick="selectProvider('do')" class="group p-4 border border-white/10 rounded-lg hover:bg-white/5 text-left transition-colors bg-black/40">
+                            <div class="font-bold text-white group-hover:text-blue-400 transition-colors">DigitalOcean</div>
+                            <div class="text-xs text-text-muted mt-1">Simple pricing</div>
+                        </button>
+                        <button onclick="selectProvider('custom')" class="group p-4 border border-white/10 rounded-lg hover:bg-white/5 text-left transition-colors bg-black/40 sm:col-span-2">
+                            <div class="font-bold text-white group-hover:text-blue-400 transition-colors">Custom / Other</div>
+                            <div class="text-xs text-text-muted mt-1">Any S3-compatible storage</div>
                         </button>
                     </div>
-                </form>
+                </div>
 
-                <!-- Plan Section (Hidden by default) -->
-                <div id="wizard-step-2" class="hidden mt-6 pt-6 border-t border-white/10">
-                    <h3 class="font-bold text-white mb-4">Migration Plan</h3>
+                <!-- Step 1: Connect -->
+                <div id="wizard-step-1" class="hidden">
+                    <div class="mb-6 flex items-center gap-3 border-b border-white/10 pb-4">
+                         <button onclick="setStep(0)" class="text-sm text-text-muted hover:text-white flex items-center gap-1">
+                             <i class="ph-bold ph-arrow-left"></i> Back
+                         </button>
+                         <span class="text-white/20">|</span>
+                         <span class="font-bold text-white" id="provider-title">Connect Destination</span>
+                    </div>
                     
+                    <!-- Simple Instructions -->
+                    <div id="instructions-r2" class="provider-instructions hidden mb-6 p-4 bg-white/5 border border-white/10 rounded text-sm text-text-muted">
+                        <strong class="text-white">Cloudflare R2 Setup:</strong><br/>
+                        1. Create an API Token with <strong>Admin Read & Write</strong> permissions.<br/>
+                        2. Use endpoint: <code class="bg-black/50 px-1 rounded">https://<ACCOUNT_ID>.r2.cloudflarestorage.com</code>
+                    </div>
+                    <div id="instructions-aws" class="provider-instructions hidden mb-6 p-4 bg-white/5 border border-white/10 rounded text-sm text-text-muted">
+                        <strong class="text-white">Amazon S3 Setup:</strong><br/>
+                        1. Create an IAM User with <strong>AmazonS3FullAccess</strong>.<br/>
+                        2. Use region-specific endpoint (e.g. <code class="bg-black/50 px-1 rounded">https://s3.us-east-1.amazonaws.com</code>)
+                    </div>
+                    <div id="instructions-b2" class="provider-instructions hidden mb-6 p-4 bg-white/5 border border-white/10 rounded text-sm text-text-muted">
+                        <strong class="text-white">Backblaze B2 Setup:</strong><br/>
+                        1. Create an App Key with <strong>Read and Write</strong> access.<br/>
+                        2. Use S3 Endpoint from bucket settings.
+                    </div>
+                    <div id="instructions-do" class="provider-instructions hidden mb-6 p-4 bg-white/5 border border-white/10 rounded text-sm text-text-muted">
+                        <strong class="text-white">DigitalOcean Spaces Setup:</strong><br/>
+                        1. Generate a Key/Secret in API section.<br/>
+                        2. Use regional endpoint (e.g. <code class="bg-black/50 px-1 rounded">https://nyc3.digitaloceanspaces.com</code>)
+                    </div>
+
+                    <form id="migration-credentials-form" class="space-y-4">
+                        <div class="space-y-1">
+                            <label class="block text-xs font-bold text-text-muted uppercase">Endpoint URL</label>
+                            <input type="text" name="endpoint" id="input-endpoint" placeholder="https://..." required
+                                class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-white/50 transition-colors">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="space-y-1">
+                                <label class="block text-xs font-bold text-text-muted uppercase">Access Key ID</label>
+                                <input type="text" name="accessKeyId" id="input-accessKeyId" required
+                                    class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-white/50 transition-colors">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="block text-xs font-bold text-text-muted uppercase">Secret Access Key</label>
+                                <input type="password" name="secretAccessKey" id="input-secretAccessKey" required
+                                    class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-white/50 transition-colors">
+                            </div>
+                        </div>
+
+                        <div class="pt-2 flex items-center justify-between">
+                            <button type="button" onclick="fillDebugCreds()" class="text-xs text-white/10 hover:text-white/30 px-2">[Debug]</button>
+                            <button type="submit" id="analyze-btn" class="bg-white text-black font-bold px-6 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm">
+                                Connect & Analyze <i class="ph-bold ph-arrow-right inline-block ml-1"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Step 2: Plan -->
+                <div id="wizard-step-2" class="hidden">
+                    <div class="mb-6 flex items-center gap-3 border-b border-white/10 pb-4">
+                         <button onclick="setStep(1)" class="text-sm text-text-muted hover:text-white flex items-center gap-1">
+                             <i class="ph-bold ph-arrow-left"></i> Back
+                         </button>
+                         <span class="text-white/20">|</span>
+                         <span class="font-bold text-white">Migration Plan</span>
+                    </div>
+
                     <form id="migration-plan-form">
-                        <div class="overflow-x-auto mb-4">
+                        <div class="bg-black/40 rounded-lg border border-white/10 overflow-hidden mb-6">
                             <table class="w-full text-left text-sm">
-                                <thead class="text-text-muted border-b border-white/10">
+                                <thead class="bg-white/5 text-text-muted font-bold uppercase text-xs">
                                     <tr>
-                                        <th class="pb-2 w-8"><input type="checkbox" onchange="toggleAllBuckets(this)" checked></th>
-                                        <th class="pb-2">Local</th>
-                                        <th class="pb-2">Target Name</th>
-                                        <th class="pb-2 text-right">Status</th>
+                                        <th class="p-3 w-10 text-center"><input type="checkbox" onchange="toggleAllBuckets(this)" checked></th>
+                                        <th class="p-3">Local Bucket</th>
+                                        <th class="p-3">Target Name</th>
+                                        <th class="p-3 text-right">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody id="plan-table-body" class="divide-y divide-white/5 text-white/80">
+                                <tbody id="plan-table-body" class="divide-y divide-white/10 text-white/80 font-mono text-xs">
                                     <!-- Rows injected -->
                                 </tbody>
                             </table>
                         </div>
                         
-                        <p class="text-xs text-yellow-500 mb-4">
-                            Warning: This will freeze your Silo account and begin transfer.
-                        </p>
+                        <div class="bg-yellow-500/10 border border-yellow-500/20 text-yellow-200 p-4 rounded-lg text-sm mb-6 flex gap-3">
+                             <i class="ph-fill ph-warning mt-0.5"></i>
+                             <div>
+                                 <strong>Warning:</strong> Starting the migration will <u>freeze your account</u>. 
+                                 We will try to create any missing buckets.
+                             </div>
+                        </div>
 
-                        <button type="submit" id="start-migration-btn" class="bg-white text-black hover:bg-gray-200 px-4 py-2 rounded font-bold transition-colors w-full text-sm">
-                            Start Migration
+                        <button type="submit" id="start-migration-btn" class="w-full bg-hc-red text-white hover:bg-red-600 font-bold py-3 rounded-lg transition-colors text-sm flex items-center justify-center gap-2">
+                            <i class="ph-bold ph-rocket-launch"></i> Start Migration
                         </button>
                     </form>
                 </div>
 
-                <!-- Terminal (Hidden by default) -->
-                <div id="migration-terminal" class="hidden mt-6 bg-black border border-white/10 rounded p-4 font-mono text-xs h-64 overflow-y-auto">
-                    <div id="terminal-content" class="space-y-1 text-white/70"></div>
+                <!-- Step 3: Terminal -->
+                <div id="migration-terminal" class="hidden">
+                    <div class="bg-black rounded-lg border border-white/10 p-4 font-mono text-xs h-80 flex flex-col">
+                        <div class="flex items-center justify-between mb-2 pb-2 border-b border-white/10">
+                             <span class="text-blue-400 font-bold">Migration Agent</span>
+                             <span id="migration-status-badge" class="px-2 py-0.5 rounded bg-white/10 text-white/60">Ready</span>
+                        </div>
+                        <div id="terminal-content" class="flex-1 overflow-y-auto space-y-1 text-white/70 scrollbar-thin scrollbar-thumb-white/20"></div>
+                    </div>
                 </div>
 
             </div>
         </div>
     </div>
-
-    <!-- Hidden Debug Control -->
-    <button type="button" onclick="fillDebugCreds()" class="fixed bottom-0 right-0 opacity-0 hover:opacity-100 text-xs text-white/20 p-2">Debug</button>
-
-    <script>
-        const credsForm = document.getElementById('migration-credentials-form');
-        const planForm = document.getElementById('migration-plan-form');
-        const terminalContent = document.getElementById('terminal-content');
-        const planSection = document.getElementById('wizard-step-2');
-        const terminalSection = document.getElementById('migration-terminal');
-        
-        let storedCredentials = {};
-
-        function selectProvider(provider) {
-            // Hide all instructions
-            document.querySelectorAll('.provider-instructions').forEach(el => el.classList.add('hidden'));
-            
-            // Show selected
-            const inst = document.getElementById(`instructions-${provider}`);
-            if (inst) inst.classList.remove('hidden');
-            
-            // Auto-fill hints
-            const endpointInput = document.getElementById('input-endpoint');
-            if (provider === 'aws') endpointInput.placeholder = 'https://s3.us-east-1.amazonaws.com';
-            else if (provider === 'b2') endpointInput.placeholder = 'https://s3.us-west-004.backblazeb2.com';
-            else if (provider === 'do') endpointInput.placeholder = 'https://nyc3.digitaloceanspaces.com';
-            else endpointInput.placeholder = 'https://<account>.r2.cloudflarestorage.com';
-        }
-
-        function fillDebugCreds() {
-            document.getElementById('input-endpoint').value = 'https://03c80993959141f237f8188172909405.r2.cloudflarestorage.com';
-            document.getElementById('input-accessKeyId').value = '348f6572f69435b0d014457e5b385966';
-            document.getElementById('input-secretAccessKey').value = '01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d';
-            
-            // Also select R2 in dropdown to show instructions nicely
-            const sel = document.getElementById('provider-select');
-            sel.value = 'r2';
-            selectProvider('r2');
-        }
-        
-        function toggleAllBuckets(source) {
-            document.querySelectorAll('input[name^="migrate_"]').forEach(cb => {
-                cb.checked = source.checked;
-            });
-        }
-
-        credsForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = document.getElementById('analyze-btn');
-            const originalText = btn.innerHTML;
-            
-            btn.disabled = true;
-            btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Analyzing...';
-
-            const formData = new FormData(credsForm);
-            storedCredentials = Object.fromEntries(formData.entries());
-
-            try {
-                const res = await fetch('/dashboard/offboarding/analyze', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(storedCredentials)
-                });
-
-                const data = await res.json();
-                
-                if (!res.ok) throw new Error(data.error || 'Connection failed');
-
-                // Populate Table
-                const tbody = document.getElementById('plan-table-body');
-                tbody.innerHTML = '';
-                
-                data.plan.forEach(row => {
-                    const tr = document.createElement('tr');
-                    
-                    // Logic to determine status badge
-                    let statusHtml = '';
-                    if (row.status === 'EXISTS') {
-                        statusHtml = `<span class="text-green-400 flex items-center justify-end gap-1"><i class="ph-bold ph-check-circle"></i> Exists</span>`;
-                    } else if (row.status === 'MISSING') {
-                        statusHtml = `<span class="text-blue-400 flex items-center justify-end gap-1"><i class="ph-bold ph-plus-circle"></i> Will Create</span>`;
-                    } else {
-                        statusHtml = `<span class="text-red-400 flex items-center justify-end gap-1"><i class="ph-bold ph-x-circle"></i> Taken</span>`;
-                    }
-
-                    tr.innerHTML = `
-                        <td class="p-4 text-center">
-                            <input type="checkbox" name="migrate_${row.localName}" checked class="rounded bg-white/10 border-white/20 text-blue-500 focus:ring-0 cursor-pointer">
-                        </td>
-                        <td class="p-4 font-mono text-white/50">${row.localName}</td>
-                        <td class="p-4">
-                            <input type="text" name="map_${row.localName}" value="${row.targetName}"
-                                class="bg-black/20 border border-white/10 rounded px-3 py-2 w-full text-sm font-mono focus:border-blue-500 outline-none text-white transition-all placeholder-white/20">
-                        </td>
-                        <td class="p-4 text-right font-bold text-xs uppercase tracking-wide">
-                            ${statusHtml}
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-
-                setStep(2);
-
-            } catch (err) {
-                alert("Connection Error: " + err.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            }
-        });
-
-        function log(msg, type = 'info') {
-            const line = document.createElement('div');
-            const timestamp = new Date().toLocaleTimeString();
-            
-            if (type === 'error') line.className = 'text-red-400 font-bold bg-red-900/10 p-1 rounded';
-            else if (type === 'success') line.className = 'text-green-400 font-bold';
-            else line.className = 'text-white/60 hover:text-white/90 transition-colors';
-            
-            line.innerHTML = `<span class="opacity-30 mr-2">[${timestamp}]</span>${msg}`;
-            terminalContent.appendChild(line);
-            
-            // Auto scroll
-            const terminalContainer = document.getElementById('migration-terminal').querySelector('.overflow-y-auto');
-            if(terminalContainer) terminalContainer.scrollTop = terminalContainer.scrollHeight;
-        }
-
-        planForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            if (!confirm('Are you ready? This will freeze your account and start moving files.')) {
-                return;
-            }
-
-            // Build bucket mapping (only checked buckets)
-            const formData = new FormData(planForm);
-            const bucketMapping = {};
-            
-            // Find all checked buckets first
-            const checkedBuckets = new Set();
-            for (const [key, value] of formData.entries()) {
-                if (key.startsWith('migrate_') && value === 'on') {
-                     checkedBuckets.add(key.replace('migrate_', ''));
-                }
-            }
-
-            // Map targets for checked buckets
-            for (const [key, value] of formData.entries()) {
-                if (key.startsWith('map_')) {
-                    const originalName = key.replace('map_', '');
-                    if (checkedBuckets.has(originalName)) {
-                        bucketMapping[originalName] = value;
-                    }
-                }
-            }
-            
-            if (Object.keys(bucketMapping).length === 0) {
-                alert("Please select at least one bucket to migrate.");
-                return;
-            }
-
-            // UI State
-            planForm.classList.add('opacity-50', 'pointer-events-none');
-            setStep(3);
-            
-            log('Initializing migration agent...', 'info');
-            log(`Plan: Migrating ${Object.keys(bucketMapping).length} buckets.`, 'info');
-            
-            const payload = {
-                ...storedCredentials,
-                bucketMapping
-            };
-
-            try {
-                const response = await fetch('/dashboard/offboarding/migrate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                const badge = document.getElementById('migration-status-badge');
-
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
-                    
-                    for (const line of lines) {
-                        if (!line.trim()) continue;
-                        if (line.startsWith('data: ')) {
-                             try {
-                                 const msg = JSON.parse(line.substring(6));
-                                 log(msg.text, msg.type);
-                                 
-                                 if (msg.type === 'error') {
-                                    // Don't stop on single file errors, but if critical...
-                                    // Usually the backend stream continues.
-                                 }
-                                 if (msg.text.includes("Migration Complete")) {
-                                     badge.textContent = "Done";
-                                     badge.className = "text-xs px-2 py-1 rounded bg-green-500/20 text-green-400 border border-green-500/20";
-                                 }
-                             } catch(e) {}
-                        }
-                    }
-                }
-            } catch (err) {
-                log('Network error occurred: ' + err.message, 'error');
-                planForm.classList.remove('opacity-50', 'pointer-events-none');
-            }
-        });
-    </script>
-
 </div>
 
-<!-- Confirmation Modal -->
+<!-- Scripts -->
+<script>
+    const STEPS = [
+        document.getElementById('wizard-step-0'),
+        document.getElementById('wizard-step-1'),
+        document.getElementById('wizard-step-2'),
+        document.getElementById('migration-terminal')
+    ];
+    
+    const credsForm = document.getElementById('migration-credentials-form');
+    const planForm = document.getElementById('migration-plan-form');
+    const terminalContent = document.getElementById('terminal-content');
+    let selectedProvider = null;
+    let storedCredentials = {};
+
+    function setStep(index) {
+        STEPS.forEach((el, i) => {
+            if (el) el.classList.toggle('hidden', i !== index);
+        });
+    }
+
+    function selectProvider(provider) {
+        selectedProvider = provider;
+        document.querySelectorAll('.provider-instructions').forEach(el => el.classList.add('hidden'));
+        const inst = document.getElementById(`instructions-${provider}`);
+        if (inst) inst.classList.remove('hidden');
+        
+        const endpointInput = document.getElementById('input-endpoint');
+        if (provider === 'aws') endpointInput.placeholder = 'https://s3.us-east-1.amazonaws.com';
+        else if (provider === 'b2') endpointInput.placeholder = 'https://s3.us-west-004.backblazeb2.com';
+        else if (provider === 'do') endpointInput.placeholder = 'https://nyc3.digitaloceanspaces.com';
+        else endpointInput.placeholder = 'https://<account>.r2.cloudflarestorage.com';
+
+        setStep(1);
+    }
+
+    function fillDebugCreds() {
+        document.getElementById('input-endpoint').value = 'https://03c80993959141f237f8188172909405.r2.cloudflarestorage.com';
+        document.getElementById('input-accessKeyId').value = '348f6572f69435b0d014457e5b385966';
+        document.getElementById('input-secretAccessKey').value = '01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d';
+    }
+    
+    function toggleAllBuckets(source) {
+        document.querySelectorAll('input[name^="migrate_"]').forEach(cb => {
+            cb.checked = source.checked;
+        });
+    }
+
+    credsForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('analyze-btn');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.textContent = 'Analyzing...';
+
+        const formData = new FormData(credsForm);
+        storedCredentials = Object.fromEntries(formData.entries());
+
+        try {
+            const res = await fetch('/dashboard/offboarding/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(storedCredentials)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Connection failed');
+
+            const tbody = document.getElementById('plan-table-body');
+            tbody.innerHTML = '';
+            
+            data.plan.forEach(row => {
+                const tr = document.createElement('tr');
+                let statusColor = 'text-red-400';
+                if (row.status === 'EXISTS') statusColor = 'text-green-400';
+                else if (row.status === 'MISSING') statusColor = 'text-blue-400';
+
+                tr.innerHTML = `
+                    <td class="p-3 text-center"><input type="checkbox" name="migrate_${row.localName}" checked></td>
+                    <td class="p-3 text-white/50">${row.localName}</td>
+                    <td class="p-3">
+                        <input type="text" name="map_${row.localName}" value="${row.targetName}"
+                            class="bg-black/20 border border-white/10 rounded px-2 py-1 w-full text-xs font-mono text-white">
+                    </td>
+                    <td class="p-3 text-right font-bold ${statusColor}">${row.status}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            setStep(2);
+        } catch (err) {
+            alert("Connection Error: " + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    });
+
+    function log(msg, type = 'info') {
+        const line = document.createElement('div');
+        const timestamp = new Date().toLocaleTimeString();
+        if (type === 'error') line.className = 'text-red-400 font-bold';
+        else if (type === 'success') line.className = 'text-green-400 font-bold';
+        line.textContent = `[${timestamp}] ${msg}`;
+        terminalContent.appendChild(line);
+        const container = document.getElementById('migration-terminal').querySelector('.overflow-y-auto');
+        if(container) container.scrollTop = container.scrollHeight;
+    }
+
+    planForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!confirm('Are you ready? This will freeze your account.')) return;
+
+        const formData = new FormData(planForm);
+        const bucketMapping = {};
+        const checkedBuckets = new Set();
+        
+        for (const [key, value] of formData.entries()) {
+            if (key.startsWith('migrate_') && value === 'on') checkedBuckets.add(key.replace('migrate_', ''));
+        }
+        for (const [key, value] of formData.entries()) {
+            if (key.startsWith('map_') && checkedBuckets.has(key.replace('map_', ''))) {
+                bucketMapping[key.replace('map_', '')] = value;
+            }
+        }
+        
+        if (Object.keys(bucketMapping).length === 0) {
+            alert("Select at least one bucket.");
+            return;
+        }
+
+        planForm.classList.add('opacity-50', 'pointer-events-none');
+        setStep(3);
+        log('Initializing migration...', 'info');
+        
+        const badge = document.getElementById('migration-status-badge');
+        badge.textContent = "Running";
+        badge.className = "px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 animate-pulse";
+
+        try {
+            const response = await fetch('/dashboard/offboarding/migrate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...storedCredentials, bucketMapping })
+            });
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                const lines = decoder.decode(value).split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const msg = JSON.parse(line.substring(6));
+                            log(msg.text, msg.type);
+                            if (msg.text.includes("Migration Complete")) {
+                                badge.textContent = "Complete";
+                                badge.className = "px-2 py-0.5 rounded bg-green-500/20 text-green-400";
+                            }
+                        } catch(e) {}
+                    }
+                }
+            }
+        } catch (err) {
+            log('Error: ' + err.message, 'error');
+            planForm.classList.remove('opacity-50', 'pointer-events-none');
+            badge.textContent = "Error";
+            badge.className = "px-2 py-0.5 rounded bg-red-500/20 text-red-400";
+        }
+    });
+</script>
+
+<!-- Confirmation Modal (Original) -->
 <div id="confirm-modal" class="fixed inset-0 bg-black/90 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
     <div class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-md card-shadow transform transition-all">
-        <h3 class="text-2xl font-bold mb-4 text-white" id="confirm-title">
-            Confirm Action
-        </h3>
-        <p class="text-text-muted mb-8 leading-relaxed" id="confirm-message">
-            Are you sure you want to proceed?
-        </p>
-
+        <h3 class="text-2xl font-bold mb-4 text-white" id="confirm-title">Confirm Action</h3>
+        <p class="text-text-muted mb-8 leading-relaxed" id="confirm-message">Are you sure?</p>
         <div class="flex justify-end gap-3">
-            <button onclick="closeConfirmModal()" class="text-text-muted hover:text-white px-4 py-3 text-sm font-bold transition-colors">
-                Cancel
-            </button>
+            <button onclick="closeConfirmModal()" class="text-text-muted hover:text-white px-4 py-3 text-sm font-bold transition-colors">Cancel</button>
             <button id="confirm-btn" disabled class="bg-white/5 text-white/40 cursor-not-allowed px-6 py-3 rounded-xl text-sm font-bold transition-all border border-white/5 flex items-center gap-2">
                 <span id="confirm-btn-text">Confirm (3)</span>
-                <svg id="confirm-spinner" class="animate-spin h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
             </button>
         </div>
     </div>
@@ -398,24 +409,19 @@
 
 <script>
     let countdownInterval;
-
     function openConfirmModal(title, message, onConfirm) {
         document.getElementById("confirm-title").textContent = title;
         document.getElementById("confirm-message").textContent = message;
-        
         const btn = document.getElementById("confirm-btn");
         const btnText = document.getElementById("confirm-btn-text");
         
-        // Reset Button State
         btn.className = "bg-white/5 text-white/40 cursor-not-allowed px-6 py-3 rounded-xl text-sm font-bold transition-all border border-white/5 flex items-center gap-2";
         btn.disabled = true;
         btnText.textContent = "Confirm (3)";
-
-        // Remove old listener to avoid stacking
+        
         const newBtn = btn.cloneNode(true);
         btn.parentNode.replaceChild(newBtn, btn);
         
-        // Countdown Logic
         let seconds = 3;
         if (countdownInterval) clearInterval(countdownInterval);
         
@@ -432,24 +438,12 @@
         }, 1000);
 
         newBtn.onclick = async () => {
-            const spinner = document.getElementById("confirm-spinner");
             const btnText = newBtn.querySelector("#confirm-btn-text");
-            
             newBtn.disabled = true;
-            spinner.classList.remove("hidden");
             btnText.textContent = "Processing...";
-            
-            try {
-                await onConfirm();
-                closeConfirmModal();
-            } catch (e) {
-                console.error(e);
-                alert("Action failed");
-            } finally {
-                newBtn.disabled = false;
-                spinner.classList.add("hidden");
-                btnText.textContent = "Confirm";
-            }
+            try { await onConfirm(); closeConfirmModal(); } 
+            catch (e) { console.error(e); alert("Action failed"); } 
+            finally { newBtn.disabled = false; btnText.textContent = "Confirm"; }
         };
         
         document.getElementById("confirm-modal").classList.remove("hidden");
@@ -463,31 +457,9 @@
     }
 
     function triggerDownloadConfirm() {
-        const title = "Final Check";
-        const message = "This will freeze your account immediately to ensure your backup is complete. You won't be able to upload files afterwards. \n\nYou can always re-download this archive until your grace period ends.";
-        
-        openConfirmModal(title, message, async () => {
+        openConfirmModal("Final Check", "This will freeze your account immediately to ensure your backup is complete. You won't be able to upload files afterwards.", async () => {
             const form = document.getElementById('download-form');
-            const btn = document.getElementById('download-btn');
-            const content = document.getElementById('btn-content');
-            const spinner = document.getElementById('btn-spinner');
-            
-            // Visual feedback on button
-            content.classList.add('opacity-0');
-            spinner.classList.remove('hidden');
-            btn.disabled = true;
-            btn.classList.add('cursor-not-allowed', 'bg-gray-200');
-
-            // Submit the form
             form.submit();
-
-            // Re-enable button logic (fallback)
-            setTimeout(() => {
-                 content.classList.remove('opacity-0');
-                 spinner.classList.add('hidden');
-                 btn.disabled = false;
-                 btn.classList.remove('cursor-not-allowed', 'bg-gray-200');
-            }, 8000);
         });
     }
 </script>
