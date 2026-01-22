@@ -18,6 +18,23 @@ const MAX_EXPORTS_PER_HOUR = 3;
 // Lock to prevent multiple simultaneous migrations for the same user
 const MIGRATION_LOCKS = new Set<string>();
 
+async function getS3Error(res: Response): Promise<string> {
+	try {
+		const text = await res.text();
+		if (text.includes("<?xml") || text.includes("<Error>")) {
+			const { XMLParser } = await import("fast-xml-parser");
+			const parser = new XMLParser();
+			const parsed = parser.parse(text);
+			if (parsed.Error) {
+				return `${parsed.Error.Code}: ${parsed.Error.Message}`;
+			}
+		}
+		return `Status ${res.status}`;
+	} catch (e) {
+		return `Status ${res.status}`;
+	}
+}
+
 function checkExportRateLimit(userId: string): boolean {
 	const now = Date.now();
 	const timestamps = EXPORT_LIMITS.get(userId) || [];
@@ -248,10 +265,11 @@ async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
 		const listRes = await destClient.fetch(cleanEndpoint, { method: "GET" });
 		
 		if (!listRes.ok) {
+			const err = await getS3Error(listRes);
 			if (listRes.status === 403) {
-				return new Response(JSON.stringify({ error: "Access Denied. Check your keys." }), { status: 403 });
+				return new Response(JSON.stringify({ error: `Access Denied: ${err}` }), { status: 403 });
 			}
-			return new Response(JSON.stringify({ error: `Could not connect: ${listRes.status}` }), { status: 400 });
+			return new Response(JSON.stringify({ error: `Could not connect: ${err}` }), { status: 400 });
 		}
 
 		const xml = await listRes.text();
@@ -453,16 +471,18 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 				                                bucketCreationErrors++;
 				                            }
 							} else if (putRes.status === 403) {
-				                            send(`Error: Access Denied creating bucket '${targetName}'. Check permissions.`, "error");
-				                            bucketCreationErrors++;
-				                        } else {
-				                            send(`Error: Failed to create bucket '${targetName}' (Status ${putRes.status}).`, "error");
-				                            bucketCreationErrors++;
+							                         const err = await getS3Error(putRes);
+							                         send(`Error: Access Denied creating bucket '${targetName}': ${err}`, "error");
+							                         bucketCreationErrors++;
+							                     } else {
+							                         const err = await getS3Error(putRes);
+							                         send(`Error: Failed to create bucket '${targetName}': ${err}`, "error");
+							                         bucketCreationErrors++;
 							}
 						}
 					} catch (e: any) {
-				                    send(`Network Error checking bucket '${targetName}': ${e.message}`, "error");
-				                    bucketCreationErrors++;
+							                 send(`Network Error checking bucket '${targetName}': ${e.message}`, "error");
+							                 bucketCreationErrors++;
 					}
 				}
 
@@ -619,7 +639,8 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 								});
 
 								if (!putRes.ok) {
-									throw new Error(`Write failed: ${putRes.status}`);
+									const err = await getS3Error(putRes);
+									throw new Error(`Write failed: ${err}`);
 								}
 
 								successFiles++;
@@ -637,7 +658,11 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 				send(`Migration Complete!`, "success");
 				send(`Total: ${totalFiles} | Success: ${successFiles} | Failed: ${failFiles}`, "success");
 				if (failFiles > 0) {
-					send("Some files failed. Check the logs above.", "info");
+					send("Some files failed. Check the logs above.", "error");
+					send("Troubleshooting:", "info");
+					send("• AccessDenied: Verify your API Token has 'Object Read & Write' permissions.", "info");
+					send("• NoSuchBucket: The destination bucket could not be created or found.", "info");
+					send("• SignatureDoesNotMatch: Check your Secret Access Key.", "info");
 				} else {
 					send("All files migrated successfully!", "success");
 				}
