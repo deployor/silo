@@ -80,9 +80,9 @@
     </div>
 
     <!-- Step 2: Choose Provider -->
-    <div x-show="step === 2" class="w-full max-w-3xl mx-auto text-center"
-         x-transition:enter="transition ease-out duration-300" 
-         x-transition:enter-start="opacity-0 transform scale-95" 
+    <div x-show="step === 2" class="w-full max-w-5xl mx-auto text-center"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 transform scale-95"
          x-transition:enter-end="opacity-100 transform scale-100">
          
          <div class="mb-8">
@@ -93,40 +93,65 @@
             <p class="text-text-muted text-lg">Where should we move your files?</p>
          </div>
 
-         <div class="grid grid-cols-1 gap-4 text-left">
+         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
             <!-- R2 -->
             <button @click="selectProvider('r2')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-[#F38020]/50 rounded-2xl p-6 transition-all flex items-center gap-6">
                  <div class="h-16 w-16 shrink-0 rounded-xl bg-white flex items-center justify-center p-3">
-                     <img src="https://img.logokit.com/ticker/NET?token=pk_fr59072484feee0961b89b" class="w-full h-full object-contain" alt="Cloudflare" />
+                     <img src="/assets/images/cloudflare.png" class="w-full h-full object-contain" alt="Cloudflare" />
                  </div>
                  <div class="flex-1">
                      <div class="flex items-center gap-3 mb-1">
                         <h4 class="text-white font-bold text-xl">Cloudflare R2</h4>
                         <span class="bg-[#F38020]/20 text-[#F38020] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Recommended</span>
                      </div>
-                     <p class="text-text-muted">Zero egress fees. S3-compatible. Generous free tier.</p>
+                     <p class="text-text-muted text-sm">Zero egress fees. S3-compatible.</p>
                  </div>
                  <i class="ph-bold ph-caret-right text-white/20 group-hover:text-white text-2xl"></i>
             </button>
             
+             <!-- AWS -->
              <button @click="selectProvider('aws')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-[#FF9900]/50 rounded-2xl p-6 transition-all flex items-center gap-6">
-                 <div class="h-16 w-16 shrink-0 rounded-xl bg-[#232F3E] flex items-center justify-center p-3">
-                     <img src="https://img.logokit.com/ticker/AMZN?token=pk_fr59072484feee0961b89b" class="w-full h-full object-contain" alt="AWS" />
+                 <div class="h-16 w-16 shrink-0 rounded-xl bg-white flex items-center justify-center p-3">
+                     <img src="/assets/images/aws.png" class="w-full h-full object-contain" alt="AWS" />
                  </div>
                  <div class="flex-1">
                      <h4 class="text-white font-bold text-xl mb-1">Amazon S3</h4>
-                     <p class="text-text-muted">The industry standard.</p>
+                     <p class="text-text-muted text-sm">The industry standard.</p>
+                 </div>
+                 <i class="ph-bold ph-caret-right text-white/20 group-hover:text-white text-2xl"></i>
+            </button>
+
+            <!-- Backblaze -->
+             <button @click="selectProvider('backblaze')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-[#FF0000]/50 rounded-2xl p-6 transition-all flex items-center gap-6">
+                 <div class="h-16 w-16 shrink-0 rounded-xl bg-white flex items-center justify-center p-3">
+                     <img src="/assets/images/backblaze.png" class="w-full h-full object-contain" alt="Backblaze" />
+                 </div>
+                 <div class="flex-1">
+                     <h4 class="text-white font-bold text-xl mb-1">Backblaze B2</h4>
+                     <p class="text-text-muted text-sm">Affordable object storage.</p>
+                 </div>
+                 <i class="ph-bold ph-caret-right text-white/20 group-hover:text-white text-2xl"></i>
+            </button>
+
+            <!-- DigitalOcean -->
+             <button @click="selectProvider('digitalocean')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-[#0080FF]/50 rounded-2xl p-6 transition-all flex items-center gap-6">
+                 <div class="h-16 w-16 shrink-0 rounded-xl bg-white flex items-center justify-center p-3">
+                     <img src="/assets/images/digitalocean.png" class="w-full h-full object-contain" alt="DigitalOcean" />
+                 </div>
+                 <div class="flex-1">
+                     <h4 class="text-white font-bold text-xl mb-1">DigitalOcean</h4>
+                     <p class="text-text-muted text-sm">Simple Spaces object storage.</p>
                  </div>
                  <i class="ph-bold ph-caret-right text-white/20 group-hover:text-white text-2xl"></i>
             </button>
             
-             <button @click="selectProvider('custom')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-white/50 rounded-2xl p-6 transition-all flex items-center gap-6">
+             <button @click="selectProvider('custom')" class="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-white/50 rounded-2xl p-6 transition-all flex items-center gap-6 col-span-1 md:col-span-2">
                  <div class="h-16 w-16 shrink-0 rounded-xl bg-white/10 flex items-center justify-center p-3 text-3xl text-white">
                      <i class="ph-bold ph-globe"></i>
                  </div>
                  <div class="flex-1">
                      <h4 class="text-white font-bold text-xl mb-1">Other / S3 Compatible</h4>
-                     <p class="text-text-muted">MinIO, DigitalOcean, Backblaze, etc.</p>
+                     <p class="text-text-muted text-sm">MinIO, Wasabi, etc.</p>
                  </div>
                  <i class="ph-bold ph-caret-right text-white/20 group-hover:text-white text-2xl"></i>
             </button>
@@ -286,15 +311,25 @@ document.addEventListener('alpine:init', () => {
         logs: [],
         
         get providerName() {
-            const map = { r2: 'Cloudflare R2', aws: 'Amazon S3', custom: 'Compatible Storage' };
+            const map = {
+                r2: 'Cloudflare R2',
+                aws: 'Amazon S3',
+                backblaze: 'Backblaze B2',
+                digitalocean: 'DigitalOcean Spaces',
+                custom: 'Compatible Storage'
+            };
             return map[this.provider] || 'Storage';
         },
 
         selectProvider(p) {
             this.provider = p;
             this.step = 3;
+            this.creds.endpoint = ''; // Reset
+
             if(p === 'r2') this.creds.endpoint = 'https://<account_id>.r2.cloudflarestorage.com';
             if(p === 'aws') this.creds.endpoint = 'https://s3.us-east-1.amazonaws.com';
+            if(p === 'backblaze') this.creds.endpoint = 'https://s3.us-west-000.backblazeb2.com';
+            if(p === 'digitalocean') this.creds.endpoint = 'https://nyc3.digitaloceanspaces.com';
         },
 
         fillDebug() {
