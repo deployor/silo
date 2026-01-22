@@ -284,7 +284,7 @@ async function streamUserData(user: typeof users.$inferSelect) {
             // Append Bag Info
              const bagInfo = `Payload-Oxum: ${manifestEntries.reduce((acc, entry) => acc + 0, 0)}.0\n` + 
                             `Bagging-Date: ${new Date().toISOString().split('T')[0]}\n` +
-                            `Contact-Name: Silo Support\n`;
+                            `Contact-Name: HackClub\n`;
             archive.append(bagInfo, { name: "bag-info.txt" });
 
             // Finalize Archive
