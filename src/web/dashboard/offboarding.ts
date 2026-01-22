@@ -43,7 +43,8 @@ export async function handleOffboardingRequest(req: Request): Promise<Response> 
 	const url = new URL(req.url);
 
 	// Ensure user is actually offboarding
-	if (!user.markedAsOverAge) {
+	// If dataExported is true, they can still access this page to re-download or check status
+	if (!user.markedAsOverAge && !user.dataExported) {
 		return Response.redirect("/");
 	}
 
@@ -434,9 +435,9 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 
 				if (bucketCreationErrors > 0) {
 					send("----------------------------------------");
-					send(`Migration Aborted: Failed to prepare ${bucketCreationErrors} buckets.`, "error");
-					send("Please fix the naming conflicts or permissions in the table above and try again.", "info");
-					return;
+					send(`Warning: Failed to prepare ${bucketCreationErrors} buckets.`, "error");
+					send("We will attempt to migrate the remaining accessible buckets.", "info");
+					// Do not abort, proceed with migration for other buckets
 				}
 
 				// Freeze Account
