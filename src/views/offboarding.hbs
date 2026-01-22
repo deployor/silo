@@ -124,10 +124,24 @@
                 <div class="flex-1 w-full max-w-full">
                     <h3 class="text-white font-bold text-xl mb-2">Move your files directly</h3>
                     <p class="text-text-muted text-lg leading-relaxed mb-4">
-                        Don't want to download everything? Use <strong>Rclone</strong> to transfer directly from Silo to R2 without touching your local disk:
+                        Use <strong>Rclone</strong> to transfer directly from Silo to another provider. Here is the configuration you need:
                     </p>
-                    <div class="bg-black/50 rounded-xl p-4 border border-white/10 font-mono text-sm text-emerald-400 overflow-x-auto w-full text-left">
-                        rclone sync silo:my-bucket r2:new-bucket --progress
+                    
+                    <div class="bg-black/50 rounded-xl p-6 border border-white/10 font-mono text-sm text-emerald-400 overflow-x-auto w-full text-left mb-4">
+                        <div class="text-text-muted mb-2 select-none"># ~/.config/rclone/rclone.conf</div>
+                        [silo]<br>
+                        type = s3<br>
+                        provider = Other<br>
+                        env_auth = false<br>
+                        access_key_id = <span class="text-yellow-400"><your_access_key></span><br>
+                        secret_access_key = <span class="text-yellow-400"><your_secret_key></span><br>
+                        endpoint = https://silo.hackclub.com<br>
+                        acl = private
+                    </div>
+
+                    <p class="text-text-muted text-sm mb-2">Then run the sync command:</p>
+                    <div class="bg-black/50 rounded-xl p-4 border border-white/10 font-mono text-sm text-white overflow-x-auto w-full text-left">
+                        rclone sync silo:my-bucket r2:new-bucket --progress --transfers=32
                     </div>
                 </div>
             </div>
