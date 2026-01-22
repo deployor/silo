@@ -122,12 +122,12 @@
                      <i class="ph-duotone ph-arrows-left-right text-3xl"></i>
                 </div>
                 <div class="flex-1 w-full max-w-full">
-                    <h3 class="text-white font-bold text-xl mb-2">Move your files</h3>
+                    <h3 class="text-white font-bold text-xl mb-2">Move your files directly</h3>
                     <p class="text-text-muted text-lg leading-relaxed mb-4">
-                        Unzip your archive, then use the AWS CLI to sync it to R2:
+                        Don't want to download everything? Use <strong>Rclone</strong> to transfer directly from Silo to R2 without touching your local disk:
                     </p>
                     <div class="bg-black/50 rounded-xl p-4 border border-white/10 font-mono text-sm text-emerald-400 overflow-x-auto w-full text-left">
-                        aws s3 sync ./silo-export s3://new-bucket-name --endpoint-url https://<account_id>.r2.cloudflarestorage.com
+                        rclone sync silo:my-bucket r2:new-bucket --progress
                     </div>
                 </div>
             </div>
