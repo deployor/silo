@@ -42,79 +42,142 @@
     </div>
 
     <!-- Automated Migration Section -->
-    <div class="w-full max-w-4xl mx-auto mb-16">
+    <div class="w-full max-w-5xl mx-auto mb-16">
         <div class="bg-black/20 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-sm">
             <!-- Header -->
-            <div class="p-8 border-b border-white/10 bg-white/5">
-                <div class="flex items-center gap-4 mb-2">
-                    <div class="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
-                        <i class="ph-duotone ph-rocket-launch text-xl"></i>
+            <div class="p-8 border-b border-white/10 bg-white/5 flex flex-col md:flex-row gap-6 items-start justify-between">
+                 <div>
+                    <div class="flex items-center gap-4 mb-2">
+                        <div class="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
+                            <i class="ph-duotone ph-rocket-launch text-xl"></i>
+                        </div>
+                        <h2 class="text-2xl font-bold text-white">Migration Assistant</h2>
                     </div>
-                    <h2 class="text-2xl font-bold text-white">Automated Migration Assistant</h2>
-                </div>
-                <p class="text-text-muted text-lg">
-                    Don't want to download and re-upload? We can move your files directly to your new provider for you.
-                    We recommend <a href="https://www.cloudflare.com/developer-platform/r2/" target="_blank" class="text-white underline decoration-white/30 hover:decoration-white">Cloudflare R2</a> (it's free for most users).
-                </p>
+                    <p class="text-text-muted text-lg max-w-2xl">
+                         Move your files directly to a new home. We'll handle the transfer so you don't have to download terabytes of data.
+                    </p>
+                 </div>
+                 <div class="flex items-center gap-2 bg-white/5 rounded-lg p-2 text-sm font-mono text-text-muted border border-white/5">
+                     <span class="px-2">Your Storage:</span>
+                     <span class="text-white font-bold">{{totalStorageFormatted}}</span>
+                 </div>
             </div>
 
             <!-- Content -->
             <div class="p-8">
-                <!-- R2 Instructions Toggle -->
-                <details class="group mb-8 bg-white/5 rounded-xl border border-white/5 open:bg-white/10 transition-all">
-                    <summary class="flex items-center justify-between p-4 cursor-pointer font-bold text-white select-none">
-                        <span class="flex items-center gap-3">
-                            <i class="ph-bold ph-info text-blue-400"></i>
-                            How to get your R2 Credentials
-                        </span>
-                        <i class="ph-bold ph-caret-down group-open:rotate-180 transition-transform text-text-muted"></i>
-                    </summary>
-                    <div class="p-4 pt-0 text-text-muted space-y-3 ml-1">
-                        <ol class="list-decimal list-inside space-y-2">
-                            <li>Log in to the Cloudflare Dashboard and go to <strong>R2</strong>.</li>
-                            <li>Click <strong>"Manage R2 API Tokens"</strong> in the sidebar.</li>
-                            <li>Click <strong>"Create API token"</strong>.</li>
-                            <li>Select <strong>"Admin Read & Write"</strong> permissions.</li>
-                            <li>Create the token and copy the <strong>Access Key ID</strong>, <strong>Secret Access Key</strong>, and your account-specific <strong>S3 Endpoint</strong>.</li>
-                            <li>Create a new bucket in R2 named exactly what you want (e.g., <code>my-silo-backup</code>).</li>
-                        </ol>
-                    </div>
-                </details>
+                
+                <!-- Step 0: Choose Provider -->
+                <div id="wizard-step-0" class="space-y-8">
+                    <h3 class="text-xl font-bold text-white mb-6">Choose your new home</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Cloudflare R2 -->
+                        <button onclick="selectProvider('r2')" class="group relative bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-6 text-left transition-all hover:-translate-y-1 hover:border-orange-500/50">
+                             <div class="absolute top-4 right-4 bg-green-500/20 text-green-400 text-xs font-bold px-2 py-1 rounded-full border border-green-500/20">Recommended</div>
+                             <div class="h-12 w-12 rounded-lg bg-[#F38020]/20 flex items-center justify-center text-[#F38020] mb-4 text-2xl">
+                                 <i class="ph-fill ph-cloud"></i>
+                             </div>
+                             <h4 class="text-white font-bold text-lg mb-1">Cloudflare R2</h4>
+                             <p class="text-text-muted text-sm mb-4">S3-compatible, zero egress fees.</p>
+                             <div class="text-xs text-white/50 border-t border-white/5 pt-3">
+                                 <span class="block font-bold text-white mb-1">Free Tier:</span>
+                                 10GB / month storage<br/>
+                                 Zero egress fees
+                             </div>
+                        </button>
 
-                <div id="wizard-step-1">
+                        <!-- AWS S3 -->
+                        <button onclick="selectProvider('aws')" class="group bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-6 text-left transition-all hover:-translate-y-1 hover:border-yellow-500/50">
+                             <div class="h-12 w-12 rounded-lg bg-[#FF9900]/20 flex items-center justify-center text-[#FF9900] mb-4 text-2xl">
+                                 <i class="ph-fill ph-amazon-logo"></i>
+                             </div>
+                             <h4 class="text-white font-bold text-lg mb-1">AWS S3</h4>
+                             <p class="text-text-muted text-sm mb-4">The industry standard.</p>
+                             <div class="text-xs text-white/50 border-t border-white/5 pt-3">
+                                 <span class="block font-bold text-white mb-1">Free Tier:</span>
+                                 5GB for 12 months<br/>
+                                 Expensive egress
+                             </div>
+                        </button>
+
+                        <!-- Custom S3 -->
+                        <button onclick="selectProvider('custom')" class="group bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-6 text-left transition-all hover:-translate-y-1 hover:border-blue-500/50">
+                             <div class="h-12 w-12 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 mb-4 text-2xl">
+                                 <i class="ph-fill ph-globe"></i>
+                             </div>
+                             <h4 class="text-white font-bold text-lg mb-1">Custom S3</h4>
+                             <p class="text-text-muted text-sm mb-4">MinIO, DigitalOcean, Backblaze...</p>
+                             <div class="text-xs text-white/50 border-t border-white/5 pt-3">
+                                 <span class="block font-bold text-white mb-1">Any Provider:</span>
+                                 Compatible with any S3 API<br/>
+                                 Check their pricing
+                             </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 1: Connect -->
+                <div id="wizard-step-1" class="hidden space-y-6">
+                    <div class="flex items-center gap-2 text-text-muted mb-4">
+                        <button onclick="setStep(0)" class="hover:text-white transition-colors flex items-center gap-1">
+                            <i class="ph-bold ph-arrow-left"></i> Back to Providers
+                        </button>
+                        <span class="text-white/20">|</span>
+                        <span class="font-bold text-white" id="provider-title">Connect</span>
+                     </div>
+
+                     <!-- Dynamic Instructions -->
+                     <div id="instructions-r2" class="provider-instructions hidden bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-sm text-blue-200">
+                         <h5 class="font-bold text-blue-100 mb-2 flex items-center gap-2"><i class="ph-bold ph-info"></i> Setup Instructions</h5>
+                         <ol class="list-decimal list-inside space-y-1 opacity-90">
+                            <li>Go to <strong>R2</strong> in Cloudflare Dashboard.</li>
+                            <li>Click <strong>"Manage R2 API Tokens"</strong> -> <strong>"Create API token"</strong>.</li>
+                            <li><strong>Crucial:</strong> Select <strong>"Admin Read & Write"</strong> permissions.</li>
+                            <li>Copy the keys below.</li>
+                         </ol>
+                     </div>
+
                     <form id="migration-credentials-form" class="space-y-6">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div class="space-y-2 col-span-2">
                                 <label class="text-sm font-bold text-text-muted uppercase tracking-wider">S3 Endpoint URL</label>
-                                <input type="text" name="endpoint" placeholder="https://<account>.r2.cloudflarestorage.com" required
+                                <input type="text" name="endpoint" id="input-endpoint" placeholder="https://<account>.r2.cloudflarestorage.com" required
                                     class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm">
+                                <p class="text-xs text-white/30">The base URL for API requests (without bucket name).</p>
                             </div>
                             <div class="space-y-2">
                                 <label class="text-sm font-bold text-text-muted uppercase tracking-wider">Access Key ID</label>
-                                <input type="text" name="accessKeyId" placeholder="Values are encrypted" required
+                                <input type="text" name="accessKeyId" id="input-accessKeyId" placeholder="Values are encrypted" required
                                     class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm">
                             </div>
                             <div class="space-y-2">
                                 <label class="text-sm font-bold text-text-muted uppercase tracking-wider">Secret Access Key</label>
-                                <input type="password" name="secretAccessKey" placeholder="••••••••••••••••" required
+                                <input type="password" name="secretAccessKey" id="input-secretAccessKey" placeholder="••••••••••••••••" required
                                     class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all font-mono text-sm">
                             </div>
                         </div>
 
-                        <button type="submit" id="analyze-btn" class="w-full bg-white text-black hover:bg-gray-100 font-bold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2">
-                            <span>Analyze Buckets</span>
-                            <i class="ph-bold ph-arrow-right"></i>
-                        </button>
+                        <div class="flex items-center justify-between gap-4">
+                             <!-- Debug Button (Hidden via CSS mostly, but visible here for convenience per request) -->
+                             <button type="button" onclick="fillDebugCreds()" class="text-xs text-white/10 hover:text-white/50 px-2 py-1">
+                                 [Debug Creds]
+                             </button>
+
+                             <button type="submit" id="analyze-btn" class="flex-1 bg-white text-black hover:bg-gray-100 font-bold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2">
+                                <span>Connect & Analyze</span>
+                                <i class="ph-bold ph-arrow-right"></i>
+                            </button>
+                        </div>
                     </form>
                 </div>
 
+                <!-- Step 2: Plan -->
                 <div id="wizard-step-2" class="hidden space-y-6">
                      <div class="flex items-center gap-2 text-text-muted mb-4">
-                        <button onclick="resetWizard()" class="hover:text-white transition-colors flex items-center gap-1">
+                        <button onclick="setStep(1)" class="hover:text-white transition-colors flex items-center gap-1">
                             <i class="ph-bold ph-arrow-left"></i> Back
                         </button>
                         <span class="text-white/20">|</span>
-                        <span class="font-bold text-white">Review Plan</span>
+                        <span class="font-bold text-white">Migration Plan</span>
                      </div>
 
                      <form id="migration-plan-form">
@@ -122,9 +185,12 @@
                             <table class="w-full text-left text-sm">
                                 <thead class="bg-white/5 text-text-muted font-bold uppercase tracking-wider">
                                     <tr>
+                                        <th class="p-4 w-12 text-center">
+                                            <input type="checkbox" onchange="toggleAllBuckets(this)" checked class="rounded bg-white/10 border-white/20 text-blue-500 focus:ring-0 cursor-pointer">
+                                        </th>
                                         <th class="p-4">Local Bucket</th>
-                                        <th class="p-4">Target Bucket</th>
-                                        <th class="p-4 text-right">Status</th>
+                                        <th class="p-4 w-1/3">Target Bucket Name</th>
+                                        <th class="p-4 text-right">Availability</th>
                                     </tr>
                                 </thead>
                                 <tbody id="plan-table-body" class="divide-y divide-white/10 text-white/80">
@@ -135,7 +201,10 @@
                         
                         <div class="mt-6 bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex gap-3 text-sm text-yellow-200/80">
                              <i class="ph-fill ph-warning text-lg shrink-0 mt-0.5"></i>
-                             <p>This will migrate your files to the mapped buckets. If "Status" is Missing, we will attempt to create the bucket. Account will be frozen.</p>
+                             <p>
+                                 <strong>Warning:</strong> Starting migration will <span class="underline">freeze your Silo account</span>.
+                                 We will attempt to create any "Missing" buckets. Ensure your API token has <code>Write</code> permissions.
+                             </p>
                         </div>
 
                         <button type="submit" id="start-migration-btn" class="w-full mt-6 bg-hc-red text-white hover:bg-red-600 font-bold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-900/20">
@@ -145,11 +214,15 @@
                      </form>
                 </div>
 
-                <!-- Terminal Output -->
-                <div id="migration-terminal" class="hidden mt-8 bg-black rounded-xl border border-white/10 p-4 font-mono text-sm h-64 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20">
-                    <div class="text-blue-400 mb-2">Silo Migration Tool v1.0.0</div>
+                <!-- Step 3: Terminal Output -->
+                <div id="migration-terminal" class="hidden mt-8 bg-black rounded-xl border border-white/10 p-4 font-mono text-sm h-80 flex flex-col shadow-2xl">
+                    <div class="flex items-center justify-between mb-2">
+                         <div class="text-blue-400 font-bold">Silo Migration Agent v1.2</div>
+                         <div id="migration-status-badge" class="text-xs px-2 py-1 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/20 animate-pulse">Running</div>
+                    </div>
                     <div class="h-px bg-white/10 w-full mb-4"></div>
-                    <div id="terminal-content" class="space-y-1 text-white/70">
+                    
+                    <div id="terminal-content" class="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 space-y-1 text-white/70 font-mono text-xs md:text-sm">
                         <!-- Logs go here -->
                     </div>
                 </div>
@@ -177,19 +250,49 @@
 
     <!-- Scripts for Migration -->
     <script>
-        const step1 = document.getElementById('wizard-step-1');
-        const step2 = document.getElementById('wizard-step-2');
+        const STEPS = [
+            document.getElementById('wizard-step-0'), // Providers
+            document.getElementById('wizard-step-1'), // Credentials
+            document.getElementById('wizard-step-2'), // Plan
+            document.getElementById('migration-terminal') // Terminal
+        ];
+        
         const credsForm = document.getElementById('migration-credentials-form');
         const planForm = document.getElementById('migration-plan-form');
-        const terminal = document.getElementById('migration-terminal');
         const terminalContent = document.getElementById('terminal-content');
-        
+        let selectedProvider = null;
         let storedCredentials = {};
 
-        function resetWizard() {
-            step1.classList.remove('hidden');
-            step2.classList.add('hidden');
-            terminal.classList.add('hidden');
+        function setStep(index) {
+            STEPS.forEach((el, i) => {
+                if (el) el.classList.toggle('hidden', i !== index);
+            });
+        }
+
+        function selectProvider(provider) {
+            selectedProvider = provider;
+            
+            // UI Updates
+            document.querySelectorAll('.provider-instructions').forEach(el => el.classList.add('hidden'));
+            const inst = document.getElementById(`instructions-${provider}`);
+            if (inst) inst.classList.remove('hidden');
+            
+            document.getElementById('provider-title').textContent = provider === 'r2' ? 'Connect Cloudflare R2' : 'Connect Destination';
+            
+            setStep(1);
+        }
+
+        function fillDebugCreds() {
+            // For testing only - easily removable
+            document.getElementById('input-endpoint').value = 'https://03c80993959141f237f8188172909405.r2.cloudflarestorage.com';
+            document.getElementById('input-accessKeyId').value = '348f6572f69435b0d014457e5b385966';
+            document.getElementById('input-secretAccessKey').value = '01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d';
+        }
+        
+        function toggleAllBuckets(source) {
+            document.querySelectorAll('input[name^="migrate_"]').forEach(cb => {
+                cb.checked = source.checked;
+            });
         }
 
         credsForm.addEventListener('submit', async (e) => {
@@ -198,7 +301,7 @@
             const originalText = btn.innerHTML;
             
             btn.disabled = true;
-            btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Connecting...';
+            btn.innerHTML = '<i class="ph-bold ph-spinner animate-spin"></i> Analyzing...';
 
             const formData = new FormData(credsForm);
             storedCredentials = Object.fromEntries(formData.entries());
@@ -220,30 +323,37 @@
                 
                 data.plan.forEach(row => {
                     const tr = document.createElement('tr');
-                    const statusColor = row.status === 'EXISTS' ? 'text-green-400' : 'text-yellow-400';
-                    const statusIcon = row.status === 'EXISTS' ? 'ph-check-circle' : 'ph-plus-circle';
                     
+                    // Logic to determine status badge
+                    let statusHtml = '';
+                    if (row.status === 'EXISTS') {
+                        statusHtml = `<span class="text-green-400 flex items-center justify-end gap-1"><i class="ph-bold ph-check-circle"></i> Exists</span>`;
+                    } else if (row.status === 'MISSING') {
+                        statusHtml = `<span class="text-blue-400 flex items-center justify-end gap-1"><i class="ph-bold ph-plus-circle"></i> Will Create</span>`;
+                    } else {
+                        statusHtml = `<span class="text-red-400 flex items-center justify-end gap-1"><i class="ph-bold ph-x-circle"></i> Taken</span>`;
+                    }
+
                     tr.innerHTML = `
-                        <td class="p-4 font-mono">${row.localName}</td>
+                        <td class="p-4 text-center">
+                            <input type="checkbox" name="migrate_${row.localName}" checked class="rounded bg-white/10 border-white/20 text-blue-500 focus:ring-0 cursor-pointer">
+                        </td>
+                        <td class="p-4 font-mono text-white/50">${row.localName}</td>
                         <td class="p-4">
                             <input type="text" name="map_${row.localName}" value="${row.targetName}"
-                                class="bg-black/20 border border-white/10 rounded px-2 py-1 w-full text-sm font-mono focus:border-blue-500 outline-none text-white">
+                                class="bg-black/20 border border-white/10 rounded px-3 py-2 w-full text-sm font-mono focus:border-blue-500 outline-none text-white transition-all placeholder-white/20">
                         </td>
-                        <td class="p-4 text-right ${statusColor} font-bold text-xs uppercase tracking-wide">
-                            <span class="flex items-center justify-end gap-1">
-                                <i class="ph-bold ${statusIcon}"></i>
-                                ${row.status}
-                            </span>
+                        <td class="p-4 text-right font-bold text-xs uppercase tracking-wide">
+                            ${statusHtml}
                         </td>
                     `;
                     tbody.appendChild(tr);
                 });
 
-                step1.classList.add('hidden');
-                step2.classList.remove('hidden');
+                setStep(2);
 
             } catch (err) {
-                alert(err.message);
+                alert("Connection Error: " + err.message);
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = originalText;
@@ -254,35 +364,58 @@
             const line = document.createElement('div');
             const timestamp = new Date().toLocaleTimeString();
             
-            if (type === 'error') line.className = 'text-red-400';
-            else if (type === 'success') line.className = 'text-green-400';
-            else line.className = 'text-white/70';
+            if (type === 'error') line.className = 'text-red-400 font-bold bg-red-900/10 p-1 rounded';
+            else if (type === 'success') line.className = 'text-green-400 font-bold';
+            else line.className = 'text-white/60 hover:text-white/90 transition-colors';
             
-            line.innerHTML = `<span class="opacity-50">[${timestamp}]</span> ${msg}`;
+            line.innerHTML = `<span class="opacity-30 mr-2">[${timestamp}]</span>${msg}`;
             terminalContent.appendChild(line);
-            terminal.scrollTop = terminal.scrollHeight;
+            
+            // Auto scroll
+            const terminalContainer = document.getElementById('migration-terminal').querySelector('.overflow-y-auto');
+            if(terminalContainer) terminalContainer.scrollTop = terminalContainer.scrollHeight;
         }
 
         planForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            if (!confirm('Are you sure you want to start the migration? This process cannot be stopped once started.')) {
+            if (!confirm('Are you ready? This will freeze your account and start moving files.')) {
                 return;
             }
 
-            // Build bucket mapping
+            // Build bucket mapping (only checked buckets)
             const formData = new FormData(planForm);
             const bucketMapping = {};
+            
+            // Find all checked buckets first
+            const checkedBuckets = new Set();
+            for (const [key, value] of formData.entries()) {
+                if (key.startsWith('migrate_') && value === 'on') {
+                     checkedBuckets.add(key.replace('migrate_', ''));
+                }
+            }
+
+            // Map targets for checked buckets
             for (const [key, value] of formData.entries()) {
                 if (key.startsWith('map_')) {
-                    bucketMapping[key.replace('map_', '')] = value;
+                    const originalName = key.replace('map_', '');
+                    if (checkedBuckets.has(originalName)) {
+                        bucketMapping[originalName] = value;
+                    }
                 }
+            }
+            
+            if (Object.keys(bucketMapping).length === 0) {
+                alert("Please select at least one bucket to migrate.");
+                return;
             }
 
             // UI State
             planForm.classList.add('opacity-50', 'pointer-events-none');
-            terminal.classList.remove('hidden');
-            log('Initializing migration agent...');
+            setStep(3);
+            
+            log('Initializing migration agent...', 'info');
+            log(`Plan: Migrating ${Object.keys(bucketMapping).length} buckets.`, 'info');
             
             const payload = {
                 ...storedCredentials,
@@ -298,6 +431,7 @@
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
+                const badge = document.getElementById('migration-status-badge');
 
                 while (true) {
                     const { value, done } = await reader.read();
@@ -309,12 +443,19 @@
                     for (const line of lines) {
                         if (!line.trim()) continue;
                         if (line.startsWith('data: ')) {
-                             const msg = JSON.parse(line.substring(6));
-                             log(msg.text, msg.type);
-                             
-                             if (msg.type === 'error') {
-                                 planForm.classList.remove('opacity-50', 'pointer-events-none');
-                             }
+                             try {
+                                 const msg = JSON.parse(line.substring(6));
+                                 log(msg.text, msg.type);
+                                 
+                                 if (msg.type === 'error') {
+                                    // Don't stop on single file errors, but if critical...
+                                    // Usually the backend stream continues.
+                                 }
+                                 if (msg.text.includes("Migration Complete")) {
+                                     badge.textContent = "Done";
+                                     badge.className = "text-xs px-2 py-1 rounded bg-green-500/20 text-green-400 border border-green-500/20";
+                                 }
+                             } catch(e) {}
                         }
                     }
                 }

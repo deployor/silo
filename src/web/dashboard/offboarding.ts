@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { users } from "../../db/schema";
 import { getCurrentUser } from "../../lib/session";
@@ -70,11 +70,32 @@ export async function handleOffboardingRequest(req: Request): Promise<Response> 
 		const totalDays = 60;
 		const progressPercentage = Math.min(100, Math.max(0, ((totalDays - daysRemaining) / totalDays) * 100));
 
+		      // Calculate Usage for Estimator
+		      // This is a rough sum of all stats if available, or just a placeholder if not calculated
+		      // For now, we'll fetch stats sum
+		      const stats = await db.execute(sql`
+		          SELECT SUM(size_bytes) as total_size
+		          FROM bucket_stats
+		          WHERE bucket_id IN (SELECT id FROM buckets WHERE user_id = ${user.id})
+		      `);
+		      const totalBytes = Number(stats[0]?.total_size || 0);
+		      
+		      // Format bytes
+		      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+		      let size = totalBytes;
+		      let unitIndex = 0;
+		      while (size >= 1024 && unitIndex < units.length - 1) {
+		          size /= 1024;
+		          unitIndex++;
+		      }
+		      const totalStorageFormatted = `${size.toFixed(2)} ${units[unitIndex]}`;
+
 		const html = await render("offboarding", {
 			title: "Export Your Data - Silo",
 			layout: "main",
 			user,
 			daysRemaining,
+		          totalStorageFormatted,
 		    progressPercentage: progressPercentage.toFixed(1),
 			gracePeriodEndsAt: ends.toLocaleDateString(),
 			hideNavLinks: true,
@@ -199,12 +220,23 @@ async function analyzeMigration(user: typeof users.$inferSelect, params: any) {
 		}
 
 		// 3. Match
-		const plan = localBuckets.map(b => ({
-			localName: b.name,
-			// Default to same name, user can change in UI
-			targetName: b.name,
-			status: remoteBuckets.has(b.name) ? "EXISTS" : "MISSING"
-		}));
+		const plan = localBuckets.map(b => {
+		          // Check if bucket name is taken (exists in list)
+		          // Note: ListAllMyBuckets only shows buckets OWNED by the credentials.
+		          // If it's missing from there, it might still be taken globally (by another user).
+		          // But for R2/S3, 'EXISTS' means "You own it".
+		          // 'MISSING' means "You don't own it".
+		          // To check availability globally (e.g. 409 Conflict), we'd need to try creating it or HEAD it.
+		          // But we don't want to create buckets during analyze phase.
+		          // So we'll rely on "Do you own it?" for now.
+		          // Users can rename in the UI.
+		          
+		          return {
+		              localName: b.name,
+		              targetName: b.name, // Default to same name
+		              status: remoteBuckets.has(b.name) ? "EXISTS" : "MISSING"
+		          };
+		      });
 
 		return new Response(JSON.stringify({ plan }), {
 			headers: { "Content-Type": "application/json" }
@@ -266,37 +298,42 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 				send("Verifying destination buckets...", "info");
 				for (const localBucket of userBuckets) {
 					const targetName = bucketMapping[localBucket.name];
-					if (!targetName) continue; // Skip if not mapped?
+					if (!targetName) continue;
 
 					const bucketUrl = `${endpoint.replace(/\/+$/, "")}/${targetName}`;
 					
-					// Check if exists (HeadBucket)
-					// Note: aws4fetch doesn't have a simple headBucket, so we try fetching ?location or similar, or just try creating
-					// Simplest is to try PutBucket. If it exists (owned by us), it succeeds (idempotent-ish).
-					// If it exists (owned by others), 409/403.
-					
 					try {
-						send(`Checking target bucket '${targetName}'...`);
+						send(`Ensuring target bucket '${targetName}' exists...`);
+						// Attempt to create bucket (idempotent if owned)
 						const putRes = await destClient.fetch(bucketUrl, { method: "PUT" });
 						
 						if (!putRes.ok) {
-							// If 409 Conflict, it might be taken by someone else OR we own it (region issues).
-							// If 200, created.
-							// AWS S3 returns 200 if we own it.
-							// R2 returns 200 if created or owned.
-							
 							if (putRes.status === 409) {
-								// BucketAlreadyExists or BucketAlreadyOwnedByYou (sometimes depends on provider)
-								// We'll assume if we can't write to it, we'll fail later.
-								// But for now let's try to proceed.
-								// Actually, let's verify we can list it.
-							} else {
-								// Some other error
-								// send(`Warning: Could not ensure bucket '${targetName}' exists. Status: ${putRes.status}`);
+				                            // Conflict: Bucket exists.
+				                            // If we own it (BucketAlreadyOwnedByYou), it's fine.
+				                            // If someone else owns it (BucketAlreadyExists), we can't write to it.
+				                            // We'll try to ListObjects to verify ownership/access.
+				                            const listRes = await destClient.fetch(`${bucketUrl}?max-keys=1`, { method: "GET" });
+				                            if (!listRes.ok) {
+				                                send(`Error: Bucket '${targetName}' exists but is not accessible (Status ${listRes.status}). Skipped.`, "error");
+				                                // Remove from mapping so we don't try to upload to it
+				                                delete bucketMapping[localBucket.name];
+				                                continue;
+				                            }
+							} else if (putRes.status === 403) {
+				                            send(`Error: Access Denied creating bucket '${targetName}'. Check permissions. Skipped.`, "error");
+				                            delete bucketMapping[localBucket.name];
+				                            continue;
+				                        } else {
+				                            send(`Error: Failed to create bucket '${targetName}' (Status ${putRes.status}). Skipped.`, "error");
+				                            delete bucketMapping[localBucket.name];
+				                            continue;
 							}
 						}
-					} catch (e) {
-						// Network error etc
+					} catch (e: any) {
+				                    send(`Network Error checking bucket '${targetName}': ${e.message}`, "error");
+				                    delete bucketMapping[localBucket.name];
+				                    continue;
 					}
 				}
 
