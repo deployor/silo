@@ -261,6 +261,12 @@ ${rulesXml}
 			headers.set("Content-Type", "application/octet-stream");
 		}
 
+		// Ensure Content-Length is present in the response if available
+		// Upstream S3 usually provides it, but sometimes it might be missing or in a different case
+		if (!headers.has("Content-Length") && headers.has("content-length")) {
+			headers.set("Content-Length", headers.get("content-length")!);
+		}
+
 		return new Response(response.body, {
 			status: response.status,
 			headers,
