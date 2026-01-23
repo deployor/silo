@@ -572,13 +572,13 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 								// Fallback 2: Try HEAD request if still missing
 								if (!contentLength) {
 									try {
-										send(`DEBUG: Fetching HEAD for ${relativeKey} to find size...`, "info");
+										// send(`DEBUG: Fetching HEAD for ${relativeKey} to find size...`, "info");
 										const headRes = await s3Client.fetch(key, { method: "HEAD" });
 										if (headRes.ok) {
 											const headCL = headRes.headers.get("content-length");
 											if (headCL) {
 												contentLength = headCL;
-												send(`DEBUG: Found size via HEAD: ${contentLength}`, "info");
+												// send(`DEBUG: Found size via HEAD: ${contentLength}`, "info");
 											}
 										}
 									} catch (e) {
