@@ -225,6 +225,9 @@ ${rulesXml}
 			headers: filterUpstreamHeaders(req.headers),
 		});
 
+		console.log(`[GET] Upstream status: ${response.status}`);
+		console.log(`[GET] Upstream headers:`, Object.fromEntries(response.headers.entries()));
+
 		if (url.searchParams.has("uploadId")) {
 			const xml = await response.text();
 			const rootPrefix = getInternalPath("", user, bucket);
