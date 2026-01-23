@@ -225,9 +225,6 @@ ${rulesXml}
 			headers: filterUpstreamHeaders(req.headers),
 		});
 
-		console.log(`[GET] Upstream status: ${response.status}`);
-		console.log(`[GET] Upstream headers:`, Object.fromEntries(response.headers.entries()));
-
 		if (url.searchParams.has("uploadId")) {
 			const xml = await response.text();
 			const rootPrefix = getInternalPath("", user, bucket);
@@ -269,6 +266,10 @@ ${rulesXml}
 		if (!headers.has("Content-Length") && headers.has("content-length")) {
 			headers.set("Content-Length", headers.get("content-length")!);
 		}
+
+		// Cleanup headers that might conflict with Content-Length or cause issues with streaming
+		headers.delete("Transfer-Encoding");
+		headers.delete("transfer-encoding");
 
 		return new Response(response.body, {
 			status: response.status,
