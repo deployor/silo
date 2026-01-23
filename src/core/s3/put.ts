@@ -397,25 +397,19 @@ export async function handlePutRequest(
 					requestBody = combined;
 					actualSize = totalLength;
 				} else {
-					// Fallback to streaming for large files
-					// If we have a declared length, we try to pass the raw body stream
-					// to avoid "double-stream" issues where Content-Length might be stripped
-					// by runtimes when wrapping streams.
+					// Fallback for large files
+					// Using a raw stream with fetch() in Bun/Node often forces Transfer-Encoding: chunked
+					// and strips Content-Length, which upstream S3 providers (like MinIO/AWS) reject
+					// if expecting a standard PUT.
+					//
+					// To guarantee Content-Length is sent, we must use a Blob or ArrayBuffer.
+					// Bun's request.blob() is efficient and handles large files (potentially backing to disk),
+					// enabling a "Store-and-Forward" approach that preserves Content-Length.
 					if (declared !== null) {
-						// Trust the declared length for pre-flight quota check
-						// (We already checked it above: if (limit !== null) ...)
-						
-						// Use the raw body stream
-						requestBody = body;
+						requestBody = await req.blob();
 						actualSize = declared;
 					} else {
-						// No declared length, but too big to buffer (wait, we shouldn't be here if declared is null)
-						// The logic above is `if (declared === null) { buffer... } else { ... }`
-						// So here declared IS NOT null.
-						// wait, the outer block is:
-						// if (declared === null) { ... } else { ... if (declared < BUFFER) ... else { WE ARE HERE } }
-						// So declared is definitely not null here.
-						
+						// Should not happen as per logic above, but fallback to stream
 						requestBody = body;
 						actualSize = declared;
 					}
