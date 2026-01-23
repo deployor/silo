@@ -263,13 +263,23 @@ ${rulesXml}
 
 		// Ensure Content-Length is present in the response if available
 		// Upstream S3 usually provides it, but sometimes it might be missing or in a different case
-		if (!headers.has("Content-Length") && headers.has("content-length")) {
-			headers.set("Content-Length", headers.get("content-length")!);
+		// Note: Bun/Node response headers are case-insensitive maps, but we want to ensure
+		// it is exposed properly if it exists.
+		const contentLength = headers.get("content-length") || headers.get("Content-Length");
+		if (contentLength) {
+			// Force explicit Content-Length header
+			headers.set("Content-Length", contentLength);
 		}
 
 		// Cleanup headers that might conflict with Content-Length or cause issues with streaming
 		headers.delete("Transfer-Encoding");
 		headers.delete("transfer-encoding");
+
+		// NOTE: Bun's Response constructor might strip Content-Length if the body is a stream
+		// and it forces chunked encoding.
+		// However, for proxying, if we provide the Content-Length in the headers object passed
+		// to the Response constructor, and the body is a ReadableStream, it *should* respect it
+		// unless `Transfer-Encoding: chunked` is also present (which we deleted).
 
 		return new Response(response.body, {
 			status: response.status,
