@@ -564,6 +564,12 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 								let body: any = getRes.body;
 								let contentLength = getRes.headers.get("content-length");
 
+								// Fallback: Use Size from ListObjects if header is missing
+								// This avoids buffering large files just to find their length
+								if (!contentLength && item.Size) {
+									contentLength = item.Size.toString();
+								}
+
 								// Fix for 411 Length Required:
 								// If Content-Length is missing, we must buffer the stream to calculate it.
 								// This is resource-intensive but necessary for some providers if the source doesn't report size.
