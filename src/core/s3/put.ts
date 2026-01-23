@@ -429,12 +429,27 @@ export async function handlePutRequest(
 		} else {
 			console.log("[PUT] Content-Length MISSING in upstreamHeaders");
 		}
-		
+
+		// Convert Headers to plain object to ensure control over casing
+		// This is critical because some fetch implementations (and S3) might strictly look for
+		// "Content-Length" (PascalCase) when deciding whether to send a stream with length vs chunked.
+		const headersObj: Record<string, string> = {};
+		upstreamHeaders.forEach((v, k) => {
+			headersObj[k] = v;
+		});
+
+		// Force set Content-Length with PascalCase if we know the size
+		if (actualSize > 0) {
+			headersObj["Content-Length"] = actualSize.toString();
+			// Remove lowercase version if it exists to avoid duplicates/confusion
+			delete headersObj["content-length"];
+		}
+
 		const response = await s3Client.fetch(
 			pathWithQuery,
 			{
 				method: "PUT",
-				headers: upstreamHeaders,
+				headers: headersObj,
 				body: requestBody,
 				duplex: "half",
 			} as unknown as RequestInit,
