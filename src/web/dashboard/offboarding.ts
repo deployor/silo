@@ -564,10 +564,26 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 								let body: any = getRes.body;
 								let contentLength = getRes.headers.get("content-length");
 
-								// Fallback: Use Size from ListObjects if header is missing
-								// This avoids buffering large files just to find their length
-								if (!contentLength && item.Size) {
+								// Fallback 1: Use Size from ListObjects if header is missing
+								if (!contentLength && item.Size !== undefined) {
 									contentLength = item.Size.toString();
+								}
+
+								// Fallback 2: Try HEAD request if still missing
+								if (!contentLength) {
+									try {
+										send(`DEBUG: Fetching HEAD for ${relativeKey} to find size...`, "info");
+										const headRes = await s3Client.fetch(key, { method: "HEAD" });
+										if (headRes.ok) {
+											const headCL = headRes.headers.get("content-length");
+											if (headCL) {
+												contentLength = headCL;
+												send(`DEBUG: Found size via HEAD: ${contentLength}`, "info");
+											}
+										}
+									} catch (e) {
+										// Ignore HEAD errors
+									}
 								}
 
 								// Fix for 411 Length Required:
