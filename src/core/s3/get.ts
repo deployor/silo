@@ -275,13 +275,15 @@ ${rulesXml}
 		headers.delete("Transfer-Encoding");
 		headers.delete("transfer-encoding");
 
-		// NOTE: Bun's Response constructor might strip Content-Length if the body is a stream
-		// and it forces chunked encoding.
-		// However, for proxying, if we provide the Content-Length in the headers object passed
-		// to the Response constructor, and the body is a ReadableStream, it *should* respect it
-		// unless `Transfer-Encoding: chunked` is also present (which we deleted).
+		// To ensure Content-Length is preserved and correct, we read the response as a Blob.
+		// This avoids Bun/Node forcing chunked encoding for streams which strips Content-Length.
+		// Bun's Blob is file-backed for large files, so this is memory-safe but adds latency (TTFB).
+		const bodyBlob = await response.blob();
+		
+		// Ensure header matches actual blob size
+		headers.set("Content-Length", bodyBlob.size.toString());
 
-		return new Response(response.body, {
+		return new Response(bodyBlob, {
 			status: response.status,
 			headers,
 		});
