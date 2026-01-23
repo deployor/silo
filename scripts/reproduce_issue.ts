@@ -67,18 +67,44 @@ async function run() {
     }));
     console.log("Large file uploaded.");
 
-    console.log("Getting large file...");
+    console.log("Getting large file (SDK)...");
     const largeRes = await s3.send(new GetObjectCommand({
       Bucket: bucketName,
       Key: largeKey,
     }));
     console.log("Large File Content-Length:", largeRes.ContentLength);
+    console.log("Large File Metadata:", largeRes.Metadata);
+    // @ts-ignore
+    console.log("Large File Raw Headers:", largeRes.$metadata);
 
     if (largeRes.ContentLength === undefined) {
         console.error("FAIL: Content-Length missing for large file");
     } else {
         console.log("PASS: Content-Length present for large file");
     }
+    
+    // 3. Raw Fetch Check
+    console.log("\nGetting large file (Raw Fetch)...");
+    // We need to sign the request or use the raw endpoint if public?
+    // It's authenticated, so we can't easily fetch without signing.
+    // But we can generate a presigned URL!
+    // Or just check the HEAD request?
+    
+    // Let's use presigned URL to fetch with standard fetch
+    const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+    const command = new GetObjectCommand({ Bucket: bucketName, Key: largeKey });
+    const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+    
+    const fetchRes = await fetch(signedUrl);
+    console.log("Raw Fetch Headers:");
+    fetchRes.headers.forEach((v, k) => console.log(`  ${k}: ${v}`));
+    
+    if (fetchRes.headers.get("content-length")) {
+        console.log("PASS: Raw fetch has content-length");
+    } else {
+        console.log("FAIL: Raw fetch missing content-length");
+    }
+
 
   } catch (e) {
     console.error("Error with large file:", e);

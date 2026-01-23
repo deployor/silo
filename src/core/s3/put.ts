@@ -432,11 +432,31 @@ export async function handlePutRequest(
 			headersObj[k] = v;
 		});
 
+		// Normalize Content-Length to PascalCase if present
+		if (headersObj["content-length"]) {
+			headersObj["Content-Length"] = headersObj["content-length"];
+			delete headersObj["content-length"];
+		}
+
 		// Force set Content-Length with PascalCase if we know the size
 		if (actualSize > 0) {
 			headersObj["Content-Length"] = actualSize.toString();
-			// Remove lowercase version if it exists to avoid duplicates/confusion
-			delete headersObj["content-length"];
+		} else if (copySource) {
+			// For CopyObject, the body is empty, so Content-Length should be 0.
+			// Ensure it's explicitly set to "0" if missing or otherwise.
+			headersObj["Content-Length"] = "0";
+		} else {
+			// If actualSize is 0 and it's not a copy, it might be an empty PUT.
+			// Ensure Content-Length is set if it was in the upstream headers (already normalized above),
+			// or default to "0" if we know the body is empty?
+			// But if actualSize is 0, it might mean we didn't count it (streamed without buffering)?
+			// No, if declared is null, we buffered and actualSize is set.
+			// If declared is not null, actualSize is set to declared.
+			// So actualSize represents the intended Content-Length.
+			
+			// If actualSize is 0, explicitly set it to "0" to be safe.
+			// This covers empty files.
+			headersObj["Content-Length"] = "0";
 		}
 
 		const response = await s3Client.fetch(
