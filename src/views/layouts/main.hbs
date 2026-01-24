@@ -35,14 +35,21 @@
           {{{breadcrumbs}}}
         {{/if}}
         {{#if config.git.shortSha}}
-          <div class="hidden xl:flex flex-col text-[9px] leading-tight text-white/10 font-mono ml-2 hover:text-white/30 transition-colors cursor-default select-none" title="Commit: {{config.git.sha}}&#013;Date: {{config.git.date}}">
+          <div class="hidden xl:flex flex-col text-[9px] leading-tight text-white/20 font-mono ml-2 transition-colors cursor-default select-none">
             <div class="flex items-center gap-1.5">
               <span class="uppercase tracking-wider">{{config.env}}</span>
               <span class="opacity-50">|</span>
-              <span>{{config.git.shortSha}}</span>
+              <span title="{{config.git.sha}}">{{config.git.shortSha}}</span>
+              {{#if config.git.message}}
+                <span class="opacity-50">|</span>
+                <span class="max-w-[150px] truncate" title="{{config.git.message}}">{{config.git.message}}</span>
+              {{/if}}
             </div>
             {{#if config.git.date}}
-              <span class="deploy-time-ago" data-time="{{config.git.date}}"></span>
+              <div class="flex items-center gap-1.5">
+                 <span class="deploy-time-ago" data-time="{{config.git.date}}"></span>
+                 <span class="opacity-50" title="{{config.git.date}}">({{config.git.date}})</span>
+              </div>
             {{/if}}
           </div>
         {{/if}}
