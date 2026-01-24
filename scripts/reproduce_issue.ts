@@ -86,7 +86,6 @@ async function run() {
     // 3. Raw Fetch Check
     console.log("\nGetting large file (Raw Fetch)...");
     // We need to sign the request or use the raw endpoint if public?
-    // It's authenticated, so we can't easily fetch without signing.
     // But we can generate a presigned URL!
     
     // Let's use presigned URL to fetch with standard fetch
