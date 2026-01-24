@@ -163,7 +163,6 @@
                      <h4 class="text-white font-bold text-xl mb-1">Other / S3 Compatible</h4>
                      <p class="text-text-muted text-sm">MinIO, Wasabi, etc.</p>
                  </div>
-                 <i class="ph-bold ph-caret-right text-white/20 group-hover:text-white text-2xl"></i>
             </button>
          </div>
 
@@ -300,9 +299,6 @@
                 <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Secret Access Key</label>
                 <input type="password" x-model="secretAccessKey" required class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-white font-mono focus:border-hc-red focus:outline-none transition-colors">
             </div>
-
-            <!-- Debug Button -->
-            <button type="button" @click="fillDebug" class="text-xs text-white/20 hover:text-white/50">[Debug]</button>
 
             <button type="submit" :disabled="loading" class="group w-full bg-hc-red text-white hover:bg-red-600 font-bold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-900/20 disabled:opacity-50 disabled:cursor-wait">
                 <span x-show="!loading" class="flex items-center gap-2">Connect & Analyze <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i></span>
