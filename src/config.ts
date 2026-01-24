@@ -66,7 +66,7 @@ if (!gitSha || !gitDate) {
 }
 
 export const config = {
-	env: env.NODE_ENV,
+	env: env.NODE_ENV === "production" ? "PROD" : "DEV",
 	git: {
 		sha: gitSha,
 		shortSha: gitSha?.substring(0, 7),
