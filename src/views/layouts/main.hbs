@@ -48,7 +48,7 @@
             {{#if config.git.date}}
               <div class="flex items-center gap-1.5">
                  <span class="deploy-time-ago" data-time="{{config.git.date}}"></span>
-                 <span class="opacity-50" title="{{config.git.date}}">({{config.git.date}})</span>
+                 <span class="deploy-date opacity-50" data-time="{{config.git.date}}"></span>
               </div>
             {{/if}}
           </div>
@@ -126,6 +126,21 @@
           if (date) {
             el.textContent = getTimeAgo(date);
             el.title = new Date(date).toLocaleString();
+          }
+        });
+
+        const dateEls = document.querySelectorAll('.deploy-date');
+        dateEls.forEach(el => {
+          const dateStr = el.getAttribute('data-time');
+          if (dateStr) {
+            const date = new Date(dateStr);
+            // Format: YYYY/MM/DD HH:MM
+            const fmt = date.getFullYear() + '/' +
+                        String(date.getMonth() + 1).padStart(2, '0') + '/' +
+                        String(date.getDate()).padStart(2, '0') + ' ' +
+                        String(date.getHours()).padStart(2, '0') + ':' +
+                        String(date.getMinutes()).padStart(2, '0');
+            el.textContent = `(${fmt})`;
           }
         });
       })();
