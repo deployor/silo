@@ -53,7 +53,7 @@
                      {{#if user.dataExported}}
                         You can still download an archive of your data.
                      {{else}}
-                        Get a single archive containing all your buckets and metadata. Best for local backups.
+                        Get a one single archive containing all your buckets files and metadata.
                      {{/if}}
                  </p>
                  
@@ -80,7 +80,7 @@
                  </div>
                  <h3 class="text-2xl font-bold text-white mb-2">Migration Assistant</h3>
                  <p class="text-text-muted mb-8 flex-1 text-lg">
-                     Directly transfer your files to Cloudflare R2, AWS, or Backblaze{{#if user.dataExported}} again{{else}} without downloading{{/if}}.
+                     Directly transfer your files to Cloudflare R2, AWS, or any S3 provider{{#if user.dataExported}} again{{else}} without downloading{{/if}}.
                  </p>
                  <button @click="step = 2" class="group w-full bg-hc-red text-white hover:bg-red-600 font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-900/20">
                      Start Migration <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
