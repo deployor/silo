@@ -106,7 +106,8 @@
           const now = new Date();
           const seconds = Math.floor((now - date) / 1000);
           
-          if (seconds < 60) return 'now';
+          if (seconds < 5) return 'now';
+          if (seconds < 60) return `${seconds}s`;
           
           const minutes = Math.floor(seconds / 60);
           if (minutes < 60) return `${minutes}m`;
