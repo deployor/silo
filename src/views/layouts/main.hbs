@@ -35,22 +35,22 @@
           {{{breadcrumbs}}}
         {{/if}}
         {{#if config.git.shortSha}}
-          <div class="hidden md:flex flex-col justify-center text-[10px] leading-none text-white/20 hover:text-white/40 font-mono ml-4 transition-colors cursor-default select-none gap-0.5">
-            <div class="flex items-center gap-1 whitespace-nowrap">
+          <div class="hidden md:flex flex-col justify-center text-[10px] leading-none text-white/10 hover:text-white/40 font-mono ml-4 transition-colors cursor-default select-none gap-[1px]">
+            <div class="flex items-center gap-[3px] whitespace-nowrap">
               <span class="uppercase tracking-wider font-bold">{{config.env}}</span>
-              <span class="opacity-30">|</span>
+              <span class="opacity-30 text-[8px]">|</span>
               <span title="{{config.git.sha}}">{{config.git.shortSha}}</span>
               {{#if config.git.message}}
-                <span class="opacity-30">|</span>
+                <span class="opacity-30 text-[8px]">|</span>
                 <span class="max-w-[150px] truncate" title="{{config.git.message}}">{{config.git.message}}</span>
               {{/if}}
             </div>
-            <div class="flex items-center gap-1 whitespace-nowrap opacity-70">
+            <div class="flex items-center gap-[3px] whitespace-nowrap opacity-70">
               {{#if config.git.date}}
                 <span class="deploy-time-ago" data-time="{{config.git.date}}" title="Commit Date: {{config.git.date}}"></span>
               {{/if}}
               {{#if config.git.buildDate}}
-                <span class="opacity-30">|</span>
+                <span class="opacity-30 text-[8px]">|</span>
                 <span class="build-duration" data-start="{{config.git.date}}" data-end="{{config.git.buildDate}}" title="Deployment Duration"></span>
               {{/if}}
             </div>
