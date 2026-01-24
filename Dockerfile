@@ -21,6 +21,11 @@ COPY --from=prerelease /usr/src/app/src src
 COPY --from=prerelease /usr/src/app/package.json .
 COPY --from=prerelease /usr/src/app/drizzle.config.ts .
 
+ARG GIT_COMMIT_SHA
+ARG GIT_COMMIT_DATE
+ENV GIT_COMMIT_SHA=$GIT_COMMIT_SHA
+ENV GIT_COMMIT_DATE=$GIT_COMMIT_DATE
+
 USER bun
 EXPOSE 3000/tcp
 ENTRYPOINT [ "bun", "run", "src/index.ts" ]
