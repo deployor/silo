@@ -16,12 +16,19 @@ const envSchema = z.object({
 	SLACK_FILE_UPLOAD_CHANNEL_ID: z.string().optional(),
 	DEV_ACCESS_CODE: z.string().optional(),
 	NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+	GIT_COMMIT_SHA: z.string().optional(),
+	GIT_COMMIT_DATE: z.string().optional(),
 });
 
 const env = envSchema.parse(process.env);
 
 export const config = {
 	env: env.NODE_ENV,
+	git: {
+		sha: env.GIT_COMMIT_SHA,
+		shortSha: env.GIT_COMMIT_SHA?.substring(0, 7),
+		date: env.GIT_COMMIT_DATE,
+	},
 	isProduction: env.NODE_ENV === "production",
 	s3Domain: env.S3_DOMAIN,
 	databaseUrl: env.DATABASE_URL,

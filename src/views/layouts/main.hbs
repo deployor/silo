@@ -34,6 +34,18 @@
         {{#if breadcrumbs}}
           {{{breadcrumbs}}}
         {{/if}}
+        {{#if config.git.shortSha}}
+          <div class="hidden xl:flex flex-col text-[9px] leading-tight text-white/10 font-mono ml-2 hover:text-white/30 transition-colors cursor-default select-none" title="Commit: {{config.git.sha}}&#013;Date: {{config.git.date}}">
+            <div class="flex items-center gap-1.5">
+              <span class="uppercase tracking-wider">{{config.env}}</span>
+              <span class="opacity-50">|</span>
+              <span>{{config.git.shortSha}}</span>
+            </div>
+            {{#if config.git.date}}
+              <span class="deploy-time-ago" data-time="{{config.git.date}}"></span>
+            {{/if}}
+          </div>
+        {{/if}}
       </div>
       <div class="flex items-center gap-6 font-bold text-sm">
         {{#unless hideNavLinks}}
@@ -79,5 +91,37 @@
     {{#if extraScripts}}
       {{{extraScripts}}}
     {{/if}}
+    <script>
+      (function() {
+        function getTimeAgo(dateString) {
+          if (!dateString) return '';
+          const date = new Date(dateString);
+          const now = new Date();
+          const seconds = Math.floor((now - date) / 1000);
+          
+          if (seconds < 60) return 'just now';
+          
+          const minutes = Math.floor(seconds / 60);
+          if (minutes < 60) return `${minutes}m ago`;
+          
+          const hours = Math.floor(minutes / 60);
+          if (hours < 24) return `${hours}h ago`;
+          
+          const days = Math.floor(hours / 24);
+          if (days < 30) return `${days}d ago`;
+          
+          return date.toLocaleDateString();
+        }
+
+        const els = document.querySelectorAll('.deploy-time-ago');
+        els.forEach(el => {
+          const date = el.getAttribute('data-time');
+          if (date) {
+            el.textContent = getTimeAgo(date);
+            el.title = new Date(date).toLocaleString();
+          }
+        });
+      })();
+    </script>
   </body>
 </html>
