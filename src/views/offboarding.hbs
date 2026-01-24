@@ -456,12 +456,6 @@ document.addEventListener('alpine:init', () => {
             if(p === 'digitalocean') this.endpoint = 'https://nyc3.digitaloceanspaces.com';
         },
 
-        fillDebug() {
-            this.endpoint = 'https://03c80993959141f237f8188172909405.r2.cloudflarestorage.com';
-            this.accessKeyId = '348f6572f69435b0d014457e5b385966';
-            this.secretAccessKey = '01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d';
-        },
-
         async analyze() {
             this.loading = true;
             try {
