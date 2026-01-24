@@ -64,7 +64,7 @@
                  {{else}}
                  <form action="/dashboard/offboarding/download" method="POST" class="w-full">
                      <button type="button" onclick="triggerDownloadConfirm()" class="group w-full bg-white/10 hover:bg-white/20 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2">
-                         Download Archive <i class="ph-bold ph-download-simple group-hover:translate-y-1 transition-transform"></i>
+                         Download Archive
                      </button>
                  </form>
                  {{/if}}
@@ -83,7 +83,7 @@
                      Directly transfer your files to Cloudflare R2, AWS, or any S3 provider{{#if user.dataExported}} again{{else}} without downloading{{/if}}.
                  </p>
                  <button @click="step = 2" class="group w-full bg-hc-red text-white hover:bg-red-600 font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-900/20">
-                     Start Migration <i class="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                     Start Migration
                  </button>
               </div>
          </div>
