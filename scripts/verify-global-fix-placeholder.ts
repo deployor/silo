@@ -10,7 +10,6 @@ async function verifyGlobalFix() {
   const buffer = new Uint8Array(size);
   buffer.fill(67); // 'C'
   
-  // Create a ReadableStream (simulating an incoming request stream)
   // This is what `handlePutRequest` receives in `req.body`
   const stream = new ReadableStream({
     start(controller) {
