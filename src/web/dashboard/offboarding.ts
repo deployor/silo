@@ -586,49 +586,25 @@ async function migrateUserData(user: typeof users.$inferSelect, params: any) {
 									}
 								}
 
-								// Fix for 411 Length Required:
-								// If Content-Length is missing, we must buffer the stream to calculate it.
-								// This is resource-intensive but necessary for some providers if the source doesn't report size.
-								if (!contentLength && body) {
-									// 50MB Buffer Limit to prevent OOM
-									const LIMIT = 50 * 1024 * 1024;
-									let accumulatedSize = 0;
-									const chunks: Uint8Array[] = [];
+								// IMPORTANT FIX: Convert stream to Blob to ensure Content-Length is sent to destination
+								// Upstream S3 providers reject PUT requests with Transfer-Encoding: chunked (no Content-Length)
+								// Even if we set the Content-Length header manually, passing a raw stream often causes the
+								// runtime to ignore it and use chunked encoding anyway. Converting to a Blob forces the
+								// correct Content-Length header to be respected and disables chunked encoding.
+								if (body && typeof body.getReader === 'function') {
+									// It's a ReadableStream, convert to Blob
+									// Note: Bun/Node efficiently handles large blobs (often backed by disk)
+									// preventing memory exhaustion for reasonably sized files.
+									body = await getRes.blob();
 									
-									// @ts-ignore
-									const reader = body.getReader();
-									try {
-										while (true) {
-											const { done, value } = await reader.read();
-											if (done) break;
-											if (value) {
-												accumulatedSize += value.length;
-												if (accumulatedSize > LIMIT) {
-													throw new Error("File too large to buffer for Length calculation (>50MB). Source missing Content-Length.");
-												}
-												chunks.push(value);
-											}
-										}
-									} finally {
-										// @ts-ignore
-										// reader.releaseLock(); // Not needed if we consumed it all or if stream is closed
-									}
-									
-									// Reconstruct body from chunks
-									const combined = new Uint8Array(accumulatedSize);
-									let offset = 0;
-									for (const chunk of chunks) {
-										combined.set(chunk, offset);
-										offset += chunk.length;
-									}
-									
-									// Convert Uint8Array to ArrayBuffer for compatibility if needed, or just use it
-									body = combined;
-									contentLength = accumulatedSize.toString();
+									// Update Content-Length to match exactly what we are sending
+									contentLength = body.size.toString();
 								}
 
 								if (contentLength) {
 									headers["Content-Length"] = contentLength;
+								} else {
+									throw new Error("MissingContentLength: Could not resolve file size. S3 PUT requires Content-Length.");
 								}
 								
 								// Copy User Metadata
