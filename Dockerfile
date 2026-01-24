@@ -11,10 +11,13 @@ COPY package.json bun.lock /temp/prod/
 RUN cd /temp/prod && bun install --frozen-lockfile --production
 
 FROM base AS prerelease
+# Install git early to allow caching (it won't re-run on code changes)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY --from=install /temp/dev/node_modules node_modules
 COPY . .
-# Install git to capture commit info
-RUN apt-get update && apt-get install -y git
 # Generate git info file
 RUN echo "{\"sha\": \"$(git rev-parse HEAD)\", \"date\": \"$(git show -s --format=%cI HEAD)\", \"message\": \"$(git show -s --format=%s HEAD | tr -d '"' | tr -d '\n')\", \"buildDate\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" > src/git-info.json
 RUN bun run build:css
