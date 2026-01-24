@@ -13,6 +13,10 @@ RUN cd /temp/prod && bun install --frozen-lockfile --production
 FROM base AS prerelease
 COPY --from=install /temp/dev/node_modules node_modules
 COPY . .
+# Install git to capture commit info
+RUN apt-get update && apt-get install -y git
+# Generate git info file
+RUN echo "{\"sha\": \"$(git rev-parse HEAD)\", \"date\": \"$(git show -s --format=%cI HEAD)\"}" > src/git-info.json
 RUN bun run build:css
 
 FROM base AS release
@@ -20,11 +24,6 @@ COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=prerelease /usr/src/app/src src
 COPY --from=prerelease /usr/src/app/package.json .
 COPY --from=prerelease /usr/src/app/drizzle.config.ts .
-
-ARG GIT_COMMIT_SHA
-ARG GIT_COMMIT_DATE
-ENV GIT_COMMIT_SHA=$GIT_COMMIT_SHA
-ENV GIT_COMMIT_DATE=$GIT_COMMIT_DATE
 
 USER bun
 EXPOSE 3000/tcp

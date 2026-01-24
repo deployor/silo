@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { readFileSync } from "fs";
 
 const envSchema = z.object({
 	S3_DOMAIN: z.string().default("localhost:3000"),
@@ -22,12 +23,41 @@ const envSchema = z.object({
 
 const env = envSchema.parse(process.env);
 
+let gitSha = env.GIT_COMMIT_SHA;
+let gitDate = env.GIT_COMMIT_DATE;
+
+if (!gitSha || !gitDate) {
+	// 1. Try file first (production build artifact)
+	try {
+		const gitInfo = JSON.parse(readFileSync("src/git-info.json", "utf-8"));
+		if (!gitSha) gitSha = gitInfo.sha;
+		if (!gitDate) gitDate = gitInfo.date;
+	} catch {
+		// 2. If file fails (local dev), try git command directly
+		try {
+			const shaProc = Bun.spawnSync(["git", "rev-parse", "HEAD"]);
+			if (shaProc.success) gitSha = shaProc.stdout.toString().trim();
+
+			const dateProc = Bun.spawnSync([
+				"git",
+				"show",
+				"-s",
+				"--format=%cI",
+				"HEAD",
+			]);
+			if (dateProc.success) gitDate = dateProc.stdout.toString().trim();
+		} catch {
+			// ignore
+		}
+	}
+}
+
 export const config = {
 	env: env.NODE_ENV,
 	git: {
-		sha: env.GIT_COMMIT_SHA,
-		shortSha: env.GIT_COMMIT_SHA?.substring(0, 7),
-		date: env.GIT_COMMIT_DATE,
+		sha: gitSha,
+		shortSha: gitSha?.substring(0, 7),
+		date: gitDate,
 	},
 	isProduction: env.NODE_ENV === "production",
 	s3Domain: env.S3_DOMAIN,
