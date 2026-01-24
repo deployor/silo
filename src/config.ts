@@ -26,6 +26,7 @@ const env = envSchema.parse(process.env);
 let gitSha = env.GIT_COMMIT_SHA;
 let gitDate = env.GIT_COMMIT_DATE;
 let gitMessage: string | undefined;
+let buildDate: string | undefined;
 
 if (!gitSha || !gitDate) {
 	// 1. Try file first (production build artifact)
@@ -34,6 +35,7 @@ if (!gitSha || !gitDate) {
 		if (!gitSha) gitSha = gitInfo.sha;
 		if (!gitDate) gitDate = gitInfo.date;
 		gitMessage = gitInfo.message;
+		buildDate = gitInfo.buildDate;
 	} catch {
 		// 2. If file fails (local dev), try git command directly
 		try {
@@ -70,6 +72,7 @@ export const config = {
 		shortSha: gitSha?.substring(0, 7),
 		date: gitDate,
 		message: gitMessage,
+		buildDate,
 	},
 	isProduction: env.NODE_ENV === "production",
 	s3Domain: env.S3_DOMAIN,

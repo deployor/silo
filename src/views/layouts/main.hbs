@@ -45,11 +45,15 @@
                 <span class="max-w-[150px] truncate" title="{{config.git.message}}">{{config.git.message}}</span>
               {{/if}}
             </div>
-            {{#if config.git.date}}
-              <div class="flex items-center gap-1.5">
-                 <span class="deploy-time-ago" data-time="{{config.git.date}}"></span>
-              </div>
-            {{/if}}
+            <div class="flex items-center gap-1.5">
+               {{#if config.git.date}}
+                 <span class="deploy-time-ago" data-time="{{config.git.date}}" title="Commit Date: {{config.git.date}}"></span>
+               {{/if}}
+               {{#if config.git.buildDate}}
+                 <span class="opacity-50">|</span>
+                 <span class="build-duration" data-start="{{config.git.date}}" data-end="{{config.git.buildDate}}" title="Deployment Duration"></span>
+               {{/if}}
+            </div>
           </div>
         {{/if}}
       </div>
@@ -124,8 +128,25 @@
           const date = el.getAttribute('data-time');
           if (date) {
             el.textContent = getTimeAgo(date);
-            el.title = new Date(date).toLocaleString();
           }
+        });
+
+        const durationEls = document.querySelectorAll('.build-duration');
+        durationEls.forEach(el => {
+            const start = el.getAttribute('data-start');
+            const end = el.getAttribute('data-end');
+            if(start && end) {
+                const diff = new Date(end).getTime() - new Date(start).getTime();
+                const seconds = Math.floor(diff / 1000);
+                if (seconds > 0) {
+                     if (seconds < 60) {
+                        el.textContent = `took ${seconds}s`;
+                     } else {
+                        const mins = Math.floor(seconds / 60);
+                        el.textContent = `took ${mins}m`;
+                     }
+                }
+            }
         });
 
       })();
