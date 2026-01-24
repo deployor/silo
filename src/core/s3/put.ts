@@ -314,29 +314,15 @@ export async function handlePutRequest(
 			// We must buffer if Content-Length is missing to calculate it for upstream.
 			// Upstream requires Content-Length for PUT.
 			if (declared === null) {
-				const chunks: Uint8Array[] = [];
-				const reader = body.getReader();
-				let totalLength = 0;
-
-				while (true) {
-					const { done, value } = await reader.read();
-					if (done) break;
-					chunks.push(value);
-					totalLength += value.byteLength;
-				}
-
-				const combined = new Uint8Array(totalLength);
-				let offset = 0;
-				for (const chunk of chunks) {
-					combined.set(chunk, offset);
-					offset += chunk.byteLength;
-				}
-
-				requestBody = combined;
-				actualSize = totalLength;
+				// If content-length is missing, we must read the whole body to know the size.
+				// Use blob() to avoid OOM on large files if the runtime supports disk-backed blobs.
+				// This is safer than reading into a Uint8Array in memory.
+				const blob = await req.blob();
+				requestBody = blob;
+				actualSize = blob.size;
 
 				// Explicitly set the Content-Length header for the upstream request
-				upstreamHeaders.set("Content-Length", totalLength.toString());
+				upstreamHeaders.set("Content-Length", actualSize.toString());
 
 				if (limit !== null) {
 					if (
