@@ -35,8 +35,8 @@
           {{{breadcrumbs}}}
         {{/if}}
         {{#if config.git.shortSha}}
-          <div class="hidden md:flex flex-col text-[10px] leading-[0.85] text-white/20 hover:text-white/40 font-mono ml-3 transition-colors cursor-default select-none">
-            <div class="flex items-center gap-1.5 whitespace-nowrap">
+          <div class="hidden md:flex flex-col justify-center text-[10px] leading-tight text-white/20 hover:text-white/40 font-mono ml-4 transition-colors cursor-default select-none gap-0.5">
+            <div class="flex items-center gap-2 whitespace-nowrap">
               <span class="uppercase tracking-wider font-bold">{{config.env}}</span>
               <span class="opacity-30">|</span>
               <span title="{{config.git.sha}}">{{config.git.shortSha}}</span>
@@ -45,7 +45,7 @@
                 <span class="max-w-[150px] truncate" title="{{config.git.message}}">{{config.git.message}}</span>
               {{/if}}
             </div>
-            <div class="flex items-center gap-1.5 whitespace-nowrap opacity-70">
+            <div class="flex items-center gap-2 whitespace-nowrap opacity-70">
               {{#if config.git.date}}
                 <span class="deploy-time-ago" data-time="{{config.git.date}}" title="Commit Date: {{config.git.date}}"></span>
               {{/if}}
