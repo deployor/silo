@@ -40,18 +40,8 @@
               <span class="uppercase tracking-wider">{{config.env}}</span>
               <span class="opacity-50">|</span>
               <span title="{{config.git.sha}}">{{config.git.shortSha}}</span>
-              {{#if config.git.message}}
-                <span class="opacity-50">|</span>
-                <span class="max-w-[150px] truncate" title="{{config.git.message}}">{{config.git.message}}</span>
-              {{/if}}
-            </div>
-            <div class="flex items-center gap-1.5">
                {{#if config.git.date}}
-                 <span class="deploy-time-ago" data-time="{{config.git.date}}" title="Commit Date: {{config.git.date}}"></span>
-               {{/if}}
-               {{#if config.git.buildDate}}
-                 <span class="opacity-50">|</span>
-                 <span class="build-duration" data-start="{{config.git.date}}" data-end="{{config.git.buildDate}}" title="Deployment Duration"></span>
+                 <span class="deploy-time-ago opacity-50" data-time="{{config.git.date}}" title="Commit Date: {{config.git.date}}"></span>
                {{/if}}
             </div>
           </div>
