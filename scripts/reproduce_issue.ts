@@ -88,7 +88,6 @@ async function run() {
     // We need to sign the request or use the raw endpoint if public?
     // It's authenticated, so we can't easily fetch without signing.
     // But we can generate a presigned URL!
-    // Or just check the HEAD request?
     
     // Let's use presigned URL to fetch with standard fetch
     const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
