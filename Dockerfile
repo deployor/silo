@@ -16,7 +16,7 @@ COPY . .
 # Install git to capture commit info
 RUN apt-get update && apt-get install -y git
 # Generate git info file
-RUN echo "{\"sha\": \"$(git rev-parse HEAD)\", \"date\": \"$(git show -s --format=%cI HEAD)\"}" > src/git-info.json
+RUN echo "{\"sha\": \"$(git rev-parse HEAD)\", \"date\": \"$(git show -s --format=%cI HEAD)\", \"message\": \"$(git show -s --format=%s HEAD | tr -d '"' | tr -d '\n')\"}" > src/git-info.json
 RUN bun run build:css
 
 FROM base AS release

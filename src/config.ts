@@ -25,6 +25,7 @@ const env = envSchema.parse(process.env);
 
 let gitSha = env.GIT_COMMIT_SHA;
 let gitDate = env.GIT_COMMIT_DATE;
+let gitMessage: string | undefined;
 
 if (!gitSha || !gitDate) {
 	// 1. Try file first (production build artifact)
@@ -32,6 +33,7 @@ if (!gitSha || !gitDate) {
 		const gitInfo = JSON.parse(readFileSync("src/git-info.json", "utf-8"));
 		if (!gitSha) gitSha = gitInfo.sha;
 		if (!gitDate) gitDate = gitInfo.date;
+		gitMessage = gitInfo.message;
 	} catch {
 		// 2. If file fails (local dev), try git command directly
 		try {
@@ -46,6 +48,15 @@ if (!gitSha || !gitDate) {
 				"HEAD",
 			]);
 			if (dateProc.success) gitDate = dateProc.stdout.toString().trim();
+
+			const msgProc = Bun.spawnSync([
+				"git",
+				"show",
+				"-s",
+				"--format=%s",
+				"HEAD",
+			]);
+			if (msgProc.success) gitMessage = msgProc.stdout.toString().trim();
 		} catch {
 			// ignore
 		}
@@ -58,6 +69,7 @@ export const config = {
 		sha: gitSha,
 		shortSha: gitSha?.substring(0, 7),
 		date: gitDate,
+		message: gitMessage,
 	},
 	isProduction: env.NODE_ENV === "production",
 	s3Domain: env.S3_DOMAIN,
