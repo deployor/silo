@@ -48,7 +48,6 @@
             {{#if config.git.date}}
               <div class="flex items-center gap-1.5">
                  <span class="deploy-time-ago" data-time="{{config.git.date}}"></span>
-                 <span class="deploy-date opacity-50" data-time="{{config.git.date}}"></span>
               </div>
             {{/if}}
           </div>
@@ -106,16 +105,16 @@
           const now = new Date();
           const seconds = Math.floor((now - date) / 1000);
           
-          if (seconds < 60) return 'just now';
+          if (seconds < 60) return 'now';
           
           const minutes = Math.floor(seconds / 60);
-          if (minutes < 60) return `${minutes}m ago`;
+          if (minutes < 60) return `${minutes}m`;
           
           const hours = Math.floor(minutes / 60);
-          if (hours < 24) return `${hours}h ago`;
+          if (hours < 24) return `${hours}h`;
           
           const days = Math.floor(hours / 24);
-          if (days < 30) return `${days}d ago`;
+          if (days < 30) return `${days}d`;
           
           return date.toLocaleDateString();
         }
@@ -129,20 +128,6 @@
           }
         });
 
-        const dateEls = document.querySelectorAll('.deploy-date');
-        dateEls.forEach(el => {
-          const dateStr = el.getAttribute('data-time');
-          if (dateStr) {
-            const date = new Date(dateStr);
-            // Format: YYYY/MM/DD HH:MM
-            const fmt = date.getFullYear() + '/' +
-                        String(date.getMonth() + 1).padStart(2, '0') + '/' +
-                        String(date.getDate()).padStart(2, '0') + ' ' +
-                        String(date.getHours()).padStart(2, '0') + ':' +
-                        String(date.getMinutes()).padStart(2, '0');
-            el.textContent = `(${fmt})`;
-          }
-        });
       })();
     </script>
   </body>
