@@ -78,6 +78,8 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 			"/api/cdn/",
 			"/onboarding",
 			"/api/onboarding/",
+			"/ysws",
+			"/admin/ysws",
 		];
 
 		// Exact match for root
