@@ -624,11 +624,18 @@ async function listLogs(url: URL) {
 
 export async function handleAdminRequest(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
-	if (!user || !user.isAdmin) {
-		return new Response("Unauthorized", { status: 403 });
+	const url = new URL(req.url);
+
+	if (!user) {
+		return new Response(null, {
+			status: 302,
+			headers: { Location: "/auth/login?next=" + encodeURIComponent(url.pathname) },
+		});
 	}
 
-	const url = new URL(req.url);
+	if (!user.isAdmin) {
+		return new Response("Forbidden", { status: 403 });
+	}
 	const path = url.pathname;
 
 	// Admin UI Pages
