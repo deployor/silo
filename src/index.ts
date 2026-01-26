@@ -53,6 +53,7 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 		(S3_DOMAIN === "localhost:3000" && host.startsWith("localhost"))
 	) {
 		const path = url.pathname;
+		console.log(`[Debug] Checking isDashboardRequest. Host: ${host}, Path: ${path}`);
 		const hasAuthHeader = req.headers.has("authorization");
 		const hasAmzParams =
 			url.searchParams.has("X-Amz-Algorithm") ||
