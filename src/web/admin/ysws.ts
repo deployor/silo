@@ -1,17 +1,11 @@
-import { authenticate } from "../../middleware/auth";
 import { YswsService } from "../../services/ysws-service";
 import { render } from "../../lib/view-engine";
 import { context } from "../../lib/context";
+import { users } from "../../db/schema";
 
-export async function handleAdminYswsRequest(req: Request): Promise<Response> {
+export async function handleAdminYswsRequest(req: Request, user: typeof users.$inferSelect): Promise<Response> {
     const url = new URL(req.url);
-    const authResult = await authenticate(req);
-    
-    if (authResult instanceof Response) {
-        return authResult;
-    }
 
-    const { user } = authResult;
     if (!user.isAdmin) {
         return new Response("Forbidden", { status: 403 });
     }
