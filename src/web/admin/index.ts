@@ -841,6 +841,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				minEgressBytes: z.number().int().min(0),
 				defaultMaxBucketsPerUser: z.number().int().min(1).max(10000),
 				defaultMaxKeysPerBucket: z.number().int().min(1).max(10000),
+				yswsQuotaPerHourBytes: z.number().int().min(0),
 			});
 
 			const body = await req.json().catch(() => null);

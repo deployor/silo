@@ -8,6 +8,7 @@ export type AppSettings = {
 	minEgressBytes: number;
 	defaultMaxBucketsPerUser: number;
 	defaultMaxKeysPerBucket: number;
+	yswsQuotaPerHourBytes: number;
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -16,6 +17,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 	minEgressBytes: 10 * 1024 * 1024 * 1024, // 10GB
 	defaultMaxBucketsPerUser: 50,
 	defaultMaxKeysPerBucket: 20,
+	yswsQuotaPerHourBytes: 1_073_741_824, // 1GB
 };
 
 let cached: { value: AppSettings; fetchedAtMs: number } | null = null;
@@ -33,6 +35,7 @@ async function ensureRowExists() {
 			minEgressBytes: DEFAULT_APP_SETTINGS.minEgressBytes,
 			defaultMaxBucketsPerUser: DEFAULT_APP_SETTINGS.defaultMaxBucketsPerUser,
 			defaultMaxKeysPerBucket: DEFAULT_APP_SETTINGS.defaultMaxKeysPerBucket,
+			yswsQuotaPerHourBytes: DEFAULT_APP_SETTINGS.yswsQuotaPerHourBytes,
 		})
 		.onConflictDoNothing();
 }
@@ -54,6 +57,7 @@ export async function getAppSettings(force = false): Promise<AppSettings> {
 			minEgressBytes: Number(row.minEgressBytes),
 			defaultMaxBucketsPerUser: Number(row.defaultMaxBucketsPerUser),
 			defaultMaxKeysPerBucket: Number(row.defaultMaxKeysPerBucket),
+			yswsQuotaPerHourBytes: Number(row.yswsQuotaPerHourBytes),
 		}
 		: DEFAULT_APP_SETTINGS;
 
@@ -77,6 +81,7 @@ export async function updateAppSettings(patch: Partial<AppSettings>) {
 			minEgressBytes: next.minEgressBytes,
 			defaultMaxBucketsPerUser: next.defaultMaxBucketsPerUser,
 			defaultMaxKeysPerBucket: next.defaultMaxKeysPerBucket,
+			yswsQuotaPerHourBytes: next.yswsQuotaPerHourBytes,
 			updatedAt: new Date(),
 		})
 		.where(eq(appSettings.id, "global"));

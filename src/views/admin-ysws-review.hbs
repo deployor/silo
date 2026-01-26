@@ -1,0 +1,149 @@
+<div class="max-w-4xl mx-auto space-y-8">
+    
+    <div class="flex items-center gap-4">
+        <a href="/admin/ysws" class="text-text-muted hover:text-white transition-colors">&larr; Back to List</a>
+        <div class="h-4 w-px bg-white/10"></div>
+        <span class="text-text-muted font-mono text-sm">ID: {{submission.id}}</span>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Main Content -->
+        <div class="lg:col-span-2 space-y-8">
+            
+            <div class="bg-card-bg border border-white/10 rounded-xl p-8 space-y-6">
+                <div>
+                    <h1 class="text-3xl font-bold tracking-tight mb-2">{{submission.projectName}}</h1>
+                    <p class="text-lg text-white/80">{{submission.shortDescription}}</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <a href="{{submission.repoUrl}}" target="_blank" rel="noopener noreferrer" 
+                        class="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg p-3 transition-colors text-sm font-medium">
+                        View Code (Repo)
+                        <span class="text-xs opacity-50">&nearr;</span>
+                    </a>
+                    <a href="{{submission.demoUrl}}" target="_blank" rel="noopener noreferrer" 
+                        class="flex items-center justify-center gap-2 bg-hc-red/10 hover:bg-hc-red/20 border border-hc-red/30 text-hc-red rounded-lg p-3 transition-colors text-sm font-medium">
+                        View Live Demo
+                        <span class="text-xs opacity-50">&nearr;</span>
+                    </a>
+                </div>
+
+                {{#if submission.screenshotUrl}}
+                <div>
+                    <h3 class="text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Screenshot</h3>
+                    <img src="{{submission.screenshotUrl}}" alt="Project Screenshot" class="w-full rounded-lg border border-white/10" />
+                </div>
+                {{/if}}
+
+                <div class="pt-6 border-t border-white/10">
+                    <h3 class="text-sm font-bold text-text-muted uppercase tracking-wider mb-4">AI Usage Declaration</h3>
+                    {{#if submission.usedAi}}
+                        <div class="bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 p-4 rounded-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-bold">AI Used ({{submission.aiPercent}}%)</span>
+                                <span class="text-xs opacity-70">{{submission.aiToolUsage}}</span>
+                            </div>
+                            <p class="text-sm opacity-90">{{submission.aiUsageDescription}}</p>
+                        </div>
+                    {{else}}
+                        <div class="bg-green-500/10 border border-green-500/20 text-green-400 p-4 rounded-lg flex items-center gap-2">
+                            <span class="text-lg">✓</span>
+                            <span>No AI used. 100% Human Made.</span>
+                        </div>
+                    {{/if}}
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Sidebar / Actions -->
+        <div class="space-y-6">
+            
+            <div class="bg-card-bg border border-white/10 rounded-xl p-6 space-y-4">
+                <h3 class="font-bold border-b border-white/10 pb-2">Submission Stats</h3>
+                
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-text-muted">User ID</span>
+                        <span class="font-mono text-white">{{submission.userId}}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-text-muted">Hackatime Project</span>
+                        <span class="text-white">{{submission.hackatimeProject}}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-text-muted">Hours Logged</span>
+                        <span class="font-bold text-white">{{submission.hoursSpent}}h</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-text-muted">Submitted</span>
+                        <span class="text-white deploy-time-ago" data-time="{{submission.createdAt}}"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-text-muted">Status</span>
+                        <span class="uppercase font-bold {{#if (eq submission.status 'pending')}}text-yellow-400{{else if (eq submission.status 'approved')}}text-green-400{{else}}text-red-400{{/if}}">
+                            {{submission.status}}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {{#if (eq submission.status "pending")}}
+            <div class="bg-card-bg border border-white/10 rounded-xl p-6">
+                <h3 class="font-bold mb-4">Review Action</h3>
+                
+                <form action="/admin/ysws/{{submission.id}}" method="POST" class="space-y-4">
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-text-muted uppercase tracking-wider mb-1">Public Notes</label>
+                        <textarea name="adminNotesPublic" rows="2" class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-hc-red focus:outline-none transition-colors" placeholder="Visible to the user..."></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-text-muted uppercase tracking-wider mb-1">Private Notes</label>
+                        <textarea name="adminNotesPrivate" rows="2" class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-hc-red focus:outline-none transition-colors" placeholder="Internal team notes..."></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 pt-2">
+                        <button type="submit" name="action" value="reject" class="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 py-2 rounded text-sm font-bold transition-colors">
+                            Reject
+                        </button>
+                        <button type="submit" name="action" value="approve" class="w-full bg-green-500/10 hover:bg-green-500/20 text-green-500 border border-green-500/20 py-2 rounded text-sm font-bold transition-colors">
+                            Approve
+                        </button>
+                    </div>
+                </form>
+            </div>
+            {{else}}
+            <div class="bg-card-bg border border-white/10 rounded-xl p-6 space-y-4 opacity-75">
+                <h3 class="font-bold border-b border-white/10 pb-2">Review Details</h3>
+                <div class="space-y-2 text-sm">
+                     <div class="flex justify-between">
+                        <span class="text-text-muted">Reviewed By</span>
+                        <span class="font-mono text-white">{{submission.reviewedBy}}</span>
+                    </div>
+                     <div class="flex justify-between">
+                        <span class="text-text-muted">Date</span>
+                        <span class="text-white deploy-time-ago" data-time="{{submission.reviewedAt}}"></span>
+                    </div>
+                    {{#if submission.adminNotesPublic}}
+                    <div class="pt-2">
+                        <span class="text-text-muted block text-xs mb-1">Public Notes</span>
+                        <p class="text-white/80 bg-black/20 p-2 rounded">{{submission.adminNotesPublic}}</p>
+                    </div>
+                    {{/if}}
+                    {{#if submission.adminNotesPrivate}}
+                    <div class="pt-2">
+                        <span class="text-text-muted block text-xs mb-1">Private Notes</span>
+                        <p class="text-white/80 bg-black/20 p-2 rounded">{{submission.adminNotesPrivate}}</p>
+                    </div>
+                    {{/if}}
+                </div>
+            </div>
+            {{/if}}
+
+        </div>
+    </div>
+</div>

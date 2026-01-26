@@ -12,7 +12,9 @@ import { securityHeaders } from "./middleware/security-headers";
 import { logService } from "./services/log-service";
 import { statsService } from "./services/stats-service";
 import { handleAdminRequest } from "./web/admin";
+import { handleAdminYswsRequest } from "./web/admin/ysws";
 import { handleDashboardRequest } from "./web/dashboard";
+import { handleYswsRequest } from "./web/ysws";
 
 const S3_DOMAIN = config.s3Domain;
 
@@ -142,10 +144,16 @@ Bun.serve({
 					}
 
 					if (
+						url.pathname.startsWith("/admin/ysws")
+					) {
+						response = await handleAdminYswsRequest(req);
+					} else if (
 						url.pathname.startsWith("/admin") ||
 						url.pathname.startsWith("/api/admin")
 					) {
 						response = await handleAdminRequest(req);
+					} else if (url.pathname.startsWith("/ysws")) {
+						response = await handleYswsRequest(req);
 					} else if (url.pathname === "/api/slack/events") {
 						response = await handleSlackRequest(req);
 					} else if (url.pathname.startsWith("/assets/")) {
