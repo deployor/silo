@@ -53,11 +53,15 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 		(S3_DOMAIN === "localhost:3000" && host.startsWith("localhost"))
 	) {
 		const path = url.pathname;
-		console.log(`[Debug] Checking isDashboardRequest. Host: ${host}, Path: ${path}`);
 		const hasAuthHeader = req.headers.has("authorization");
 		const hasAmzParams =
 			url.searchParams.has("X-Amz-Algorithm") ||
 			url.searchParams.has("x-amz-algorithm");
+
+		// If it looks like an S3 request (Auth header or params), treat as S3
+		if (hasAuthHeader || hasAmzParams) {
+			return false;
+		}
 
 		// Known dashboard paths
 		const dashboardPaths = [
@@ -75,23 +79,16 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 			"/onboarding",
 			"/api/onboarding/",
 			"/ysws",
-			"/admin/ysws",
+			"/api/ysws",
 		];
 
-		// Check for dashboard paths FIRST.
-		// If it matches a specific dashboard path (excluding root which is ambiguous), it's definitely dashboard.
+		// Exact match for root
+		if (path === "/") return true;
+
+		// Prefix match for others
 		if (dashboardPaths.some((p) => p !== "/" && path.startsWith(p))) {
 			return true;
 		}
-
-		// If it looks like an S3 request (Auth header or params), treat as S3
-		// Only relevant for root "/" or unknown paths.
-		if (hasAuthHeader || hasAmzParams) {
-			return false;
-		}
-
-		// Exact match for root (if not S3 signed)
-		if (path === "/") return true;
 
 		// Default to S3 for unknown paths (public bucket access)
 		return false;
