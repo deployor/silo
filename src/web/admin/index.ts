@@ -15,6 +15,7 @@ import { s3Client } from "../../lib/s3-client";
 import { getAppSettings, updateAppSettings } from "../../services/settings-service";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
+import { handleAdminYswsRequest } from "./ysws";
 
 type AdminUpdateUserQuotaBody = {
 	storageLimitBytes?: unknown;
@@ -638,6 +639,11 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 			headers: { Location: "/admin/users" },
 		});
 	}
+
+	if (path.startsWith("/admin/ysws")) {
+		return handleAdminYswsRequest(req);
+	}
+
 	if (path === "/admin/users") {
 		return serveAdminUsersPage(req);
 	}

@@ -10,7 +10,6 @@ const reservedBucketNames = new Set([
 	"api",
 	"auth",
 	"docs",
-	"ysws",
 ]);
 
 export const bucketNameSchema = z
