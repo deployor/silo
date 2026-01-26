@@ -17,7 +17,7 @@ export async function handleAdminYswsRequest(req: Request): Promise<Response> {
     }
 
     // List submissions
-    if (url.pathname === "/admin/ysws" || url.pathname === "/admin/ysws/") {
+    if (url.pathname === "/admin/ysws") {
         const submissions = await YswsService.getSubmissions();
         return new Response(await render("admin-ysws", {
             title: "YSWS Submissions",
