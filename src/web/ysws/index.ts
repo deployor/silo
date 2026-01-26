@@ -2,7 +2,7 @@ import { context } from "../../lib/context";
 import { render } from "../../lib/view-engine";
 import { YswsService } from "../../services/ysws-service";
 import { SettingsService } from "../../services/settings-service";
-import { authenticate } from "../../middleware/auth";
+import { getCurrentUser } from "../../lib/session";
 import { z } from "zod";
 
 // Mock Hackatime Projects
@@ -29,13 +29,15 @@ const SubmissionSchema = z.object({
 
 export async function handleYswsRequest(req: Request): Promise<Response> {
     const url = new URL(req.url);
-    const authResult = await authenticate(req);
-    
-    if (authResult instanceof Response) {
-        return authResult; // Redirect to login if not authenticated
+    const user = await getCurrentUser(req);
+
+    if (!user) {
+        return new Response(null, {
+            status: 302,
+            headers: { Location: "/auth/login?next=" + encodeURIComponent(url.pathname) },
+        });
     }
 
-    const { user } = authResult;
     const appSettings = await SettingsService.getAppSettings();
 
     if (req.method === "GET") {
