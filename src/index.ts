@@ -14,6 +14,7 @@ import { statsService } from "./services/stats-service";
 import { handleAdminRequest } from "./web/admin";
 import { handleDashboardRequest } from "./web/dashboard";
 import { handleYswsRequest } from "./web/ysws";
+import { handleAdminYswsRequest } from "./web/admin/ysws";
 
 const S3_DOMAIN = config.s3Domain;
 
