@@ -159,5 +159,44 @@ export const appSettings = pgTable("app_settings", {
 	defaultMaxKeysPerBucket: bigint("default_max_keys_per_bucket", {
 		mode: "number",
 	}).notNull().default(20),
+	yswsQuotaPerHourBytes: bigint("ysws_quota_per_hour_bytes", {
+		mode: "number",
+	})
+		.notNull()
+		.default(1073741824), // 1GB
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export const yswsSubmissions = pgTable(
+	"ysws_submissions",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		userId: text("user_id")
+			.references(() => users.id)
+			.notNull(),
+		projectName: text("project_name").notNull(),
+		shortDescription: text("short_description").notNull(),
+		repoUrl: text("repo_url").notNull(),
+		demoUrl: text("demo_url").notNull(),
+		hackatimeProject: text("hackatime_project"),
+		hoursSpent: bigint("hours_spent", { mode: "number" }).notNull(),
+		usedAi: boolean("used_ai").default(false).notNull(),
+		aiToolUsage: text("ai_tool_usage"),
+		aiUsageDescription: text("ai_usage_description"),
+		aiPercent: bigint("ai_percent", { mode: "number" }).default(0),
+		screenshotUrl: text("screenshot_url"),
+		readmeConfirmed: boolean("readme_confirmed").default(false).notNull(),
+		status: text("status").default("pending").notNull(), // pending, approved, rejected
+		adminNotesPublic: text("admin_notes_public"),
+		adminNotesPrivate: text("admin_notes_private"),
+		createdAt: timestamp("created_at").defaultNow(),
+		reviewedAt: timestamp("reviewed_at"),
+		reviewedBy: text("reviewed_by").references(() => users.id),
+	},
+	(table) => {
+		return {
+			userIdIdx: index("ysws_user_id_idx").on(table.userId),
+			statusIdx: index("ysws_status_idx").on(table.status),
+		};
+	},
+);

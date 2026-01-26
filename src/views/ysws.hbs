@@ -1,0 +1,170 @@
+<div class="max-w-3xl mx-auto py-12">
+    <div class="mb-8 text-center">
+        <h1 class="text-4xl font-extrabold tracking-tight mb-2">Ship to Earn</h1>
+        <p class="text-xl text-white/60">Ship your projects, earn more storage. Simple as that.</p>
+        <p class="mt-4 text-sm text-hc-green bg-hc-green/10 border border-hc-green/20 rounded-full px-4 py-1 inline-block">
+            Earn {{quotaPerHourFormatted}} per hour tracked on Hackatime
+        </p>
+    </div>
+
+    {{#if success}}
+    <div class="bg-green-500/10 border border-green-500/20 text-green-400 p-6 rounded-lg mb-8 text-center">
+        <h3 class="font-bold text-lg mb-1">Submission Received!</h3>
+        <p>Your project has been submitted for review. We'll verify it shortly and apply your storage bonus.</p>
+        <a href="/" class="inline-block mt-4 bg-white/10 hover:bg-white/20 px-4 py-2 rounded text-sm transition-colors">Return to Dashboard</a>
+    </div>
+    {{else}}
+
+    <div class="bg-card-bg border border-white/10 rounded-xl p-8 shadow-2xl">
+        <form action="/ysws/submit" method="POST" class="space-y-6">
+            
+            <!-- Project Details -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-bold border-b border-white/10 pb-2 mb-4">Project Details</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-text-muted mb-1">Project Name</label>
+                        <input type="text" name="projectName" value="{{values.projectName}}" required
+                            class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors"
+                            placeholder="My Awesome Project" />
+                        {{#if errors.projectName}}<p class="text-red-400 text-xs mt-1">{{errors.projectName}}</p>{{/if}}
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-text-muted mb-1">Short Description</label>
+                        <input type="text" name="shortDescription" value="{{values.shortDescription}}" required
+                            class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors"
+                            placeholder="A website that does X..." />
+                        {{#if errors.shortDescription}}<p class="text-red-400 text-xs mt-1">{{errors.shortDescription}}</p>{{/if}}
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-text-muted mb-1">Code URL (Repo)</label>
+                        <input type="url" name="repoUrl" value="{{values.repoUrl}}" required
+                            class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors"
+                            placeholder="https://github.com/..." />
+                        {{#if errors.repoUrl}}<p class="text-red-400 text-xs mt-1">{{errors.repoUrl}}</p>{{/if}}
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-text-muted mb-1">Demo / Playable URL</label>
+                        <input type="url" name="demoUrl" value="{{values.demoUrl}}" required
+                            class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors"
+                            placeholder="https://my-project.hackclub.app" />
+                        {{#if errors.demoUrl}}<p class="text-red-400 text-xs mt-1">{{errors.demoUrl}}</p>{{/if}}
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-text-muted mb-1">Screenshot URL</label>
+                    <input type="url" name="screenshotUrl" value="{{values.screenshotUrl}}"
+                        class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors"
+                        placeholder="https://..." />
+                    {{#if errors.screenshotUrl}}<p class="text-red-400 text-xs mt-1">{{errors.screenshotUrl}}</p>{{/if}}
+                </div>
+            </div>
+
+            <!-- Hackatime Selection -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-bold border-b border-white/10 pb-2 mb-4">Hackatime Integration</h3>
+                
+                <div>
+                    <label class="block text-sm font-medium text-text-muted mb-1">Select Hackatime Project</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {{#each hackatimeProjects}}
+                        <label class="cursor-pointer group">
+                            <input type="radio" name="hackatimeProject" value="{{this.id}}" class="peer sr-only" required>
+                            <div class="bg-black/20 border border-white/10 rounded p-3 peer-checked:border-hc-green peer-checked:bg-hc-green/5 transition-all group-hover:border-white/30">
+                                <div class="font-mono text-sm font-bold text-white">{{this.name}}</div>
+                                <div class="text-xs text-text-muted mt-1">{{this.hours}} hours tracked</div>
+                            </div>
+                        </label>
+                        {{/each}}
+                    </div>
+                     {{#if errors.hackatimeProject}}<p class="text-red-400 text-xs mt-1">{{errors.hackatimeProject}}</p>{{/if}}
+                </div>
+            </div>
+
+            <!-- AI Usage -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-bold border-b border-white/10 pb-2 mb-4">AI Usage Declaration</h3>
+                
+                <div>
+                    <label class="block text-sm font-medium text-text-muted mb-2">Did you use AI?</label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="usedAi" value="no" class="peer sr-only" onclick="document.getElementById('ai-details').classList.add('hidden')">
+                            <div class="w-4 h-4 rounded-full border border-white/30 peer-checked:bg-hc-red peer-checked:border-hc-red"></div>
+                            <span class="text-sm">No, I built this manually</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="usedAi" value="yes" class="peer sr-only" onclick="document.getElementById('ai-details').classList.remove('hidden')">
+                            <div class="w-4 h-4 rounded-full border border-white/30 peer-checked:bg-hc-red peer-checked:border-hc-red"></div>
+                            <span class="text-sm">Yes, I used AI tools</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="ai-details" class="hidden space-y-4 pl-4 border-l-2 border-white/10">
+                    <div>
+                        <label class="block text-sm font-medium text-text-muted mb-1">How did you use AI?</label>
+                        <select name="aiToolUsage" class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors">
+                            <option value="">Select usage type...</option>
+                            <option value="tab-completion">Tab Completion Only (Copilot, etc.)</option>
+                            <option value="command-k">Command-K / Inline Edits</option>
+                            <option value="chat">Full Chat / Generation</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-text-muted mb-1">Percentage of AI Generated Code (0-50%)</label>
+                        <input type="range" name="aiPercent" min="0" max="50" value="0" class="w-full accent-hc-red" oninput="document.getElementById('ai-percent-display').textContent = this.value + '%'">
+                        <div class="text-right text-xs text-text-muted" id="ai-percent-display">0%</div>
+                        <p class="text-xs text-text-muted mt-1">Note: Projects with >50% AI generation are not eligible for rewards.</p>
+                        {{#if error}}<p class="text-red-400 text-xs mt-1">{{error}}</p>{{/if}}
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-text-muted mb-1">Description of AI Usage</label>
+                        <textarea name="aiUsageDescription" rows="3"
+                            class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors"
+                            placeholder="I used Copilot for boilerplate and some regex..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Confirmation -->
+            <div class="space-y-4 pt-4 border-t border-white/10">
+                <label class="flex items-start gap-3 cursor-pointer p-4 bg-black/20 rounded border border-white/10 hover:border-white/20 transition-colors">
+                    <input type="checkbox" name="readmeConfirmed" class="mt-1 accent-hc-red" required>
+                    <div>
+                        <div class="font-bold text-sm">I confirm my project has a great README</div>
+                        <div class="text-xs text-text-muted">Submissions without a descriptive README explaining what the project is and how to run it will be rejected.</div>
+                    </div>
+                </label>
+                {{#if errors.readmeConfirmed}}<p class="text-red-400 text-xs mt-1">{{errors.readmeConfirmed}}</p>{{/if}}
+            </div>
+
+            <button type="submit" class="w-full bg-hc-red hover:bg-hc-red/80 text-white font-bold py-3 rounded transition-colors shadow-lg shadow-hc-red/20">
+                Ship Project
+            </button>
+
+        </form>
+    </div>
+    {{/if}}
+</div>
+
+<script>
+    // Pre-fill check if needed based on server rendering of values
+    const usedAiVal = "{{values.usedAi}}";
+    if (usedAiVal === "yes") {
+        const rad = document.querySelector('input[name="usedAi"][value="yes"]');
+        if (rad) {
+            rad.checked = true;
+            document.getElementById('ai-details').classList.remove('hidden');
+        }
+    }
+</script>
