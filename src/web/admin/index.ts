@@ -648,7 +648,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	}
 
 	if (path.startsWith("/admin/ysws")) {
-		return handleAdminYswsRequest(req);
+		return handleAdminYswsRequest(req, user);
 	}
 
 	if (path === "/admin/users") {
