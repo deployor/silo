@@ -102,7 +102,7 @@
             </div>
 
             <!-- Hackatime Selection -->
-            <div class="space-y-4 pt-4 border-t border-white/10" x-data="hackatimeSelector(hackatimeProjectsData, '{{values.hackatimeProject}}', {{quotaPerHour}})">
+            <div class="space-y-4 pt-4 border-t border-white/10" x-data="hackatimeSelector(window.hackatimeProjectsData, '{{values.hackatimeProject}}', {{quotaPerHour}})">
                 <h3 class="text-lg font-bold text-white mb-2">Hackatime Integration</h3>
                 
                 <div class="relative" @click.outside="open = false">
@@ -161,29 +161,7 @@
             </div>
 
             <!-- AI Usage -->
-            <div class="space-y-4 pt-4 border-t border-white/10" x-data="{
-                aiLevel: 0,
-                aiPercent: 0,
-                levels: [
-                    { val: 'none', label: 'No AI', desc: 'I wrote everything manually' },
-                    { val: 'tab-completion', label: 'Tab Completion', desc: 'Copilot / Supermaven' },
-                    { val: 'command-k', label: 'Inline Edits', desc: 'Command-K / Chat in Editor' },
-                    { val: 'chat', label: 'Chat / Generation', desc: 'ChatGPT / Claude Web UI' },
-                    { val: 'no-code', label: 'No Code', desc: 'v0 / Lovable / Bolt' }
-                ],
-                get currentLevel() { return this.levels[this.aiLevel] || this.levels[0]; },
-                get isRejected() { return this.aiLevel === 4; },
-                get requiresDetails() { return this.aiLevel >= 1 && this.aiLevel <= 3; }
-            }" x-init="
-                // Init from server values if needed
-                {{#if values.usedAi}}
-                    {{#if values.aiToolUsage}}
-                        const foundIdx = levels.findIndex(l => l.val === '{{values.aiToolUsage}}');
-                        if (foundIdx > -1) aiLevel = foundIdx;
-                        aiPercent = Number('{{values.aiPercent}}') || 0;
-                    {{/if}}
-                {{/if}}
-            ">
+            <div class="space-y-4 pt-4 border-t border-white/10" x-data="aiUsageSelector('{{values.aiToolUsage}}', '{{values.aiPercent}}')">
                 <h3 class="text-lg font-bold text-white mb-2">AI Usage Declaration</h3>
                 
                 <input type="hidden" name="aiToolUsage" :value="currentLevel.val">
@@ -193,7 +171,7 @@
                     <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-6">How much AI did you use?</label>
                     
                     <div class="relative mb-8 px-2">
-                        <input type="range" :value="aiLevel" @input="aiLevel = parseInt($event.target.value)" min="0" max="4" step="1"
+                        <input type="range" x-model="aiLevel" @input="aiLevel = parseInt($event.target.value)" min="0" max="4" step="1"
                             class="w-full accent-hc-red cursor-pointer relative z-10"
                         >
                         <div class="flex justify-between text-[10px] text-text-muted mt-2 font-mono uppercase tracking-wider">
@@ -258,12 +236,10 @@
     {{/if}}
 </div>
 
-<!-- Alpine.js -->
-<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.x.x/dist/cdn.min.js"></script>
-
+<!-- Alpine.js logic -->
 <script>
     // Mock Data passed to JS
-    const hackatimeProjectsData = [
+    window.hackatimeProjectsData = [
         {{#each hackatimeProjects}}
         { id: '{{this.id}}', name: '{{this.name}}', hours: {{this.hours}} },
         {{/each}}
@@ -320,8 +296,38 @@
                 return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
             }
         }));
+
+        Alpine.data('aiUsageSelector', (initialTool, initialPercent) => ({
+            aiLevel: 0,
+            aiPercent: 0,
+            levels: [
+                { val: 'none', label: 'No AI', desc: 'I wrote everything manually' },
+                { val: 'tab-completion', label: 'Tab Completion', desc: 'Copilot / Supermaven' },
+                { val: 'command-k', label: 'Inline Edits', desc: 'Command-K / Chat in Editor' },
+                { val: 'chat', label: 'Chat / Generation', desc: 'ChatGPT / Claude Web UI' },
+                { val: 'no-code', label: 'No Code', desc: 'v0 / Lovable / Bolt' }
+            ],
+
+            init() {
+                if (initialTool) {
+                    const foundIdx = this.levels.findIndex(l => l.val === initialTool);
+                    if (foundIdx > -1) this.aiLevel = foundIdx;
+                    this.aiPercent = Number(initialPercent) || 0;
+                }
+            },
+
+            get currentLevel() { return this.levels[this.aiLevel] || this.levels[0]; },
+            get isRejected() { return this.aiLevel === 4; },
+            get requiresDetails() { return this.aiLevel >= 1 && this.aiLevel <= 3; }
+        }));
     });
 
+</script>
+
+<!-- Alpine.js Core -->
+<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.x.x/dist/cdn.min.js"></script>
+
+<script>
     // Drag and Drop Logic
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
