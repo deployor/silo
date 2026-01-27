@@ -90,11 +90,13 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 	const user = await getCurrentUser(req);
 	if (!user) {
+		const settings = await getAppSettings();
 		const html = await render("landing", {
 			title: "Silo S3 Gateway",
 			layout: "main",
 			hideNavLinks: true,
 			mainClass: "flex flex-col items-center justify-center",
+			yswsQuotaPerHour: settings.yswsQuotaPerHourBytes,
 		});
 		return new Response(html, {
 			headers: { "Content-Type": "text/html" },
