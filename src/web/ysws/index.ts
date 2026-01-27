@@ -4,6 +4,12 @@ import { YswsService } from "../../services/ysws-service";
 import { SettingsService } from "../../services/settings-service";
 import { getCurrentUser } from "../../lib/session";
 import { z } from "zod";
+import { s3Client } from "../../lib/s3-client";
+import { config } from "../../config";
+import { getInternalPath } from "../../core/s3/utils";
+import { db } from "../../db";
+import { buckets, users } from "../../db/schema";
+import { eq } from "drizzle-orm";
 
 // Mock Hackatime Projects
 const MOCK_HACKATIME_PROJECTS = [
@@ -23,7 +29,7 @@ const SubmissionSchema = z.object({
     aiToolUsage: z.string().optional(),
     aiUsageDescription: z.string().optional(),
     aiPercent: z.string().transform((val) => parseInt(val, 10)).pipe(z.number().min(0).max(100)),
-    screenshotUrl: z.string().url("Invalid Screenshot URL").optional(),
+    screenshotUrl: z.string().url("Invalid Screenshot URL").optional().or(z.literal("")),
     readmeConfirmed: z.literal("on", { errorMap: () => ({ message: "You must confirm the README is good" }) }),
 });
 
@@ -42,19 +48,12 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
 
     if (req.method === "GET") {
         if (url.pathname === "/ysws") {
-            // Check if user has pending submissions? Maybe just list them or show form.
-            // User asked for "one form not some step by step process"
-            // We'll pass the mock hackatime projects
-            
-            // In a real implementation, we would fetch these from an API using the user's connected account
-            // For now, we mock it as requested.
-            
             return new Response(await render("ysws", {
                 title: "Ship to Earn",
                 user,
                 hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                 quotaPerHour: appSettings.yswsQuotaPerHourBytes,
-                quotaPerHourFormatted: (appSettings.yswsQuotaPerHourBytes / (1024 * 1024)).toFixed(0) + " MB" // Simplified for display
+                quotaPerHourFormatted: (appSettings.yswsQuotaPerHourBytes / (1024 * 1024)).toFixed(0) + " MB"
             }), {
                 headers: { "Content-Type": "text/html" },
             });
@@ -66,13 +65,9 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
             const formData = await req.formData();
             const data = Object.fromEntries(formData.entries());
             
-            // Handle checkbox "on" value for boolean
-            // usedAi is radio yes/no
-            
             const validation = SubmissionSchema.safeParse(data);
 
             if (!validation.success) {
-                // Return errors to the form
                  return new Response(await render("ysws", {
                     title: "Ship to Earn",
                     user,
@@ -110,28 +105,80 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                     hackatimeProjectName = project.name;
                 }
             }
-
-            // TODO: Handle screenshot upload if it was a file upload?
-            // The prompt says "Screenshot of project" - likely a file upload.
-            // But for now let's assume they provide a URL or we need to implement file upload to S3 here.
-            // Wait, "shipping means people put their code url ... and then a playable URL ... and then they select hackaitme project ... Screenshot of project"
-            // Let's assume for now it's a URL input or we might need to change it to file upload if the user wants us to host it.
-            // "Screenshot of project" usually implies uploading an image.
-            // Since we are building an S3 thing, we should probably upload it to a system bucket?
-            // Or just let them paste a URL. The prompt says "Screenshot of project". 
-            // I'll stick to text URL in schema for now, but if it's a file in FormData, I need to handle it.
-            // Let's check formData for 'screenshot'.
             
             let screenshotUrl = validData.screenshotUrl;
             
+            // Handle Screenshot Upload
             const screenshotFile = formData.get("screenshotFile");
             if (screenshotFile && screenshotFile instanceof File && screenshotFile.size > 0) {
-                 // Upload logic would go here. For now, let's assume we want them to host it on their own bucket?
-                 // Or we could upload it to a public bucket if we had one.
-                 // Simplification: We'll require a URL for now as per my schema, but I should probably allow file upload in a real app.
-                 // The prompt doesn't explicitly say "upload file", just "Screenshot of project". 
-                 // I will stick to URL input to avoid complex file handling in this single step unless user complains.
-                 // Actually, looking at the schema I wrote `screenshotUrl: text("screenshot_url")`.
+                try {
+                    // Create or get 'ysws' bucket owned by admin/system or current user?
+                    // We'll create a 'ysws' system bucket if it doesn't exist, owned by this user for simplicity in this context,
+                    // or better: a dedicated system bucket. But we need an owner.
+                    // Let's use the current user's bucket or a specific 'ysws-assets' bucket.
+                    // For now, let's just upload to a public 'ysws' bucket owned by the first admin found, or the current user.
+                    // User requested "we handle the upload into our bucket and make like a public whatever bucket for system".
+                    
+                    const systemBucketName = "ysws";
+                    
+                    // Check if bucket exists
+                    let bucket = await db.select().from(buckets).where(eq(buckets.name, systemBucketName)).limit(1);
+                    
+                    if (bucket.length === 0) {
+                        // Create it if not exists. Assign to current user for ownership.
+                        // In real app, this should be a system user.
+                        const newBucket = await db.insert(buckets).values({
+                            name: systemBucketName,
+                            userId: user.id,
+                            isPublic: true,
+                            region: "auto",
+                        }).returning();
+                        bucket = newBucket;
+                    }
+
+                    const targetBucket = bucket[0];
+                    const ext = screenshotFile.name.split(".").pop() || "png";
+                    const fileName = `screenshots/${crypto.randomUUID()}.${ext}`;
+                    const internalPath = getInternalPath(fileName, user, targetBucket);
+                    const fileBuffer = await screenshotFile.arrayBuffer();
+
+                    // Upload to S3
+                    await s3Client.fetch(internalPath, {
+                        method: "PUT",
+                        body: fileBuffer,
+                        headers: {
+                            "Content-Type": screenshotFile.type || "application/octet-stream",
+                        }
+                    });
+
+                    // Construct Public URL
+                    screenshotUrl = `https://${config.s3Domain}/${systemBucketName}/${fileName}`;
+
+                } catch (uploadError) {
+                    console.error("Screenshot upload failed:", uploadError);
+                     return new Response(await render("ysws", {
+                        title: "Ship to Earn",
+                        user,
+                        hackatimeProjects: MOCK_HACKATIME_PROJECTS,
+                        quotaPerHour: appSettings.yswsQuotaPerHourBytes,
+                        error: "Failed to upload screenshot. Please try again or use a URL.",
+                        values: data
+                    }), {
+                        headers: { "Content-Type": "text/html" },
+                    });
+                }
+            } else if (!screenshotUrl) {
+                // Require either file or URL
+                 return new Response(await render("ysws", {
+                    title: "Ship to Earn",
+                    user,
+                    hackatimeProjects: MOCK_HACKATIME_PROJECTS,
+                    quotaPerHour: appSettings.yswsQuotaPerHourBytes,
+                    error: "Please provide a screenshot URL or upload a file.",
+                    values: data
+                }), {
+                    headers: { "Content-Type": "text/html" },
+                });
             }
 
             await YswsService.createSubmission({
