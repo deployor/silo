@@ -24,35 +24,35 @@
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-text-muted mb-1">Project Name</label>
+                        <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Project Name</label>
                         <input type="text" name="projectName" value="{{values.projectName}}" required
-                            class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors"
+                            class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-hc-red focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors placeholder-white/20"
                             placeholder="My Awesome Project" />
                         {{#if errors.projectName}}<p class="text-red-400 text-xs mt-1">{{errors.projectName}}</p>{{/if}}
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-text-muted mb-1">Short Description</label>
+                        <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Short Description</label>
                         <input type="text" name="shortDescription" value="{{values.shortDescription}}" required
-                            class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors"
+                            class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-hc-red focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors placeholder-white/20"
                             placeholder="A website that does X..." />
                         {{#if errors.shortDescription}}<p class="text-red-400 text-xs mt-1">{{errors.shortDescription}}</p>{{/if}}
                     </div>
                 </div>
-
+    
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-text-muted mb-1">Code URL (Repo)</label>
+                        <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Code URL (Repo)</label>
                         <input type="url" name="repoUrl" value="{{values.repoUrl}}" required
-                            class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors"
+                            class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-hc-red focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors placeholder-white/20 font-mono text-sm"
                             placeholder="https://github.com/..." />
                         {{#if errors.repoUrl}}<p class="text-red-400 text-xs mt-1">{{errors.repoUrl}}</p>{{/if}}
                     </div>
                     
                     <div>
-                        <label class="block text-sm font-medium text-text-muted mb-1">Demo / Playable URL</label>
+                        <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Demo / Playable URL</label>
                         <input type="url" name="demoUrl" value="{{values.demoUrl}}" required
-                            class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors"
+                            class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-hc-red focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors placeholder-white/20 font-mono text-sm"
                             placeholder="https://my-project.hackclub.app" />
                         {{#if errors.demoUrl}}<p class="text-red-400 text-xs mt-1">{{errors.demoUrl}}</p>{{/if}}
                     </div>
@@ -102,87 +102,152 @@
             </div>
 
             <!-- Hackatime Selection -->
-            <div class="space-y-4">
-                <h3 class="text-lg font-bold border-b border-white/10 pb-2 mb-4">Hackatime Integration</h3>
+            <div class="space-y-4 pt-4 border-t border-white/10" x-data="{
+                open: false,
+                search: '',
+                selected: '{{values.hackatimeProject}}',
+                selectedName: '',
+                projects: [
+                    {{#each hackatimeProjects}}
+                    { id: '{{this.id}}', name: '{{this.name}}', hours: {{this.hours}} },
+                    {{/each}}
+                ],
+                get filteredProjects() {
+                    if (this.search === '') return this.projects;
+                    return this.projects.filter(p => p.name.toLowerCase().includes(this.search.toLowerCase()));
+                },
+                select(project) {
+                    this.selected = project.id;
+                    this.selectedName = project.name;
+                    this.open = false;
+                    this.search = '';
+                },
+                init() {
+                    const found = this.projects.find(p => p.id === this.selected);
+                    if (found) this.selectedName = found.name;
+                }
+            }">
+                <h3 class="text-lg font-bold text-white mb-2">Hackatime Integration</h3>
                 
-                <div>
-                    <label class="block text-sm font-medium text-text-muted mb-1">Select Hackatime Project</label>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {{#each hackatimeProjects}}
-                        <label class="cursor-pointer group">
-                            <input type="radio" name="hackatimeProject" value="{{this.id}}" class="peer sr-only" required>
-                            <div class="bg-black/20 border border-white/10 rounded p-3 peer-checked:border-hc-green peer-checked:bg-hc-green/5 transition-all group-hover:border-white/30">
-                                <div class="font-mono text-sm font-bold text-white">{{this.name}}</div>
-                                <div class="text-xs text-text-muted mt-1">{{this.hours}} hours tracked</div>
+                <div class="relative">
+                    <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Select Hackatime Project</label>
+                    <input type="hidden" name="hackatimeProject" :value="selected" required>
+                    
+                    <button type="button" @click="open = !open" @click.outside="open = false"
+                        class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-left text-white focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors flex justify-between items-center group hover:bg-black/40">
+                        <span x-text="selectedName || 'Select a project...'" :class="{'text-text-muted': !selectedName, 'text-white': selectedName}"></span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-text-muted group-hover:text-white transition-colors" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+
+                    <div x-show="open" x-transition.opacity.duration.200ms
+                        class="absolute z-10 w-full mt-2 bg-hc-dark border border-white/10 rounded-xl shadow-xl max-h-60 overflow-hidden flex flex-col">
+                        
+                        <div class="p-2 border-b border-white/10 bg-black/20">
+                            <input type="text" x-model="search" placeholder="Search projects..."
+                                class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-hc-blue placeholder-white/20">
+                        </div>
+                        
+                        <div class="overflow-y-auto flex-1 p-1 scrollbar-thin">
+                            <template x-for="project in filteredProjects" :key="project.id">
+                                <button type="button" @click="select(project)"
+                                    class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5 transition-colors flex justify-between items-center group">
+                                    <div>
+                                        <div class="font-bold text-sm text-white" x-text="project.name"></div>
+                                        <div class="text-xs text-text-muted group-hover:text-white/70" x-text="project.hours + ' hours tracked'"></div>
+                                    </div>
+                                    <div x-show="selected === project.id" class="text-hc-green">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                        </svg>
+                                    </div>
+                                </button>
+                            </template>
+                            <div x-show="filteredProjects.length === 0" class="px-4 py-3 text-sm text-text-muted text-center italic">
+                                No projects found
                             </div>
-                        </label>
-                        {{/each}}
+                        </div>
                     </div>
                      {{#if errors.hackatimeProject}}<p class="text-red-400 text-xs mt-1">{{errors.hackatimeProject}}</p>{{/if}}
                 </div>
             </div>
 
             <!-- AI Usage -->
-            <div class="space-y-4">
-                <h3 class="text-lg font-bold border-b border-white/10 pb-2 mb-4">AI Usage Declaration</h3>
+            <div class="space-y-4 pt-4 border-t border-white/10">
+                <h3 class="text-lg font-bold text-white mb-2">AI Usage Declaration</h3>
                 
                 <div>
-                    <label class="block text-sm font-medium text-text-muted mb-2">Did you use AI?</label>
+                    <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-3">Did you use AI?</label>
                     <div class="flex gap-4">
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="radio" name="usedAi" value="no" class="peer sr-only" onclick="document.getElementById('ai-details').classList.add('hidden')">
-                            <div class="w-4 h-4 rounded-full border border-white/30 peer-checked:bg-hc-red peer-checked:border-hc-red"></div>
-                            <span class="text-sm">No, I built this manually</span>
+                        <label class="flex items-center gap-3 cursor-pointer group">
+                            <div class="relative flex items-center">
+                                <input type="radio" name="usedAi" value="no" class="peer sr-only" onclick="document.getElementById('ai-details').classList.add('hidden')">
+                                <div class="w-5 h-5 rounded-full border border-white/30 peer-checked:border-hc-red peer-checked:bg-hc-red transition-all"></div>
+                                <div class="absolute inset-0 rounded-full ring-2 ring-white/0 peer-focus:ring-white/20 transition-all"></div>
+                            </div>
+                            <span class="text-sm group-hover:text-white transition-colors">No, I built this manually</span>
                         </label>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="radio" name="usedAi" value="yes" class="peer sr-only" onclick="document.getElementById('ai-details').classList.remove('hidden')">
-                            <div class="w-4 h-4 rounded-full border border-white/30 peer-checked:bg-hc-red peer-checked:border-hc-red"></div>
-                            <span class="text-sm">Yes, I used AI tools</span>
+                        <label class="flex items-center gap-3 cursor-pointer group">
+                            <div class="relative flex items-center">
+                                <input type="radio" name="usedAi" value="yes" class="peer sr-only" onclick="document.getElementById('ai-details').classList.remove('hidden')">
+                                <div class="w-5 h-5 rounded-full border border-white/30 peer-checked:border-hc-red peer-checked:bg-hc-red transition-all"></div>
+                                <div class="absolute inset-0 rounded-full ring-2 ring-white/0 peer-focus:ring-white/20 transition-all"></div>
+                            </div>
+                            <span class="text-sm group-hover:text-white transition-colors">Yes, I used AI tools</span>
                         </label>
                     </div>
                 </div>
 
-                <div id="ai-details" class="hidden space-y-4 pl-4 border-l-2 border-white/10">
-                    <div>
-                        <label class="block text-sm font-medium text-text-muted mb-1">How did you use AI?</label>
-                        <select name="aiToolUsage" class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors">
-                            <option value="">Select usage type...</option>
-                            <option value="tab-completion">Tab Completion Only (Copilot, etc.)</option>
-                            <option value="command-k">Command-K / Inline Edits</option>
-                            <option value="chat">Full Chat / Generation</option>
-                        </select>
-                    </div>
+                <div id="ai-details" class="hidden space-y-6 pt-2">
+                    <div class="bg-black/30 rounded-xl p-6 border border-white/10 space-y-6">
+                        <div>
+                            <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">How did you use AI?</label>
+                            <select name="aiToolUsage" class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-hc-red focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors cursor-pointer appearance-none">
+                                <option value="">Select usage type...</option>
+                                <option value="tab-completion">Tab Completion Only (Copilot, etc.)</option>
+                                <option value="command-k">Command-K / Inline Edits</option>
+                                <option value="chat">Full Chat / Generation</option>
+                            </select>
+                        </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-text-muted mb-1">Percentage of AI Generated Code (0-50%)</label>
-                        <input type="range" name="aiPercent" min="0" max="50" value="0" class="w-full accent-hc-red" oninput="document.getElementById('ai-percent-display').textContent = this.value + '%'">
-                        <div class="text-right text-xs text-text-muted" id="ai-percent-display">0%</div>
-                        <p class="text-xs text-text-muted mt-1">Note: Projects with >50% AI generation are not eligible for rewards.</p>
-                        {{#if error}}<p class="text-red-400 text-xs mt-1">{{error}}</p>{{/if}}
-                    </div>
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="block text-sm font-bold text-text-muted uppercase tracking-wider">Percentage of AI Generated Code</label>
+                                <span class="text-sm font-mono text-hc-red" id="ai-percent-display">0%</span>
+                            </div>
+                            <input type="range" name="aiPercent" min="0" max="50" value="0" class="w-full accent-hc-red cursor-pointer" oninput="document.getElementById('ai-percent-display').textContent = this.value + '%'">
+                            <div class="flex justify-between text-xs text-text-muted mt-2 font-mono">
+                                <span>0%</span>
+                                <span>50% (Max allowed)</span>
+                            </div>
+                            <p class="text-xs text-text-muted mt-2">Projects with >50% AI generation are not eligible for rewards.</p>
+                            {{#if error}}<p class="text-red-400 text-xs mt-1">{{error}}</p>{{/if}}
+                        </div>
 
-                    <div>
-                        <label class="block text-sm font-medium text-text-muted mb-1">Description of AI Usage</label>
-                        <textarea name="aiUsageDescription" rows="3"
-                            class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors"
-                            placeholder="I used Copilot for boilerplate and some regex..."></textarea>
+                        <div>
+                            <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Description of AI Usage</label>
+                            <textarea name="aiUsageDescription" rows="3"
+                                class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-hc-red focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors placeholder-white/20"
+                                placeholder="I used Copilot for boilerplate and some regex..."></textarea>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Confirmation -->
-            <div class="space-y-4 pt-4 border-t border-white/10">
-                <label class="flex items-start gap-3 cursor-pointer p-4 bg-black/20 rounded border border-white/10 hover:border-white/20 transition-colors">
-                    <input type="checkbox" name="readmeConfirmed" class="mt-1 accent-hc-red" required>
+            <div class="space-y-4 pt-6 border-t border-white/10">
+                <label class="flex items-start gap-4 cursor-pointer p-5 bg-black/30 rounded-xl border border-white/10 hover:border-white/20 transition-colors group">
+                    <input type="checkbox" name="readmeConfirmed" class="mt-1 w-5 h-5 rounded border-white/30 text-hc-red focus:ring-hc-red focus:ring-offset-0 bg-transparent" required>
                     <div>
-                        <div class="font-bold text-sm">I confirm my project has a great README</div>
-                        <div class="text-xs text-text-muted">Submissions without a descriptive README explaining what the project is and how to run it will be rejected.</div>
+                        <div class="font-bold text-white text-base group-hover:text-white transition-colors">I confirm my project has a great README</div>
+                        <div class="text-sm text-text-muted mt-1">Submissions without a descriptive README explaining what the project is and how to run it will be rejected.</div>
                     </div>
                 </label>
                 {{#if errors.readmeConfirmed}}<p class="text-red-400 text-xs mt-1">{{errors.readmeConfirmed}}</p>{{/if}}
             </div>
 
-            <button type="submit" class="w-full bg-hc-red hover:bg-hc-red/80 text-white font-bold py-3 rounded transition-colors shadow-lg shadow-hc-red/20">
+            <button type="submit" class="w-full bg-hc-red hover:bg-red-600 text-white font-bold py-4 rounded-xl transition-all hover:scale-[1.02] shadow-lg shadow-hc-red/20 text-lg">
                 Ship Project
             </button>
 
