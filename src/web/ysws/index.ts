@@ -8,8 +8,8 @@ import { s3Client } from "../../lib/s3-client";
 import { config } from "../../config";
 import { getInternalPath } from "../../core/s3/utils";
 import { db } from "../../db";
-import { buckets, users } from "../../db/schema";
-import { eq } from "drizzle-orm";
+import { buckets, users, yswsSubmissions } from "../../db/schema";
+import { eq, isNotNull, desc } from "drizzle-orm";
 
 // Mock Hackatime Projects
 const MOCK_HACKATIME_PROJECTS = [
@@ -49,12 +49,54 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
 
     if (req.method === "GET") {
         if (url.pathname === "/ysws") {
+            // Calculate average review time
+            const recentReviews = await db
+                .select({
+                    createdAt: yswsSubmissions.createdAt,
+                    reviewedAt: yswsSubmissions.reviewedAt,
+                })
+                .from(yswsSubmissions)
+                .where(isNotNull(yswsSubmissions.reviewedAt))
+                .orderBy(desc(yswsSubmissions.reviewedAt))
+                .limit(10);
+
+            let estimatedReviewTime = "24 hours"; // Default
+
+            if (recentReviews.length > 0) {
+                let totalDurationMs = 0;
+                let count = 0;
+                for (const review of recentReviews) {
+                    if (review.createdAt && review.reviewedAt) {
+                        const duration = review.reviewedAt.getTime() - review.createdAt.getTime();
+                        if (duration > 0) {
+                            totalDurationMs += duration;
+                            count++;
+                        }
+                    }
+                }
+
+                if (count > 0) {
+                    const avgMs = totalDurationMs / count;
+                    const hours = Math.round(avgMs / (1000 * 60 * 60));
+                    if (hours < 1) {
+                        estimatedReviewTime = "less than an hour";
+                    } else if (hours < 24) {
+                        estimatedReviewTime = `${hours} hours`;
+                    } else {
+                        const days = Math.round(hours / 24);
+                        estimatedReviewTime = `${days} day${days > 1 ? "s" : ""}`;
+                    }
+                }
+            }
+
             return new Response(await render("ysws", {
                 title: "Ship to Earn",
                 user,
                 hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                 quotaPerHour: appSettings.yswsQuotaPerHourBytes,
-                quotaPerHourFormatted: (appSettings.yswsQuotaPerHourBytes / (1024 * 1024)).toFixed(0) + " MB"
+                quotaPerHourFormatted: (appSettings.yswsQuotaPerHourBytes / (1024 * 1024)).toFixed(0) + " MB",
+                estimatedReviewTime,
+                success: url.searchParams.get("success") === "true",
             }), {
                 headers: { "Content-Type": "text/html" },
             });
@@ -109,13 +151,13 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                      }
                 }
 
-                if (validData.aiPercent > 50) {
+                if (validData.aiPercent > 30) {
                     return new Response(await render("ysws", {
                        title: "Ship to Earn",
                        user,
                        hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                        quotaPerHour: appSettings.yswsQuotaPerHourBytes,
-                       error: "AI contribution cannot exceed 50%",
+                       error: "AI contribution cannot exceed 30%",
                        values: data
                    }), { headers: { "Content-Type": "text/html" } });
                }
