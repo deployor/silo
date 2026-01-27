@@ -8,10 +8,40 @@
     </div>
 
     {{#if success}}
-    <div class="bg-green-500/10 border border-green-500/20 text-green-400 p-6 rounded-lg mb-8 text-center">
-        <h3 class="font-bold text-lg mb-1">Submission Received!</h3>
-        <p>Your project has been submitted for review. We'll verify it shortly and apply your storage bonus.</p>
-        <a href="/" class="inline-block mt-4 bg-white/10 hover:bg-white/20 px-4 py-2 rounded text-sm transition-colors">Return to Dashboard</a>
+    <div class="text-center py-16">
+        <div class="mb-6 flex justify-center">
+            <div class="w-20 h-20 bg-hc-green/20 rounded-full flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-hc-green" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+            </div>
+        </div>
+        
+        <h2 class="text-3xl font-extrabold text-white mb-4">Submission Received!</h2>
+        <p class="text-xl text-text-muted max-w-2xl mx-auto mb-8">
+            Thanks for shipping! We've received your project and it's now in the queue for review.
+            Once approved, your storage bonus will be automatically applied.
+        </p>
+
+        <div class="bg-white/5 border border-white/10 rounded-xl p-6 max-w-md mx-auto mb-10">
+            <h4 class="text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Estimated Wait Time</h4>
+            <div class="flex items-center justify-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-hc-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span class="text-2xl font-bold text-white">{{estimatedReviewTime}}</span>
+            </div>
+            <p class="text-xs text-text-muted mt-2">Based on recent review times</p>
+        </div>
+
+        <div class="flex justify-center gap-4">
+            <a href="/" class="bg-white/10 hover:bg-white/20 text-white font-bold py-3 px-6 rounded-xl transition-colors">
+                Return to Dashboard
+            </a>
+            <a href="/ysws" class="bg-hc-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-xl transition-colors shadow-lg shadow-hc-red/20">
+                Submit Another
+            </a>
+        </div>
     </div>
     {{else}}
 
