@@ -1,7 +1,10 @@
 <div class="max-w-4xl mx-auto space-y-8">
     
     <div class="flex items-center gap-4">
-        <a href="/admin/ysws" class="text-text-muted hover:text-white transition-colors">&larr; Back to List</a>
+        <a href="/admin/ysws" class="text-text-muted hover:text-white transition-colors flex items-center gap-2">
+            <i class="ph ph-arrow-left"></i>
+            Back to List
+        </a>
         <div class="h-4 w-px bg-white/10"></div>
         <span class="text-text-muted font-mono text-sm">ID: {{submission.id}}</span>
     </div>
@@ -18,15 +21,15 @@
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
-                    <a href="{{submission.repoUrl}}" target="_blank" rel="noopener noreferrer" 
+                    <a href="{{submission.repoUrl}}" target="_blank" rel="noopener noreferrer"
                         class="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg p-3 transition-colors text-sm font-medium">
                         View Code (Repo)
-                        <span class="text-xs opacity-50">&nearr;</span>
+                        <i class="ph ph-arrow-up-right opacity-50"></i>
                     </a>
-                    <a href="{{submission.demoUrl}}" target="_blank" rel="noopener noreferrer" 
+                    <a href="{{submission.demoUrl}}" target="_blank" rel="noopener noreferrer"
                         class="flex items-center justify-center gap-2 bg-hc-red/10 hover:bg-hc-red/20 border border-hc-red/30 text-hc-red rounded-lg p-3 transition-colors text-sm font-medium">
                         View Live Demo
-                        <span class="text-xs opacity-50">&nearr;</span>
+                        <i class="ph ph-arrow-up-right opacity-50"></i>
                     </a>
                 </div>
 
