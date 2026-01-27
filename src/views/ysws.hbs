@@ -15,7 +15,7 @@
     </div>
     {{else}}
 
-    <div class="bg-card-bg border border-white/10 rounded-xl p-8 shadow-2xl">
+    <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow">
         <form action="/ysws/submit" method="POST" enctype="multipart/form-data" class="space-y-6">
             
             <!-- Project Details -->
@@ -201,4 +201,91 @@
             document.getElementById('ai-details').classList.remove('hidden');
         }
     }
+
+    // Drag and Drop Logic
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const uploadPlaceholder = document.getElementById('upload-placeholder');
+    const uploadPreviewContainer = document.getElementById('upload-preview-container');
+    const uploadPreview = document.getElementById('upload-preview');
+    const removeFileBtn = document.getElementById('remove-file');
+
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    // Highlight drop zone when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight(e) {
+        dropZone.classList.add('border-hc-red', 'bg-white/5');
+    }
+
+    function unhighlight(e) {
+        dropZone.classList.remove('border-hc-red', 'bg-white/5');
+    }
+
+    // Handle dropped files
+    dropZone.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles(files);
+    }
+
+    // Handle file input change
+    fileInput.addEventListener('change', function() {
+        handleFiles(this.files);
+    });
+
+    function handleFiles(files) {
+        if (files.length > 0) {
+            const file = files[0];
+            if (file.type.startsWith('image/')) {
+                previewFile(file);
+                // Update file input files if coming from drop
+                if (fileInput.files !== files) {
+                   fileInput.files = files;
+                }
+            } else {
+                alert('Please upload an image file.');
+            }
+        }
+    }
+
+    function previewFile(file) {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onloadend = function() {
+            uploadPreview.src = reader.result;
+            uploadPlaceholder.classList.add('hidden');
+            uploadPreviewContainer.classList.remove('hidden');
+            uploadPreviewContainer.classList.add('flex');
+        }
+    }
+
+    removeFileBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation(); // Prevent opening file dialog
+        fileInput.value = ''; // Clear input
+        uploadPreview.src = '';
+        uploadPreviewContainer.classList.add('hidden');
+        uploadPreviewContainer.classList.remove('flex');
+        uploadPlaceholder.classList.remove('hidden');
+    });
+
 </script>
