@@ -81,6 +81,10 @@ Handlebars.registerHelper("eq", (a, b) => {
 	return a === b;
 });
 
+Handlebars.registerHelper("gt", (a, b) => {
+	return a > b;
+});
+
 Handlebars.registerHelper("section", function (this: ViewData, name, options) {
 	if (!this.sections) this.sections = {};
 	this.sections[name] = options.fn(this);
