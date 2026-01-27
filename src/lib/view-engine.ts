@@ -86,3 +86,12 @@ Handlebars.registerHelper("section", function (this: ViewData, name, options) {
 	this.sections[name] = options.fn(this);
 	return null;
 });
+
+Handlebars.registerHelper("formatDate", (date) => {
+	if (!date) return "";
+	return new Date(date).toLocaleDateString("en-US", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	});
+});
