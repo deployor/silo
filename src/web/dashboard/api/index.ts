@@ -145,6 +145,7 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 						],
 						bucketId: targetBucket.id,
 						uploaderSlackId: user.slackId,
+						uploaderEmail: user.email,
 					});
 				} catch (slackError) {
 					console.error("Failed to send Slack notification:", slackError);

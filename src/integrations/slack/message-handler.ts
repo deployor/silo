@@ -5,6 +5,7 @@ import { db } from "../../db";
 import { buckets, requestLogs } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 import { getStorageUsage, getUserBySlackId } from "../../services/user-service";
+import { getUserInfo } from "./client";
 
 type SlackFile = {
 	name: string;
@@ -322,6 +323,7 @@ export async function postUploadSummary(params: {
 	results: UploadResult[];
 	bucketId: string;
 	uploaderSlackId: string;
+	uploaderEmail?: string;
 }) {
 	const {
 		channelId,
@@ -332,7 +334,29 @@ export async function postUploadSummary(params: {
 		results,
 		bucketId,
 		uploaderSlackId,
+		uploaderEmail,
 	} = params;
+
+	// If we are posting as a summary (not a reply), we want to impersonate the user
+	let username = undefined;
+	let iconUrl = undefined;
+
+	if (!messageTs && uploaderSlackId) {
+		const slackUser = await getUserInfo(uploaderSlackId);
+		if (slackUser) {
+			username =
+				slackUser.profile.display_name ||
+				slackUser.profile.real_name ||
+				slackUser.name;
+			iconUrl = slackUser.profile.image_192 || slackUser.profile.image_512;
+		} else if (uploaderEmail) {
+			username = uploaderEmail.split("@")[0];
+		}
+		
+		if (!iconUrl) {
+			iconUrl = `https://cachet.dunkirk.sh/users/${uploaderSlackId}/r`;
+		}
+	}
 
 	const blocks: SlackBlock[] = [];
 
@@ -341,7 +365,11 @@ export async function postUploadSummary(params: {
 		headerText = "❌ *Failed to upload files*";
 		if (messageTs) await addReaction(channelId, messageTs, "ms-no");
 	} else if (successCount === totalCount) {
-		headerText = `:dinowow: *Uploaded ${successCount} ${plural(successCount, "file", "files")}!*`;
+		if (!messageTs && successCount === 1 && results[0]) {
+			headerText = `*Uploaded ${results[0].name}*`;
+		} else {
+			headerText = `:dinowow: *Uploaded ${successCount} ${plural(successCount, "file", "files")}!*`;
+		}
 		if (messageTs) await addReaction(channelId, messageTs, "ms-green-tick");
 	} else {
 		headerText = `⚠️ *Uploaded ${successCount}/${totalCount} files*`;
@@ -360,13 +388,19 @@ export async function postUploadSummary(params: {
 
 	for (const r of results) {
 		if (r.url && r.key) {
-			blocks.push({
+			const section: SlackBlock = {
 				type: "section",
 				text: {
 					type: "mrkdwn",
 					text: `*${r.name}*\n<${r.url}|${r.url}>`,
 				},
-				accessory: {
+			};
+
+			// Only add delete button if it's a message reply (original behavior) or if explicitly requested
+			// The requirement was "without a delete button" for CDN postings.
+			// Since CDN postings have messageTs=undefined, we can use that check.
+			if (messageTs) {
+				section.accessory = {
 					type: "button",
 					text: {
 						type: "plain_text",
@@ -385,8 +419,10 @@ export async function postUploadSummary(params: {
 						confirm: { type: "plain_text", text: "Yes, delete it" },
 						deny: { type: "plain_text", text: "Cancel" },
 					},
-				},
-			});
+				};
+			}
+
+			blocks.push(section);
 		} else {
 			blocks.push({
 				type: "section",
@@ -403,19 +439,44 @@ export async function postUploadSummary(params: {
 		(b): b is SlackBlock => Boolean(b),
 	);
 
+	// Variables `username` and `iconUrl` are already set at the start of the function
+
+	const fallbackText =
+		successCount === 1 && results[0]
+			? `Uploaded ${results[0].name}`
+			: `Uploaded ${successCount} files`;
+
 	for (let i = 2; i < blocks.length; i++) {
 		currentBlocks.push(blocks[i]);
 		if (currentBlocks.length >= CHUNK_SIZE) {
-			await postBlocks(channelId, currentBlocks, threadTs);
+			await postBlocks(
+				channelId,
+				currentBlocks,
+				threadTs,
+				username,
+				iconUrl,
+				fallbackText,
+			);
 			currentBlocks = [];
 		}
 	}
 
 	if (currentBlocks.length > 0)
-		await postBlocks(channelId, currentBlocks, threadTs);
+		await postBlocks(
+			channelId,
+			currentBlocks,
+			threadTs,
+			username,
+			iconUrl,
+			fallbackText,
+		);
 }
 
-export async function postMessage(channel: string, text: string, threadTs?: string) {
+export async function postMessage(
+	channel: string,
+	text: string,
+	threadTs?: string,
+) {
 	await fetch("https://slack.com/api/chat.postMessage", {
 		method: "POST",
 		headers: {
@@ -437,6 +498,9 @@ async function postBlocks(
 	channel: string,
 	blocks: SlackBlock[],
 	threadTs?: string,
+	username?: string,
+	icon_url?: string,
+	text: string = "File Upload Summary",
 ) {
 	await fetch("https://slack.com/api/chat.postMessage", {
 		method: "POST",
@@ -448,9 +512,11 @@ async function postBlocks(
 			channel,
 			blocks,
 			thread_ts: threadTs,
-			text: "File Upload Summary", // Fallback text
-			unfurl_links: false,
-			unfurl_media: false,
+			text,
+			unfurl_links: true,
+			unfurl_media: true,
+			username,
+			icon_url,
 		}),
 	});
 }
