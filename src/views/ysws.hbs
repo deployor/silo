@@ -102,16 +102,16 @@
             </div>
 
             <!-- Hackatime Selection -->
-            <div class="space-y-4 pt-4 border-t border-white/10" x-data="hackatimeSelector(hackatimeProjectsData, '{{values.hackatimeProject}}')">
+            <div class="space-y-4 pt-4 border-t border-white/10" x-data="hackatimeSelector(hackatimeProjectsData, '{{values.hackatimeProject}}', {{quotaPerHour}})">
                 <h3 class="text-lg font-bold text-white mb-2">Hackatime Integration</h3>
                 
                 <div class="relative" @click.outside="open = false">
-                    <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Select Hackatime Project</label>
-                    <input type="hidden" name="hackatimeProject" :value="selected" required>
+                    <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Select Hackatime Project(s)</label>
+                    <input type="hidden" name="hackatimeProject" :value="selectedIds.join(',')" required>
                     
                     <button type="button" @click="open = !open"
                         class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-left text-white focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors flex justify-between items-center group hover:bg-black/40">
-                        <span x-text="selectedName || 'Select a project...'" :class="{'text-text-muted': !selectedName, 'text-white': selectedName}"></span>
+                        <span x-text="selectedLabel" :class="{'text-text-muted': selectedIds.length === 0, 'text-white': selectedIds.length > 0}"></span>
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-text-muted group-hover:text-white transition-colors" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                         </svg>
@@ -127,17 +127,21 @@
                         
                         <div class="overflow-y-auto flex-1 p-1 scrollbar-thin">
                             <template x-for="project in filteredProjects" :key="project.id">
-                                <button type="button" @click="select(project)"
+                                <button type="button" @click="toggle(project)"
                                     class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5 transition-colors flex justify-between items-center group">
-                                    <div>
-                                        <div class="font-bold text-sm text-white" x-text="project.name"></div>
-                                        <div class="text-xs text-text-muted group-hover:text-white/70" x-text="project.hours + ' hours tracked'"></div>
+                                    <div class="flex items-center gap-3">
+                                         <div class="w-4 h-4 rounded border flex items-center justify-center transition-colors"
+                                              :class="isSelected(project.id) ? 'bg-hc-red border-hc-red' : 'border-white/30'">
+                                              <svg x-show="isSelected(project.id)" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                                                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                              </svg>
+                                         </div>
+                                         <div>
+                                            <div class="font-bold text-sm text-white" x-text="project.name"></div>
+                                            <div class="text-xs text-text-muted group-hover:text-white/70" x-text="project.hours + ' hours tracked'"></div>
+                                         </div>
                                     </div>
-                                    <div x-show="selected === project.id" class="text-hc-green">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                                        </svg>
-                                    </div>
+                                    <div class="text-xs font-mono text-hc-green bg-hc-green/10 px-2 py-0.5 rounded" x-text="formatSize(project.hours * quotaPerHour)"></div>
                                 </button>
                             </template>
                             <div x-show="filteredProjects.length === 0" class="px-4 py-3 text-sm text-text-muted text-center italic">
@@ -145,69 +149,92 @@
                             </div>
                         </div>
                     </div>
+                     
+                    <!-- Summary -->
+                    <div class="mt-2 p-3 rounded-lg bg-black/20 border border-white/5 flex justify-between items-center" x-show="selectedIds.length > 0">
+                        <span class="text-sm text-text-muted">Total Reward:</span>
+                        <span class="text-sm font-bold text-hc-green" x-text="formatSize(totalRewardBytes)"></span>
+                    </div>
+
                      {{#if errors.hackatimeProject}}<p class="text-red-400 text-xs mt-1">{{errors.hackatimeProject}}</p>{{/if}}
                 </div>
             </div>
 
             <!-- AI Usage -->
-            <div class="space-y-4 pt-4 border-t border-white/10">
+            <div class="space-y-4 pt-4 border-t border-white/10" x-data="{
+                aiLevel: 0,
+                aiPercent: 0,
+                levels: [
+                    { val: 'none', label: 'No AI', desc: 'I wrote everything manually' },
+                    { val: 'tab-completion', label: 'Tab Completion', desc: 'Copilot / Supermaven' },
+                    { val: 'command-k', label: 'Inline Edits', desc: 'Command-K / Chat in Editor' },
+                    { val: 'chat', label: 'Chat / Generation', desc: 'ChatGPT / Claude Web UI' },
+                    { val: 'no-code', label: 'No Code', desc: 'v0 / Lovable / Bolt' }
+                ],
+                get currentLevel() { return this.levels[this.aiLevel]; },
+                get isRejected() { return this.aiLevel === 4; },
+                get requiresDetails() { return this.aiLevel > 0 && this.aiLevel < 4; },
+                updateLevel(val) { this.aiLevel = parseInt(val); }
+            }" x-init="
+                // Init from server values if needed
+                {{#if values.usedAi}}
+                    {{#if values.aiToolUsage}}
+                        const foundIdx = levels.findIndex(l => l.val === '{{values.aiToolUsage}}');
+                        if (foundIdx > -1) aiLevel = foundIdx;
+                        aiPercent = {{values.aiPercent}} || 0;
+                    {{/if}}
+                {{/if}}
+            ">
                 <h3 class="text-lg font-bold text-white mb-2">AI Usage Declaration</h3>
                 
-                <div>
-                    <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-3">Did you use AI?</label>
-                    <div class="flex gap-4">
-                        <label class="flex items-center gap-3 cursor-pointer group">
-                            <div class="relative flex items-center">
-                                <input type="radio" name="usedAi" value="no" class="peer sr-only" onclick="document.getElementById('ai-details').classList.add('hidden')">
-                                <div class="w-5 h-5 rounded-full border border-white/30 peer-checked:border-hc-red peer-checked:bg-hc-red transition-all"></div>
-                                <div class="absolute inset-0 rounded-full ring-2 ring-white/0 peer-focus:ring-white/20 transition-all"></div>
-                            </div>
-                            <span class="text-sm group-hover:text-white transition-colors">No, I built this manually</span>
-                        </label>
-                        <label class="flex items-center gap-3 cursor-pointer group">
-                            <div class="relative flex items-center">
-                                <input type="radio" name="usedAi" value="yes" class="peer sr-only" onclick="document.getElementById('ai-details').classList.remove('hidden')">
-                                <div class="w-5 h-5 rounded-full border border-white/30 peer-checked:border-hc-red peer-checked:bg-hc-red transition-all"></div>
-                                <div class="absolute inset-0 rounded-full ring-2 ring-white/0 peer-focus:ring-white/20 transition-all"></div>
-                            </div>
-                            <span class="text-sm group-hover:text-white transition-colors">Yes, I used AI tools</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div id="ai-details" class="hidden space-y-6 pt-2">
-                    <div class="bg-black/30 rounded-xl p-6 border border-white/10 space-y-6">
-                        <div>
-                            <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">How did you use AI?</label>
-                            <select name="aiToolUsage" class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-hc-red focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors cursor-pointer appearance-none">
-                                <option value="">Select usage type...</option>
-                                <option value="tab-completion">Tab Completion Only (Copilot, etc.)</option>
-                                <option value="command-k">Command-K / Inline Edits</option>
-                                <option value="chat">Full Chat / Generation</option>
-                            </select>
+                <input type="hidden" name="aiToolUsage" :value="currentLevel.val">
+                <input type="hidden" name="usedAi" :value="aiLevel > 0 ? 'yes' : 'no'">
+                
+                <div class="bg-black/30 rounded-xl p-6 border border-white/10">
+                    <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-6">How much AI did you use?</label>
+                    
+                    <div class="relative mb-8 px-2">
+                        <input type="range" x-model="aiLevel" min="0" max="4" step="1"
+                            class="w-full accent-hc-red cursor-pointer relative z-10"
+                        >
+                        <div class="flex justify-between text-[10px] text-text-muted mt-2 font-mono uppercase tracking-wider">
+                            <span>None</span>
+                            <span>Tab</span>
+                            <span>Inline</span>
+                            <span>Chat</span>
+                            <span>No Code</span>
                         </div>
+                    </div>
+                    
+                    <div class="text-center p-4 bg-white/5 rounded-lg border border-white/10 mb-6 transition-all duration-300"
+                        :class="{'border-red-500/50 bg-red-500/10': isRejected, 'border-hc-green/30 bg-hc-green/10': aiLevel === 0}">
+                        <h4 class="font-bold text-lg text-white" x-text="currentLevel.label"></h4>
+                        <p class="text-sm text-text-muted" x-text="currentLevel.desc"></p>
+                        <p x-show="isRejected" class="text-red-400 text-sm mt-2 font-bold">⚠️ Purely AI-generated / No Code projects are not eligible for rewards.</p>
+                    </div>
 
-                        <div>
+                    <div x-show="requiresDetails" x-transition.opacity.duration.300ms class="space-y-6">
+                         <div>
                             <div class="flex justify-between items-center mb-2">
                                 <label class="block text-sm font-bold text-text-muted uppercase tracking-wider">Percentage of AI Generated Code</label>
-                                <span class="text-sm font-mono text-hc-red" id="ai-percent-display">0%</span>
+                                <span class="text-sm font-mono text-hc-red" x-text="aiPercent + '%'"></span>
                             </div>
-                            <input type="range" name="aiPercent" min="0" max="50" value="0" class="w-full accent-hc-red cursor-pointer" oninput="document.getElementById('ai-percent-display').textContent = this.value + '%'">
+                            <input type="range" name="aiPercent" x-model="aiPercent" min="0" max="50" class="w-full accent-hc-red cursor-pointer">
                             <div class="flex justify-between text-xs text-text-muted mt-2 font-mono">
                                 <span>0%</span>
                                 <span>50% (Max allowed)</span>
                             </div>
                             <p class="text-xs text-text-muted mt-2">Projects with >50% AI generation are not eligible for rewards.</p>
-                            {{#if error}}<p class="text-red-400 text-xs mt-1">{{error}}</p>{{/if}}
                         </div>
 
                         <div>
-                            <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Description of AI Usage</label>
-                            <textarea name="aiUsageDescription" rows="3"
+                            <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Description of AI Usage (Required)</label>
+                            <textarea name="aiUsageDescription" rows="3" :required="requiresDetails"
                                 class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-hc-red focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors placeholder-white/20"
                                 placeholder="I used Copilot for boilerplate and some regex..."></textarea>
                         </div>
                     </div>
+                     {{#if error}}<p class="text-red-400 text-xs mt-1">{{error}}</p>{{/if}}
                 </div>
             </div>
 
@@ -244,43 +271,57 @@
     ];
 
     document.addEventListener('alpine:init', () => {
-        Alpine.data('hackatimeSelector', (projects, initialSelected) => ({
+        Alpine.data('hackatimeSelector', (projects, initialSelected, quotaPerHour) => ({
             open: false,
             search: '',
-            selected: initialSelected || '',
-            selectedName: '',
+            selectedIds: initialSelected ? initialSelected.split(',').filter(Boolean) : [],
             projects: projects,
+            quotaPerHour: quotaPerHour,
             
             get filteredProjects() {
                 if (this.search === '') return this.projects;
                 return this.projects.filter(p => p.name.toLowerCase().includes(this.search.toLowerCase()));
             },
             
-            select(project) {
-                this.selected = project.id;
-                this.selectedName = project.name;
-                this.open = false;
-                this.search = '';
+            get selectedLabel() {
+                if (this.selectedIds.length === 0) return 'Select Hackatime Project(s)...';
+                if (this.selectedIds.length === 1) {
+                    const p = this.projects.find(x => x.id === this.selectedIds[0]);
+                    return p ? p.name : '1 Project Selected';
+                }
+                return `${this.selectedIds.length} Projects Selected`;
+            },
+
+            get totalRewardBytes() {
+                let hours = 0;
+                this.selectedIds.forEach(id => {
+                    const p = this.projects.find(x => x.id === id);
+                    if (p) hours += p.hours;
+                });
+                return hours * this.quotaPerHour;
             },
             
-            init() {
-                if (this.selected) {
-                    const found = this.projects.find(p => p.id === this.selected);
-                    if (found) this.selectedName = found.name;
+            isSelected(id) {
+                return this.selectedIds.includes(id);
+            },
+
+            toggle(project) {
+                if (this.selectedIds.includes(project.id)) {
+                    this.selectedIds = this.selectedIds.filter(id => id !== project.id);
+                } else {
+                    this.selectedIds.push(project.id);
                 }
+            },
+            
+            formatSize(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
             }
         }));
     });
-
-    // Pre-fill check if needed based on server rendering of values
-    const usedAiVal = "{{values.usedAi}}";
-    if (usedAiVal === "yes") {
-        const rad = document.querySelector('input[name="usedAi"][value="yes"]');
-        if (rad) {
-            rad.checked = true;
-            document.getElementById('ai-details').classList.remove('hidden');
-        }
-    }
 
     // Drag and Drop Logic
     const dropZone = document.getElementById('drop-zone');
