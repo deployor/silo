@@ -1,0 +1,429 @@
+<div class="max-w-3xl mx-auto py-12">
+    <div class="mb-8 text-center">
+        <h1 class="text-4xl font-extrabold tracking-tight mb-2">YSWS</h1>
+        <p class="text-xl text-white/60">Ship your projects, earn more storage. Simple as that.</p>
+        <p class="mt-4 text-sm text-hc-green bg-hc-green/10 border border-hc-green/20 rounded-full px-4 py-1 inline-block">
+            Earn {{quotaPerHourFormatted}} per hour tracked on Hackatime
+        </p>
+    </div>
+
+    <div class="flex justify-center mb-8">
+        <a href="/ysws" class="text-sm text-text-muted hover:text-white transition-colors flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back to Dashboard
+        </a>
+    </div>
+
+    <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow">
+        <form action="/ysws/submit" method="POST" enctype="multipart/form-data" class="space-y-6">
+            
+            <!-- Project Details -->
+            <div class="space-y-4">
+                <h3 class="text-lg font-bold border-b border-white/10 pb-2 mb-4">Project Details</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Project Name</label>
+                        <input type="text" name="projectName" value="{{values.projectName}}" required
+                            class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-hc-red focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors placeholder-white/20"
+                            placeholder="My Awesome Project" />
+                        {{#if errors.projectName}}<p class="text-red-400 text-xs mt-1">{{errors.projectName}}</p>{{/if}}
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Short Description</label>
+                        <input type="text" name="shortDescription" value="{{values.shortDescription}}" required
+                            class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-hc-red focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors placeholder-white/20"
+                            placeholder="A website that does X..." />
+                        {{#if errors.shortDescription}}<p class="text-red-400 text-xs mt-1">{{errors.shortDescription}}</p>{{/if}}
+                    </div>
+                </div>
+    
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Code URL (Repo)</label>
+                        <input type="url" name="repoUrl" value="{{values.repoUrl}}" required
+                            class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-hc-red focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors placeholder-white/20 font-mono text-sm"
+                            placeholder="https://github.com/..." />
+                        {{#if errors.repoUrl}}<p class="text-red-400 text-xs mt-1">{{errors.repoUrl}}</p>{{/if}}
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Demo / Playable URL</label>
+                        <input type="url" name="demoUrl" value="{{values.demoUrl}}" required
+                            class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-hc-red focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors placeholder-white/20 font-mono text-sm"
+                            placeholder="https://my-project.hackclub.app" />
+                        {{#if errors.demoUrl}}<p class="text-red-400 text-xs mt-1">{{errors.demoUrl}}</p>{{/if}}
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-text-muted mb-2">Project Screenshot</label>
+                    
+                    <div class="border-2 border-dashed border-white/20 rounded-xl p-8 transition-colors hover:border-white/40 group relative" id="drop-zone">
+                        <input type="file" name="screenshotFile" accept="image/*" id="file-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                        
+                        <div class="text-center" id="upload-placeholder">
+                            <div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-3 group-hover:bg-white/10 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-text-muted group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <p class="text-sm font-medium text-white">Drop your screenshot here, or <span class="text-hc-red">browse</span></p>
+                            <p class="text-xs text-text-muted mt-1">Supports PNG, JPG, WEBP</p>
+                        </div>
+
+                        <div class="hidden items-center justify-center gap-4" id="upload-preview-container">
+                             <img id="upload-preview" class="max-h-48 rounded-lg shadow-lg" src="" alt="Preview" />
+                             <button type="button" id="remove-file" class="bg-red-500/20 hover:bg-red-500/40 text-red-400 p-2 rounded-lg transition-colors z-20">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                             </button>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 flex items-center gap-3">
+                         <div class="h-px bg-white/10 flex-1"></div>
+                         <span class="text-xs text-text-muted uppercase font-bold tracking-wider">OR</span>
+                         <div class="h-px bg-white/10 flex-1"></div>
+                    </div>
+
+                    <div class="mt-4">
+                        <label class="block text-xs font-medium text-text-muted mb-1 uppercase tracking-wider">Provide URL</label>
+                        <input type="url" name="screenshotUrl" value="{{values.screenshotUrl}}"
+                            class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors text-sm font-mono"
+                            placeholder="https://..." />
+                    </div>
+
+                    {{#if errors.screenshotUrl}}<p class="text-red-400 text-xs mt-1">{{errors.screenshotUrl}}</p>{{/if}}
+                </div>
+            </div>
+
+            <!-- Hackatime Selection -->
+            <div class="space-y-4 pt-4 border-t border-white/10" x-data="hackatimeSelector">
+                <h3 class="text-lg font-bold text-white mb-2">Hackatime Integration</h3>
+                
+                <div class="relative" @click.outside="open = false">
+                    <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Select Hackatime Project(s)</label>
+                    <input type="hidden" name="hackatimeProject" :value="selectedIds.join(',')" required>
+                    
+                    <button type="button" @click="open = !open"
+                        class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-left text-white focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors flex justify-between items-center group hover:bg-black/40">
+                        <span x-text="selectedLabel" :class="{'text-text-muted': selectedIds.length === 0, 'text-white': selectedIds.length > 0}"></span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-text-muted group-hover:text-white transition-colors" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+
+                    <div x-show="open" style="display: none;" x-transition.opacity.duration.200ms
+                        class="absolute z-10 w-full mt-2 bg-hc-dark border border-white/10 rounded-xl shadow-xl max-h-60 overflow-hidden flex flex-col">
+                        
+                        <div class="p-2 border-b border-white/10 bg-black/20">
+                            <input type="text" x-model="search" placeholder="Search projects..."
+                                class="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-hc-blue placeholder-white/20">
+                        </div>
+                        
+                        <div class="overflow-y-auto flex-1 p-1 scrollbar-thin">
+                            <template x-for="project in filteredProjects" :key="project.id">
+                                <button type="button" @click="toggle(project)"
+                                    class="w-full text-left px-3 py-2 rounded-lg hover:bg-white/5 transition-colors flex justify-between items-center group">
+                                    <div class="flex items-center gap-3">
+                                         <div class="w-4 h-4 rounded border flex items-center justify-center transition-colors"
+                                              :class="isSelected(project.id) ? 'bg-hc-red border-hc-red' : 'border-white/30'">
+                                              <svg x-show="isSelected(project.id)" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                                                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                              </svg>
+                                         </div>
+                                         <div>
+                                            <div class="font-bold text-sm text-white" x-text="project.name"></div>
+                                            <div class="text-xs text-text-muted group-hover:text-white/70" x-text="project.hours + ' hours tracked'"></div>
+                                         </div>
+                                    </div>
+                                    <div class="text-xs font-mono text-hc-green bg-hc-green/10 px-2 py-0.5 rounded" x-text="formatSize(project.hours * quotaPerHour)"></div>
+                                </button>
+                            </template>
+                            <div x-show="filteredProjects.length === 0" class="px-4 py-3 text-sm text-text-muted text-center italic">
+                                No projects found
+                            </div>
+                        </div>
+                    </div>
+                     
+                    <!-- Summary -->
+                    <div class="mt-2 p-3 rounded-lg bg-black/20 border border-white/5 flex justify-between items-center" x-show="selectedIds.length > 0">
+                        <span class="text-sm text-text-muted">Total Reward:</span>
+                        <span class="text-sm font-bold text-hc-green" x-text="formatSize(totalRewardBytes)"></span>
+                    </div>
+
+                     {{#if errors.hackatimeProject}}<p class="text-red-400 text-xs mt-1">{{errors.hackatimeProject}}</p>{{/if}}
+                </div>
+            </div>
+
+            <!-- AI Usage -->
+            <div class="space-y-4 pt-4 border-t border-white/10" x-data="aiUsageSelector">
+                <h3 class="text-lg font-bold text-white mb-2">AI Usage Declaration</h3>
+                
+                <input type="hidden" name="aiToolUsage" :value="currentLevel.val">
+                <input type="hidden" name="usedAi" :value="aiLevel > 0 ? 'yes' : 'no'">
+                
+                <div class="bg-black/30 rounded-xl p-6 border border-white/10">
+                    <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-6">How much AI did you use?</label>
+                    
+                    <div class="relative mb-8 px-2">
+                        <input type="range" x-model.number="aiLevel" min="0" max="4" step="1"
+                            class="w-full accent-hc-red cursor-pointer relative z-10"
+                        >
+                        <div class="flex justify-between text-[10px] text-text-muted mt-2 font-mono uppercase tracking-wider">
+                            <span>None</span>
+                            <span>Tab</span>
+                            <span>Inline</span>
+                            <span>Chat</span>
+                            <span>No Code</span>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center p-4 bg-white/5 rounded-lg border border-white/10 mb-6 transition-all duration-300"
+                        :class="{'border-red-500/50 bg-red-500/10': isRejected, 'border-hc-green/30 bg-hc-green/10': aiLevel === 0}">
+                        <h4 class="font-bold text-lg text-white" x-text="currentLevel.label"></h4>
+                        <p class="text-sm text-text-muted" x-text="currentLevel.desc"></p>
+                        <p x-show="aiLevel === 4" style="display: none;" class="text-red-400 text-sm mt-2 font-bold">Purely AI-generated / No Code projects are not eligible for rewards.</p>
+                        <p x-show="requiresDetails && aiPercent > 30" style="display: none;" class="text-red-400 text-sm mt-2 font-bold">Projects with >30% AI generation are not eligible.</p>
+                    </div>
+
+                    <div x-show="requiresDetails" style="display: none;" x-transition.opacity.duration.300ms class="space-y-6">
+                         <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="block text-sm font-bold text-text-muted uppercase tracking-wider">Percentage of AI Generated Code</label>
+                                <span class="text-sm font-mono text-hc-red" x-text="aiPercent + '%'"></span>
+                            </div>
+                            <input type="range" name="aiPercent" x-model="aiPercent" min="0" max="100" class="w-full accent-hc-red cursor-pointer">
+                            <div class="flex justify-between text-xs text-text-muted mt-2 font-mono">
+                                <span>0%</span>
+                                <span>100%</span>
+                            </div>
+                            <p class="text-xs text-red-400 mt-2 font-bold" x-show="aiPercent > 30" style="display: none;">Projects with >30% AI generation are not eligible for rewards.</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Description of AI Usage (Required)</label>
+                            <textarea name="aiUsageDescription" rows="3" :required="requiresDetails"
+                                class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-hc-red focus:outline-none focus:ring-1 focus:ring-hc-red transition-colors placeholder-white/20"
+                                placeholder="I used Copilot for boilerplate and some regex..."></textarea>
+                        </div>
+                    </div>
+                     {{#if error}}<p class="text-red-400 text-xs mt-1">{{error}}</p>{{/if}}
+                </div>
+            </div>
+
+            <!-- Confirmation -->
+            <div class="space-y-4 pt-6 border-t border-white/10">
+                <label class="flex items-start gap-4 cursor-pointer p-5 bg-black/30 rounded-xl border border-white/10 hover:border-white/20 transition-colors group">
+                    <input type="checkbox" name="readmeConfirmed" class="mt-1 w-5 h-5 rounded border-white/30 text-hc-red focus:ring-hc-red focus:ring-offset-0 bg-transparent" required>
+                    <div>
+                        <div class="font-bold text-white text-base group-hover:text-white transition-colors">I confirm my project has a great README</div>
+                        <div class="text-sm text-text-muted mt-1">Submissions without a descriptive README explaining what the project is and how to run it will be rejected.</div>
+                    </div>
+                </label>
+                {{#if errors.readmeConfirmed}}<p class="text-red-400 text-xs mt-1">{{errors.readmeConfirmed}}</p>{{/if}}
+            </div>
+
+            <button type="submit" class="w-full bg-hc-red hover:bg-red-600 text-white font-bold py-4 rounded-xl transition-all hover:scale-[1.02] shadow-lg shadow-hc-red/20 text-lg">
+                Ship Project
+            </button>
+
+        </form>
+    </div>
+</div>
+
+{{#section "extraScripts"}}
+<script>
+    // Global Config
+    window.yswsConfig = {
+        projects: [
+            {{#each hackatimeProjects}}
+            { id: '{{this.id}}', name: '{{this.name}}', hours: {{this.hours}} },
+            {{/each}}
+        ],
+        quotaPerHour: {{quotaPerHour}},
+        initialHackatimeSelection: '{{values.hackatimeProject}}',
+        initialAiTool: '{{values.aiToolUsage}}',
+        initialAiPercent: '{{values.aiPercent}}'
+    };
+    console.log('YSWS Config:', window.yswsConfig);
+
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('hackatimeSelector', () => ({
+            open: false,
+            search: '',
+            selectedIds: [],
+            projects: [],
+            
+            init() {
+                this.projects = window.yswsConfig.projects || [];
+                console.log('Hackatime Selector Init. Projects:', this.projects);
+                const initial = window.yswsConfig.initialHackatimeSelection;
+                this.selectedIds = initial ? initial.split(',').filter(Boolean) : [];
+            },
+            
+            get filteredProjects() {
+                if (this.search === '') return this.projects;
+                return this.projects.filter(p => p.name.toLowerCase().includes(this.search.toLowerCase()));
+            },
+            
+            get selectedLabel() {
+                if (this.selectedIds.length === 0) return 'Select Hackatime Project(s)...';
+                if (this.selectedIds.length === 1) {
+                    const p = this.projects.find(x => x.id === this.selectedIds[0]);
+                    return p ? p.name : '1 Project Selected';
+                }
+                return `${this.selectedIds.length} Projects Selected`;
+            },
+
+            get totalRewardBytes() {
+                let hours = 0;
+                this.selectedIds.forEach(id => {
+                    const p = this.projects.find(x => x.id === id);
+                    if (p) hours += p.hours;
+                });
+                return hours * window.yswsConfig.quotaPerHour;
+            },
+            
+            isSelected(id) {
+                return this.selectedIds.includes(id);
+            },
+
+            toggle(project) {
+                if (this.selectedIds.includes(project.id)) {
+                    this.selectedIds = this.selectedIds.filter(id => id !== project.id);
+                } else {
+                    this.selectedIds.push(project.id);
+                }
+            },
+            
+            formatSize(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+        }));
+
+        Alpine.data('aiUsageSelector', () => ({
+            aiLevel: 0,
+            aiPercent: 0,
+            levels: [
+                { val: 'none', label: 'No AI', desc: 'I wrote everything manually' },
+                { val: 'tab-completion', label: 'Tab Completion', desc: 'Copilot Tab' },
+                { val: 'command-k', label: 'Inline Edits', desc: 'Command-K' },
+                { val: 'chat', label: 'Chat / Generation', desc: 'ChatGPT / Copilot Chat / AMP' },
+                { val: 'no-code', label: 'No Code', desc: 'v0 / Lovable / Bolt' }
+            ],
+
+            init() {
+                const initialTool = window.yswsConfig.initialAiTool;
+                const initialPercent = window.yswsConfig.initialAiPercent;
+                
+                if (initialTool) {
+                    const foundIdx = this.levels.findIndex(l => l.val === initialTool);
+                    if (foundIdx > -1) this.aiLevel = foundIdx;
+                    this.aiPercent = Number(initialPercent) || 0;
+                }
+            },
+
+            get currentLevel() { return this.levels[this.aiLevel] || this.levels[0]; },
+            get isRejected() { return this.aiLevel === 4 || (this.requiresDetails && this.aiPercent > 30); },
+            get requiresDetails() { return this.aiLevel >= 1 && this.aiLevel <= 3; }
+        }));
+    });
+
+    // Drag and Drop Logic
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const uploadPlaceholder = document.getElementById('upload-placeholder');
+    const uploadPreviewContainer = document.getElementById('upload-preview-container');
+    const uploadPreview = document.getElementById('upload-preview');
+    const removeFileBtn = document.getElementById('remove-file');
+
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        if(dropZone) dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    // Highlight drop zone when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        if(dropZone) dropZone.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        if(dropZone) dropZone.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight(e) {
+        if(dropZone) dropZone.classList.add('border-hc-red', 'bg-white/5');
+    }
+
+    function unhighlight(e) {
+        if(dropZone) dropZone.classList.remove('border-hc-red', 'bg-white/5');
+    }
+
+    // Handle dropped files
+    if(dropZone) dropZone.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles(files);
+    }
+
+    // Handle file input change
+    if(fileInput) fileInput.addEventListener('change', function() {
+        handleFiles(this.files);
+    });
+
+    function handleFiles(files) {
+        if (files.length > 0) {
+            const file = files[0];
+            if (file.type.startsWith('image/')) {
+                previewFile(file);
+                // Update file input files if coming from drop
+                if (fileInput.files !== files) {
+                    fileInput.files = files;
+                }
+            } else {
+                alert('Please upload an image file.');
+            }
+        }
+    }
+
+    function previewFile(file) {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onloadend = function() {
+            uploadPreview.src = reader.result;
+            uploadPlaceholder.classList.add('hidden');
+            uploadPreviewContainer.classList.remove('hidden');
+            uploadPreviewContainer.classList.add('flex');
+        }
+    }
+
+    if(removeFileBtn) removeFileBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation(); // Prevent opening file dialog
+        fileInput.value = ''; // Clear input
+        uploadPreview.src = '';
+        uploadPreviewContainer.classList.add('hidden');
+        uploadPreviewContainer.classList.remove('flex');
+        uploadPlaceholder.classList.remove('hidden');
+    });
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.x.x/dist/cdn.min.js"></script>
+{{/section}}
