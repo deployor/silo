@@ -1,6 +1,7 @@
 import {
 	bigint,
 	boolean,
+	doublePrecision,
 	index,
 	pgTable,
 	text,
@@ -164,6 +165,7 @@ export const appSettings = pgTable("app_settings", {
 	})
 		.notNull()
 		.default(1073741824), // 1GB
+	yswsBonusTiers: text("ysws_bonus_tiers"), // JSON string: [{ hours: 20, percent: 5 }, ...]
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -179,7 +181,7 @@ export const yswsSubmissions = pgTable(
 		repoUrl: text("repo_url").notNull(),
 		demoUrl: text("demo_url").notNull(),
 		hackatimeProject: text("hackatime_project"), // Can be comma separated if multiple
-		hoursSpent: bigint("hours_spent", { mode: "number" }).notNull(),
+		hoursSpent: doublePrecision("hours_spent").notNull(),
 		usedAi: boolean("used_ai").default(false).notNull(),
 		aiToolUsage: text("ai_tool_usage"),
 		aiUsageDescription: text("ai_usage_description"),
@@ -192,6 +194,8 @@ export const yswsSubmissions = pgTable(
 		createdAt: timestamp("created_at").defaultNow(),
 		reviewedAt: timestamp("reviewed_at"),
 		reviewedBy: text("reviewed_by").references(() => users.id),
+		tierBonusPercent: doublePrecision("tier_bonus_percent").default(0).notNull(),
+		adminBonusPercent: doublePrecision("admin_bonus_percent").default(0).notNull(),
 	},
 	(table) => {
 		return {

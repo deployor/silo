@@ -52,9 +52,12 @@ export async function handleAdminYswsRequest(req: Request, user: typeof users.$i
             const action = formData.get("action");
             const publicNotes = formData.get("adminNotesPublic") as string;
             const privateNotes = formData.get("adminNotesPrivate") as string;
+            let adminBonusPercent = Number(formData.get("adminBonusPercent") || 0);
+            if (adminBonusPercent < 0) adminBonusPercent = 0;
+            if (adminBonusPercent > 10) adminBonusPercent = 10;
 
             if (action === "approve") {
-                await YswsService.approveSubmission(id, user.id, publicNotes, privateNotes);
+                await YswsService.approveSubmission(id, user.id, publicNotes, privateNotes, adminBonusPercent);
             } else if (action === "reject") {
                 await YswsService.rejectSubmission(id, user.id, publicNotes, privateNotes);
             }
