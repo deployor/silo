@@ -210,10 +210,10 @@
                         :class="{'border-red-500/50 bg-red-500/10': isRejected, 'border-hc-green/30 bg-hc-green/10': aiLevel === 0}">
                         <h4 class="font-bold text-lg text-white" x-text="currentLevel.label"></h4>
                         <p class="text-sm text-text-muted" x-text="currentLevel.desc"></p>
-                        <p x-show="isRejected" class="text-red-400 text-sm mt-2 font-bold">⚠️ Purely AI-generated / No Code projects are not eligible for rewards.</p>
+                        <p x-show="isRejected" class="text-red-400 text-sm mt-2 font-bold">Purely AI-generated / No Code projects are not eligible for rewards.</p>
                     </div>
 
-                    <div x-show="requiresDetails" x-transition.opacity.duration.300ms class="space-y-6">
+                    <div x-show="requiresDetails" style="display: none;" x-transition.opacity.duration.300ms class="space-y-6">
                          <div>
                             <div class="flex justify-between items-center mb-2">
                                 <label class="block text-sm font-bold text-text-muted uppercase tracking-wider">Percentage of AI Generated Code</label>
