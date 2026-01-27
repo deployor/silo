@@ -89,12 +89,17 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                 }
             }
 
-            return new Response(await render("ysws", {
-                title: "YSWS",
+            // Get User Submissions
+            const userSubmissions = await db
+                .select()
+                .from(yswsSubmissions)
+                .where(eq(yswsSubmissions.userId, user.id))
+                .orderBy(desc(yswsSubmissions.createdAt));
+
+            return new Response(await render("ysws-list", {
+                title: "Your YSWS Projects",
                 user,
-                hackatimeProjects: MOCK_HACKATIME_PROJECTS,
-                quotaPerHour: appSettings.yswsQuotaPerHourBytes,
-                quotaPerHourFormatted: (appSettings.yswsQuotaPerHourBytes / (1024 * 1024)).toFixed(0) + " MB",
+                submissions: userSubmissions,
                 estimatedReviewTime,
                 success: url.searchParams.get("success") === "true",
             }), {
