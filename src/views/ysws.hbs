@@ -59,10 +59,28 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-text-muted mb-1">Screenshot URL</label>
-                    <input type="url" name="screenshotUrl" value="{{values.screenshotUrl}}"
-                        class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors"
-                        placeholder="https://..." />
+                    <label class="block text-sm font-medium text-text-muted mb-1">Screenshot (Upload or URL)</label>
+                    
+                    <div class="space-y-3">
+                         <!-- File Upload -->
+                        <div class="flex items-center gap-3">
+                            <input type="file" name="screenshotFile" accept="image/*"
+                                class="block w-full text-sm text-text-muted
+                                file:mr-4 file:py-2 file:px-4
+                                file:rounded-full file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-hc-red/10 file:text-hc-red
+                                hover:file:bg-hc-red/20" />
+                        </div>
+                        
+                        <div class="text-xs text-center text-text-muted">- OR -</div>
+
+                        <!-- URL Input -->
+                        <input type="url" name="screenshotUrl" value="{{values.screenshotUrl}}"
+                            class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors"
+                            placeholder="https://... (Optional if uploading file)" />
+                    </div>
+
                     {{#if errors.screenshotUrl}}<p class="text-red-400 text-xs mt-1">{{errors.screenshotUrl}}</p>{{/if}}
                 </div>
             </div>
