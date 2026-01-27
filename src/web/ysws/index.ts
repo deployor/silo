@@ -96,7 +96,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                     }), { headers: { "Content-Type": "text/html" } });
                 }
 
-                if (["command-k", "chat"].includes(validData.aiToolUsage || "") && validData.aiPercent > 0) {
+                if (["tab-completion", "command-k", "chat"].includes(validData.aiToolUsage || "")) {
                      if (!validData.aiUsageDescription || validData.aiUsageDescription.length < 10) {
                         return new Response(await render("ysws", {
                             title: "Ship to Earn",
