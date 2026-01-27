@@ -115,6 +115,18 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                 headers: { "Content-Type": "text/html" },
             });
         }
+
+        if (url.pathname === "/ysws/submit") {
+             return new Response(await render("ysws-submit", {
+                title: "Submit to YSWS",
+                user,
+                hackatimeProjects: MOCK_HACKATIME_PROJECTS,
+                quotaPerHour: appSettings.yswsQuotaPerHourBytes,
+                quotaPerHourFormatted: (appSettings.yswsQuotaPerHourBytes / (1024 * 1024)).toFixed(0) + " MB",
+            }), {
+                headers: { "Content-Type": "text/html" },
+            });
+        }
     }
 
     if (req.method === "POST" && url.pathname === "/ysws/submit") {
