@@ -102,31 +102,7 @@
             </div>
 
             <!-- Hackatime Selection -->
-            <div class="space-y-4 pt-4 border-t border-white/10" x-data="{
-                open: false,
-                search: '',
-                selected: '{{values.hackatimeProject}}',
-                selectedName: '',
-                projects: [
-                    {{#each hackatimeProjects}}
-                    { id: '{{this.id}}', name: '{{this.name}}', hours: {{this.hours}} },
-                    {{/each}}
-                ],
-                get filteredProjects() {
-                    if (this.search === '') return this.projects;
-                    return this.projects.filter(p => p.name.toLowerCase().includes(this.search.toLowerCase()));
-                },
-                select(project) {
-                    this.selected = project.id;
-                    this.selectedName = project.name;
-                    this.open = false;
-                    this.search = '';
-                },
-                init() {
-                    const found = this.projects.find(p => p.id === this.selected);
-                    if (found) this.selectedName = found.name;
-                }
-            }">
+            <div class="space-y-4 pt-4 border-t border-white/10" x-data="hackatimeSelector(hackatimeProjectsData, '{{values.hackatimeProject}}')">
                 <h3 class="text-lg font-bold text-white mb-2">Hackatime Integration</h3>
                 
                 <div class="relative">
@@ -141,7 +117,7 @@
                         </svg>
                     </button>
 
-                    <div x-show="open" x-transition.opacity.duration.200ms
+                    <div x-show="open" style="display: none;" x-transition.opacity.duration.200ms
                         class="absolute z-10 w-full mt-2 bg-hc-dark border border-white/10 rounded-xl shadow-xl max-h-60 overflow-hidden flex flex-col">
                         
                         <div class="p-2 border-b border-white/10 bg-black/20">
@@ -256,7 +232,46 @@
     {{/if}}
 </div>
 
+<!-- Alpine.js -->
+<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.x.x/dist/cdn.min.js"></script>
+
 <script>
+    // Mock Data passed to JS
+    const hackatimeProjectsData = [
+        {{#each hackatimeProjects}}
+        { id: '{{this.id}}', name: '{{this.name}}', hours: {{this.hours}} },
+        {{/each}}
+    ];
+
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('hackatimeSelector', (projects, initialSelected) => ({
+            open: false,
+            search: '',
+            selected: initialSelected || '',
+            selectedName: '',
+            projects: projects,
+            
+            get filteredProjects() {
+                if (this.search === '') return this.projects;
+                return this.projects.filter(p => p.name.toLowerCase().includes(this.search.toLowerCase()));
+            },
+            
+            select(project) {
+                this.selected = project.id;
+                this.selectedName = project.name;
+                this.open = false;
+                this.search = '';
+            },
+            
+            init() {
+                if (this.selected) {
+                    const found = this.projects.find(p => p.id === this.selected);
+                    if (found) this.selectedName = found.name;
+                }
+            }
+        }));
+    });
+
     // Pre-fill check if needed based on server rendering of values
     const usedAiVal = "{{values.usedAi}}";
     if (usedAiVal === "yes") {
