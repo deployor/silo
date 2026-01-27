@@ -68,9 +68,7 @@
             <p class="text-text-muted text-sm mt-1 font-mono" id="modal-user-email">email@example.com</p>
         </div>
         <button onclick="closeUserModal()" class="text-text-muted hover:text-white transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <i class="ph ph-x text-xl"></i>
         </button>
     </div>
 
@@ -180,9 +178,7 @@
             <p class="text-text-muted text-sm mt-1 font-mono" id="admin-bucket-owner">Owner: ...</p>
         </div>
         <button onclick="closeAdminBucketModal()" class="text-text-muted hover:text-white transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <i class="ph ph-x text-xl"></i>
         </button>
     </div>
 
@@ -213,9 +209,9 @@
     </div>
 
     <div class="flex justify-between items-center mb-4">
-        <h4 class="text-white font-bold">Files</h4>
-        <a id="admin-view-files-link" href="#" target="_blank" class="text-hc-blue hover:text-blue-400 text-sm font-bold">Open File Explorer &rarr;</a>
-    </div>
+<h4 class="text-white font-bold">Files</h4>
+<a id="admin-view-files-link" href="#" target="_blank" class="text-hc-blue hover:text-blue-400 text-sm font-bold flex items-center gap-1">Open File Explorer <i class="ph ph-arrow-right"></i></a>
+</div>
     <div class="bg-black/30 rounded-xl border border-white/10 overflow-hidden h-64 overflow-y-auto">
          <table class="w-full text-left text-sm">
             <thead class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider sticky top-0">
