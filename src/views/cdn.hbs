@@ -9,10 +9,19 @@
       Drag and drop any file to upload.
     </p>
 
-    <div class="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-4 py-2 rounded-lg text-sm mb-6 inline-block max-w-xl">
+    <div class="flex flex-col items-center gap-4 mb-6">
+        <div class="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-4 py-2 rounded-lg text-sm inline-block max-w-xl">
+            <div class="flex items-center gap-2">
+                <i class="ph ph-info text-lg"></i>
+                <span>Files uploaded here can be automatically posted to the <span class="font-bold text-white">#cdn</span> channel on Slack.</span>
+            </div>
+        </div>
+        
         <div class="flex items-center gap-2">
-            <i class="ph ph-info text-lg"></i>
-            <span>Files uploaded here will be automatically posted to the <span class="font-bold text-white">#cdn</span> channel on Slack.</span>
+             <input id="postToSlack" type="checkbox" class="form-checkbox h-4 w-4 bg-black/50 border-white/10 rounded text-hc-blue focus:ring-0 cursor-pointer" />
+             <label for="postToSlack" class="text-text-muted text-sm cursor-pointer select-none hover:text-white transition-colors">
+                Post uploaded files to #cdn
+             </label>
         </div>
     </div>
     <br/>
@@ -130,7 +139,12 @@
             formData.append('file', file);
 
             try {
-                const res = await fetch('/api/cdn/upload', {
+                // Check preferences
+                const shouldPost = document.getElementById('postToSlack').checked;
+                
+                // Add query param to override default if user unchecked it
+                // We'll update the API to respect this
+                const res = await fetch(`/api/cdn/upload?skipSlack=${!shouldPost}`, {
                     method: 'POST',
                     body: formData
                 });
@@ -272,6 +286,17 @@
         document.getElementById('storage-bar').classList.remove('bg-hc-red');
         document.getElementById('storage-bar').classList.add('bg-red-500');
     }
+    
+    // Load preference from local storage or default to true
+    const savedPref = localStorage.getItem('silo_cdn_post_slack');
+    const checkbox = document.getElementById('postToSlack');
+    // Default to true if not set
+    checkbox.checked = savedPref === null ? true : (savedPref === 'true');
+    
+    // Save preference on change
+    checkbox.addEventListener('change', (e) => {
+        localStorage.setItem('silo_cdn_post_slack', e.target.checked);
+    });
   }).catch(() => {
     // window.location.href = '/auth/login'; // Auth middleware handles this
   });

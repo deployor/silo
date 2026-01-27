@@ -127,8 +127,13 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 
 			const publicUrl = `https://${config.s3Domain}/${bucketName}/${fileName}`;
 			const settings = await getAppSettings();
+			const skipSlack = url.searchParams.get("skipSlack") === "true";
 
-			if (settings.cdnForceSlackUpload && config.slack.fileUploadChannelId) {
+			if (
+				!skipSlack &&
+				settings.cdnForceSlackUpload &&
+				config.slack.fileUploadChannelId
+			) {
 				try {
 					await postUploadSummary({
 						channelId: config.slack.fileUploadChannelId,
