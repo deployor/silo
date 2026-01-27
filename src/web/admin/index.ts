@@ -864,6 +864,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 						}),
 					)
 					.optional(),
+				cdnForceSlackUpload: z.boolean().optional(),
 			});
 
 			const body = await req.json().catch(() => null);

@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { config } from "../../../config";
+import { postUploadSummary } from "../../../integrations/slack/message-handler";
 import { getAppSettings } from "../../../services/settings-service";
 import { getInternalPath } from "../../../core/s3/utils";
 import { db } from "../../../db";
@@ -125,6 +126,32 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 			});
 
 			const publicUrl = `https://${config.s3Domain}/${bucketName}/${fileName}`;
+			const settings = await getAppSettings();
+
+			if (settings.cdnForceSlackUpload && config.slack.fileUploadChannelId) {
+				try {
+					await postUploadSummary({
+						channelId: config.slack.fileUploadChannelId,
+						messageTs: undefined, // Not replying to a message
+						threadTs: undefined,
+						successCount: 1,
+						totalCount: 1,
+						results: [
+							{
+								name: file.name,
+								url: publicUrl,
+								key: fileName,
+							},
+						],
+						bucketId: targetBucket.id,
+						uploaderSlackId: user.slackId,
+					});
+				} catch (slackError) {
+					console.error("Failed to send Slack notification:", slackError);
+					// Don't fail the upload if Slack notification fails
+				}
+			}
+
 			return jsonResponse({ url: publicUrl });
 		} catch (e) {
 			console.error("CDN Upload Error:", e);

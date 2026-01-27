@@ -105,6 +105,21 @@
         <p class="text-[11px] text-text-muted mt-2">Stored as bytes.</p>
       </div>
 
+      <div class="bg-black/30 p-6 rounded-xl border border-white/10">
+        <h4 class="text-white font-bold mb-1">CDN Settings</h4>
+        <p class="text-xs text-text-muted mb-4">Configuration for the CDN feature.</p>
+        
+        <div class="flex items-center gap-3">
+          <input id="cdnForceSlackUpload" type="checkbox" class="form-checkbox h-5 w-5 bg-black/50 border-white/10 rounded text-hc-blue focus:ring-0 cursor-pointer" />
+          <label for="cdnForceSlackUpload" class="text-white text-sm cursor-pointer select-none">
+            Force Slack Upload Notification
+          </label>
+        </div>
+        <p class="text-[11px] text-text-muted mt-2">
+            If enabled, all CDN uploads will be posted to the configured Slack channel.
+        </p>
+      </div>
+
       <div class="bg-black/30 p-6 rounded-xl border border-white/10 md:col-span-2">
         <h4 class="text-white font-bold mb-1">YSWS Bonus Tiers</h4>
         <p class="text-xs text-text-muted mb-4">Configure automatic bonuses for high-hour projects.</p>
@@ -151,6 +166,8 @@
     yswsQuotaPerHourBytes: document.getElementById('yswsQuotaPerHourBytes'),
     yswsQuotaAmount: document.getElementById('yswsQuotaAmount'),
     yswsQuotaUnit: document.getElementById('yswsQuotaUnit'),
+
+    cdnForceSlackUpload: document.getElementById('cdnForceSlackUpload'),
   };
 
   let currentTiers = [];
@@ -257,6 +274,8 @@
     fields.yswsQuotaAmount.value = String(bestYsws.value);
     fields.yswsQuotaUnit.value = String(bestYsws.unit);
 
+    fields.cdnForceSlackUpload.checked = data.cdnForceSlackUpload ?? true;
+
     currentTiers = data.yswsBonusTiers || [];
     renderTiers();
 
@@ -279,6 +298,7 @@
       defaultMaxKeysPerBucket: Number(fields.defaultMaxKeysPerBucket.value),
       yswsQuotaPerHourBytes: Number(fields.yswsQuotaPerHourBytes.value),
       yswsBonusTiers: currentTiers,
+      cdnForceSlackUpload: fields.cdnForceSlackUpload.checked,
     };
 
     const res = await fetch('/api/admin/settings', {
