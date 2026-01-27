@@ -171,7 +171,7 @@
                     <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-6">How much AI did you use?</label>
                     
                     <div class="relative mb-8 px-2">
-                        <input type="range" x-model="aiLevel" @input="aiLevel = parseInt($event.target.value)" min="0" max="4" step="1"
+                        <input type="range" x-model.number="aiLevel" min="0" max="4" step="1"
                             class="w-full accent-hc-red cursor-pointer relative z-10"
                         >
                         <div class="flex justify-between text-[10px] text-text-muted mt-2 font-mono uppercase tracking-wider">
