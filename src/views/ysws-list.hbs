@@ -98,6 +98,7 @@
                         <img src="{{this.screenshotUrl}}" alt="Screenshot of {{this.projectName}}"
                              class="w-full h-full object-cover"
                              @error="error = true"
+                             x-init="$el.complete && $el.naturalWidth === 0 && (error = true)"
                              x-show="!error"
                         >
                         <div x-show="error" style="display: none;" class="w-full h-full flex items-center justify-center text-white/20">
@@ -165,6 +166,7 @@
                     <img src="{{this.screenshotUrl}}" alt="{{this.projectName}}"
                         class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                         @error="error = true"
+                        x-init="$el.complete && $el.naturalWidth === 0 && (error = true)"
                         x-show="!error"
                     >
                     <div x-show="error" style="display: none;" class="w-full h-full flex items-center justify-center text-white/20">
