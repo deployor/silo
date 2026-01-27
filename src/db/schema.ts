@@ -178,7 +178,7 @@ export const yswsSubmissions = pgTable(
 		shortDescription: text("short_description").notNull(),
 		repoUrl: text("repo_url").notNull(),
 		demoUrl: text("demo_url").notNull(),
-		hackatimeProject: text("hackatime_project"),
+		hackatimeProject: text("hackatime_project"), // Can be comma separated if multiple
 		hoursSpent: bigint("hours_spent", { mode: "number" }).notNull(),
 		usedAi: boolean("used_ai").default(false).notNull(),
 		aiToolUsage: text("ai_tool_usage"),

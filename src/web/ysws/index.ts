@@ -13,10 +13,11 @@ import { eq } from "drizzle-orm";
 
 // Mock Hackatime Projects
 const MOCK_HACKATIME_PROJECTS = [
-    { id: "proj_1", name: "My Cool Website", hours: 4 },
-    { id: "proj_2", name: "Discord Bot", hours: 12 },
-    { id: "proj_3", name: "S3 Thing", hours: 25 },
-    { id: "proj_4", name: "Portfolio", hours: 1 },
+    { id: "proj_1", name: "hackclub/silo-s3-gateway", hours: 42.5 },
+    { id: "proj_2", name: "personal/portfolio-2024", hours: 12.0 },
+    { id: "proj_3", name: "hackclub/sprig-game", hours: 8.5 },
+    { id: "proj_4", name: "school/ap-cs-final", hours: 15.2 },
+    { id: "proj_5", name: "random/discord-bot", hours: 3.1 },
 ];
 
 const SubmissionSchema = z.object({
@@ -24,7 +25,7 @@ const SubmissionSchema = z.object({
     shortDescription: z.string().min(1, "Description is required"),
     repoUrl: z.string().url("Invalid Repository URL"),
     demoUrl: z.string().url("Invalid Demo URL"),
-    hackatimeProject: z.string().optional(),
+    hackatimeProject: z.string().optional(), // Comma separated IDs
     usedAi: z.enum(["yes", "no"]),
     aiToolUsage: z.string().optional(),
     aiUsageDescription: z.string().optional(),
@@ -82,27 +83,57 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
 
             const validData = validation.data;
             
-            if (validData.aiPercent > 50) {
-                 return new Response(await render("ysws", {
-                    title: "Ship to Earn",
-                    user,
-                    hackatimeProjects: MOCK_HACKATIME_PROJECTS,
-                    quotaPerHour: appSettings.yswsQuotaPerHourBytes,
-                    error: "AI contribution cannot exceed 50%",
-                    values: data
-                }), {
-                    headers: { "Content-Type": "text/html" },
-                });
+            // AI Validation Logic
+            if (validData.usedAi === "yes") {
+                if (validData.aiToolUsage === "no-code") {
+                     return new Response(await render("ysws", {
+                        title: "Ship to Earn",
+                        user,
+                        hackatimeProjects: MOCK_HACKATIME_PROJECTS,
+                        quotaPerHour: appSettings.yswsQuotaPerHourBytes,
+                        error: "Sorry, purely AI-generated / no-code projects are not eligible for YSWS rewards.",
+                        values: data
+                    }), { headers: { "Content-Type": "text/html" } });
+                }
+
+                if (["command-k", "chat"].includes(validData.aiToolUsage || "") && validData.aiPercent > 0) {
+                     if (!validData.aiUsageDescription || validData.aiUsageDescription.length < 10) {
+                        return new Response(await render("ysws", {
+                            title: "Ship to Earn",
+                            user,
+                            hackatimeProjects: MOCK_HACKATIME_PROJECTS,
+                            quotaPerHour: appSettings.yswsQuotaPerHourBytes,
+                            error: "Please provide a description of how you used AI tools.",
+                            values: data
+                        }), { headers: { "Content-Type": "text/html" } });
+                     }
+                }
+
+                if (validData.aiPercent > 50) {
+                    return new Response(await render("ysws", {
+                       title: "Ship to Earn",
+                       user,
+                       hackatimeProjects: MOCK_HACKATIME_PROJECTS,
+                       quotaPerHour: appSettings.yswsQuotaPerHourBytes,
+                       error: "AI contribution cannot exceed 50%",
+                       values: data
+                   }), { headers: { "Content-Type": "text/html" } });
+               }
             }
 
-            // Find hours from hackatime project
+            // Calculate hours from multiple projects
             let hoursSpent = 0;
-            let hackatimeProjectName = "";
+            let hackatimeProjectNames: string[] = [];
+            
             if (validData.hackatimeProject) {
-                const project = MOCK_HACKATIME_PROJECTS.find(p => p.id === validData.hackatimeProject);
-                if (project) {
-                    hoursSpent = project.hours;
-                    hackatimeProjectName = project.name;
+                const projectIds = validData.hackatimeProject.split(',').filter(Boolean);
+                
+                for (const pid of projectIds) {
+                    const project = MOCK_HACKATIME_PROJECTS.find(p => p.id === pid);
+                    if (project) {
+                        hoursSpent += project.hours;
+                        hackatimeProjectNames.push(project.name);
+                    }
                 }
             }
             
@@ -187,7 +218,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                 shortDescription: validData.shortDescription,
                 repoUrl: validData.repoUrl,
                 demoUrl: validData.demoUrl,
-                hackatimeProject: hackatimeProjectName, // Store name or ID? Schema says text.
+                hackatimeProject: hackatimeProjectNames.join(", "),
                 hoursSpent: hoursSpent,
                 usedAi: validData.usedAi === "yes",
                 aiToolUsage: validData.aiToolUsage,
