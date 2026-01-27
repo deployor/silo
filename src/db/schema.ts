@@ -166,6 +166,9 @@ export const appSettings = pgTable("app_settings", {
 		.notNull()
 		.default(1073741824), // 1GB
 	yswsBonusTiers: text("ysws_bonus_tiers"), // JSON string: [{ hours: 20, percent: 5 }, ...]
+	cdnForceSlackUpload: boolean("cdn_force_slack_upload")
+		.default(true)
+		.notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

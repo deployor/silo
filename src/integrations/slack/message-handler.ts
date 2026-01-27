@@ -313,10 +313,10 @@ Please sign in with Hack Club Auth so we can match this Slack user to your recor
 
 type SlackBlock = Record<string, unknown>;
 
-async function postUploadSummary(params: {
+export async function postUploadSummary(params: {
 	channelId: string;
-	messageTs: string;
-	threadTs: string;
+	messageTs?: string;
+	threadTs?: string;
 	successCount: number;
 	totalCount: number;
 	results: UploadResult[];
@@ -339,13 +339,13 @@ async function postUploadSummary(params: {
 	let headerText = "";
 	if (successCount === 0) {
 		headerText = "❌ *Failed to upload files*";
-		await addReaction(channelId, messageTs, "ms-no");
+		if (messageTs) await addReaction(channelId, messageTs, "ms-no");
 	} else if (successCount === totalCount) {
 		headerText = `:dinowow: *Uploaded ${successCount} ${plural(successCount, "file", "files")}!*`;
-		await addReaction(channelId, messageTs, "ms-green-tick");
+		if (messageTs) await addReaction(channelId, messageTs, "ms-green-tick");
 	} else {
 		headerText = `⚠️ *Uploaded ${successCount}/${totalCount} files*`;
-		await addReaction(channelId, messageTs, "ms-worried");
+		if (messageTs) await addReaction(channelId, messageTs, "ms-worried");
 	}
 
 	blocks.push({
@@ -415,7 +415,7 @@ async function postUploadSummary(params: {
 		await postBlocks(channelId, currentBlocks, threadTs);
 }
 
-async function postMessage(channel: string, text: string, threadTs?: string) {
+export async function postMessage(channel: string, text: string, threadTs?: string) {
 	await fetch("https://slack.com/api/chat.postMessage", {
 		method: "POST",
 		headers: {

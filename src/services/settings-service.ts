@@ -16,6 +16,7 @@ export type AppSettings = {
 	defaultMaxKeysPerBucket: number;
 	yswsQuotaPerHourBytes: number;
 	yswsBonusTiers: YswsBonusTier[];
+	cdnForceSlackUpload: boolean;
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -26,6 +27,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 	defaultMaxKeysPerBucket: 20,
 	yswsQuotaPerHourBytes: 1_073_741_824, // 1GB
 	yswsBonusTiers: [],
+	cdnForceSlackUpload: true,
 };
 
 let cached: { value: AppSettings; fetchedAtMs: number } | null = null;
@@ -45,6 +47,7 @@ async function ensureRowExists() {
 			defaultMaxKeysPerBucket: DEFAULT_APP_SETTINGS.defaultMaxKeysPerBucket,
 			yswsQuotaPerHourBytes: DEFAULT_APP_SETTINGS.yswsQuotaPerHourBytes,
 			yswsBonusTiers: JSON.stringify(DEFAULT_APP_SETTINGS.yswsBonusTiers),
+			cdnForceSlackUpload: DEFAULT_APP_SETTINGS.cdnForceSlackUpload,
 		})
 		.onConflictDoNothing();
 }
@@ -70,6 +73,7 @@ export async function getAppSettings(force = false): Promise<AppSettings> {
 				yswsBonusTiers: row.yswsBonusTiers
 					? JSON.parse(row.yswsBonusTiers)
 					: [],
+				cdnForceSlackUpload: row.cdnForceSlackUpload ?? true,
 			}
 		: DEFAULT_APP_SETTINGS;
 
@@ -95,6 +99,7 @@ export async function updateAppSettings(patch: Partial<AppSettings>) {
 			defaultMaxKeysPerBucket: next.defaultMaxKeysPerBucket,
 			yswsQuotaPerHourBytes: next.yswsQuotaPerHourBytes,
 			yswsBonusTiers: JSON.stringify(next.yswsBonusTiers),
+			cdnForceSlackUpload: next.cdnForceSlackUpload,
 			updatedAt: new Date(),
 		})
 		.where(eq(appSettings.id, "global"));
