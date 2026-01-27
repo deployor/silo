@@ -255,8 +255,8 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
 
                 } catch (uploadError) {
                     console.error("Screenshot upload failed:", uploadError);
-                     return new Response(await render("ysws", {
-                        title: "YSWS",
+                     return new Response(await render("ysws-submit", {
+                        title: "Submit to YSWS",
                         user,
                         hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                         quotaPerHour: appSettings.yswsQuotaPerHourBytes,
@@ -268,8 +268,8 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                 }
             } else if (!screenshotUrl) {
                 // Require either file or URL
-                 return new Response(await render("ysws", {
-                    title: "YSWS",
+                 return new Response(await render("ysws-submit", {
+                    title: "Submit to YSWS",
                     user,
                     hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                     quotaPerHour: appSettings.yswsQuotaPerHourBytes,
