@@ -137,8 +137,8 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
             const validation = SubmissionSchema.safeParse(data);
 
             if (!validation.success) {
-                 return new Response(await render("ysws", {
-                    title: "YSWS",
+                 return new Response(await render("ysws-submit", {
+                    title: "Submit to YSWS",
                     user,
                     hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                     quotaPerHour: appSettings.yswsQuotaPerHourBytes,
@@ -154,8 +154,8 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
             // AI Validation Logic
             if (validData.usedAi === "yes") {
                 if (validData.aiToolUsage === "no-code") {
-                     return new Response(await render("ysws", {
-                        title: "YSWS",
+                     return new Response(await render("ysws-submit", {
+                        title: "Submit to YSWS",
                         user,
                         hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                         quotaPerHour: appSettings.yswsQuotaPerHourBytes,
@@ -166,8 +166,8 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
 
                 if (["tab-completion", "command-k", "chat"].includes(validData.aiToolUsage || "")) {
                      if (!validData.aiUsageDescription || validData.aiUsageDescription.length < 10) {
-                        return new Response(await render("ysws", {
-                            title: "YSWS",
+                        return new Response(await render("ysws-submit", {
+                            title: "Submit to YSWS",
                             user,
                             hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                             quotaPerHour: appSettings.yswsQuotaPerHourBytes,
@@ -178,8 +178,8 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                 }
 
                 if (validData.aiPercent > 30) {
-                    return new Response(await render("ysws", {
-                       title: "YSWS",
+                    return new Response(await render("ysws-submit", {
+                       title: "Submit to YSWS",
                        user,
                        hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                        quotaPerHour: appSettings.yswsQuotaPerHourBytes,
