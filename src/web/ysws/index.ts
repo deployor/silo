@@ -77,15 +77,17 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
 
                 if (count > 0) {
                     const avgMs = totalDurationMs / count;
-                    const hours = Math.round(avgMs / (1000 * 60 * 60));
-                    if (hours < 1) {
-                        estimatedReviewTime = "less than an hour";
-                    } else if (hours < 24) {
-                        estimatedReviewTime = `${hours} hours`;
-                    } else {
-                        const days = Math.round(hours / 24);
-                        estimatedReviewTime = `${days} day${days > 1 ? "s" : ""}`;
-                    }
+                    
+                    const days = Math.floor(avgMs / (1000 * 60 * 60 * 24));
+                    const hours = Math.floor((avgMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const minutes = Math.floor((avgMs % (1000 * 60 * 60)) / (1000 * 60));
+
+                    const parts = [];
+                    if (days > 0) parts.push(`${days} day${days !== 1 ? "s" : ""}`);
+                    if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? "s" : ""}`);
+                    if (days === 0 && hours === 0) parts.push(`${minutes} minute${minutes !== 1 ? "s" : ""}`);
+                    
+                    estimatedReviewTime = parts.join(", ");
                 }
             }
 
