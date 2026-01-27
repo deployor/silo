@@ -56,9 +56,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                     reviewedAt: yswsSubmissions.reviewedAt,
                 })
                 .from(yswsSubmissions)
-                .where(isNotNull(yswsSubmissions.reviewedAt))
-                .orderBy(desc(yswsSubmissions.reviewedAt))
-                .limit(10);
+                .where(isNotNull(yswsSubmissions.reviewedAt));
 
             let estimatedReviewTime = "24 hours"; // Default
 
