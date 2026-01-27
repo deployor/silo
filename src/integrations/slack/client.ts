@@ -45,3 +45,23 @@ export async function openModal(triggerId: string, view: unknown) {
 
 	return responseData;
 }
+
+export async function getUserInfo(userId: string) {
+	const response = await fetch(
+		`${SLACK_API_URL}/users.info?user=${userId}`,
+		{
+			headers: {
+				Authorization: `Bearer ${config.slack.botToken}`,
+			},
+		},
+	);
+
+	const responseData = await response.json();
+	if (!responseData.ok) {
+		console.error("Slack API Error (users.info):", responseData);
+		// Return null instead of throwing to handle gracefully
+		return null;
+	}
+
+	return responseData.user;
+}
