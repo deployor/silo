@@ -31,9 +31,24 @@
                 </div>
 
                 {{#if submission.screenshotUrl}}
-                <div>
+                <div x-data="{ error: false }">
                     <h3 class="text-sm font-bold text-text-muted uppercase tracking-wider mb-2">Screenshot</h3>
-                    <img src="{{submission.screenshotUrl}}" alt="Project Screenshot" class="w-full rounded-lg border border-white/10" />
+                    <div class="relative w-full rounded-lg border border-white/10 overflow-hidden bg-black/20 min-h-[300px]">
+                        <img src="{{submission.screenshotUrl}}" alt="Project Screenshot"
+                             class="w-full h-full object-contain bg-black/50"
+                             @error="error = true"
+                             x-init="$el.complete && $el.naturalWidth === 0 && (error = true)"
+                             x-show="!error"
+                        />
+                        <div x-show="error" style="display: none;" class="absolute inset-0 flex items-center justify-center text-white/20">
+                            <div class="text-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <p class="text-sm font-mono">Image failed to load</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 {{/if}}
 
