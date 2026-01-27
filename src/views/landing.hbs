@@ -50,39 +50,40 @@
     </div>
 
     {{#if yswsQuotaPerHour}}
-    <div class="mt-20 border-t border-white/10 pt-16 max-w-2xl mx-auto" x-data="{ hours: 10, rate: {{yswsQuotaPerHour}} }">
-        <h3 class="text-2xl font-bold mb-8 flex items-center justify-center gap-3">
-             <span class="bg-gradient-to-r from-hc-red to-orange-500 text-transparent bg-clip-text">YSWS Rewards</span>
-             <span class="px-2 py-0.5 rounded text-xs border border-white/20 bg-white/5 text-white/50 uppercase tracking-widest font-mono">Calculator</span>
+    <div class="mt-20 border-t border-white/10 pt-16 max-w-3xl mx-auto" x-data="{ hours: 10, rate: {{yswsQuotaPerHour}} }">
+        <h3 class="text-text-muted text-sm font-bold uppercase tracking-wider mb-6 text-center">
+            Reward Calculator
         </h3>
 
-        <div class="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-sm">
-            <div class="mb-8">
-                <div class="flex justify-between items-end mb-4">
-                    <label class="text-sm font-mono text-gray-400 uppercase tracking-wider">Hours Spent Coding</label>
-                    <span class="text-4xl font-bold text-white font-mono" x-text="hours + 'h'"></span>
+        <div class="bg-hc-dark rounded-3xl p-8 border border-white/10 card-shadow">
+            <div class="flex flex-col md:flex-row gap-8 items-center">
+                <div class="flex-1 w-full">
+                     <div class="flex justify-between items-end mb-4">
+                        <label class="text-sm font-bold text-white">Hours Spent Coding</label>
+                        <span class="text-2xl font-bold text-hc-red font-mono" x-text="hours + 'h'"></span>
+                    </div>
+                    <input type="range" min="1" max="100" x-model="hours" class="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-hc-red hover:accent-red-400 transition-all">
+                    <div class="flex justify-between mt-2 text-xs text-text-muted font-mono">
+                        <span>1h</span>
+                        <span>100h</span>
+                    </div>
                 </div>
-                <input type="range" min="1" max="100" x-model="hours" class="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-hc-red hover:accent-red-400 transition-all">
-                <div class="flex justify-between mt-2 text-xs text-white/30 font-mono">
-                    <span>1h</span>
-                    <span>100h</span>
-                </div>
-            </div>
 
-            <div class="flex items-center justify-between border-t border-white/10 pt-6">
-                 <div class="text-left">
-                    <p class="text-sm text-gray-400 mb-1">Storage Reward</p>
-                    <p class="text-xs text-white/30">Lifetime increase</p>
-                </div>
-                <div class="text-right">
-                    <p class="text-4xl font-bold text-green-400 font-mono" x-text="((hours * rate) / (1024 * 1024 * 1024)).toFixed(1) + ' GB'"></p>
+                <div class="hidden md:block w-px h-24 bg-white/10"></div>
+
+                <div class="flex-1 w-full text-center md:text-left">
+                    <p class="text-text-muted text-xs font-bold uppercase tracking-wider mb-2">You Earn</p>
+                    <div class="flex items-baseline justify-center md:justify-start gap-2">
+                         <span class="text-5xl font-bold text-white tracking-tighter" x-text="((hours * rate) / (1024 * 1024 * 1024)).toFixed(1)"></span>
+                         <span class="text-xl text-white/40 font-bold">GB</span>
+                    </div>
+                    <p class="text-xs text-text-muted mt-2">Permanent storage added to your account</p>
                 </div>
             </div>
         </div>
         
-        <p class="mt-6 text-sm text-white/40 max-w-md mx-auto">
+        <p class="mt-8 text-lg text-text-muted max-w-xl mx-auto">
             Ship your project to High Seas, Onboard, or any YSWS to earn permanent storage quota.
-            <a href="/ysws" class="text-white hover:text-hc-blue underline decoration-white/30 hover:decoration-hc-blue transition-all">Learn more &rarr;</a>
         </p>
     </div>
     {{/if}}
