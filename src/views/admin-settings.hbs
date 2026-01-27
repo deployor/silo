@@ -104,6 +104,26 @@
         <input id="yswsQuotaPerHourBytes" type="hidden" />
         <p class="text-[11px] text-text-muted mt-2">Stored as bytes.</p>
       </div>
+
+      <div class="bg-black/30 p-6 rounded-xl border border-white/10 md:col-span-2">
+        <h4 class="text-white font-bold mb-1">YSWS Bonus Tiers</h4>
+        <p class="text-xs text-text-muted mb-4">Configure automatic bonuses for high-hour projects.</p>
+
+        <div class="grid grid-cols-12 gap-4 mb-2 text-xs text-text-muted uppercase font-bold tracking-wider">
+          <div class="col-span-3">Hours ></div>
+          <div class="col-span-3">Bonus %</div>
+          <div class="col-span-2 text-center">Enabled</div>
+          <div class="col-span-4"></div>
+        </div>
+        
+        <div id="tiersContainer" class="space-y-2 mb-4">
+          <!-- Tiers injected here -->
+        </div>
+        
+        <button id="addTierBtn" class="text-xs bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg transition-colors">
+            + Add Tier
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -112,6 +132,8 @@
   const statusEl = document.getElementById('status');
   const saveBtn = document.getElementById('saveBtn');
   const reloadBtn = document.getElementById('reloadBtn');
+  const addTierBtn = document.getElementById('addTierBtn');
+  const tiersContainer = document.getElementById('tiersContainer');
 
   const fields = {
     defaultStorageLimitBytes: document.getElementById('defaultStorageLimitBytes'),
@@ -130,6 +152,53 @@
     yswsQuotaAmount: document.getElementById('yswsQuotaAmount'),
     yswsQuotaUnit: document.getElementById('yswsQuotaUnit'),
   };
+
+  let currentTiers = [];
+
+  function renderTiers() {
+    tiersContainer.innerHTML = '';
+    currentTiers.forEach((tier, index) => {
+      const row = document.createElement('div');
+      row.className = 'grid grid-cols-12 gap-4 items-center bg-white/5 p-3 rounded-lg border border-white/5';
+      
+      row.innerHTML = `
+        <div class="col-span-3">
+          <input type="number" class="tier-hours bg-black/50 border border-white/10 rounded px-2 py-1 text-white w-full font-mono text-sm" value="${tier.hours}" min="0" />
+        </div>
+        <div class="col-span-3 relative">
+          <input type="number" class="tier-percent bg-black/50 border border-white/10 rounded px-2 py-1 text-white w-full font-mono text-sm" value="${tier.percent}" min="0" />
+          <span class="absolute right-3 top-1.5 text-text-muted text-xs">%</span>
+        </div>
+        <div class="col-span-2 flex justify-center">
+           <input type="checkbox" class="tier-enabled form-checkbox h-4 w-4 bg-black/50 border-white/10 rounded text-hc-blue focus:ring-0" ${tier.enabled ? 'checked' : ''} />
+        </div>
+        <div class="col-span-4 text-right">
+          <button class="tier-delete text-red-400 hover:text-red-300 text-xs font-bold px-2 py-1">Delete</button>
+        </div>
+      `;
+
+      // Bind events
+      const hoursInput = row.querySelector('.tier-hours');
+      const percentInput = row.querySelector('.tier-percent');
+      const enabledInput = row.querySelector('.tier-enabled');
+      const deleteBtn = row.querySelector('.tier-delete');
+
+      hoursInput.addEventListener('input', (e) => { currentTiers[index].hours = Number(e.target.value); });
+      percentInput.addEventListener('input', (e) => { currentTiers[index].percent = Number(e.target.value); });
+      enabledInput.addEventListener('change', (e) => { currentTiers[index].enabled = e.target.checked; });
+      deleteBtn.addEventListener('click', () => {
+        currentTiers.splice(index, 1);
+        renderTiers();
+      });
+
+      tiersContainer.appendChild(row);
+    });
+  }
+
+  addTierBtn.addEventListener('click', () => {
+    currentTiers.push({ hours: 50, percent: 5, enabled: true });
+    renderTiers();
+  });
 
   function getBestUnit(bytes) {
     if (!Number(bytes)) return { value: 0, unit: 1 };
@@ -188,6 +257,9 @@
     fields.yswsQuotaAmount.value = String(bestYsws.value);
     fields.yswsQuotaUnit.value = String(bestYsws.unit);
 
+    currentTiers = data.yswsBonusTiers || [];
+    renderTiers();
+
     setStatus('Loaded');
   }
 
@@ -206,6 +278,7 @@
       defaultMaxBucketsPerUser: Number(fields.defaultMaxBucketsPerUser.value),
       defaultMaxKeysPerBucket: Number(fields.defaultMaxKeysPerBucket.value),
       yswsQuotaPerHourBytes: Number(fields.yswsQuotaPerHourBytes.value),
+      yswsBonusTiers: currentTiers,
     };
 
     const res = await fetch('/api/admin/settings', {

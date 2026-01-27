@@ -855,6 +855,15 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				defaultMaxBucketsPerUser: z.number().int().min(1).max(10000),
 				defaultMaxKeysPerBucket: z.number().int().min(1).max(10000),
 				yswsQuotaPerHourBytes: z.number().int().min(0),
+				yswsBonusTiers: z
+					.array(
+						z.object({
+							hours: z.number().min(0),
+							percent: z.number().min(0),
+							enabled: z.boolean(),
+						}),
+					)
+					.optional(),
 			});
 
 			const body = await req.json().catch(() => null);

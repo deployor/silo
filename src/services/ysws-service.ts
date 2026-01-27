@@ -37,13 +37,38 @@ export async function updateSubmission(id: string, update: Partial<YswsSubmissio
 	return result;
 }
 
-export async function approveSubmission(id: string, reviewerId: string, publicNotes?: string, privateNotes?: string) {
+export async function approveSubmission(
+	id: string,
+	reviewerId: string,
+	publicNotes?: string,
+	privateNotes?: string,
+	adminBonusPercent = 0,
+) {
 	const submission = await getSubmissionById(id);
 	if (!submission) throw new Error("Submission not found");
 	if (submission.status !== "pending") throw new Error("Submission already processed");
 
 	const appSettings = await SettingsService.getAppSettings();
-	const rewardBytes = submission.hoursSpent * appSettings.yswsQuotaPerHourBytes;
+
+	// Calculate base reward
+	const baseRewardBytes = submission.hoursSpent * appSettings.yswsQuotaPerHourBytes;
+
+	// Determine Tier Bonus
+	let tierBonusPercent = 0;
+	if (appSettings.yswsBonusTiers && appSettings.yswsBonusTiers.length > 0) {
+		const validTiers = appSettings.yswsBonusTiers
+			.filter((t) => t.enabled && submission.hoursSpent >= t.hours)
+			.sort((a, b) => b.hours - a.hours); // Highest hours first
+
+		if (validTiers.length > 0) {
+			tierBonusPercent = validTiers[0].percent;
+		}
+	}
+
+	// Calculate Final Reward
+	const totalBonusPercent = tierBonusPercent + adminBonusPercent;
+	const multiplier = 1 + totalBonusPercent / 100;
+	const finalRewardBytes = Math.floor(baseRewardBytes * multiplier);
 
 	// Transaction to update submission status and user quota
 	await db.transaction(async (tx) => {
@@ -56,21 +81,18 @@ export async function approveSubmission(id: string, reviewerId: string, publicNo
 				reviewedAt: new Date(),
 				adminNotesPublic: publicNotes,
 				adminNotesPrivate: privateNotes,
+				tierBonusPercent: tierBonusPercent,
+				adminBonusPercent: adminBonusPercent,
 			})
 			.where(eq(yswsSubmissions.id, id));
 
 		// Update user quota
-		// We need to fetch the current user to get their current limit
-		// However, UserService.updateUserStorageLimit updates the absolute limit, not adds to it.
-		// Wait, UserService logic might be needed here.
-		// Let's look at schema. users.storageLimitBytes is a number.
-		// If it's null, it falls back to default.
-		
 		const user = await UserService.getUserById(submission.userId);
 		if (!user) throw new Error("User not found");
 
-		const currentLimit = user.storageLimitBytes ?? appSettings.defaultStorageLimitBytes;
-		const newLimit = currentLimit + rewardBytes;
+		const currentLimit =
+			user.storageLimitBytes ?? appSettings.defaultStorageLimitBytes;
+		const newLimit = currentLimit + finalRewardBytes;
 
 		await tx
 			.update(users)
@@ -80,7 +102,7 @@ export async function approveSubmission(id: string, reviewerId: string, publicNo
 			.where(eq(users.id, submission.userId));
 	});
 
-	return { success: true, rewardBytes };
+	return { success: true, rewardBytes: finalRewardBytes };
 }
 
 export async function rejectSubmission(id: string, reviewerId: string, publicNotes?: string, privateNotes?: string) {

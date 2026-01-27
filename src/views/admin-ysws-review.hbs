@@ -121,6 +121,12 @@
                         <textarea name="adminNotesPrivate" rows="2" class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-hc-red focus:outline-none transition-colors" placeholder="Internal team notes..."></textarea>
                     </div>
 
+                    <div>
+                         <label class="block text-xs font-bold text-text-muted uppercase tracking-wider mb-1">Extra Bonus (%)</label>
+                         <p class="text-[10px] text-text-muted mb-2">Discretionary bonus up to 10%.</p>
+                         <input type="number" name="adminBonusPercent" min="0" max="10" value="0" step="0.5" class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-hc-red focus:outline-none transition-colors font-mono" />
+                    </div>
+
                     <div class="grid grid-cols-2 gap-3 pt-2">
                         <button type="submit" name="action" value="reject" class="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 py-2 rounded text-sm font-bold transition-colors">
                             Reject
@@ -143,6 +149,18 @@
                         <span class="text-text-muted">Date</span>
                         <span class="text-white deploy-time-ago" data-time="{{submission.reviewedAt}}"></span>
                     </div>
+                    {{#if (gt submission.tierBonusPercent 0)}}
+                    <div class="flex justify-between">
+                         <span class="text-text-muted">Tier Bonus</span>
+                         <span class="text-green-400 font-bold font-mono">+{{submission.tierBonusPercent}}%</span>
+                    </div>
+                    {{/if}}
+                    {{#if (gt submission.adminBonusPercent 0)}}
+                    <div class="flex justify-between">
+                         <span class="text-text-muted">Admin Bonus</span>
+                         <span class="text-green-400 font-bold font-mono">+{{submission.adminBonusPercent}}%</span>
+                    </div>
+                    {{/if}}
                     {{#if submission.adminNotesPublic}}
                     <div class="pt-2">
                         <span class="text-text-muted block text-xs mb-1">Public Notes</span>
