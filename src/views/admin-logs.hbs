@@ -27,9 +27,7 @@
               Search
            </button>
            <button onclick="toggleFilters()" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-              </svg>
+              <i class="ph ph-funnel"></i>
               Filters
            </button>
        </div>
@@ -57,7 +55,7 @@
     <table class="w-full text-left text-sm">
       <thead class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
         <tr>
-          <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors" onclick="sortLogs('createdAt')">Time <span id="sort-createdAt" class="ml-1">↓</span></th>
+          <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors" onclick="sortLogs('createdAt')">Time <span id="sort-createdAt" class="ml-1"><i class="ph ph-caret-down"></i></span></th>
           <th class="px-6 py-4">Method</th>
           <th class="px-6 py-4 cursor-pointer hover:text-white transition-colors" onclick="sortLogs('statusCode')">Status <span id="sort-statusCode" class="ml-1"></span></th>
           <th class="px-6 py-4">Path</th>
@@ -89,9 +87,7 @@
     <div class="p-6 border-b border-white/10 flex justify-between items-center shrink-0">
         <h3 class="text-xl font-bold text-white">Log Details</h3>
         <button onclick="closeLogModal()" class="text-text-muted hover:text-white transition-colors p-1">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <i class="ph ph-x text-xl"></i>
         </button>
     </div>
 
@@ -256,10 +252,10 @@ function escapeHtml(unsafe) {
         // Update UI indicators
         ['createdAt', 'statusCode', 'ingressBytes', 'egressBytes', 'latencyMs'].forEach(f => {
             const el = document.getElementById(`sort-${f}`);
-            if (el) el.textContent = '';
+            if (el) el.innerHTML = '';
         });
         const currentEl = document.getElementById(`sort-${field}`);
-        if (currentEl) currentEl.textContent = logsSortOrder === 'asc' ? '↑' : '↓';
+        if (currentEl) currentEl.innerHTML = logsSortOrder === 'asc' ? '<i class="ph ph-caret-up"></i>' : '<i class="ph ph-caret-down"></i>';
 
         loadLogs(true);
     }
