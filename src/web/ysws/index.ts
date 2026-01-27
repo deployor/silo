@@ -90,7 +90,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
             }
 
             return new Response(await render("ysws", {
-                title: "Ship to Earn",
+                title: "YSWS",
                 user,
                 hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                 quotaPerHour: appSettings.yswsQuotaPerHourBytes,
@@ -112,7 +112,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
 
             if (!validation.success) {
                  return new Response(await render("ysws", {
-                    title: "Ship to Earn",
+                    title: "YSWS",
                     user,
                     hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                     quotaPerHour: appSettings.yswsQuotaPerHourBytes,
@@ -129,7 +129,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
             if (validData.usedAi === "yes") {
                 if (validData.aiToolUsage === "no-code") {
                      return new Response(await render("ysws", {
-                        title: "Ship to Earn",
+                        title: "YSWS",
                         user,
                         hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                         quotaPerHour: appSettings.yswsQuotaPerHourBytes,
@@ -141,7 +141,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                 if (["tab-completion", "command-k", "chat"].includes(validData.aiToolUsage || "")) {
                      if (!validData.aiUsageDescription || validData.aiUsageDescription.length < 10) {
                         return new Response(await render("ysws", {
-                            title: "Ship to Earn",
+                            title: "YSWS",
                             user,
                             hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                             quotaPerHour: appSettings.yswsQuotaPerHourBytes,
@@ -153,7 +153,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
 
                 if (validData.aiPercent > 30) {
                     return new Response(await render("ysws", {
-                       title: "Ship to Earn",
+                       title: "YSWS",
                        user,
                        hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                        quotaPerHour: appSettings.yswsQuotaPerHourBytes,
@@ -205,7 +205,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                             userId: user.id,
                             isPublic: true,
                             region: "auto",
-                        }).returning();
+                            }).returning();
                         bucket = newBucket;
                     }
 
@@ -230,7 +230,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                 } catch (uploadError) {
                     console.error("Screenshot upload failed:", uploadError);
                      return new Response(await render("ysws", {
-                        title: "Ship to Earn",
+                        title: "YSWS",
                         user,
                         hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                         quotaPerHour: appSettings.yswsQuotaPerHourBytes,
@@ -243,7 +243,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
             } else if (!screenshotUrl) {
                 // Require either file or URL
                  return new Response(await render("ysws", {
-                    title: "Ship to Earn",
+                    title: "YSWS",
                     user,
                     hackatimeProjects: MOCK_HACKATIME_PROJECTS,
                     quotaPerHour: appSettings.yswsQuotaPerHourBytes,
