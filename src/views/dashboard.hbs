@@ -10,9 +10,7 @@
   <div class="bg-hc-dark border border-white/10 rounded-3xl p-6 mb-8 card-shadow flex flex-col md:flex-row items-center justify-between gap-6">
       <div class="flex items-start gap-4">
           <div class="shrink-0 p-3 bg-white/10 rounded-xl text-white">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <i class="ph ph-warning-circle text-2xl"></i>
           </div>
           <div>
               <h3 class="text-white font-bold text-lg">Your account is closing soon.</h3>
@@ -153,9 +151,7 @@
           <p class="text-text-muted text-sm mt-1 font-mono" id="cors-bucket-name">bucket-name</p>
         </div>
         <button onclick="closeCorsModal()" class="text-text-muted hover:text-white transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <i class="ph ph-x text-2xl"></i>
         </button>
       </div>
 
@@ -195,9 +191,7 @@
           <p class="text-text-muted text-sm mt-1 font-mono" id="manage-keys-bucket-name">bucket-name</p>
         </div>
         <button onclick="closeManageKeysModal()" class="text-text-muted hover:text-white transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <i class="ph ph-x text-2xl"></i>
         </button>
       </div>
 
@@ -231,9 +225,7 @@
     <div class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-md card-shadow">
       <div class="flex items-center gap-3 mb-2">
         <div class="bg-emerald-500/20 p-2 rounded-full text-emerald-400">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-          </svg>
+          <i class="ph ph-check-circle text-2xl"></i>
         </div>
         <h3 class="text-2xl font-bold text-white">Bucket Created!</h3>
       </div>
@@ -247,9 +239,7 @@
           <div class="flex items-center gap-2 bg-black/20 rounded-lg p-2 border border-white/5 hover:border-white/10 transition-colors">
             <div class="font-mono text-sm select-all text-white overflow-x-auto whitespace-nowrap scrollbar-thin flex-1" id="new-access-key"></div>
             <button id="btn-new-access-key" onclick="copyToClipboard('new-access-key')" class="text-text-muted hover:text-white transition-colors p-1" title="Copy">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
+              <i class="ph ph-copy text-lg"></i>
             </button>
           </div>
         </div>
@@ -258,9 +248,7 @@
           <div class="flex items-center gap-2 bg-black/20 rounded-lg p-2 border border-white/5 hover:border-white/10 transition-colors">
             <div class="font-mono text-sm select-all text-emerald-400 overflow-x-auto whitespace-nowrap scrollbar-thin flex-1" id="new-secret-key"></div>
             <button id="btn-new-secret-key" onclick="copyToClipboard('new-secret-key')" class="text-text-muted hover:text-white transition-colors p-1" title="Copy">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
+              <i class="ph ph-copy text-lg"></i>
             </button>
           </div>
         </div>
@@ -271,9 +259,7 @@
               https://silo.deployor.dev
             </div>
             <button id="btn-new-endpoint" onclick="copyToClipboard('new-endpoint')" class="text-text-muted hover:text-white transition-colors p-1" title="Copy">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
+              <i class="ph ph-copy text-lg"></i>
             </button>
           </div>
         </div>
@@ -285,9 +271,7 @@
               ...
             </div>
             <button id="btn-new-public-url" onclick="copyToClipboard('new-public-url')" class="text-text-muted hover:text-white transition-colors p-1" title="Copy">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
+              <i class="ph ph-copy text-lg"></i>
             </button>
           </div>
         </div>
@@ -315,10 +299,7 @@
         </button>
         <button id="confirm-btn" class="bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105 card-shadow flex items-center gap-2">
           <span id="confirm-btn-text">Confirm</span>
-          <svg id="confirm-spinner" class="animate-spin h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
+          <i id="confirm-spinner" class="ph ph-spinner animate-spin text-lg hidden"></i>
         </button>
       </div>
     </div>
@@ -466,9 +447,7 @@
                     <td class="px-6 py-4 font-mono text-xs text-text-muted group-hover:text-white transition-colors">
                         ${!isCdn ? `
                         <button onclick="openManageKeysModal('${escapeJs(bucket.name)}')" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2 ${disabledClass}" ${disabledAttr}>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                            </svg>
+                            <i class="ph ph-key text-sm"></i>
                             ${bucket.keys.length} Keys
                         </button>` : '<span class="text-text-muted italic">Managed</span>'}
                     </td>
@@ -489,15 +468,11 @@
                     <td class="px-6 py-4 text-right flex justify-end items-center gap-3">
                         ${!isCdn ? `
                         <button onclick="openCorsModal('${escapeJs(bucket.name)}')" class="bg-white/5 hover:bg-white/10 text-text-muted hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${disabledClass}" ${disabledAttr}>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                            </svg>
+                            <i class="ph ph-code text-sm"></i>
                             CORS
                         </button>` : ''}
                         <a href="/dashboard/buckets/${escapeHtml(bucket.name)}" class="bg-hc-blue/10 hover:bg-hc-blue/20 text-hc-blue px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 ${disabledClass}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
-                            </svg>
+                            <i class="ph ph-folder text-sm"></i>
                             Files
                         </a>
                         ${isCdn ?
@@ -582,7 +557,7 @@
       const btn = document.getElementById(`btn-${elementId}`);
       const originalHTML = btn.innerHTML;
       btn.innerHTML =
-        '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-400" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>';
+        '<i class="ph ph-check text-emerald-400 text-lg"></i>';
       setTimeout(() => {
         btn.innerHTML = originalHTML;
       }, 2000);
