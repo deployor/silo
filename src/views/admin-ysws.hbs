@@ -48,7 +48,10 @@
                         {{this.createdAt}}
                     </td>
                     <td class="px-6 py-4 text-right">
-                        <a href="/admin/ysws/{{this.id}}" class="text-hc-red hover:text-white transition-colors font-medium">Review &rarr;</a>
+                        <a href="/admin/ysws/{{this.id}}" class="text-hc-red hover:text-white transition-colors font-medium flex items-center justify-end gap-1">
+                            Review
+                            <i class="ph ph-arrow-right"></i>
+                        </a>
                     </td>
                 </tr>
                 {{else}}
