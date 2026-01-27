@@ -59,26 +59,42 @@
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-text-muted mb-1">Screenshot (Upload or URL)</label>
+                    <label class="block text-sm font-medium text-text-muted mb-2">Project Screenshot</label>
                     
-                    <div class="space-y-3">
-                         <!-- File Upload -->
-                        <div class="flex items-center gap-3">
-                            <input type="file" name="screenshotFile" accept="image/*"
-                                class="block w-full text-sm text-text-muted
-                                file:mr-4 file:py-2 file:px-4
-                                file:rounded-full file:border-0
-                                file:text-sm file:font-semibold
-                                file:bg-hc-red/10 file:text-hc-red
-                                hover:file:bg-hc-red/20" />
-                        </div>
+                    <div class="border-2 border-dashed border-white/20 rounded-xl p-8 transition-colors hover:border-white/40 group relative" id="drop-zone">
+                        <input type="file" name="screenshotFile" accept="image/*" id="file-input" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                         
-                        <div class="text-xs text-center text-text-muted">- OR -</div>
+                        <div class="text-center" id="upload-placeholder">
+                            <div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-3 group-hover:bg-white/10 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-text-muted group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <p class="text-sm font-medium text-white">Drop your screenshot here, or <span class="text-hc-red">browse</span></p>
+                            <p class="text-xs text-text-muted mt-1">Supports PNG, JPG, WEBP</p>
+                        </div>
 
-                        <!-- URL Input -->
+                        <div class="hidden items-center justify-center gap-4" id="upload-preview-container">
+                             <img id="upload-preview" class="max-h-48 rounded-lg shadow-lg" src="" alt="Preview" />
+                             <button type="button" id="remove-file" class="bg-red-500/20 hover:bg-red-500/40 text-red-400 p-2 rounded-lg transition-colors z-20">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                             </button>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 flex items-center gap-3">
+                         <div class="h-px bg-white/10 flex-1"></div>
+                         <span class="text-xs text-text-muted uppercase font-bold tracking-wider">OR</span>
+                         <div class="h-px bg-white/10 flex-1"></div>
+                    </div>
+
+                    <div class="mt-4">
+                        <label class="block text-xs font-medium text-text-muted mb-1 uppercase tracking-wider">Provide URL</label>
                         <input type="url" name="screenshotUrl" value="{{values.screenshotUrl}}"
-                            class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors"
-                            placeholder="https://... (Optional if uploading file)" />
+                            class="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white focus:border-hc-red focus:outline-none transition-colors text-sm font-mono"
+                            placeholder="https://..." />
                     </div>
 
                     {{#if errors.screenshotUrl}}<p class="text-red-400 text-xs mt-1">{{errors.screenshotUrl}}</p>{{/if}}
