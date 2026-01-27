@@ -236,7 +236,7 @@
     {{/if}}
 </div>
 
-<!-- Alpine.js logic -->
+{{#section "extraScripts"}}
 <script>
     // Mock Data passed to JS
     window.hackatimeProjectsData = [
@@ -322,12 +322,6 @@
         }));
     });
 
-</script>
-
-<!-- Alpine.js Core -->
-<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.x.x/dist/cdn.min.js"></script>
-
-<script>
     // Drag and Drop Logic
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
@@ -338,7 +332,7 @@
 
     // Prevent default drag behaviors
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, preventDefaults, false);
+        if(dropZone) dropZone.addEventListener(eventName, preventDefaults, false);
         document.body.addEventListener(eventName, preventDefaults, false);
     });
 
@@ -349,23 +343,23 @@
 
     // Highlight drop zone when item is dragged over it
     ['dragenter', 'dragover'].forEach(eventName => {
-        dropZone.addEventListener(eventName, highlight, false);
+        if(dropZone) dropZone.addEventListener(eventName, highlight, false);
     });
 
     ['dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, unhighlight, false);
+        if(dropZone) dropZone.addEventListener(eventName, unhighlight, false);
     });
 
     function highlight(e) {
-        dropZone.classList.add('border-hc-red', 'bg-white/5');
+        if(dropZone) dropZone.classList.add('border-hc-red', 'bg-white/5');
     }
 
     function unhighlight(e) {
-        dropZone.classList.remove('border-hc-red', 'bg-white/5');
+        if(dropZone) dropZone.classList.remove('border-hc-red', 'bg-white/5');
     }
 
     // Handle dropped files
-    dropZone.addEventListener('drop', handleDrop, false);
+    if(dropZone) dropZone.addEventListener('drop', handleDrop, false);
 
     function handleDrop(e) {
         const dt = e.dataTransfer;
@@ -374,7 +368,7 @@
     }
 
     // Handle file input change
-    fileInput.addEventListener('change', function() {
+    if(fileInput) fileInput.addEventListener('change', function() {
         handleFiles(this.files);
     });
 
@@ -385,7 +379,7 @@
                 previewFile(file);
                 // Update file input files if coming from drop
                 if (fileInput.files !== files) {
-                   fileInput.files = files;
+                    fileInput.files = files;
                 }
             } else {
                 alert('Please upload an image file.');
@@ -404,7 +398,7 @@
         }
     }
 
-    removeFileBtn.addEventListener('click', function(e) {
+    if(removeFileBtn) removeFileBtn.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation(); // Prevent opening file dialog
         fileInput.value = ''; // Clear input
@@ -413,5 +407,6 @@
         uploadPreviewContainer.classList.remove('flex');
         uploadPlaceholder.classList.remove('hidden');
     });
-
 </script>
+<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.x.x/dist/cdn.min.js"></script>
+{{/section}}
