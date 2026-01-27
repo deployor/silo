@@ -102,7 +102,7 @@
             </div>
 
             <!-- Hackatime Selection -->
-            <div class="space-y-4 pt-4 border-t border-white/10" x-data="hackatimeSelector(window.hackatimeProjectsData, '{{values.hackatimeProject}}', {{quotaPerHour}})">
+            <div class="space-y-4 pt-4 border-t border-white/10" x-data="hackatimeSelector">
                 <h3 class="text-lg font-bold text-white mb-2">Hackatime Integration</h3>
                 
                 <div class="relative" @click.outside="open = false">
@@ -161,7 +161,7 @@
             </div>
 
             <!-- AI Usage -->
-            <div class="space-y-4 pt-4 border-t border-white/10" x-data="aiUsageSelector('{{values.aiToolUsage}}', '{{values.aiPercent}}')">
+            <div class="space-y-4 pt-4 border-t border-white/10" x-data="aiUsageSelector">
                 <h3 class="text-lg font-bold text-white mb-2">AI Usage Declaration</h3>
                 
                 <input type="hidden" name="aiToolUsage" :value="currentLevel.val">
@@ -187,7 +187,8 @@
                         :class="{'border-red-500/50 bg-red-500/10': isRejected, 'border-hc-green/30 bg-hc-green/10': aiLevel === 0}">
                         <h4 class="font-bold text-lg text-white" x-text="currentLevel.label"></h4>
                         <p class="text-sm text-text-muted" x-text="currentLevel.desc"></p>
-                        <p x-show="isRejected" style="display: none;" class="text-red-400 text-sm mt-2 font-bold">Purely AI-generated / No Code projects are not eligible for rewards.</p>
+                        <p x-show="aiLevel === 4" style="display: none;" class="text-red-400 text-sm mt-2 font-bold">Purely AI-generated / No Code projects are not eligible for rewards.</p>
+                        <p x-show="requiresDetails && aiPercent > 30" style="display: none;" class="text-red-400 text-sm mt-2 font-bold">Projects with >30% AI generation are not eligible.</p>
                     </div>
 
                     <div x-show="requiresDetails" style="display: none;" x-transition.opacity.duration.300ms class="space-y-6">
@@ -196,12 +197,12 @@
                                 <label class="block text-sm font-bold text-text-muted uppercase tracking-wider">Percentage of AI Generated Code</label>
                                 <span class="text-sm font-mono text-hc-red" x-text="aiPercent + '%'"></span>
                             </div>
-                            <input type="range" name="aiPercent" x-model="aiPercent" min="0" max="50" class="w-full accent-hc-red cursor-pointer">
+                            <input type="range" name="aiPercent" x-model="aiPercent" min="0" max="100" class="w-full accent-hc-red cursor-pointer">
                             <div class="flex justify-between text-xs text-text-muted mt-2 font-mono">
                                 <span>0%</span>
-                                <span>50% (Max allowed)</span>
+                                <span>100%</span>
                             </div>
-                            <p class="text-xs text-text-muted mt-2">Projects with >50% AI generation are not eligible for rewards.</p>
+                            <p class="text-xs text-red-400 mt-2 font-bold" x-show="aiPercent > 30" style="display: none;">Projects with >30% AI generation are not eligible for rewards.</p>
                         </div>
 
                         <div>
@@ -238,20 +239,33 @@
 
 {{#section "extraScripts"}}
 <script>
-    // Mock Data passed to JS
-    window.hackatimeProjectsData = [
-        {{#each hackatimeProjects}}
-        { id: '{{this.id}}', name: '{{this.name}}', hours: {{this.hours}} },
-        {{/each}}
-    ];
+    // Global Config
+    window.yswsConfig = {
+        projects: [
+            {{#each hackatimeProjects}}
+            { id: '{{this.id}}', name: '{{this.name}}', hours: {{this.hours}} },
+            {{/each}}
+        ],
+        quotaPerHour: {{quotaPerHour}},
+        initialHackatimeSelection: '{{values.hackatimeProject}}',
+        initialAiTool: '{{values.aiToolUsage}}',
+        initialAiPercent: '{{values.aiPercent}}'
+    };
+    console.log('YSWS Config:', window.yswsConfig);
 
     document.addEventListener('alpine:init', () => {
-        Alpine.data('hackatimeSelector', (projects, initialSelected, quotaPerHour) => ({
+        Alpine.data('hackatimeSelector', () => ({
             open: false,
             search: '',
-            selectedIds: initialSelected ? initialSelected.split(',').filter(Boolean) : [],
-            projects: projects,
-            quotaPerHour: quotaPerHour,
+            selectedIds: [],
+            projects: [],
+            
+            init() {
+                this.projects = window.yswsConfig.projects || [];
+                console.log('Hackatime Selector Init. Projects:', this.projects);
+                const initial = window.yswsConfig.initialHackatimeSelection;
+                this.selectedIds = initial ? initial.split(',').filter(Boolean) : [];
+            },
             
             get filteredProjects() {
                 if (this.search === '') return this.projects;
@@ -273,7 +287,7 @@
                     const p = this.projects.find(x => x.id === id);
                     if (p) hours += p.hours;
                 });
-                return hours * this.quotaPerHour;
+                return hours * window.yswsConfig.quotaPerHour;
             },
             
             isSelected(id) {
@@ -297,18 +311,21 @@
             }
         }));
 
-        Alpine.data('aiUsageSelector', (initialTool, initialPercent) => ({
+        Alpine.data('aiUsageSelector', () => ({
             aiLevel: 0,
             aiPercent: 0,
             levels: [
                 { val: 'none', label: 'No AI', desc: 'I wrote everything manually' },
-                { val: 'tab-completion', label: 'Tab Completion', desc: 'Copilot / Supermaven' },
-                { val: 'command-k', label: 'Inline Edits', desc: 'Command-K / Chat in Editor' },
-                { val: 'chat', label: 'Chat / Generation', desc: 'ChatGPT / Claude Web UI' },
+                { val: 'tab-completion', label: 'Tab Completion', desc: 'Copilot Tab' },
+                { val: 'command-k', label: 'Inline Edits', desc: 'Command-K' },
+                { val: 'chat', label: 'Chat / Generation', desc: 'ChatGPT / Copilot Chat / AMP' },
                 { val: 'no-code', label: 'No Code', desc: 'v0 / Lovable / Bolt' }
             ],
 
             init() {
+                const initialTool = window.yswsConfig.initialAiTool;
+                const initialPercent = window.yswsConfig.initialAiPercent;
+                
                 if (initialTool) {
                     const foundIdx = this.levels.findIndex(l => l.val === initialTool);
                     if (foundIdx > -1) this.aiLevel = foundIdx;
@@ -317,7 +334,7 @@
             },
 
             get currentLevel() { return this.levels[this.aiLevel] || this.levels[0]; },
-            get isRejected() { return this.aiLevel === 4; },
+            get isRejected() { return this.aiLevel === 4 || (this.requiresDetails && this.aiPercent > 30); },
             get requiresDetails() { return this.aiLevel >= 1 && this.aiLevel <= 3; }
         }));
     });
