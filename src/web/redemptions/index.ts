@@ -27,11 +27,16 @@ export async function handleAdminRedemptionsRequest(req: Request, user: typeof u
     // Create Program
     if (url.pathname === "/admin/redemptions/create" && req.method === "POST") {
         const formData = await req.formData();
+        
+        const amount = Number(formData.get("amount"));
+        const unit = Number(formData.get("unit"));
+        const quotaCreditBytes = Math.floor(amount * unit);
+
         await RedemptionService.createProgram({
             name: formData.get("name") as string,
             prefix: formData.get("prefix") as string,
             description: formData.get("description") as string,
-            quotaCreditBytes: Number(formData.get("quotaCreditBytes"))
+            quotaCreditBytes
         });
         return new Response(null, {
             status: 302,
