@@ -189,22 +189,24 @@ export async function handleMessage(event: SlackMessageEvent) {
 	try {
 		const user = await getUserBySlackId(slackId);
 		if (!user) {
-			await postBlocks(
-				channelId,
-				[
-					Header({ text: "Whoops! Account Required" }).buildToObject(),
+			const msg = Message()
+				.blocks(
+					Header({ text: "Whoops! Account Required" }),
 					Section({
 						text: "Heyho! You need an account on Silo so I can manage quota (and more) for you. Please sign in with Hack Club Auth so we can match this Slack user to your record.",
-					}).buildToObject(),
-					Actions()
-						.elements(
-							Button({
-								text: "Sign in to Silo",
-								url: `https://${config.s3Domain}/auth/login?source=slack`,
-							}).primary(),
-						)
-						.buildToObject(),
-				],
+					}),
+					Actions().elements(
+						Button({
+							text: "Sign in to Silo",
+							url: `https://${config.s3Domain}/auth/login?source=slack`,
+						}).primary(),
+					),
+				)
+				.buildToObject();
+
+			await postBlocks(
+				channelId,
+				(msg.blocks || []) as SlackBlock[],
 				threadTs,
 				undefined,
 				undefined,
@@ -216,14 +218,18 @@ export async function handleMessage(event: SlackMessageEvent) {
 
 		if (user.filesDeleted) {
 			if (user.dataExported) {
-				await postBlocks(
-					channelId,
-					[
-						Header({ text: "CDN Access Revoked" }).buildToObject(),
+				const msg = Message()
+					.blocks(
+						Header({ text: "CDN Access Revoked" }),
 						Section({
 							text: "Bro, you're over 18. :ms-raised-eyebrow: I'm sorry to tell you, but you also can't use the CDN anymore, sowwy! As you know, all your files and S3 and everything got paused before too, and you downloaded them in time!",
-						}).buildToObject(),
-					],
+						}),
+					)
+					.buildToObject();
+
+				await postBlocks(
+					channelId,
+					(msg.blocks || []) as SlackBlock[],
 					threadTs,
 					undefined,
 					undefined,
@@ -231,14 +237,18 @@ export async function handleMessage(event: SlackMessageEvent) {
 				);
 				await addReaction(channelId, messageTs, "ms-raised-eyebrow");
 			} else {
-				await postBlocks(
-					channelId,
-					[
-						Header({ text: "Files Deleted" }).buildToObject(),
+				const msg = Message()
+					.blocks(
+						Header({ text: "Files Deleted" }),
 						Section({
 							text: "Hey uh, how do I tell you this but... :panic:\n\nYour files got forever deleted and you weren't in time to actually download them. You're over 18, and to save budget and more, Hack Club doesn't actually run this for over 18-year-olds... Sorry.",
-						}).buildToObject(),
-					],
+						}),
+					)
+					.buildToObject();
+
+				await postBlocks(
+					channelId,
+					(msg.blocks || []) as SlackBlock[],
 					threadTs,
 					undefined,
 					undefined,
@@ -264,31 +274,31 @@ export async function handleMessage(event: SlackMessageEvent) {
 			: "soon";
 
 		if (user.dataExported) {
-			await postBlocks(
-				channelId,
-				[
-					Header({ text: "Files Scheduled for Deletion" }).buildToObject(),
+			const msg = Message()
+				.blocks(
+					Header({ text: "Files Scheduled for Deletion" }),
 					Section({
 						text: "Heyho, sorry you're over 18 and your files are also soon to be deleted :sad-pf:, soooooo no new files and old ones gone soon too :C",
-					}).buildToObject(),
+					}),
 					Section({
 						text: "You already downloaded your files, but if you need to again, you can find them below.",
-					}).buildToObject(),
-					Context()
-						.elements(
-							`Usage: ${usageGB} GB`,
-							`Deletion in: ${daysLeft} days (${endDate})`,
-						)
-						.buildToObject(),
-					Actions()
-						.elements(
-							Button({
-								text: "View Old Files",
-								url: `https://${config.s3Domain}/dashboard/offboarding`,
-							}),
-						)
-						.buildToObject(),
-				],
+					}),
+					Context().elements(
+						`Usage: ${usageGB} GB`,
+						`Deletion in: ${daysLeft} days (${endDate})`,
+					),
+					Actions().elements(
+						Button({
+							text: "View Old Files",
+							url: `https://${config.s3Domain}/dashboard/offboarding`,
+						}),
+					),
+				)
+				.buildToObject();
+
+			await postBlocks(
+				channelId,
+				(msg.blocks || []) as SlackBlock[],
 				threadTs,
 				undefined,
 				undefined,
@@ -299,31 +309,31 @@ export async function handleMessage(event: SlackMessageEvent) {
 		}
 
 		if (user.markedAsOverAge) {
-			await postBlocks(
-				channelId,
-				[
-					Header({ text: "Action Required: Download Files!" }).buildToObject(),
+			const msg = Message()
+				.blocks(
+					Header({ text: "Action Required: Download Files!" }),
 					Section({
 						text: `Hey... Sorry but you're over 18- You seem to store *${usageGB} GB* of data though! WHICH YOU HAVE STILL NOT DOWNLOADED!!!!! :siren1::siren1::siren1::siren1::siren1:`,
-					}).buildToObject(),
+					}),
 					Section({
 						text: "Please download them and migrate to something like Cloudflare R2 ASAP! :catalarm: I will delete everything soon, so HURRY!",
-					}).buildToObject(),
-					Context()
-						.elements(
-							`Usage: ${usageGB} GB`,
-							`Deletion in: ${daysLeft} days (${endDate})`,
-						)
-						.buildToObject(),
-					Actions()
-						.elements(
-							Button({
-								text: "Download Files",
-								url: `https://${config.s3Domain}/dashboard/offboarding`,
-							}).danger(),
-						)
-						.buildToObject(),
-				],
+					}),
+					Context().elements(
+						`Usage: ${usageGB} GB`,
+						`Deletion in: ${daysLeft} days (${endDate})`,
+					),
+					Actions().elements(
+						Button({
+							text: "Download Files",
+							url: `https://${config.s3Domain}/dashboard/offboarding`,
+						}).danger(),
+					),
+				)
+				.buildToObject();
+
+			await postBlocks(
+				channelId,
+				(msg.blocks || []) as SlackBlock[],
 				threadTs,
 				undefined,
 				undefined,
@@ -334,14 +344,18 @@ export async function handleMessage(event: SlackMessageEvent) {
 		}
 
 		if (user.isLocked) {
-			await postBlocks(
-				channelId,
-				[
-					Header({ text: "Account Locked" }).buildToObject(),
+			const msg = Message()
+				.blocks(
+					Header({ text: "Account Locked" }),
 					Section({
 						text: `Your account is locked.\n*Reason:* ${user.lockReason || "No reason provided."}`,
-					}).buildToObject(),
-				],
+					}),
+				)
+				.buildToObject();
+
+			await postBlocks(
+				channelId,
+				(msg.blocks || []) as SlackBlock[],
 				threadTs,
 				undefined,
 				undefined,
@@ -353,12 +367,16 @@ export async function handleMessage(event: SlackMessageEvent) {
 
 		const bucketName = user.slackId?.toLowerCase() ?? "";
 		if (!bucketName) {
+			const msg = Message()
+				.blocks(
+					Header({ text: "Error" }),
+					Section({ text: "Unable to determine bucket name for this user." }),
+				)
+				.buildToObject();
+
 			await postBlocks(
 				channelId,
-				[
-					Header({ text: "Error" }).buildToObject(),
-					Section({ text: "Unable to determine bucket name for this user." }).buildToObject(),
-				],
+				(msg.blocks || []) as SlackBlock[],
 				threadTs,
 				undefined,
 				undefined,
@@ -370,14 +388,18 @@ export async function handleMessage(event: SlackMessageEvent) {
 
 		const targetBucket = await getOrCreateCdnBucket(user.id, bucketName);
 		if (targetBucket.isPaused) {
-			await postBlocks(
-				channelId,
-				[
-					Header({ text: "Bucket Paused" }).buildToObject(),
+			const msg = Message()
+				.blocks(
+					Header({ text: "Bucket Paused" }),
 					Section({
 						text: `Your CDN bucket is paused.\n*Reason:* ${targetBucket.pauseReason || "No reason provided."}`,
-					}).buildToObject(),
-				],
+					}),
+				)
+				.buildToObject();
+
+			await postBlocks(
+				channelId,
+				(msg.blocks || []) as SlackBlock[],
 				threadTs,
 				undefined,
 				undefined,
