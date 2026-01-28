@@ -577,7 +577,7 @@ export async function postUploadSummary(params: {
 				channelId,
 				currentBlocks,
 				threadTs,
-				undefined, // username
+				uploaderName, // username
 				uploaderIconUrl, // iconUrl
 				fallbackText,
 				shouldUnfurl,
@@ -591,7 +591,7 @@ export async function postUploadSummary(params: {
 			channelId,
 			currentBlocks,
 			threadTs,
-			undefined, // username
+			uploaderName, // username
 			uploaderIconUrl, // iconUrl
 			fallbackText,
 			shouldUnfurl,
