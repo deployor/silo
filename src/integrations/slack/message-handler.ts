@@ -2,7 +2,9 @@ import { eq, sql } from "drizzle-orm";
 import {
 	Actions,
 	Button,
+	ConfirmationDialog,
 	Context,
+	Divider,
 	Header,
 	Message,
 	Section,
@@ -206,7 +208,7 @@ export async function handleMessage(event: SlackMessageEvent) {
 
 			await postBlocks(
 				channelId,
-				(msg.blocks || []) as SlackBlock[],
+				(msg.blocks || []) as unknown as SlackBlock[],
 				threadTs,
 				undefined,
 				undefined,
@@ -229,7 +231,7 @@ export async function handleMessage(event: SlackMessageEvent) {
 
 				await postBlocks(
 					channelId,
-					(msg.blocks || []) as SlackBlock[],
+					(msg.blocks || []) as unknown as SlackBlock[],
 					threadTs,
 					undefined,
 					undefined,
@@ -248,7 +250,7 @@ export async function handleMessage(event: SlackMessageEvent) {
 
 				await postBlocks(
 					channelId,
-					(msg.blocks || []) as SlackBlock[],
+					(msg.blocks || []) as unknown as SlackBlock[],
 					threadTs,
 					undefined,
 					undefined,
@@ -298,7 +300,7 @@ export async function handleMessage(event: SlackMessageEvent) {
 
 			await postBlocks(
 				channelId,
-				(msg.blocks || []) as SlackBlock[],
+				(msg.blocks || []) as unknown as SlackBlock[],
 				threadTs,
 				undefined,
 				undefined,
@@ -333,7 +335,7 @@ export async function handleMessage(event: SlackMessageEvent) {
 
 			await postBlocks(
 				channelId,
-				(msg.blocks || []) as SlackBlock[],
+				(msg.blocks || []) as unknown as SlackBlock[],
 				threadTs,
 				undefined,
 				undefined,
@@ -355,7 +357,7 @@ export async function handleMessage(event: SlackMessageEvent) {
 
 			await postBlocks(
 				channelId,
-				(msg.blocks || []) as SlackBlock[],
+				(msg.blocks || []) as unknown as SlackBlock[],
 				threadTs,
 				undefined,
 				undefined,
@@ -376,7 +378,7 @@ export async function handleMessage(event: SlackMessageEvent) {
 
 			await postBlocks(
 				channelId,
-				(msg.blocks || []) as SlackBlock[],
+				(msg.blocks || []) as unknown as SlackBlock[],
 				threadTs,
 				undefined,
 				undefined,
@@ -399,7 +401,7 @@ export async function handleMessage(event: SlackMessageEvent) {
 
 			await postBlocks(
 				channelId,
-				(msg.blocks || []) as SlackBlock[],
+				(msg.blocks || []) as unknown as SlackBlock[],
 				threadTs,
 				undefined,
 				undefined,
@@ -507,61 +509,44 @@ export async function postUploadSummary(params: {
 		if (messageTs) await addReaction(channelId, messageTs, "ms-worried");
 	}
 
-	blocks.push({
-		type: "section",
-		text: {
-			type: "mrkdwn",
-			text: headerText,
-		},
-	});
-
-	blocks.push({ type: "divider" });
+	blocks.push(Section({ text: headerText }).buildToObject());
+	blocks.push(Divider().buildToObject());
 
 	for (const r of results) {
 		if (r.url && r.key) {
-			const section: SlackBlock = {
-				type: "section",
-				text: {
-					type: "mrkdwn",
-					text: `*${r.name}*\n<${r.url}|${r.url}>`,
-				},
-			};
+			const section = Section({
+				text: `*${r.name}*\n<${r.url}|${r.url}>`,
+			});
 
 			// Only add delete button if it's a message reply (original behavior) or if explicitly requested
 			// The requirement was "without a delete button" for CDN postings.
 			// Since CDN postings have messageTs=undefined, we can use that check.
 			if (messageTs) {
-				section.accessory = {
-					type: "button",
-					text: {
-						type: "plain_text",
+				section.accessory(
+					Button({
 						text: "Delete",
-						emoji: true,
-					},
-					style: "danger",
-					value: `delete_cdn_file:${bucketId}:${r.key}:${uploaderSlackId}`,
-					action_id: "delete_cdn_file",
-					confirm: {
-						title: { type: "plain_text", text: "Delete File" },
-						text: {
-							type: "mrkdwn",
-							text: `Are you sure you want to delete *${r.name}*? This cannot be undone.`,
-						},
-						confirm: { type: "plain_text", text: "Yes, delete it" },
-						deny: { type: "plain_text", text: "Cancel" },
-					},
-				};
+						actionId: "delete_cdn_file",
+						value: `delete_cdn_file:${bucketId}:${r.key}:${uploaderSlackId}`,
+					})
+						.danger()
+						.confirm(
+							ConfirmationDialog({
+								title: "Delete File",
+								text: `Are you sure you want to delete *${r.name}*? This cannot be undone.`,
+								confirm: "Yes, delete it",
+								deny: "Cancel",
+							}),
+						),
+				);
 			}
 
-			blocks.push(section);
+			blocks.push(section.buildToObject());
 		} else {
-			blocks.push({
-				type: "section",
-				text: {
-					type: "mrkdwn",
+			blocks.push(
+				Section({
 					text: `~${r.name}~\n_Error: ${r.error || "Unknown error"}_`,
-				},
-			});
+				}).buildToObject(),
+			);
 		}
 	}
 
