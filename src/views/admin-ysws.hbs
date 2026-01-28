@@ -7,17 +7,19 @@
   <a href="/admin/settings" id="tab-settings" class="text-text-muted font-bold px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">Settings</a>
 </div>
 
-<div class="space-y-6">
-    <div class="flex justify-between items-center">
-        <h1 class="text-3xl font-bold tracking-tight">YSWS Submissions</h1>
-        <div class="text-sm text-text-muted">
-            Review submissions and award storage quota.
+<div class="bg-hc-dark rounded-3xl border border-white/10 overflow-hidden card-shadow mb-8">
+    <div class="p-6 border-b border-white/10 flex justify-between items-center">
+        <div>
+            <h2 class="text-xl font-bold text-white">YSWS Submissions</h2>
+            <p class="text-text-muted text-sm mt-1">
+                Review submissions and award storage quota.
+            </p>
         </div>
     </div>
 
-    <div class="overflow-x-auto rounded-lg border border-white/10">
+    <div class="overflow-x-auto">
         <table class="w-full text-left text-sm">
-            <thead class="bg-white/5 uppercase font-medium text-text-muted">
+            <thead class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
                 <tr>
                     <th class="px-6 py-4">Project</th>
                     <th class="px-6 py-4">User</th>
@@ -27,7 +29,7 @@
                     <th class="px-6 py-4"></th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-white/5 bg-black/20">
+            <tbody class="divide-y divide-white/5">
                 {{#each submissions}}
                 <tr class="hover:bg-white/5 transition-colors">
                     <td class="px-6 py-4 font-medium">
