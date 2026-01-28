@@ -232,6 +232,7 @@ export const redemptionCodes = pgTable(
 		isRedeemed: boolean("is_redeemed").default(false).notNull(),
 		redeemedBy: text("redeemed_by").references(() => users.id),
 		redeemedAt: timestamp("redeemed_at"),
+		createdBy: text("created_by").references(() => users.id),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},
 	(table) => {
@@ -241,6 +242,7 @@ export const redemptionCodes = pgTable(
 			redeemedByIdx: index("redemption_code_redeemed_by_idx").on(
 				table.redeemedBy,
 			),
+			createdByIdx: index("redemption_code_created_by_idx").on(table.createdBy),
 		};
 	},
 );
