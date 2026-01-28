@@ -47,12 +47,13 @@ export class RedemptionService {
 	static async generateCodes(
 		programId: string,
 		count: number,
+	       createdBy: string,
 		length = 16, // Total length of random part (excluding dashes/prefix)
 	) {
 		const program = await this.getProgramById(programId);
 		if (!program) throw new Error("Program not found");
 
-		const codesToInsert: { programId: string; code: string }[] = [];
+		const codesToInsert: { programId: string; code: string; createdBy: string }[] = [];
 
 		for (let i = 0; i < count; i++) {
 			// Generate random hex string
@@ -69,6 +70,7 @@ export class RedemptionService {
 			codesToInsert.push({
 				programId,
 				code,
+			             createdBy,
 			});
 		}
 
