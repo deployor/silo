@@ -1,5 +1,6 @@
 import Handlebars from "handlebars";
 import { config } from "../config";
+import { formatBytes } from "./format";
 
 const templateCache = new Map<string, Handlebars.TemplateDelegate>();
 
@@ -98,4 +99,20 @@ Handlebars.registerHelper("formatDate", (date) => {
 		month: "short",
 		day: "numeric",
 	});
+});
+
+Handlebars.registerHelper("formatBytes", (bytes) => {
+	return formatBytes(bytes);
+});
+
+Handlebars.registerHelper("lt", (a, b) => {
+	return a < b;
+});
+
+Handlebars.registerHelper("add", (a, b) => {
+	return Number(a) + Number(b);
+});
+
+Handlebars.registerHelper("subtract", (a, b) => {
+	return Number(a) - Number(b);
 });
