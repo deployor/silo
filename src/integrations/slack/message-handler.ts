@@ -1,4 +1,11 @@
 import { eq, sql } from "drizzle-orm";
+import {
+	Actions,
+	Button,
+	Context,
+	Header,
+	Section,
+} from "slack-block-builder";
 import { config } from "../../config";
 import { getInternalPath } from "../../core/s3/utils";
 import { db } from "../../db";
@@ -181,13 +188,26 @@ export async function handleMessage(event: SlackMessageEvent) {
 	try {
 		const user = await getUserBySlackId(slackId);
 		if (!user) {
-			await postMessage(
+			await postBlocks(
 				channelId,
-				`Heyho! you need an account on Silo so i can manage quota (and more) for you.
-
-Please sign in with Hack Club Auth so we can match this Slack user to your record:
-<https://${config.s3Domain}/auth/login?source=slack|Sign in to Silo>`,
+				[
+					Header({ text: "Whoops! Account Required" }).buildToObject(),
+					Section({
+						text: "Heyho! You need an account on Silo so I can manage quota (and more) for you. Please sign in with Hack Club Auth so we can match this Slack user to your record.",
+					}).buildToObject(),
+					Actions()
+						.elements(
+							Button({
+								text: "Sign in to Silo",
+								url: `https://${config.s3Domain}/auth/login?source=slack`,
+							}).primary(),
+						)
+						.buildToObject(),
+				],
 				threadTs,
+				undefined,
+				undefined,
+				"Account Required",
 			);
 			await addReaction(channelId, messageTs, "ms-no");
 			return;
@@ -195,17 +215,33 @@ Please sign in with Hack Club Auth so we can match this Slack user to your recor
 
 		if (user.filesDeleted) {
 			if (user.dataExported) {
-				await postMessage(
+				await postBlocks(
 					channelId,
-					"Bro, you're over 18. :ms-raised-eyebrow: I'm sorry to tell you, but you also can't use the CDN anymore, sowwy! As you know, all your files and S3 and everything got paused before too, and you downloaded them in time!",
+					[
+						Header({ text: "CDN Access Revoked" }).buildToObject(),
+						Section({
+							text: "Bro, you're over 18. :ms-raised-eyebrow: I'm sorry to tell you, but you also can't use the CDN anymore, sowwy! As you know, all your files and S3 and everything got paused before too, and you downloaded them in time!",
+						}).buildToObject(),
+					],
 					threadTs,
+					undefined,
+					undefined,
+					"CDN Access Revoked",
 				);
 				await addReaction(channelId, messageTs, "ms-raised-eyebrow");
 			} else {
-				await postMessage(
+				await postBlocks(
 					channelId,
-					"Hey uh, how do I tell you this but... :panic:\n\nYour files got forever deleted and you weren't in time to actually download them. You're over 18, and to save budget and more, Hack Club doesn't actually run this for over 18-year-olds... Sorry.",
+					[
+						Header({ text: "Files Deleted" }).buildToObject(),
+						Section({
+							text: "Hey uh, how do I tell you this but... :panic:\n\nYour files got forever deleted and you weren't in time to actually download them. You're over 18, and to save budget and more, Hack Club doesn't actually run this for over 18-year-olds... Sorry.",
+						}).buildToObject(),
+					],
 					threadTs,
+					undefined,
+					undefined,
+					"Files Deleted",
 				);
 				await addReaction(channelId, messageTs, "panic");
 			}
@@ -227,30 +263,88 @@ Please sign in with Hack Club Auth so we can match this Slack user to your recor
 			: "soon";
 
 		if (user.dataExported) {
-			await postMessage(
+			await postBlocks(
 				channelId,
-				`Heyho, sorry you're over 18 and your files are also soon to be deleted :sad-pf:, soooooo no new files and old ones gone soon too :C\n\nYou already downloaded your files, but if you need to again, <https://${config.s3Domain}/dashboard/offboarding|HERE> are your old files. Soooo ${usageGB} GB will be deleted in ${daysLeft} days on ${endDate}.`,
+				[
+					Header({ text: "Files Scheduled for Deletion" }).buildToObject(),
+					Section({
+						text: "Heyho, sorry you're over 18 and your files are also soon to be deleted :sad-pf:, soooooo no new files and old ones gone soon too :C",
+					}).buildToObject(),
+					Section({
+						text: "You already downloaded your files, but if you need to again, you can find them below.",
+					}).buildToObject(),
+					Context()
+						.elements(
+							`Usage: ${usageGB} GB`,
+							`Deletion in: ${daysLeft} days (${endDate})`,
+						)
+						.buildToObject(),
+					Actions()
+						.elements(
+							Button({
+								text: "View Old Files",
+								url: `https://${config.s3Domain}/dashboard/offboarding`,
+							}),
+						)
+						.buildToObject(),
+				],
 				threadTs,
+				undefined,
+				undefined,
+				"Files Scheduled for Deletion",
 			);
 			await addReaction(channelId, messageTs, "sad-pf");
 			return;
 		}
 
 		if (user.markedAsOverAge) {
-			await postMessage(
+			await postBlocks(
 				channelId,
-				`Hey... Sorry but you're over 18- You seem to store ${usageGB} GB of data though! WHICH YOU HAVE STILL NOT DOWNLOADED!!!!! :siren1::siren1::siren1::siren1::siren1::siren1::siren1::siren1::siren1::siren1: Please download them <https://${config.s3Domain}/dashboard/offboarding|HERE> and migrate to something like Cloudflare R2 ASAP! :catalarm: I will delete everything in ${daysLeft} days on ${endDate}, so HURRY! I won't upload the files you provided me with :(`,
+				[
+					Header({ text: "Action Required: Download Files!" }).buildToObject(),
+					Section({
+						text: `Hey... Sorry but you're over 18- You seem to store *${usageGB} GB* of data though! WHICH YOU HAVE STILL NOT DOWNLOADED!!!!! :siren1::siren1::siren1::siren1::siren1:`,
+					}).buildToObject(),
+					Section({
+						text: "Please download them and migrate to something like Cloudflare R2 ASAP! :catalarm: I will delete everything soon, so HURRY!",
+					}).buildToObject(),
+					Context()
+						.elements(
+							`Usage: ${usageGB} GB`,
+							`Deletion in: ${daysLeft} days (${endDate})`,
+						)
+						.buildToObject(),
+					Actions()
+						.elements(
+							Button({
+								text: "Download Files",
+								url: `https://${config.s3Domain}/dashboard/offboarding`,
+							}).danger(),
+						)
+						.buildToObject(),
+				],
 				threadTs,
+				undefined,
+				undefined,
+				"Urgent: Download Files",
 			);
 			await addReaction(channelId, messageTs, "siren1");
 			return;
 		}
 
 		if (user.isLocked) {
-			await postMessage(
+			await postBlocks(
 				channelId,
-				`Your account is locked. Reason: ${user.lockReason || "No reason provided."}`,
+				[
+					Header({ text: "Account Locked" }).buildToObject(),
+					Section({
+						text: `Your account is locked.\n*Reason:* ${user.lockReason || "No reason provided."}`,
+					}).buildToObject(),
+				],
 				threadTs,
+				undefined,
+				undefined,
+				"Account Locked",
 			);
 			await addReaction(channelId, messageTs, "ms-no");
 			return;
@@ -258,10 +352,16 @@ Please sign in with Hack Club Auth so we can match this Slack user to your recor
 
 		const bucketName = user.slackId?.toLowerCase() ?? "";
 		if (!bucketName) {
-			await postMessage(
+			await postBlocks(
 				channelId,
-				"Unable to determine bucket name for this user.",
+				[
+					Header({ text: "Error" }).buildToObject(),
+					Section({ text: "Unable to determine bucket name for this user." }).buildToObject(),
+				],
 				threadTs,
+				undefined,
+				undefined,
+				"Error",
 			);
 			await addReaction(channelId, messageTs, "ms-no");
 			return;
@@ -269,10 +369,18 @@ Please sign in with Hack Club Auth so we can match this Slack user to your recor
 
 		const targetBucket = await getOrCreateCdnBucket(user.id, bucketName);
 		if (targetBucket.isPaused) {
-			await postMessage(
+			await postBlocks(
 				channelId,
-				`Your CDN bucket is paused. Reason: ${targetBucket.pauseReason || "No reason provided."}`,
+				[
+					Header({ text: "Bucket Paused" }).buildToObject(),
+					Section({
+						text: `Your CDN bucket is paused.\n*Reason:* ${targetBucket.pauseReason || "No reason provided."}`,
+					}).buildToObject(),
+				],
 				threadTs,
+				undefined,
+				undefined,
+				"Bucket Paused",
 			);
 			await addReaction(channelId, messageTs, "ms-no");
 			return;

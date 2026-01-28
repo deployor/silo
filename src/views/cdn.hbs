@@ -9,6 +9,7 @@
       Drag and drop any file to upload.
     </p>
 
+    {{#if user.isAdmin}}
     <div class="flex flex-col items-center gap-4 mb-6">
         <div class="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-4 py-2 rounded-lg text-sm inline-block max-w-xl">
             <div class="flex items-center gap-2">
@@ -17,13 +18,26 @@
             </div>
         </div>
         
-        <div class="flex items-center gap-2">
-             <input id="postToSlack" type="checkbox" class="form-checkbox h-4 w-4 bg-black/50 border-white/10 rounded text-hc-blue focus:ring-0 cursor-pointer" />
-             <label for="postToSlack" class="text-text-muted text-sm cursor-pointer select-none hover:text-white transition-colors">
+        <div class="flex items-center gap-2 group cursor-pointer" onclick="document.getElementById('postToSlack').click()">
+             <div class="relative flex items-center">
+                 <input id="postToSlack" type="checkbox" class="peer h-4 w-4 opacity-0 absolute" />
+                 <div class="w-10 h-6 bg-white/10 peer-checked:bg-hc-green rounded-full transition-colors duration-200 ease-in-out"></div>
+                 <div class="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 ease-in-out peer-checked:translate-x-4"></div>
+             </div>
+             <label class="text-text-muted text-sm cursor-pointer select-none group-hover:text-white transition-colors font-medium">
                 Post uploaded files to #cdn
              </label>
         </div>
     </div>
+    {{else}}
+    <div class="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-4 py-2 rounded-lg text-sm mb-6 inline-block max-w-xl">
+        <div class="flex items-center gap-2">
+            <i class="ph ph-info text-lg"></i>
+            <span>Files uploaded here will be automatically posted to the <span class="font-bold text-white">#cdn</span> channel on Slack.</span>
+        </div>
+    </div>
+    <input id="postToSlack" type="checkbox" class="hidden" checked />
+    {{/if}}
     <br/>
 
     <div class="inline-flex flex-wrap justify-center items-center gap-3 bg-white/5 px-4 py-2 rounded-full border border-white/10 max-w-full">
@@ -290,13 +304,16 @@
     // Load preference from local storage or default to true
     const savedPref = localStorage.getItem('silo_cdn_post_slack');
     const checkbox = document.getElementById('postToSlack');
-    // Default to true if not set
-    checkbox.checked = savedPref === null ? true : (savedPref === 'true');
     
-    // Save preference on change
-    checkbox.addEventListener('change', (e) => {
-        localStorage.setItem('silo_cdn_post_slack', e.target.checked);
-    });
+    if (checkbox && checkbox.type !== 'hidden') {
+        // Default to true if not set
+        checkbox.checked = savedPref === null ? true : (savedPref === 'true');
+        
+        // Save preference on change
+        checkbox.addEventListener('change', (e) => {
+            localStorage.setItem('silo_cdn_post_slack', e.target.checked);
+        });
+    }
   }).catch(() => {
     // window.location.href = '/auth/login'; // Auth middleware handles this
   });
