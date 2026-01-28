@@ -130,6 +130,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
     }
 
     if (req.method === "POST" && url.pathname === "/ysws/submit") {
+        console.log("[YSWS] POST /ysws/submit received");
         try {
             const formData = await req.formData();
             const data = Object.fromEntries(formData.entries());
@@ -137,6 +138,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
             const validation = SubmissionSchema.safeParse(data);
 
             if (!validation.success) {
+                 console.log("[YSWS] Validation failed", validation.error.flatten().fieldErrors);
                  return new Response(await render("ysws-submit", {
                     title: "Submit to YSWS",
                     user,
@@ -210,6 +212,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
             // Handle Screenshot Upload
             const screenshotFile = formData.get("screenshotFile");
             if (screenshotFile && screenshotFile instanceof File && screenshotFile.size > 0) {
+                console.log(`[YSWS] Processing screenshot upload: ${screenshotFile.name} (${screenshotFile.size} bytes)`);
                 try {
                     // Create or get 'ysws' bucket owned by admin/system or current user?
                     // We'll create a 'ysws' system bucket if it doesn't exist, owned by this user for simplicity in this context,
@@ -235,6 +238,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                     let targetOwner: typeof users.$inferSelect | undefined;
 
                     if (bucketResult.length === 0) {
+                        console.log(`[YSWS] Creating system bucket '${systemBucketName}'`);
                         // Create it if not exists. System bucket with no owner.
                         const [newBucket] = await db
                             .insert(buckets)
@@ -248,6 +252,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                             .returning();
                         targetBucket = newBucket;
                     } else {
+                        console.log(`[YSWS] Using existing bucket '${systemBucketName}'`);
                         targetBucket = bucketResult[0].bucket;
                         targetOwner = bucketResult[0].user || undefined;
                     }
@@ -257,10 +262,12 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                     
                     // The getInternalPath function will ignore user for system buckets
                     const internalPath = getInternalPath(fileName, targetOwner || user, targetBucket);
+                    console.log(`[YSWS] Internal path: ${internalPath}`);
                     const fileBuffer = await screenshotFile.arrayBuffer();
 
                     // Upload to S3
-                    await s3Client.fetch(internalPath, {
+                    console.log("[YSWS] Uploading to S3...");
+                    const uploadRes = await s3Client.fetch(internalPath, {
                         method: "PUT",
                         body: fileBuffer,
                         headers: {
@@ -268,8 +275,14 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                         }
                     });
 
+                    if (!uploadRes.ok) {
+                         throw new Error(`S3 Upload failed: ${uploadRes.status} ${uploadRes.statusText}`);
+                    }
+                    console.log("[YSWS] Upload successful");
+
                     // Construct Public URL
                     screenshotUrl = `https://${config.s3Domain}/${systemBucketName}/${fileName}`;
+                    console.log(`[YSWS] Screenshot URL: ${screenshotUrl}`);
 
                 } catch (uploadError) {
                     console.error("Screenshot upload failed:", uploadError);
@@ -298,6 +311,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                 });
             }
 
+            console.log("[YSWS] Creating submission record...");
             await YswsService.createSubmission({
                 userId: user.id,
                 projectName: validData.projectName,
@@ -316,13 +330,14 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
             });
 
             // Redirect to success or list
+            console.log("[YSWS] Submission successful, redirecting...");
              return new Response(null, {
                 status: 302,
                 headers: { Location: "/ysws?success=true" },
             });
 
         } catch (e) {
-            console.error(e);
+            console.error("[YSWS] Error in submission handler:", e);
             return new Response("Internal Server Error", { status: 500 });
         }
     }
