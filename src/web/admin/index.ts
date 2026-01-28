@@ -230,11 +230,11 @@ async function ageOutUser(userId: string, req: Request) {
 					text: "Hey there. Since you're 18 now, you've aged out of Silo. Hack Club is a space for teenagers, so we need you to move your files to another provider.",
 				}),
 				Section({
-					text: `You have until *${gracePeriodEndsAt.toLocaleDateString()}* to download everything. After that, we'll permanently delete your files.\n\nWe've built an export tool to make this easy. Click below to download a ZIP of all your buckets.`,
+					text: `You have until *${gracePeriodEndsAt.toLocaleDateString()}* to migrate everything. After that, we'll permanently delete your files.\n\nWe've built an *super easy migration assistant* that can move your buckets directly to Cloudflare R2, AWS S3, or any other provider in minutes—no downloading required!`,
 				}),
 				Actions().elements(
 					Button({
-						text: "Export Your Data",
+						text: "Migrate or Download Data",
 						url: `https://${config.s3Domain}/dashboard/offboarding`,
 						actionId: "open_export_portal",
 					}).danger(),

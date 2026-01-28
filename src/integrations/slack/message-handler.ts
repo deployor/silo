@@ -305,12 +305,12 @@ export async function handleMessage(event: SlackMessageEvent) {
 			await postBlocks(
 				channelId,
 				[
-					Header({ text: "Action Required: Download Files!" }),
+					Header({ text: "Action Required: Migrate Your Files!" }),
 					Section({
-						text: `Hey... Sorry but you're over 18- You seem to store *${usageGB} GB* of data though! WHICH YOU HAVE STILL NOT DOWNLOADED!!!!! :siren1::siren1::siren1::siren1::siren1:`,
+						text: `Hey... Sorry but you're over 18. You have *${usageGB} GB* of data stored that needs to be moved.`,
 					}),
 					Section({
-						text: "Please download them and migrate to something like Cloudflare R2 ASAP! :catalarm: I will delete everything soon, so HURRY!",
+						text: "Please use our *Migration Assistant* to transfer your buckets to Cloudflare R2, AWS, or any S3 provider. It's super fast and doesn't require downloading anything! :catalarm:",
 					}),
 					Context().elements(
 						`Usage: ${usageGB} GB`,
@@ -318,7 +318,7 @@ export async function handleMessage(event: SlackMessageEvent) {
 					),
 					Actions().elements(
 						Button({
-							text: "Download Files",
+							text: "Open Migration Assistant",
 							url: `https://${config.s3Domain}/dashboard/offboarding`,
 						}).danger(),
 					),
