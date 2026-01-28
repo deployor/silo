@@ -221,24 +221,43 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                     const systemBucketName = "ysws";
                     
                     // Check if bucket exists
-                    let bucket = await db.select().from(buckets).where(eq(buckets.name, systemBucketName)).limit(1);
-                    
-                    if (bucket.length === 0) {
-                        // Create it if not exists. Assign to current user for ownership.
-                        // In real app, this should be a system user.
-                        const newBucket = await db.insert(buckets).values({
-                            name: systemBucketName,
-                            userId: user.id,
-                            isPublic: true,
-                            region: "auto",
-                            }).returning();
-                        bucket = newBucket;
+                    const bucketResult = await db
+                        .select({
+                            bucket: buckets,
+                            user: users,
+                        })
+                        .from(buckets)
+                        .innerJoin(users, eq(buckets.userId, users.id))
+                        .where(eq(buckets.name, systemBucketName))
+                        .limit(1);
+
+                    let targetBucket: typeof buckets.$inferSelect;
+                    let targetOwner: typeof users.$inferSelect | undefined;
+
+                    if (bucketResult.length === 0) {
+                        // Create it if not exists. System bucket with no owner.
+                        const [newBucket] = await db
+                            .insert(buckets)
+                            .values({
+                                name: systemBucketName,
+                                userId: null,
+                                isPublic: true,
+                                isSystem: true,
+                                region: "auto",
+                            })
+                            .returning();
+                        targetBucket = newBucket;
+                    } else {
+                        targetBucket = bucketResult[0].bucket;
+                        targetOwner = bucketResult[0].user;
                     }
 
-                    const targetBucket = bucket[0];
                     const ext = screenshotFile.name.split(".").pop() || "png";
                     const fileName = `screenshots/${crypto.randomUUID()}.${ext}`;
-                    const internalPath = getInternalPath(fileName, user, targetBucket);
+                    
+                    // Ensure we pass a user object even for system buckets to satisfy Typescript
+                    // The getInternalPath function will ignore it for system buckets
+                    const internalPath = getInternalPath(fileName, targetOwner || user, targetBucket);
                     const fileBuffer = await screenshotFile.arrayBuffer();
 
                     // Upload to S3

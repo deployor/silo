@@ -103,6 +103,8 @@ export async function emptyBucket(
 	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
 	if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
 
+	if (!bucket[0].userId) throw new Error("Cannot empty system bucket without owner");
+
 	const owner = await db
 		.select()
 		.from(users)
@@ -134,17 +136,20 @@ export async function deleteBucket(
 	if (bucket.length === 0) throw new Error("Bucket not found");
 	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
 	if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
+	if (bucket[0].isSystem) throw new Error("Cannot delete system bucket");
 
 	// Best-effort: remove all objects first so upstream storage doesn't leak
 	try {
-		const owner = await db
-			.select()
-			.from(users)
-			.where(eq(users.id, bucket[0].userId))
-			.limit(1);
-		if (owner.length > 0) {
-			const internalPrefix = getInternalPath("", owner[0], bucket[0]);
-			await deleteBucketContents(internalPrefix);
+		if (bucket[0].userId) {
+			const owner = await db
+				.select()
+				.from(users)
+				.where(eq(users.id, bucket[0].userId))
+				.limit(1);
+			if (owner.length > 0) {
+				const internalPrefix = getInternalPath("", owner[0], bucket[0]);
+				await deleteBucketContents(internalPrefix);
+			}
 		}
 	} catch (e) {
 		console.error("Failed to empty bucket during delete:", e);
