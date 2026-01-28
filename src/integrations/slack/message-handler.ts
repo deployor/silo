@@ -450,8 +450,12 @@ export async function postUploadSummary(params: {
 	// So we will NOT impersonate the user for CDN uploads, but instead explicitly state "User uploaded X".
 	
 	let uploaderName = undefined;
+	let uploaderIconUrl = undefined;
 
 	if (!messageTs && uploaderSlackId) {
+		// Use Cachet for the avatar
+		uploaderIconUrl = `https://cachet.dunkirk.sh/users/${uploaderSlackId}/r`;
+
 		const slackUser = await getUserInfo(uploaderSlackId);
 		if (slackUser) {
 			uploaderName =
@@ -574,7 +578,7 @@ export async function postUploadSummary(params: {
 				currentBlocks,
 				threadTs,
 				undefined, // username
-				undefined, // iconUrl
+				uploaderIconUrl, // iconUrl
 				fallbackText,
 				shouldUnfurl,
 			);
@@ -588,7 +592,7 @@ export async function postUploadSummary(params: {
 			currentBlocks,
 			threadTs,
 			undefined, // username
-			undefined, // iconUrl
+			uploaderIconUrl, // iconUrl
 			fallbackText,
 			shouldUnfurl,
 		);
