@@ -9,49 +9,49 @@
   <a href="/admin/settings" id="tab-settings" class="text-text-muted font-bold px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">Settings</a>
 </div>
 
-<div class="space-y-6">
-    <div class="flex items-center justify-between">
+<!-- Main Section -->
+<div class="bg-hc-dark rounded-3xl border border-white/10 overflow-hidden card-shadow mb-8">
+    <div class="p-6 border-b border-white/10 flex justify-between items-center">
         <div>
-            <h1 class="text-2xl font-bold font-display text-zinc-100">Redemption Programs</h1>
-            <p class="text-zinc-400 mt-1">Manage codes and quota grants for external programs.</p>
+            <h2 class="text-xl font-bold text-white">Redemption Programs</h2>
+            <p class="text-text-muted text-sm mt-1">Manage codes and quota grants for external programs.</p>
         </div>
-        <button onclick="document.getElementById('new-program-modal').showModal()" 
-                class="px-4 py-2 bg-zinc-100 text-zinc-900 text-sm font-medium rounded-md hover:bg-white transition-colors">
-            New Program
+        <button onclick="document.getElementById('new-program-modal').classList.remove('hidden'); document.getElementById('new-program-modal').classList.add('flex');"
+                class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors">
+            + New Program
         </button>
     </div>
 
-    <!-- Programs List -->
-    <div class="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
-        <table class="w-full text-left text-sm text-zinc-400">
-            <thead class="bg-zinc-800/50 text-zinc-200">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+            <thead class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
                 <tr>
-                    <th class="px-6 py-3 font-medium">Name</th>
-                    <th class="px-6 py-3 font-medium">Prefix</th>
-                    <th class="px-6 py-3 font-medium">Credit</th>
-                    <th class="px-6 py-3 font-medium">Status</th>
-                    <th class="px-6 py-3 font-medium text-right">Actions</th>
+                    <th class="px-6 py-4">Name</th>
+                    <th class="px-6 py-4">Prefix</th>
+                    <th class="px-6 py-4">Credit</th>
+                    <th class="px-6 py-4">Status</th>
+                    <th class="px-6 py-4 text-right">Actions</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-zinc-800">
+            <tbody class="divide-y divide-white/5">
                 {{#each programs}}
-                <tr class="hover:bg-zinc-800/30 transition-colors">
-                    <td class="px-6 py-4 font-medium text-zinc-200">{{this.name}}</td>
-                    <td class="px-6 py-4 font-mono text-xs">{{this.prefix}}</td>
-                    <td class="px-6 py-4">{{formatBytes this.quotaCreditBytes}}</td>
+                <tr class="hover:bg-white/5 transition-colors">
+                    <td class="px-6 py-4 font-medium text-white">{{this.name}}</td>
+                    <td class="px-6 py-4 font-mono text-xs text-text-muted">{{this.prefix}}</td>
+                    <td class="px-6 py-4 text-white font-mono">{{formatBytes this.quotaCreditBytes}}</td>
                     <td class="px-6 py-4">
                         {{#if this.isActive}}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-500/10 text-green-400">
-                                Active
+                            <span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-bold border border-emerald-500/30">
+                                ACTIVE
                             </span>
                         {{else}}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-zinc-700/50 text-zinc-400">
-                                Inactive
+                            <span class="bg-white/10 text-text-muted px-2 py-0.5 rounded text-xs font-bold border border-white/20">
+                                INACTIVE
                             </span>
                         {{/if}}
                     </td>
                     <td class="px-6 py-4 text-right">
-                        <a href="/admin/redemptions/{{this.id}}" class="text-blue-400 hover:text-blue-300 hover:underline">
+                        <a href="/admin/redemptions/{{this.id}}" class="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider">
                             Manage Codes
                         </a>
                     </td>
@@ -59,7 +59,7 @@
                 {{/each}}
                 {{#unless programs}}
                 <tr>
-                    <td colspan="5" class="px-6 py-8 text-center text-zinc-500">
+                    <td colspan="5" class="px-6 py-8 text-center text-text-muted italic">
                         No redemption programs created yet.
                     </td>
                 </tr>
@@ -70,47 +70,47 @@
 </div>
 
 <!-- New Program Modal -->
-<dialog id="new-program-modal" class="bg-transparent backdrop:bg-black/80 p-0 w-full max-w-md">
-    <div class="bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl overflow-hidden">
-        <div class="px-6 py-4 border-b border-zinc-800 flex justify-between items-center">
-            <h3 class="text-lg font-medium text-zinc-100">Create New Program</h3>
-            <button onclick="document.getElementById('new-program-modal').close()" class="text-zinc-500 hover:text-zinc-300">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+<div id="new-program-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50">
+    <div class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-md card-shadow transform transition-all">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-2xl font-bold text-white">Create New Program</h3>
+            <button onclick="document.getElementById('new-program-modal').classList.add('hidden'); document.getElementById('new-program-modal').classList.remove('flex');" class="text-text-muted hover:text-white transition-colors">
+                <i class="ph ph-x text-2xl"></i>
             </button>
         </div>
-        <form method="POST" action="/admin/redemptions/create" class="p-6 space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-zinc-300 mb-1">Program Name</label>
-                <input type="text" name="name" required placeholder="e.g. Hack Club Winter 2024" 
-                       class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
+        <form method="POST" action="/admin/redemptions/create">
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Program Name</label>
+                <input type="text" name="name" required placeholder="e.g. Hack Club Winter 2024"
+                       class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-blue focus:ring-1 focus:ring-hc-blue placeholder-white/20 transition-colors">
             </div>
-            <div>
-                <label class="block text-sm font-medium text-zinc-300 mb-1">Code Prefix</label>
+            <div class="mb-4">
+                <label class="block text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Code Prefix</label>
                 <input type="text" name="prefix" required placeholder="e.g. WINTER" pattern="[A-Za-z0-9]+" title="Alphanumeric only"
-                       class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 uppercase">
-                <p class="text-xs text-zinc-500 mt-1">Codes will look like: PREFIX-XXXX-XXXX</p>
+                       class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-blue focus:ring-1 focus:ring-hc-blue placeholder-white/20 transition-colors uppercase font-mono">
+                <p class="text-xs text-text-muted mt-2">Codes will look like: PREFIX-XXXX-XXXX</p>
             </div>
-             <div>
-                <label class="block text-sm font-medium text-zinc-300 mb-1">Quota Credit (Bytes)</label>
+             <div class="mb-4">
+                <label class="block text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Quota Credit (Bytes)</label>
                 <input type="number" name="quotaCreditBytes" required value="1073741824"
-                       class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
-                <p class="text-xs text-zinc-500 mt-1">Default: 1GB (1073741824)</p>
+                       class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-blue focus:ring-1 focus:ring-hc-blue placeholder-white/20 transition-colors font-mono">
+                <p class="text-xs text-text-muted mt-2">Default: 1GB (1073741824)</p>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-zinc-300 mb-1">Description</label>
+            <div class="mb-6">
+                <label class="block text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Description</label>
                 <textarea name="description" rows="3"
-                          class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"></textarea>
+                          class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-blue focus:ring-1 focus:ring-hc-blue placeholder-white/20 transition-colors"></textarea>
             </div>
-            <div class="pt-2 flex justify-end gap-3">
-                <button type="button" onclick="document.getElementById('new-program-modal').close()" 
-                        class="px-4 py-2 text-zinc-400 hover:text-zinc-200 text-sm font-medium">
+            <div class="flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('new-program-modal').classList.add('hidden'); document.getElementById('new-program-modal').classList.remove('flex');"
+                        class="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors">
                     Cancel
                 </button>
-                <button type="submit" 
-                        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-md transition-colors">
+                <button type="submit"
+                        class="bg-hc-blue hover:bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105 card-shadow">
                     Create Program
                 </button>
             </div>
         </form>
     </div>
-</dialog>
+</div>
