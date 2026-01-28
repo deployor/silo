@@ -439,54 +439,71 @@ export async function postUploadSummary(params: {
 		uploaderEmail,
 	} = params;
 
-	// If we are posting as a summary (not a reply), we want to impersonate the user
-	let username = undefined;
-	let iconUrl = undefined;
+	// If we are posting as a summary (not a reply), we want to impersonate the user?
+	// User feedback: "make it go like xy uploaded or sum in the cdn channel when from /cdn ... it should be a like a notification that xy upaoded sum"
+	// So we will NOT impersonate the user for CDN uploads, but instead explicitly state "User uploaded X".
+	
+	let uploaderName = undefined;
 
 	if (!messageTs && uploaderSlackId) {
 		const slackUser = await getUserInfo(uploaderSlackId);
 		if (slackUser) {
-			username =
+			uploaderName =
 				slackUser.profile.display_name ||
 				slackUser.profile.real_name ||
 				slackUser.name;
-			iconUrl = slackUser.profile.image_192 || slackUser.profile.image_512;
 		} else if (uploaderEmail) {
-			username = uploaderEmail.split("@")[0];
-		}
-		
-		if (!iconUrl) {
-			iconUrl = `https://cachet.dunkirk.sh/users/${uploaderSlackId}/r`;
+			uploaderName = uploaderEmail.split("@")[0];
 		}
 	}
 
 	const blocks: any[] = [];
 
 	let headerText = "";
-	let uploadedBy = "";
+	let subHeaderText = "";
+
+	// If it's a CDN upload (no messageTs), we redesign the header
 	if (!messageTs) {
-		// This is a CDN upload (not a reply to a message)
-		if (username) {
-			uploadedBy = ` by *${username}*`;
-		}
-	}
-
-	if (successCount === 0) {
-		headerText = "❌ *Failed to upload files*";
-		if (messageTs) await addReaction(channelId, messageTs, "ms-no");
-	} else if (successCount === totalCount) {
-		if (!messageTs && successCount === 1 && results[0]) {
-			headerText = `*Uploaded ${results[0].name}*${uploadedBy}`;
+		const userTag = uploaderSlackId ? `<@${uploaderSlackId}>` : uploaderName || "Someone";
+		
+		if (successCount === 0) {
+			blocks.push(
+				Section({
+					text: `*Upload Failed*\n${userTag} tried to upload ${totalCount} ${plural(totalCount, "file", "files")} but failed.`
+				})
+			);
 		} else {
-			headerText = `:dinowow: *Uploaded ${successCount} ${plural(successCount, "file", "files")}!*${uploadedBy}`;
+			// Success (partial or full)
+			let text = "";
+			if (successCount === 1 && results.length === 1) {
+				text = `${userTag} uploaded *${results[0].name}*`;
+			} else {
+				text = `${userTag} uploaded ${successCount} ${plural(successCount, "file", "files")}`;
+				if (successCount < totalCount) {
+					text += ` (${totalCount - successCount} failed)`;
+				}
+			}
+			blocks.push(Section({ text }));
 		}
-		if (messageTs) await addReaction(channelId, messageTs, "ms-green-tick");
 	} else {
-		headerText = `⚠️ *Uploaded ${successCount}/${totalCount} files*${uploadedBy}`;
-		if (messageTs) await addReaction(channelId, messageTs, "ms-worried");
+		// Traditional logic for Slack-native uploads (replying to a message)
+		if (successCount === 0) {
+			headerText = "❌ *Failed to upload files*";
+			if (messageTs) await addReaction(channelId, messageTs, "ms-no");
+		} else if (successCount === totalCount) {
+			if (successCount === 1 && results[0]) {
+				headerText = `*Uploaded ${results[0].name}*`;
+			} else {
+				headerText = `:dinowow: *Uploaded ${successCount} ${plural(successCount, "file", "files")}!*`;
+			}
+			if (messageTs) await addReaction(channelId, messageTs, "ms-green-tick");
+		} else {
+			headerText = `⚠️ *Uploaded ${successCount}/${totalCount} files*`;
+			if (messageTs) await addReaction(channelId, messageTs, "ms-worried");
+		}
+		blocks.push(Section({ text: headerText }));
 	}
-
-	blocks.push(Section({ text: headerText }));
+	
 	blocks.push(Divider());
 
 	for (const r of results) {
@@ -540,6 +557,9 @@ export async function postUploadSummary(params: {
 	// Only unfurl if this is a CDN upload (no messageTs implies it's not a reply/reaction to a Slack message)
 	const shouldUnfurl = !messageTs;
 
+	// Note: We are explicitly passing undefined for username/iconUrl here to use the default bot identity
+	// This makes it look like a notification from the system rather than impersonating the user.
+
 	for (let i = 2; i < blocks.length; i++) {
 		currentBlocks.push(blocks[i]);
 		if (currentBlocks.length >= CHUNK_SIZE) {
@@ -547,8 +567,8 @@ export async function postUploadSummary(params: {
 				channelId,
 				currentBlocks,
 				threadTs,
-				username,
-				iconUrl,
+				undefined, // username
+				undefined, // iconUrl
 				fallbackText,
 				shouldUnfurl,
 			);
@@ -561,8 +581,8 @@ export async function postUploadSummary(params: {
 			channelId,
 			currentBlocks,
 			threadTs,
-			username,
-			iconUrl,
+			undefined, // username
+			undefined, // iconUrl
 			fallbackText,
 			shouldUnfurl,
 		);
