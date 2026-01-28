@@ -14,7 +14,7 @@ import {
 
 export async function handleGetRequest(
 	req: Request,
-	user: typeof users.$inferSelect,
+	user: typeof users.$inferSelect | null,
 	bucket: typeof buckets.$inferSelect,
 	key: string,
 	internalPath: string,
@@ -94,24 +94,26 @@ ${rulesXml}
 	}
 
 	let egressLimit: bigint | null = null;
-	if (user.egressLimitBytes !== null) {
-		const manualLimit = BigInt(user.egressLimitBytes);
-		if (manualLimit !== -1n) {
-			egressLimit = manualLimit;
+	if (user) {
+		if (user.egressLimitBytes !== null) {
+			const manualLimit = BigInt(user.egressLimitBytes);
+			if (manualLimit !== -1n) {
+				egressLimit = manualLimit;
+			}
+		} else {
+			if (user.storageLimitBytes !== null) {
+				const storageLimit = BigInt(user.storageLimitBytes);
+				const calculated = storageLimit * 3n;
+				const minLimit = 10n * 1024n * 1024n * 1024n; // 10GB
+				egressLimit = calculated > minLimit ? calculated : minLimit;
+			}
 		}
-	} else {
-		if (user.storageLimitBytes !== null) {
-			const storageLimit = BigInt(user.storageLimitBytes);
-			const calculated = storageLimit * 3n;
-			const minLimit = 10n * 1024n * 1024n * 1024n; // 10GB
-			egressLimit = calculated > minLimit ? calculated : minLimit;
-		}
-	}
 
-	if (egressLimit !== null && BigInt(user.egressBytes) > egressLimit) {
-		return S3Errors.QuotaExceeded(
-			"You have exceeded your egress quota.",
-		).toResponse();
+		if (egressLimit !== null && BigInt(user.egressBytes) > egressLimit) {
+			return S3Errors.QuotaExceeded(
+				"You have exceeded your egress quota.",
+			).toResponse();
+		}
 	}
 
 	if (key === "" && url.searchParams.has("location")) {
@@ -132,7 +134,7 @@ ${rulesXml}
 	if (isListObjects) {
 		const query = url.searchParams;
 		const userPrefix = query.get("prefix") || "";
-		const internalPrefix = getInternalPath(userPrefix, user, bucket);
+		const internalPrefix = getInternalPath(userPrefix, user || undefined, bucket);
 
 		const newQuery = new URLSearchParams(query);
 		newQuery.set("prefix", internalPrefix);
@@ -140,7 +142,11 @@ ${rulesXml}
 		if (query.has("start-after")) {
 			newQuery.set(
 				"start-after",
-				getInternalPath(query.get("start-after") as string, user, bucket),
+				getInternalPath(
+					query.get("start-after") as string,
+					user || undefined,
+					bucket,
+				),
 			);
 		}
 
@@ -157,7 +163,7 @@ ${rulesXml}
 		);
 
 		const xml = await response.text();
-		const rootPrefix = getInternalPath("", user, bucket);
+		const rootPrefix = getInternalPath("", user || undefined, bucket);
 		const rewrittenXml = rewriteListObjectsV2Response(xml, rootPrefix);
 
 		const headers = new Headers({ "Content-Type": "application/xml" });
@@ -174,7 +180,7 @@ ${rulesXml}
 	if (key === "" && url.searchParams.has("uploads")) {
 		const query = url.searchParams;
 		const userPrefix = query.get("prefix") || "";
-		const internalPrefix = getInternalPath(userPrefix, user, bucket);
+		const internalPrefix = getInternalPath(userPrefix, user || undefined, bucket);
 
 		const newQuery = new URLSearchParams(query);
 		newQuery.set("prefix", internalPrefix);
@@ -182,7 +188,11 @@ ${rulesXml}
 		if (query.has("key-marker")) {
 			newQuery.set(
 				"key-marker",
-				getInternalPath(query.get("key-marker") as string, user, bucket),
+				getInternalPath(
+					query.get("key-marker") as string,
+					user || undefined,
+					bucket,
+				),
 			);
 		}
 
@@ -199,7 +209,7 @@ ${rulesXml}
 		);
 
 		const xml = await response.text();
-		const rootPrefix = getInternalPath("", user, bucket);
+		const rootPrefix = getInternalPath("", user || undefined, bucket);
 		const rewrittenXml = rewriteMultipartUploadResponse(xml, rootPrefix);
 
 		const headers = new Headers({ "Content-Type": "application/xml" });
@@ -227,7 +237,7 @@ ${rulesXml}
 
 		if (url.searchParams.has("uploadId")) {
 			const xml = await response.text();
-			const rootPrefix = getInternalPath("", user, bucket);
+			const rootPrefix = getInternalPath("", user || undefined, bucket);
 			const rewrittenXml = rewriteMultipartUploadResponse(xml, rootPrefix);
 			const headers = new Headers({ "Content-Type": "application/xml" });
 			for (const [k, v] of corsHeaders.entries()) {

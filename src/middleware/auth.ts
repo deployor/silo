@@ -63,7 +63,7 @@ function getDate(req: Request) {
 
 export type AuthResult =
 	| {
-			user: typeof users.$inferSelect;
+			user: typeof users.$inferSelect | null;
 			bucket: typeof buckets.$inferSelect;
 			mode: "authenticated" | "public";
 	  }
@@ -84,7 +84,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 					user: users,
 				})
 				.from(buckets)
-				.innerJoin(users, eq(buckets.userId, users.id))
+				.leftJoin(users, eq(buckets.userId, users.id))
 				.where(eq(buckets.name, requestedBucket))
 				.limit(1);
 
@@ -93,9 +93,14 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 			}
 
 			const { bucket, user } = bucketResult[0];
+
+			if (!user && !bucket.isSystem) {
+				return new Response(null, { status: 404 });
+			}
+
 			const ctx = context.getStore();
 			if (ctx) {
-				ctx.user = user;
+				ctx.user = user || undefined;
 				ctx.bucket = bucket;
 				ctx.mode = "public";
 			}
@@ -117,7 +122,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 				user: users,
 			})
 			.from(buckets)
-			.innerJoin(users, eq(buckets.userId, users.id))
+			.leftJoin(users, eq(buckets.userId, users.id))
 			.where(eq(buckets.name, requestedBucket))
 			.limit(1);
 
@@ -126,6 +131,29 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 		}
 
 		const { bucket, user } = bucketResult[0];
+
+		if (!user) {
+			if (bucket.isSystem) {
+				if (bucket.isPaused) {
+					return S3Errors.AccessDenied(
+						`Bucket is temporarily paused.${bucket.pauseReason ? ` Reason: ${bucket.pauseReason}` : ""}`,
+					).toResponse();
+				}
+
+				if (!bucket.isPublic) {
+					return S3Errors.AccessDenied().toResponse();
+				}
+
+				const ctx = context.getStore();
+				if (ctx) {
+					ctx.user = undefined;
+					ctx.bucket = bucket;
+					ctx.mode = "public";
+				}
+				return { user: null, bucket, mode: "public" };
+			}
+			return S3Errors.AccessDenied().toResponse();
+		}
 
 		const usageResult = await db
 			.select({ total: sql<number>`sum(${buckets.totalBytes})` })

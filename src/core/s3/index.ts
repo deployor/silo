@@ -19,7 +19,7 @@ import {
 
 export async function handleS3Request(
 	req: Request,
-	user: typeof users.$inferSelect,
+	user: typeof users.$inferSelect | null,
 	bucket: typeof buckets.$inferSelect,
 	mode: "authenticated" | "public",
 ): Promise<Response> {
@@ -67,7 +67,7 @@ export async function handleS3Request(
 			!url.searchParams.has("location"))
 	) {
 		if (host === S3_DOMAIN) {
-			if (method === "GET") {
+			if (method === "GET" && user) {
 				const userBuckets = await db
 					.select()
 					.from(buckets)
@@ -99,23 +99,27 @@ export async function handleS3Request(
 					},
 				);
 			}
+			// If no user (public system bucket access attempt on root), or bad method
+			if (!user) return S3Errors.AccessDenied().toResponse();
 			return S3Errors.MethodNotAllowed().toResponse();
 		}
 	}
 
 	const internalPath = getInternalPath(key, user, bucket);
 
-	if (user.dataExported) {
-		return S3Errors.AccessDenied(
-			"Account is frozen due to data export. No new modifications allowed.",
-		).toResponse();
-	}
-
-	if (user.markedAsOverAge) {
-		if (method === "PUT" || method === "POST" || method === "DELETE") {
+	if (user) {
+		if (user.dataExported) {
 			return S3Errors.AccessDenied(
-				"Account is in migration grace period. New uploads are disabled.",
+				"Account is frozen due to data export. No new modifications allowed.",
 			).toResponse();
+		}
+
+		if (user.markedAsOverAge) {
+			if (method === "PUT" || method === "POST" || method === "DELETE") {
+				return S3Errors.AccessDenied(
+					"Account is in migration grace period. New uploads are disabled.",
+				).toResponse();
+			}
 		}
 	}
 
@@ -152,10 +156,12 @@ export async function handleS3Request(
 	}
 
 	if (method === "PUT") {
+		if (!user) return S3Errors.AccessDenied().toResponse();
 		return handlePutRequest(req, user, bucket, key, internalPath, url);
 	}
 
 	if (method === "DELETE") {
+		if (!user) return S3Errors.AccessDenied().toResponse();
 		return handleDeleteRequest(req, bucket, internalPath, url, key);
 	}
 
@@ -192,6 +198,7 @@ export async function handleS3Request(
 	}
 
 	if (method === "POST") {
+		if (!user) return S3Errors.AccessDenied().toResponse();
 		return handlePostRequest(req, user, bucket, internalPath, url);
 	}
 

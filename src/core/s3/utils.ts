@@ -74,7 +74,7 @@ export function getKeyFromRequest(req: Request, bucketName: string): string {
 
 export function getInternalPath(
 	key: string,
-	user: typeof users.$inferSelect,
+	user: typeof users.$inferSelect | null | undefined,
 	bucket: typeof buckets.$inferSelect,
 ): string {
 	// Security: reject path traversal.
