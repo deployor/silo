@@ -38,7 +38,7 @@ export async function handleAppHomeOpened(event: { user: string }) {
 			slackId,
 			HomeTab()
 				.blocks(
-					Header({ text: "Account Locked 🔒" }),
+					Header({ text: "Account Locked" }),
 					Section({
 						text: `Your account has been temporarily locked. You cannot perform any actions at this time.${user.lockReason ? `\n\n*Reason:* ${user.lockReason}` : ""}`,
 					}),
