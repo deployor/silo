@@ -18,16 +18,16 @@
             </div>
         </div>
         
-        <div class="flex items-center gap-2 group cursor-pointer" onclick="document.getElementById('postToSlack').click()">
+        <label class="flex items-center gap-2 group cursor-pointer">
              <div class="relative flex items-center">
-                 <input id="postToSlack" type="checkbox" class="peer h-4 w-4 opacity-0 absolute" />
+                 <input id="postToSlack" type="checkbox" class="peer sr-only" />
                  <div class="w-10 h-6 bg-white/10 peer-checked:bg-hc-green rounded-full transition-colors duration-200 ease-in-out"></div>
                  <div class="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-200 ease-in-out peer-checked:translate-x-4"></div>
              </div>
-             <label class="text-text-muted text-sm cursor-pointer select-none group-hover:text-white transition-colors font-medium">
+             <span class="text-text-muted text-sm cursor-pointer select-none group-hover:text-white transition-colors font-medium">
                 Post uploaded files to #cdn
-             </label>
-        </div>
+             </span>
+        </label>
     </div>
     {{else}}
     <div class="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-4 py-2 rounded-lg text-sm mb-6 inline-block max-w-xl">
