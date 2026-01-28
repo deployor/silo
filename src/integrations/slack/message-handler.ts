@@ -616,7 +616,7 @@ export async function postMessage(
 	});
 }
 
-async function postBlocks(
+export async function postBlocks(
 	channel: string,
 	blocks: unknown[],
 	threadTs?: string,

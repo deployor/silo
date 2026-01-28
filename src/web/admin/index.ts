@@ -220,28 +220,44 @@ async function ageOutUser(userId: string, req: Request) {
 		const { publishView } = await import("../../integrations/slack/client");
 		const { config } = await import("../../config");
 
-		await publishView(
+		const message = (await import("slack-block-builder")).Message({
+			channel: user[0].slackId,
+			text: "Action Required: You have aged out of Silo",
+		})
+			.blocks(
+				Header({ text: "It's time to move on from Silo." }),
+				Section({
+					text: "Hey there. Since you're 18 now, you've aged out of Silo. Hack Club is a space for teenagers, so we need you to move your files to another provider.",
+				}),
+				Section({
+					text: `You have until *${gracePeriodEndsAt.toLocaleDateString()}* to download everything. After that, we'll permanently delete your files.\n\nWe've built an export tool to make this easy. Click below to download a ZIP of all your buckets.`,
+				}),
+				Actions().elements(
+					Button({
+						text: "Export Your Data",
+						url: `https://${config.s3Domain}/dashboard/offboarding`,
+						actionId: "open_export_portal",
+					}).danger(),
+				),
+			)
+			.buildToObject();
+
+		const { postMessage } = await import("../../integrations/slack/message-handler");
+		// message-handler.ts exports postBlocks which is better for Block Kit
+		// but wait, postBlocks takes (channel, blocks, ...)
+		// The message object built by slack-block-builder is { channel, text, blocks }
+		
+		// Let's use fetch directly or the message-handler equivalent
+		// postBlocks expects an array of blocks, not the whole message object
+		
+		const { postBlocks } = await import("../../integrations/slack/message-handler");
+		await postBlocks(
 			user[0].slackId,
-			(await import("slack-block-builder")).HomeTab({
-				privateMetaData: "age_out_notification",
-			})
-				.blocks(
-					Header({ text: "It's time to move on from Silo." }),
-					Section({
-						text: "Hey there. Since you're 18 now, you've aged out of Silo. Hack Club is a space for teenagers, so we need you to move your files to another provider.",
-					}),
-					Section({
-						text: `You have until *${gracePeriodEndsAt.toLocaleDateString()}* to download everything. After that, we'll permanently delete your files.\n\nWe've built an export tool to make this easy. Click below to download a ZIP of all your buckets.`,
-					}),
-					Actions().elements(
-						Button({
-							text: "Export Your Data",
-							url: `https://${config.s3Domain}/dashboard/offboarding`,
-							actionId: "open_export_portal",
-						}).danger(),
-					),
-				)
-				.buildToObject(),
+			message.blocks || [], // Access blocks array from built object
+			undefined, // threadTs
+			undefined, // username
+			undefined, // icon_url
+			message.text // fallback text
 		);
 	}
 
