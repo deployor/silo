@@ -593,13 +593,6 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 							type: "mrkdwn",
 							text: `~${displayName}~\n_Deleted_`,
 						},
-						accessory: {
-							type: "button",
-							text: { type: "plain_text", text: "Deleted", emoji: true },
-							style: "danger",
-							action_id: "delete_cdn_file_done",
-							value: actionValue,
-						},
 					} satisfies SlackBlock;
 				});
 
