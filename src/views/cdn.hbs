@@ -305,7 +305,13 @@
     const savedPref = localStorage.getItem('silo_cdn_post_slack');
     const checkbox = document.getElementById('postToSlack');
     
-    if (checkbox && checkbox.type !== 'hidden') {
+    // We check for type !== 'hidden' to avoid overwriting the hidden input for non-admins if we had logic for them
+    // But currently non-admins have a hidden input that is checked by default.
+    // If the element exists, we should respect the saved pref IF it's user-interactive (i.e. not hidden).
+    // Wait, the hidden input for non-admins is hardcoded to checked.
+    // The interactive one for admins has class 'peer h-4 w-4 opacity-0 absolute'.
+    
+    if (checkbox && !checkbox.classList.contains('hidden')) {
         // Default to true if not set
         checkbox.checked = savedPref === null ? true : (savedPref === 'true');
         
