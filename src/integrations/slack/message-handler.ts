@@ -6,7 +6,6 @@ import {
 	Context,
 	Divider,
 	Header,
-	Message,
 	Section,
 } from "slack-block-builder";
 import { config } from "../../config";
@@ -191,8 +190,9 @@ export async function handleMessage(event: SlackMessageEvent) {
 	try {
 		const user = await getUserBySlackId(slackId);
 		if (!user) {
-			const msg = Message()
-				.blocks(
+			await postBlocks(
+				channelId,
+				[
 					Header({ text: "Whoops! Account Required" }),
 					Section({
 						text: "Heyho! You need an account on Silo so I can manage quota (and more) for you. Please sign in with Hack Club Auth so we can match this Slack user to your record.",
@@ -203,12 +203,7 @@ export async function handleMessage(event: SlackMessageEvent) {
 							url: `https://${config.s3Domain}/auth/login?source=slack`,
 						}).primary(),
 					),
-				)
-				.buildToObject();
-
-			await postBlocks(
-				channelId,
-				(msg.blocks || []) as unknown as SlackBlock[],
+				],
 				threadTs,
 				undefined,
 				undefined,
@@ -220,18 +215,14 @@ export async function handleMessage(event: SlackMessageEvent) {
 
 		if (user.filesDeleted) {
 			if (user.dataExported) {
-				const msg = Message()
-					.blocks(
+				await postBlocks(
+					channelId,
+					[
 						Header({ text: "CDN Access Revoked" }),
 						Section({
 							text: "Bro, you're over 18. :ms-raised-eyebrow: I'm sorry to tell you, but you also can't use the CDN anymore, sowwy! As you know, all your files and S3 and everything got paused before too, and you downloaded them in time!",
 						}),
-					)
-					.buildToObject();
-
-				await postBlocks(
-					channelId,
-					(msg.blocks || []) as unknown as SlackBlock[],
+					],
 					threadTs,
 					undefined,
 					undefined,
@@ -239,18 +230,14 @@ export async function handleMessage(event: SlackMessageEvent) {
 				);
 				await addReaction(channelId, messageTs, "ms-raised-eyebrow");
 			} else {
-				const msg = Message()
-					.blocks(
+				await postBlocks(
+					channelId,
+					[
 						Header({ text: "Files Deleted" }),
 						Section({
 							text: "Hey uh, how do I tell you this but... :panic:\n\nYour files got forever deleted and you weren't in time to actually download them. You're over 18, and to save budget and more, Hack Club doesn't actually run this for over 18-year-olds... Sorry.",
 						}),
-					)
-					.buildToObject();
-
-				await postBlocks(
-					channelId,
-					(msg.blocks || []) as unknown as SlackBlock[],
+					],
 					threadTs,
 					undefined,
 					undefined,
@@ -276,8 +263,9 @@ export async function handleMessage(event: SlackMessageEvent) {
 			: "soon";
 
 		if (user.dataExported) {
-			const msg = Message()
-				.blocks(
+			await postBlocks(
+				channelId,
+				[
 					Header({ text: "Files Scheduled for Deletion" }),
 					Section({
 						text: "Heyho, sorry you're over 18 and your files are also soon to be deleted :sad-pf:, soooooo no new files and old ones gone soon too :C",
@@ -295,12 +283,7 @@ export async function handleMessage(event: SlackMessageEvent) {
 							url: `https://${config.s3Domain}/dashboard/offboarding`,
 						}),
 					),
-				)
-				.buildToObject();
-
-			await postBlocks(
-				channelId,
-				(msg.blocks || []) as unknown as SlackBlock[],
+				],
 				threadTs,
 				undefined,
 				undefined,
@@ -311,8 +294,9 @@ export async function handleMessage(event: SlackMessageEvent) {
 		}
 
 		if (user.markedAsOverAge) {
-			const msg = Message()
-				.blocks(
+			await postBlocks(
+				channelId,
+				[
 					Header({ text: "Action Required: Download Files!" }),
 					Section({
 						text: `Hey... Sorry but you're over 18- You seem to store *${usageGB} GB* of data though! WHICH YOU HAVE STILL NOT DOWNLOADED!!!!! :siren1::siren1::siren1::siren1::siren1:`,
@@ -330,12 +314,7 @@ export async function handleMessage(event: SlackMessageEvent) {
 							url: `https://${config.s3Domain}/dashboard/offboarding`,
 						}).danger(),
 					),
-				)
-				.buildToObject();
-
-			await postBlocks(
-				channelId,
-				(msg.blocks || []) as unknown as SlackBlock[],
+				],
 				threadTs,
 				undefined,
 				undefined,
@@ -346,18 +325,14 @@ export async function handleMessage(event: SlackMessageEvent) {
 		}
 
 		if (user.isLocked) {
-			const msg = Message()
-				.blocks(
+			await postBlocks(
+				channelId,
+				[
 					Header({ text: "Account Locked" }),
 					Section({
 						text: `Your account is locked.\n*Reason:* ${user.lockReason || "No reason provided."}`,
 					}),
-				)
-				.buildToObject();
-
-			await postBlocks(
-				channelId,
-				(msg.blocks || []) as unknown as SlackBlock[],
+				],
 				threadTs,
 				undefined,
 				undefined,
@@ -369,16 +344,12 @@ export async function handleMessage(event: SlackMessageEvent) {
 
 		const bucketName = user.slackId?.toLowerCase() ?? "";
 		if (!bucketName) {
-			const msg = Message()
-				.blocks(
-					Header({ text: "Error" }),
-					Section({ text: "Unable to determine bucket name for this user." }),
-				)
-				.buildToObject();
-
 			await postBlocks(
 				channelId,
-				(msg.blocks || []) as unknown as SlackBlock[],
+				[
+					Header({ text: "Error" }),
+					Section({ text: "Unable to determine bucket name for this user." }),
+				],
 				threadTs,
 				undefined,
 				undefined,
@@ -390,18 +361,14 @@ export async function handleMessage(event: SlackMessageEvent) {
 
 		const targetBucket = await getOrCreateCdnBucket(user.id, bucketName);
 		if (targetBucket.isPaused) {
-			const msg = Message()
-				.blocks(
+			await postBlocks(
+				channelId,
+				[
 					Header({ text: "Bucket Paused" }),
 					Section({
 						text: `Your CDN bucket is paused.\n*Reason:* ${targetBucket.pauseReason || "No reason provided."}`,
 					}),
-				)
-				.buildToObject();
-
-			await postBlocks(
-				channelId,
-				(msg.blocks || []) as unknown as SlackBlock[],
+				],
 				threadTs,
 				undefined,
 				undefined,
@@ -491,7 +458,7 @@ export async function postUploadSummary(params: {
 		}
 	}
 
-	const blocks: SlackBlock[] = [];
+	const blocks: any[] = [];
 
 	let headerText = "";
 	if (successCount === 0) {
@@ -509,8 +476,8 @@ export async function postUploadSummary(params: {
 		if (messageTs) await addReaction(channelId, messageTs, "ms-worried");
 	}
 
-	blocks.push(Section({ text: headerText }).buildToObject());
-	blocks.push(Divider().buildToObject());
+	blocks.push(Section({ text: headerText }));
+	blocks.push(Divider());
 
 	for (const r of results) {
 		if (r.url && r.key) {
@@ -540,20 +507,18 @@ export async function postUploadSummary(params: {
 				);
 			}
 
-			blocks.push(section.buildToObject());
+			blocks.push(section);
 		} else {
 			blocks.push(
 				Section({
 					text: `~${r.name}~\n_Error: ${r.error || "Unknown error"}_`,
-				}).buildToObject(),
+				}),
 			);
 		}
 	}
 
 	const CHUNK_SIZE = 40;
-	let currentBlocks: SlackBlock[] = [blocks[0], blocks[1]].filter(
-		(b): b is SlackBlock => Boolean(b),
-	);
+	let currentBlocks: any[] = [blocks[0], blocks[1]].filter(Boolean);
 
 	// Variables `username` and `iconUrl` are already set at the start of the function
 
@@ -612,12 +577,26 @@ export async function postMessage(
 
 async function postBlocks(
 	channel: string,
-	blocks: SlackBlock[],
+	blocks: unknown[],
 	threadTs?: string,
 	username?: string,
 	icon_url?: string,
 	text: string = "File Upload Summary",
 ) {
+	// The blocks passed in here are from slack-block-builder which have a buildToObject() method.
+	// But sometimes they might already be plain objects if we manipulated them.
+	// Actually, based on how we called it, we are passing arrays of builder objects.
+	// We should convert them to JSON using buildToJSON() then parse it, OR just map them to object using buildToObject which exists on them (but typescript was complaining).
+	// Let's use the Print() helper from slack-block-builder if we could, but we don't have it imported.
+	// Instead, let's just assume they are builders and call JSON.parse(b.buildToJSON()) on them if they have the method, or leave them as is.
+
+	const formattedBlocks = blocks.map((b: any) => {
+		if (typeof b.buildToJSON === "function") {
+			return JSON.parse(b.buildToJSON());
+		}
+		return b;
+	});
+
 	await fetch("https://slack.com/api/chat.postMessage", {
 		method: "POST",
 		headers: {
@@ -626,7 +605,7 @@ async function postBlocks(
 		},
 		body: JSON.stringify({
 			channel,
-			blocks,
+			blocks: formattedBlocks,
 			thread_ts: threadTs,
 			text,
 			unfurl_links: true,
