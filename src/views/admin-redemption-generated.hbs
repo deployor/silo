@@ -1,0 +1,64 @@
+{{!< main}}
+<div class="max-w-4xl mx-auto space-y-8">
+    <div class="flex items-center gap-4">
+        <a href="/admin/redemptions/{{program.id}}" class="text-text-muted hover:text-white transition-colors">
+            <i class="ph ph-arrow-left text-2xl"></i>
+        </a>
+        <div>
+            <h1 class="text-2xl font-bold text-white">Codes Generated Successfully! 🎉</h1>
+            <p class="text-text-muted mt-1">{{codes.length}} new codes created for <span class="text-white font-bold">{{program.name}}</span>.</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Raw Codes -->
+        <div class="bg-hc-dark border border-white/10 rounded-3xl p-6 card-shadow flex flex-col h-full">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-white text-lg">Raw Codes</h3>
+                <button onclick="copyToClipboard('raw-codes-area')" class="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors font-bold uppercase tracking-wider">
+                    Copy All
+                </button>
+            </div>
+            <textarea id="raw-codes-area" readonly class="w-full flex-grow bg-black/30 border border-white/10 rounded-xl p-4 text-sm font-mono text-text-muted focus:outline-none focus:border-hc-blue transition-colors resize-none h-96 select-all">{{#each codes}}{{this}}&#13;&#10;{{/each}}</textarea>
+        </div>
+
+        <!-- Links -->
+        <div class="bg-hc-dark border border-white/10 rounded-3xl p-6 card-shadow flex flex-col h-full">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-white text-lg">Redemption Links</h3>
+                <button onclick="copyToClipboard('links-area')" class="text-xs bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg transition-colors font-bold uppercase tracking-wider">
+                    Copy All
+                </button>
+            </div>
+            <textarea id="links-area" readonly class="w-full flex-grow bg-black/30 border border-white/10 rounded-xl p-4 text-sm font-mono text-text-muted focus:outline-none focus:border-hc-blue transition-colors resize-none h-96 select-all">{{#each codes}}https://silo.deployor.dev/redeem?code={{this}}&#13;&#10;{{/each}}</textarea>
+        </div>
+    </div>
+
+    <div class="flex justify-center">
+        <a href="/admin/redemptions/{{program.id}}" class="px-8 py-3 bg-hc-blue hover:bg-blue-600 text-white font-bold rounded-xl transition-all hover:scale-105 shadow-lg shadow-blue-900/20">
+            Done & Return to Program
+        </a>
+    </div>
+</div>
+
+<script>
+    function copyToClipboard(elementId) {
+        const copyText = document.getElementById(elementId);
+        copyText.select();
+        copyText.setSelectionRange(0, 99999); /* For mobile devices */
+        navigator.clipboard.writeText(copyText.value).then(() => {
+            // Optional: Show feedback
+            const btn = document.querySelector(`button[onclick="copyToClipboard('${elementId}')"]`);
+            const originalText = btn.innerText;
+            btn.innerText = "COPIED!";
+            btn.classList.add('bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
+            btn.classList.remove('bg-white/10', 'text-white');
+            
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.classList.remove('bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
+                btn.classList.add('bg-white/10', 'text-white');
+            }, 2000);
+        });
+    }
+</script>
