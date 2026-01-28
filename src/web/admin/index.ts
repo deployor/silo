@@ -286,7 +286,7 @@ async function getBucketDetails(bucketName: string) {
 	// List files from S3 (limit 50 for preview)
 	let files: Array<{ key: string; size: number; url: string }> = [];
 	try {
-		let owner: typeof users.$inferSelect[] = [];
+		let owner: (typeof users.$inferSelect)[] = [];
 		if (bucket[0].userId) {
 			owner = await db
 				.select()
@@ -410,7 +410,7 @@ async function deleteBucket(bucketName: string, url: URL) {
 		.limit(1);
 
 	if (bucket.length > 0) {
-		let owner: typeof users.$inferSelect[] = [];
+		let owner: (typeof users.$inferSelect)[] = [];
 		if (bucket[0].userId) {
 			owner = await db
 				.select()
@@ -504,7 +504,7 @@ async function deleteFile(bucketName: string, url: URL) {
 		.where(eq(buckets.name, bucketName))
 		.limit(1);
 	if (bucket.length > 0) {
-		let owner: typeof users.$inferSelect[] = [];
+		let owner: (typeof users.$inferSelect)[] = [];
 		if (bucket[0].userId) {
 			owner = await db
 				.select()
