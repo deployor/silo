@@ -56,6 +56,12 @@ function isAllowedSlackDownloadUrl(url: string): boolean {
 	return url.startsWith(SLACK_FILES_HOST_PREFIX);
 }
 
+function sanitizeForSlack(text: string): string {
+	// Remove control characters and generic bad stuff, but keep it readable
+	// Also prevent mentions (@here, @channel) from firing if they are in the filename
+	return text.replace(/[@<>]/g, "");
+}
+
 function plural(n: number, singular: string, pluralForm: string): string {
 	return n === 1 ? singular : pluralForm;
 }
@@ -476,7 +482,7 @@ export async function postUploadSummary(params: {
 			// Success (partial or full)
 			let text = "";
 			if (successCount === 1 && results.length === 1) {
-				text = `${userTag} uploaded *${results[0].name}*`;
+				text = `${userTag} uploaded *${sanitizeForSlack(results[0].name)}*`;
 			} else {
 				text = `${userTag} uploaded ${successCount} ${plural(successCount, "file", "files")}`;
 				if (successCount < totalCount) {
@@ -509,7 +515,7 @@ export async function postUploadSummary(params: {
 	for (const r of results) {
 		if (r.url && r.key) {
 			const section = Section({
-				text: `*${r.name}*\n<${r.url}|${r.url}>`,
+				text: `*${sanitizeForSlack(r.name)}*\n<${r.url}|${r.url}>`,
 			});
 
 			// Only add delete button if it's a message reply (original behavior) or if explicitly requested
