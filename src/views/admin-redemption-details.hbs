@@ -2,22 +2,22 @@
 <div class="space-y-6">
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">
-            <a href="/admin/redemptions" class="text-zinc-500 hover:text-zinc-300">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            <a href="/admin/redemptions" class="text-text-muted hover:text-white transition-colors">
+                <i class="ph ph-arrow-left text-2xl"></i>
             </a>
             <div>
-                <h1 class="text-2xl font-bold font-display text-zinc-100">{{program.name}}</h1>
-                <p class="text-zinc-400 mt-1 font-mono text-sm">{{program.prefix}} • {{formatBytes program.quotaCreditBytes}} Credit</p>
+                <h1 class="text-2xl font-bold text-white">{{program.name}}</h1>
+                <p class="text-text-muted mt-1 font-mono text-sm">{{program.prefix}} • {{formatBytes program.quotaCreditBytes}} Credit</p>
             </div>
         </div>
         <div class="flex items-center gap-3">
              <form method="POST" action="/admin/redemptions/{{program.id}}/export" target="_blank">
-                <button type="submit" class="px-4 py-2 bg-zinc-800 text-zinc-300 text-sm font-medium rounded-md hover:bg-zinc-700 transition-colors">
+                <button type="submit" class="px-4 py-2 bg-white/5 text-text-muted text-sm font-bold rounded-lg border border-white/10 hover:bg-white/10 hover:text-white transition-colors">
                     Export Codes (CSV)
                 </button>
             </form>
-            <button onclick="document.getElementById('generate-codes-modal').showModal()" 
-                    class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-500 transition-colors">
+            <button onclick="document.getElementById('generate-codes-modal').classList.remove('hidden'); document.getElementById('generate-codes-modal').classList.add('flex');"
+                    class="px-4 py-2 bg-hc-blue text-white text-sm font-bold rounded-lg hover:bg-blue-600 transition-colors shadow-lg shadow-blue-900/20">
                 Generate Codes
             </button>
         </div>
@@ -25,92 +25,93 @@
 
     <!-- Stats -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
-            <h3 class="text-sm font-medium text-zinc-400">Total Codes</h3>
-            <p class="text-3xl font-bold text-zinc-100 mt-2">{{pagination.total}}</p>
+        <div class="bg-hc-dark border border-white/10 rounded-3xl p-6 card-shadow">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-text-muted">Total Codes</h3>
+            <p class="text-3xl font-bold text-white mt-2">{{pagination.total}}</p>
         </div>
-        <!-- You could add more stats here like Redeemed Count if you aggregated them -->
     </div>
 
     <!-- Codes List -->
-    <div class="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
-        <div class="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-800/30">
-            <h3 class="font-medium text-zinc-200">Generated Codes</h3>
+    <div class="bg-hc-dark border border-white/10 rounded-3xl overflow-hidden card-shadow">
+        <div class="p-6 border-b border-white/10 flex justify-between items-center">
+            <h3 class="font-bold text-white">Generated Codes</h3>
             <div class="flex gap-2">
                  {{#if (gt pagination.page 1)}}
-                    <a href="?page={{subtract pagination.page 1}}" class="px-3 py-1 bg-zinc-800 text-zinc-300 rounded text-xs hover:bg-zinc-700">Previous</a>
+                    <a href="?page={{subtract pagination.page 1}}" class="px-3 py-1 bg-white/5 border border-white/10 text-white rounded-lg text-xs font-bold hover:bg-white/10 transition-colors">Previous</a>
                 {{/if}}
-                <span class="text-zinc-500 text-xs py-1">Page {{pagination.page}} of {{pagination.totalPages}}</span>
+                <span class="text-text-muted text-xs py-1 font-mono">Page {{pagination.page}} of {{pagination.totalPages}}</span>
                 {{#if (lt pagination.page pagination.totalPages)}}
-                    <a href="?page={{add pagination.page 1}}" class="px-3 py-1 bg-zinc-800 text-zinc-300 rounded text-xs hover:bg-zinc-700">Next</a>
+                    <a href="?page={{add pagination.page 1}}" class="px-3 py-1 bg-white/5 border border-white/10 text-white rounded-lg text-xs font-bold hover:bg-white/10 transition-colors">Next</a>
                 {{/if}}
             </div>
         </div>
-        <table class="w-full text-left text-sm text-zinc-400">
-            <thead class="bg-zinc-800/50 text-zinc-200">
-                <tr>
-                    <th class="px-6 py-3 font-medium">Code</th>
-                    <th class="px-6 py-3 font-medium">Status</th>
-                    <th class="px-6 py-3 font-medium">Redeemed By</th>
-                    <th class="px-6 py-3 font-medium">Redeemed At</th>
-                    <th class="px-6 py-3 font-medium text-right">Link</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-zinc-800 font-mono text-xs">
-                {{#each codes}}
-                <tr class="hover:bg-zinc-800/30 transition-colors">
-                    <td class="px-6 py-4 text-zinc-200 select-all">{{this.code}}</td>
-                    <td class="px-6 py-4">
-                        {{#if this.isRedeemed}}
-                            <span class="text-green-400">Redeemed</span>
-                        {{else}}
-                            <span class="text-zinc-500">Available</span>
-                        {{/if}}
-                    </td>
-                    <td class="px-6 py-4">{{#if this.redeemedBy}}{{this.redeemedBy}}{{else}}-{{/if}}</td>
-                    <td class="px-6 py-4">{{#if this.redeemedAt}}{{formatDate this.redeemedAt}}{{else}}-{{/if}}</td>
-                    <td class="px-6 py-4 text-right">
-                         <button onclick="navigator.clipboard.writeText('https://silo.deployor.dev/redeem?code={{this.code}}')" class="text-blue-400 hover:text-blue-300">
-                            Copy Link
-                        </button>
-                    </td>
-                </tr>
-                {{/each}}
-            </tbody>
-        </table>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
+                    <tr>
+                        <th class="px-6 py-4">Code</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4">Redeemed By</th>
+                        <th class="px-6 py-4">Redeemed At</th>
+                        <th class="px-6 py-4 text-right">Link</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5 font-mono text-xs">
+                    {{#each codes}}
+                    <tr class="hover:bg-white/5 transition-colors">
+                        <td class="px-6 py-4 text-white select-all font-bold">{{this.code}}</td>
+                        <td class="px-6 py-4">
+                            {{#if this.isRedeemed}}
+                                <span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold border border-emerald-500/30 uppercase tracking-wider">Redeemed</span>
+                            {{else}}
+                                <span class="bg-white/10 text-text-muted px-2 py-0.5 rounded text-[10px] font-bold border border-white/20 uppercase tracking-wider">Available</span>
+                            {{/if}}
+                        </td>
+                        <td class="px-6 py-4 text-text-muted">{{#if this.redeemedBy}}{{this.redeemedBy}}{{else}}-{{/if}}</td>
+                        <td class="px-6 py-4 text-text-muted">{{#if this.redeemedAt}}{{formatDate this.redeemedAt}}{{else}}-{{/if}}</td>
+                        <td class="px-6 py-4 text-right">
+                             <button onclick="navigator.clipboard.writeText('https://silo.deployor.dev/redeem?code={{this.code}}')" class="text-hc-blue hover:text-blue-400 font-bold uppercase tracking-wider text-[10px]">
+                                Copy Link
+                            </button>
+                        </td>
+                    </tr>
+                    {{/each}}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 <!-- Generate Codes Modal -->
-<dialog id="generate-codes-modal" class="bg-transparent backdrop:bg-black/80 p-0 w-full max-w-md">
-    <div class="bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl overflow-hidden">
-        <div class="px-6 py-4 border-b border-zinc-800 flex justify-between items-center">
-            <h3 class="text-lg font-medium text-zinc-100">Generate Codes</h3>
-            <button onclick="document.getElementById('generate-codes-modal').close()" class="text-zinc-500 hover:text-zinc-300">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+<div id="generate-codes-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center z-50">
+    <div class="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-md card-shadow transform transition-all">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-2xl font-bold text-white">Generate Codes</h3>
+            <button onclick="document.getElementById('generate-codes-modal').classList.add('hidden'); document.getElementById('generate-codes-modal').classList.remove('flex');" class="text-text-muted hover:text-white transition-colors">
+                <i class="ph ph-x text-2xl"></i>
             </button>
         </div>
-        <form method="POST" action="/admin/redemptions/{{program.id}}/generate" class="p-6 space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-zinc-300 mb-1">Number of Codes</label>
+        <form method="POST" action="/admin/redemptions/{{program.id}}/generate">
+            <div class="mb-6">
+                <label class="block text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Number of Codes</label>
                 <input type="number" name="count" required min="1" max="1000" value="10"
-                       class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
+                       class="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-blue focus:ring-1 focus:ring-hc-blue placeholder-white/20 transition-colors font-mono">
             </div>
             
-             <div class="bg-blue-900/20 border border-blue-900/50 rounded p-3 text-xs text-blue-200">
+             <div class="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-6 text-xs text-blue-300">
                 Codes will be generated immediately. For large batches, this might take a moment.
             </div>
 
-            <div class="pt-2 flex justify-end gap-3">
-                <button type="button" onclick="document.getElementById('generate-codes-modal').close()" 
-                        class="px-4 py-2 text-zinc-400 hover:text-zinc-200 text-sm font-medium">
+            <div class="flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('generate-codes-modal').classList.add('hidden'); document.getElementById('generate-codes-modal').classList.remove('flex');"
+                        class="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors">
                     Cancel
                 </button>
-                <button type="submit" 
-                        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-md transition-colors">
+                <button type="submit"
+                        class="bg-hc-blue hover:bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105 card-shadow">
                     Generate
                 </button>
             </div>
         </form>
     </div>
-</dialog>
+</div>
