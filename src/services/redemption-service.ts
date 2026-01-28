@@ -138,19 +138,7 @@ export class RedemptionService {
 		}
 
 		// Find code
-		const codeRecord = await db.query.redemptionCodes.findFirst({
-			where: eq(redemptionCodes.code, normalizedCode),
-			with: {
-				program: true // We didn't define relation in schema.ts properly for query builder to auto-resolve if we didn't use relations() helper
-                             // Wait, I didn't add relations definitions in schema.ts, so `with` won't work directly unless I do a join manually or update schema.
-                             // I'll use a manual join for safety.
-			},
-		});
-
-        // Let's do a join since I don't want to modify schema relations right now if not strictly necessary,
-        // although it's cleaner. Let's stick to simple queries.
-        
-        const [foundCode] = await db
+		      const [foundCode] = await db
             .select({
                 code: redemptionCodes,
                 program: redemptionPrograms
