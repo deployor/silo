@@ -1,0 +1,106 @@
+{{!< main}}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold font-display text-zinc-100">Redemption Programs</h1>
+            <p class="text-zinc-400 mt-1">Manage codes and quota grants for external programs.</p>
+        </div>
+        <button onclick="document.getElementById('new-program-modal').showModal()" 
+                class="px-4 py-2 bg-zinc-100 text-zinc-900 text-sm font-medium rounded-md hover:bg-white transition-colors">
+            New Program
+        </button>
+    </div>
+
+    <!-- Programs List -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
+        <table class="w-full text-left text-sm text-zinc-400">
+            <thead class="bg-zinc-800/50 text-zinc-200">
+                <tr>
+                    <th class="px-6 py-3 font-medium">Name</th>
+                    <th class="px-6 py-3 font-medium">Prefix</th>
+                    <th class="px-6 py-3 font-medium">Credit</th>
+                    <th class="px-6 py-3 font-medium">Status</th>
+                    <th class="px-6 py-3 font-medium text-right">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-800">
+                {{#each programs}}
+                <tr class="hover:bg-zinc-800/30 transition-colors">
+                    <td class="px-6 py-4 font-medium text-zinc-200">{{this.name}}</td>
+                    <td class="px-6 py-4 font-mono text-xs">{{this.prefix}}</td>
+                    <td class="px-6 py-4">{{formatBytes this.quotaCreditBytes}}</td>
+                    <td class="px-6 py-4">
+                        {{#if this.isActive}}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-500/10 text-green-400">
+                                Active
+                            </span>
+                        {{else}}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-zinc-700/50 text-zinc-400">
+                                Inactive
+                            </span>
+                        {{/if}}
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        <a href="/admin/redemptions/{{this.id}}" class="text-blue-400 hover:text-blue-300 hover:underline">
+                            Manage Codes
+                        </a>
+                    </td>
+                </tr>
+                {{/each}}
+                {{#unless programs}}
+                <tr>
+                    <td colspan="5" class="px-6 py-8 text-center text-zinc-500">
+                        No redemption programs created yet.
+                    </td>
+                </tr>
+                {{/unless}}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- New Program Modal -->
+<dialog id="new-program-modal" class="bg-transparent backdrop:bg-black/80 p-0 w-full max-w-md">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl overflow-hidden">
+        <div class="px-6 py-4 border-b border-zinc-800 flex justify-between items-center">
+            <h3 class="text-lg font-medium text-zinc-100">Create New Program</h3>
+            <button onclick="document.getElementById('new-program-modal').close()" class="text-zinc-500 hover:text-zinc-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <form method="POST" action="/admin/redemptions/create" class="p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-zinc-300 mb-1">Program Name</label>
+                <input type="text" name="name" required placeholder="e.g. Hack Club Winter 2024" 
+                       class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-zinc-300 mb-1">Code Prefix</label>
+                <input type="text" name="prefix" required placeholder="e.g. WINTER" pattern="[A-Za-z0-9]+" title="Alphanumeric only"
+                       class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 uppercase">
+                <p class="text-xs text-zinc-500 mt-1">Codes will look like: PREFIX-XXXX-XXXX</p>
+            </div>
+             <div>
+                <label class="block text-sm font-medium text-zinc-300 mb-1">Quota Credit (Bytes)</label>
+                <input type="number" name="quotaCreditBytes" required value="1073741824"
+                       class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
+                <p class="text-xs text-zinc-500 mt-1">Default: 1GB (1073741824)</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-zinc-300 mb-1">Description</label>
+                <textarea name="description" rows="3"
+                          class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"></textarea>
+            </div>
+            <div class="pt-2 flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('new-program-modal').close()" 
+                        class="px-4 py-2 text-zinc-400 hover:text-zinc-200 text-sm font-medium">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-md transition-colors">
+                    Create Program
+                </button>
+            </div>
+        </form>
+    </div>
+</dialog>

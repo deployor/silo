@@ -16,6 +16,7 @@ import { getAppSettings, updateAppSettings } from "../../services/settings-servi
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
 import { handleAdminYswsRequest } from "./ysws";
+import { handleAdminRedemptionsRequest } from "../redemptions";
 
 type AdminUpdateUserQuotaBody = {
 	storageLimitBytes?: unknown;
@@ -665,6 +666,10 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 
 	if (path.startsWith("/admin/ysws")) {
 		return handleAdminYswsRequest(req, user);
+	}
+
+	if (path.startsWith("/admin/redemptions")) {
+		return handleAdminRedemptionsRequest(req, user);
 	}
 
 	if (path === "/admin/users") {
