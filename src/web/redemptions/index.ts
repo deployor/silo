@@ -74,11 +74,17 @@ export async function handleAdminRedemptionsRequest(req: Request, user: typeof u
         const formData = await req.formData();
         const count = Number(formData.get("count"));
         
-        await RedemptionService.generateCodes(programId, count);
+        const newCodes = await RedemptionService.generateCodes(programId, count);
+        const program = await RedemptionService.getProgramById(programId);
         
-        return new Response(null, {
-            status: 302,
-            headers: { Location: `/admin/redemptions/${programId}` },
+        return new Response(await render("admin-redemption-generated", {
+            title: "Codes Generated",
+            user,
+            program,
+            codes: newCodes,
+            layout: "main"
+        }), {
+            headers: { "Content-Type": "text/html" },
         });
     }
 
