@@ -64,10 +64,10 @@ export const buckets = pgTable(
 		id: uuid("id").defaultRandom().primaryKey(),
 		name: text("name").notNull(),
 		userId: text("user_id")
-			.references(() => users.id)
-			.notNull(),
+			.references(() => users.id),
 		region: text("region").default("auto"),
 		isPublic: boolean("is_public").default(false).notNull(),
+		isSystem: boolean("is_system").default(false).notNull(),
 		isCdn: boolean("is_cdn").default(false).notNull(),
 		isPaused: boolean("is_paused").default(false).notNull(),
 		pauseReason: text("pause_reason"),

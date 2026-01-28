@@ -101,6 +101,15 @@ export function getInternalPath(
 	}
 
 	const cleanKey = key.startsWith("/") ? key.slice(1) : key;
+
+	if (bucket.isSystem && !bucket.userId) {
+		return `system/${bucket.name}/${cleanKey}`;
+	}
+
+	if (!user) {
+		throw new Error("User required for non-system buckets");
+	}
+
 	const sanitizedUserId = user.id.replace(/[^a-zA-Z0-9-]/g, "_");
 	return `users/${sanitizedUserId}/${bucket.name}/${cleanKey}`;
 }
@@ -269,8 +278,15 @@ export async function rewriteCopySourceHeader(
 		}
 	}
 
-	const sanitizedUserId = sourceBucket.userId.replace(/[^a-zA-Z0-9-]/g, "_");
-	const internalPath = `users/${sanitizedUserId}/${sourceBucket.name}/${key}`;
+	let internalPath: string;
+
+	if (sourceBucket.isSystem && !sourceBucket.userId) {
+		internalPath = `system/${sourceBucket.name}/${key}`;
+	} else {
+		if (!sourceBucket.userId) return null;
+		const sanitizedUserId = sourceBucket.userId.replace(/[^a-zA-Z0-9-]/g, "_");
+		internalPath = `users/${sanitizedUserId}/${sourceBucket.name}/${key}`;
+	}
 
 	return `/${config.s3.bucket}/${internalPath}`;
 }
