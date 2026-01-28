@@ -97,6 +97,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			hideNavLinks: true,
 			mainClass: "flex flex-col items-center justify-center",
 			yswsQuotaPerHour: settings.yswsQuotaPerHourBytes,
+			yswsBonusTiers: settings.yswsBonusTiers,
 		});
 		return new Response(html, {
 			headers: { "Content-Type": "text/html" },
