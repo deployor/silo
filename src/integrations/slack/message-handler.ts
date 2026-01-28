@@ -529,6 +529,9 @@ export async function postUploadSummary(params: {
 			? `Uploaded ${results[0].name}`
 			: `Uploaded ${successCount} files`;
 
+	// Only unfurl if this is a CDN upload (no messageTs implies it's not a reply/reaction to a Slack message)
+	const shouldUnfurl = !messageTs;
+
 	for (let i = 2; i < blocks.length; i++) {
 		currentBlocks.push(blocks[i]);
 		if (currentBlocks.length >= CHUNK_SIZE) {
@@ -539,6 +542,7 @@ export async function postUploadSummary(params: {
 				username,
 				iconUrl,
 				fallbackText,
+				shouldUnfurl,
 			);
 			currentBlocks = [];
 		}
@@ -552,6 +556,7 @@ export async function postUploadSummary(params: {
 			username,
 			iconUrl,
 			fallbackText,
+			shouldUnfurl,
 		);
 }
 
@@ -584,6 +589,7 @@ async function postBlocks(
 	username?: string,
 	icon_url?: string,
 	text: string = "File Upload Summary",
+	unfurl: boolean = true,
 ) {
 	// Ensure blocks are properly converted to JSON objects
 	const formattedBlocks = blocks.map((b: any) => {
@@ -619,8 +625,8 @@ async function postBlocks(
 			blocks: formattedBlocks,
 			thread_ts: threadTs,
 			text,
-			unfurl_links: true,
-			unfurl_media: true,
+			unfurl_links: unfurl,
+			unfurl_media: unfurl,
 			username,
 			icon_url,
 		}),
