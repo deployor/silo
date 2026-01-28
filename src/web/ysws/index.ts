@@ -227,7 +227,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                             user: users,
                         })
                         .from(buckets)
-                        .innerJoin(users, eq(buckets.userId, users.id))
+                        .leftJoin(users, eq(buckets.userId, users.id))
                         .where(eq(buckets.name, systemBucketName))
                         .limit(1);
 
@@ -249,14 +249,13 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
                         targetBucket = newBucket;
                     } else {
                         targetBucket = bucketResult[0].bucket;
-                        targetOwner = bucketResult[0].user;
+                        targetOwner = bucketResult[0].user || undefined;
                     }
 
                     const ext = screenshotFile.name.split(".").pop() || "png";
                     const fileName = `screenshots/${crypto.randomUUID()}.${ext}`;
                     
-                    // Ensure we pass a user object even for system buckets to satisfy Typescript
-                    // The getInternalPath function will ignore it for system buckets
+                    // The getInternalPath function will ignore user for system buckets
                     const internalPath = getInternalPath(fileName, targetOwner || user, targetBucket);
                     const fileBuffer = await screenshotFile.arrayBuffer();
 

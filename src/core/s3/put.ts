@@ -13,7 +13,7 @@ import {
 
 export async function handlePutRequest(
 	req: Request,
-	user: typeof users.$inferSelect,
+	user: typeof users.$inferSelect | null,
 	bucket: typeof buckets.$inferSelect,
 	key: string,
 	internalPath: string,
@@ -121,7 +121,7 @@ export async function handlePutRequest(
 		}
 	}
 
-	const limit = user.storageLimitBytes;
+	const limit = user ? user.storageLimitBytes : null;
 	const upstreamHeaders = filterUpstreamHeaders(req.headers);
 
 	if (!upstreamHeaders.has("x-amz-content-sha256")) {
@@ -130,7 +130,7 @@ export async function handlePutRequest(
 
 	const copySource = req.headers.get("x-amz-copy-source");
 
-	if (copySource) {
+	if (copySource && user) {
 		const rewrittenSource = await rewriteCopySourceHeader(
 			req,
 			copySource,
@@ -183,7 +183,7 @@ export async function handlePutRequest(
 					upstreamHeaders.set("Content-Length", contentLengthHeader);
 				}
 
-				if (limit !== null) {
+				if (limit !== null && user) {
 					if (
 						BigInt(user.storageUsageBytes) + BigInt(actualSize) >
 						BigInt(limit)
@@ -324,7 +324,7 @@ export async function handlePutRequest(
 				// Explicitly set the Content-Length header for the upstream request
 				upstreamHeaders.set("Content-Length", actualSize.toString());
 
-				if (limit !== null) {
+				if (limit !== null && user) {
 					if (
 						BigInt(user.storageUsageBytes) + BigInt(actualSize) >
 						BigInt(limit)
@@ -368,7 +368,7 @@ export async function handlePutRequest(
 					}
 					
 					// Update quota check just in case
-					if (limit !== null) {
+					if (limit !== null && user) {
 						if (
 							BigInt(user.storageUsageBytes) + BigInt(totalLength) >
 							BigInt(limit)

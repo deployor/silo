@@ -9,7 +9,7 @@ import { filterUpstreamHeaders, getInternalPath } from "./utils";
 
 export async function handlePostRequest(
 	req: Request,
-	user: typeof users.$inferSelect,
+	user: typeof users.$inferSelect | null,
 	bucket: typeof buckets.$inferSelect,
 	internalPath: string,
 	url: URL,
@@ -18,7 +18,7 @@ export async function handlePostRequest(
 
 	if (query.has("delete")) {
 		const bodyText = await req.text();
-		const rootPrefix = getInternalPath("", user, bucket);
+		const rootPrefix = getInternalPath("", user || undefined, bucket);
 
 		const rewrittenBody = bodyText.replace(
 			/<Key>(.*?)<\/Key>/g,
@@ -56,7 +56,7 @@ export async function handlePostRequest(
 			headers: filterUpstreamHeaders(req.headers),
 		});
 		const resText = await response.text();
-		const rootPrefix = getInternalPath("", user, bucket);
+		const rootPrefix = getInternalPath("", user || undefined, bucket);
 		const rewrittenRes = rewriteMultipartUploadResponse(resText, rootPrefix);
 
 		return new Response(rewrittenRes, {
@@ -77,7 +77,7 @@ export async function handlePostRequest(
 		);
 
 		const resText = await response.text();
-		const rootPrefix = getInternalPath("", user, bucket);
+		const rootPrefix = getInternalPath("", user || undefined, bucket);
 		const rewrittenRes = rewriteMultipartUploadResponse(resText, rootPrefix);
 
 		return new Response(rewrittenRes, {
