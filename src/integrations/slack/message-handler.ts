@@ -463,18 +463,26 @@ export async function postUploadSummary(params: {
 	const blocks: any[] = [];
 
 	let headerText = "";
+	let uploadedBy = "";
+	if (!messageTs) {
+		// This is a CDN upload (not a reply to a message)
+		if (username) {
+			uploadedBy = ` by *${username}*`;
+		}
+	}
+
 	if (successCount === 0) {
 		headerText = "❌ *Failed to upload files*";
 		if (messageTs) await addReaction(channelId, messageTs, "ms-no");
 	} else if (successCount === totalCount) {
 		if (!messageTs && successCount === 1 && results[0]) {
-			headerText = `*Uploaded ${results[0].name}*`;
+			headerText = `*Uploaded ${results[0].name}*${uploadedBy}`;
 		} else {
-			headerText = `:dinowow: *Uploaded ${successCount} ${plural(successCount, "file", "files")}!*`;
+			headerText = `:dinowow: *Uploaded ${successCount} ${plural(successCount, "file", "files")}!*${uploadedBy}`;
 		}
 		if (messageTs) await addReaction(channelId, messageTs, "ms-green-tick");
 	} else {
-		headerText = `⚠️ *Uploaded ${successCount}/${totalCount} files*`;
+		headerText = `⚠️ *Uploaded ${successCount}/${totalCount} files*${uploadedBy}`;
 		if (messageTs) await addReaction(channelId, messageTs, "ms-worried");
 	}
 
