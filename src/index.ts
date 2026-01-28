@@ -13,8 +13,8 @@ import { logService } from "./services/log-service";
 import { statsService } from "./services/stats-service";
 import { handleAdminRequest } from "./web/admin";
 import { handleDashboardRequest } from "./web/dashboard";
-import { handleYswsRequest } from "./web/ysws";
 import { handleRedeemRequest } from "./web/redemptions";
+import { handleYswsRequest } from "./web/ysws";
 
 const S3_DOMAIN = config.s3Domain;
 
@@ -223,7 +223,7 @@ Bun.serve({
 								// Populate context with auth info
 								const ctx = context.getStore();
 								if (ctx) {
-									ctx.user = user;
+									ctx.user = user || undefined;
 									ctx.bucket = bucket;
 									ctx.mode = mode;
 								}

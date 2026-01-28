@@ -205,8 +205,8 @@ async function main() {
 		.update(stringToSign)
 		.digest("hex");
 
-	console.log("\n--- canonicalRequest ---\n" + canonicalRequest);
-	console.log("\n--- stringToSign ---\n" + stringToSign);
+	console.log(`\n--- canonicalRequest ---\n${canonicalRequest}`);
+	console.log(`\n--- stringToSign ---\n${stringToSign}`);
 	console.log("\n--- signature compare ---");
 	console.log("expected:", signature);
 	console.log("calculated:", calc);

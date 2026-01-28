@@ -143,7 +143,7 @@ async function runTest() {
 
 	// Lifecycle (using raw fetch because SDK command is complex to mock without valid config)
 	console.log("Testing GetBucketLifecycle (Raw Fetch)...");
-	const lifecycleRes = await fetch(`${endpoint}/${testBucketName}?lifecycle`, {
+	const _lifecycleRes = await fetch(`${endpoint}/${testBucketName}?lifecycle`, {
 		headers: {
 			Authorization: `AWS4-HMAC-SHA256 Credential=${accessKey}/...`, // We just check if it hits the whitelist logic, auth might fail first if we don't sign properly, but let's rely on SDK for signed requests where possible.
 		},

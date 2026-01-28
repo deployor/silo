@@ -32,7 +32,10 @@ function formatBytes(bytes: number) {
 export const homeView = (
 	user: User,
 	buckets: Bucket[],
-	settings: { defaultMaxBucketsPerUser: number; defaultMaxKeysPerBucket: number },
+	settings: {
+		defaultMaxBucketsPerUser: number;
+		defaultMaxKeysPerBucket: number;
+	},
 	page = 0,
 ) => {
 	const limit = user.storageLimitBytes ?? 0;

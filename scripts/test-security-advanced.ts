@@ -81,7 +81,7 @@ async function runTest() {
 				`❌ Random Query Param (POST) allowed or unexpected status: ${res.status}`,
 			);
 		}
-	} catch (e) {
+	} catch (_e) {
 		console.log("✅ Random Query Param (POST) blocked (Network Error)");
 	}
 
@@ -97,7 +97,7 @@ async function runTest() {
 		} else {
 			console.error(`❌ PROPFIND allowed or unexpected status: ${res.status}`);
 		}
-	} catch (e) {
+	} catch (_e) {
 		console.log("✅ PROPFIND blocked (Network Error)");
 	}
 
@@ -209,7 +209,7 @@ async function runTest() {
 				`❌ Missing Date allowed or unexpected status: ${res.status}`,
 			);
 		}
-	} catch (e) {
+	} catch (_e) {
 		console.log("✅ Missing Date blocked (Network Error)");
 	}
 
@@ -239,7 +239,7 @@ async function runTest() {
 				`❌ Invalid Signature allowed or unexpected status: ${res.status}`,
 			);
 		}
-	} catch (e) {
+	} catch (_e) {
 		console.log("✅ Invalid Signature blocked (Network Error)");
 	}
 

@@ -166,7 +166,10 @@ export function filterUpstreamHeaders(reqHeaders: Headers): Headers {
 
 	reqHeaders.forEach((value, key) => {
 		const lowerKey = key.toLowerCase();
-		if (allowedHeaders.includes(lowerKey) || lowerKey.startsWith("x-amz-meta-")) {
+		if (
+			allowedHeaders.includes(lowerKey) ||
+			lowerKey.startsWith("x-amz-meta-")
+		) {
 			upstreamHeaders.set(key, value);
 		}
 	});
@@ -194,7 +197,7 @@ export async function deleteBucketContents(prefix: string) {
 		const xml = await res.text();
 		// Ensure array handling is consistent
 		const parser = new XMLParser({
-			isArray: (name) => name === "Contents"
+			isArray: (name) => name === "Contents",
 		});
 		const result = parser.parse(xml).ListBucketResult;
 
@@ -202,7 +205,9 @@ export async function deleteBucketContents(prefix: string) {
 
 		const contents = result.Contents;
 
-		console.log(`[deleteBucketContents] Found ${contents.length} objects to delete for prefix: ${prefix}`);
+		console.log(
+			`[deleteBucketContents] Found ${contents.length} objects to delete for prefix: ${prefix}`,
+		);
 
 		const objects = contents
 			.map(

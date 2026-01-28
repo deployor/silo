@@ -1,10 +1,10 @@
 import {
-	S3Client,
-	PutObjectCommand,
-	GetObjectCommand,
 	DeleteObjectCommand,
-	ListObjectsV2Command,
+	GetObjectCommand,
 	HeadObjectCommand,
+	ListObjectsV2Command,
+	PutObjectCommand,
+	S3Client,
 } from "@aws-sdk/client-s3";
 
 const config = {
@@ -76,12 +76,12 @@ async function runTest() {
 			const head = await client.send(
 				new HeadObjectCommand({ Bucket: config.bucket, Key: file.key }),
 			);
-			
-            if (head.Metadata?.["x-test-meta"] === "silo-verification") {
-                 console.log(`   ✅ Metadata verified for ${file.key}`);
-            } else {
-                 console.log(`   ⚠️ Metadata missing/mismatch for ${file.key}`);
-            }
+
+			if (head.Metadata?.["x-test-meta"] === "silo-verification") {
+				console.log(`   ✅ Metadata verified for ${file.key}`);
+			} else {
+				console.log(`   ⚠️ Metadata missing/mismatch for ${file.key}`);
+			}
 
 			const get = await client.send(
 				new GetObjectCommand({ Bucket: config.bucket, Key: file.key }),

@@ -134,7 +134,11 @@ ${rulesXml}
 	if (isListObjects) {
 		const query = url.searchParams;
 		const userPrefix = query.get("prefix") || "";
-		const internalPrefix = getInternalPath(userPrefix, user || undefined, bucket);
+		const internalPrefix = getInternalPath(
+			userPrefix,
+			user || undefined,
+			bucket,
+		);
 
 		const newQuery = new URLSearchParams(query);
 		newQuery.set("prefix", internalPrefix);
@@ -180,7 +184,11 @@ ${rulesXml}
 	if (key === "" && url.searchParams.has("uploads")) {
 		const query = url.searchParams;
 		const userPrefix = query.get("prefix") || "";
-		const internalPrefix = getInternalPath(userPrefix, user || undefined, bucket);
+		const internalPrefix = getInternalPath(
+			userPrefix,
+			user || undefined,
+			bucket,
+		);
 
 		const newQuery = new URLSearchParams(query);
 		newQuery.set("prefix", internalPrefix);
@@ -275,7 +283,8 @@ ${rulesXml}
 		// Upstream S3 usually provides it, but sometimes it might be missing or in a different case
 		// Note: Bun/Node response headers are case-insensitive maps, but we want to ensure
 		// it is exposed properly if it exists.
-		const contentLength = headers.get("content-length") || headers.get("Content-Length");
+		const contentLength =
+			headers.get("content-length") || headers.get("Content-Length");
 		if (contentLength) {
 			// Force explicit Content-Length header
 			headers.set("Content-Length", contentLength);
@@ -289,7 +298,7 @@ ${rulesXml}
 		// This avoids Bun/Node forcing chunked encoding for streams which strips Content-Length.
 		// Bun's Blob is file-backed for large files, so this is memory-safe but adds latency (TTFB).
 		const bodyBlob = await response.blob();
-		
+
 		// Ensure header matches actual blob size
 		headers.set("Content-Length", bodyBlob.size.toString());
 

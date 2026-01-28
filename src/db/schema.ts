@@ -63,8 +63,7 @@ export const buckets = pgTable(
 	{
 		id: uuid("id").defaultRandom().primaryKey(),
 		name: text("name").notNull(),
-		userId: text("user_id")
-			.references(() => users.id),
+		userId: text("user_id").references(() => users.id),
 		region: text("region").default("auto"),
 		isPublic: boolean("is_public").default(false).notNull(),
 		isSystem: boolean("is_system").default(false).notNull(),
@@ -146,7 +145,9 @@ export const appSettings = pgTable("app_settings", {
 	id: text("id").primaryKey().default("global"),
 	defaultStorageLimitBytes: bigint("default_storage_limit_bytes", {
 		mode: "number",
-	}).notNull().default(1073741824),
+	})
+		.notNull()
+		.default(1073741824),
 	// Egress default is formula-based: max(minEgressBytes, storageBytes * egressMultiplier)
 	egressMultiplier: bigint("egress_multiplier", { mode: "number" })
 		.notNull()
@@ -156,10 +157,14 @@ export const appSettings = pgTable("app_settings", {
 		.default(10737418240),
 	defaultMaxBucketsPerUser: bigint("default_max_buckets_per_user", {
 		mode: "number",
-	}).notNull().default(50),
+	})
+		.notNull()
+		.default(50),
 	defaultMaxKeysPerBucket: bigint("default_max_keys_per_bucket", {
 		mode: "number",
-	}).notNull().default(20),
+	})
+		.notNull()
+		.default(20),
 	yswsQuotaPerHourBytes: bigint("ysws_quota_per_hour_bytes", {
 		mode: "number",
 	})
@@ -197,8 +202,12 @@ export const yswsSubmissions = pgTable(
 		createdAt: timestamp("created_at").defaultNow(),
 		reviewedAt: timestamp("reviewed_at"),
 		reviewedBy: text("reviewed_by").references(() => users.id),
-		tierBonusPercent: doublePrecision("tier_bonus_percent").default(0).notNull(),
-		adminBonusPercent: doublePrecision("admin_bonus_percent").default(0).notNull(),
+		tierBonusPercent: doublePrecision("tier_bonus_percent")
+			.default(0)
+			.notNull(),
+		adminBonusPercent: doublePrecision("admin_bonus_percent")
+			.default(0)
+			.notNull(),
 	},
 	(table) => {
 		return {

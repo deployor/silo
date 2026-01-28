@@ -1,11 +1,11 @@
+import { randomBytes } from "node:crypto";
+import { Readable } from "node:stream";
 import {
 	AbortMultipartUploadCommand,
 	CompleteMultipartUploadCommand,
 	CopyObjectCommand,
 	CreateMultipartUploadCommand,
-	DeleteObjectCommand,
 	DeleteObjectsCommand,
-	GetBucketLocationCommand,
 	GetObjectCommand,
 	HeadBucketCommand,
 	HeadObjectCommand,
@@ -18,8 +18,6 @@ import {
 	UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { randomBytes } from "node:crypto";
-import { Readable } from "node:stream";
 
 // --- Configuration ---
 const CONFIG = {
@@ -90,7 +88,10 @@ async function runTest() {
 			// Try to list buckets to see if we have access at all
 			try {
 				const list = await s3.send(new ListBucketsCommand({}));
-				console.log("✅ ListBuckets success", list.Buckets?.map((b) => b.Name));
+				console.log(
+					"✅ ListBuckets success",
+					list.Buckets?.map((b) => b.Name),
+				);
 			} catch (listErr) {
 				logError("ListBuckets failed", listErr);
 				throw new Error("Cannot connect to S3 or find bucket");
@@ -126,8 +127,7 @@ async function runTest() {
 				new GetObjectCommand({ Bucket: CONFIG.bucket, Key: smallKey }),
 			);
 			const getContent = await get.Body?.transformToString();
-			if (getContent !== smallContent)
-				throw new Error("Content mismatch");
+			if (getContent !== smallContent) throw new Error("Content mismatch");
 			console.log("✅ GetObject (Small) success");
 		} catch (e) {
 			logError("Basic CRUD failed", e);
@@ -157,9 +157,11 @@ async function runTest() {
 			);
 			const getMediumBuffer = await getMedium.Body?.transformToByteArray();
 			console.timeEnd("GetObject 10MB");
-			
+
 			if (getMediumBuffer?.length !== mediumSize) {
-				throw new Error(`Size mismatch: expected ${mediumSize}, got ${getMediumBuffer?.length}`);
+				throw new Error(
+					`Size mismatch: expected ${mediumSize}, got ${getMediumBuffer?.length}`,
+				);
 			}
 			console.log("✅ GetObject (10MB) success");
 		} catch (e) {
@@ -174,7 +176,7 @@ async function runTest() {
 		const partSize = 5 * 1024 * 1024; // 5MB min part size
 		const partCount = 10;
 		const totalSize = partSize * partCount;
-		
+
 		try {
 			const createMulti = await s3.send(
 				new CreateMultipartUploadCommand({
@@ -186,12 +188,12 @@ async function runTest() {
 			console.log(`Initialized Upload ID: ${uploadId}`);
 
 			const parts: { PartNumber: number; ETag: string }[] = [];
-			
+
 			console.time("Multipart Upload 50MB");
 			for (let i = 0; i < partCount; i++) {
 				const partNum = i + 1;
 				const partBody = generateRandomBuffer(partSize);
-				
+
 				// Upload parts in parallel groups if we wanted to be faster, but sequential is safer for tests
 				process.stdout.write(`Uploading Part ${partNum}/${partCount}...\r`);
 				const uploadPart = await s3.send(
@@ -203,18 +205,21 @@ async function runTest() {
 						Body: partBody,
 					}),
 				);
-				
+
 				if (!uploadPart.ETag) throw new Error(`Part ${partNum} missing ETag`);
 				parts.push({ PartNumber: partNum, ETag: uploadPart.ETag });
 			}
 			console.log("\nAll parts uploaded.");
 
-			const listParts = await s3.send(new ListPartsCommand({
-				Bucket: CONFIG.bucket,
-				Key: multipartKey,
-				UploadId: uploadId
-			}));
-			if (listParts.Parts?.length !== partCount) throw new Error("ListParts mismatch count");
+			const listParts = await s3.send(
+				new ListPartsCommand({
+					Bucket: CONFIG.bucket,
+					Key: multipartKey,
+					UploadId: uploadId,
+				}),
+			);
+			if (listParts.Parts?.length !== partCount)
+				throw new Error("ListParts mismatch count");
 			console.log("✅ ListParts success");
 
 			await s3.send(
@@ -229,15 +234,18 @@ async function runTest() {
 			console.log("✅ CompleteMultipartUpload success");
 
 			// Verify size
-			const headMulti = await s3.send(new HeadObjectCommand({
-				Bucket: CONFIG.bucket,
-				Key: multipartKey
-			}));
+			const headMulti = await s3.send(
+				new HeadObjectCommand({
+					Bucket: CONFIG.bucket,
+					Key: multipartKey,
+				}),
+			);
 			if (headMulti.ContentLength !== totalSize) {
-				throw new Error(`Multipart size mismatch. Expected ${totalSize}, got ${headMulti.ContentLength}`);
+				throw new Error(
+					`Multipart size mismatch. Expected ${totalSize}, got ${headMulti.ContentLength}`,
+				);
 			}
 			console.log("✅ Multipart Size Verification success");
-
 		} catch (e) {
 			logError("Multipart Upload failed", e);
 		}
@@ -252,33 +260,46 @@ async function runTest() {
 					Key: abortKey,
 				}),
 			);
-			await s3.send(new UploadPartCommand({
-				Bucket: CONFIG.bucket,
-				Key: abortKey,
-				UploadId: createAbort.UploadId,
-				PartNumber: 1,
-				Body: generateRandomBuffer(5 * 1024 * 1024)
-			}));
-			
+			await s3.send(
+				new UploadPartCommand({
+					Bucket: CONFIG.bucket,
+					Key: abortKey,
+					UploadId: createAbort.UploadId,
+					PartNumber: 1,
+					Body: generateRandomBuffer(5 * 1024 * 1024),
+				}),
+			);
+
 			// Verify it exists in list
-			const listIncomplete = await s3.send(new ListMultipartUploadsCommand({ Bucket: CONFIG.bucket }));
-			if (!listIncomplete.Uploads?.some(u => u.UploadId === createAbort.UploadId)) {
+			const listIncomplete = await s3.send(
+				new ListMultipartUploadsCommand({ Bucket: CONFIG.bucket }),
+			);
+			if (
+				!listIncomplete.Uploads?.some(
+					(u) => u.UploadId === createAbort.UploadId,
+				)
+			) {
 				throw new Error("Multipart upload not found in list before abort");
 			}
 
-			await s3.send(new AbortMultipartUploadCommand({
-				Bucket: CONFIG.bucket,
-				Key: abortKey,
-				UploadId: createAbort.UploadId
-			}));
+			await s3.send(
+				new AbortMultipartUploadCommand({
+					Bucket: CONFIG.bucket,
+					Key: abortKey,
+					UploadId: createAbort.UploadId,
+				}),
+			);
 
 			// Verify it's gone
-			const listAfterAbort = await s3.send(new ListMultipartUploadsCommand({ Bucket: CONFIG.bucket }));
-			if (listAfterAbort.Uploads?.some(u => u.UploadId === createAbort.UploadId)) {
+			const listAfterAbort = await s3.send(
+				new ListMultipartUploadsCommand({ Bucket: CONFIG.bucket }),
+			);
+			if (
+				listAfterAbort.Uploads?.some((u) => u.UploadId === createAbort.UploadId)
+			) {
 				throw new Error("Multipart upload still exists after abort");
 			}
 			console.log("✅ AbortMultipartUpload success");
-
 		} catch (e) {
 			logError("Abort Multipart failed", e);
 		}
@@ -287,13 +308,16 @@ async function runTest() {
 		console.log("\n--- 6. Range Requests ---");
 		try {
 			// Using the medium file
-			const rangeGet = await s3.send(new GetObjectCommand({
-				Bucket: CONFIG.bucket,
-				Key: mediumKey,
-				Range: "bytes=0-9"
-			}));
+			const rangeGet = await s3.send(
+				new GetObjectCommand({
+					Bucket: CONFIG.bucket,
+					Key: mediumKey,
+					Range: "bytes=0-9",
+				}),
+			);
 			const rangeContent = await rangeGet.Body?.transformToByteArray();
-			if (rangeContent?.length !== 10) throw new Error("Range request length mismatch");
+			if (rangeContent?.length !== 10)
+				throw new Error("Range request length mismatch");
 			console.log("✅ Range Request (0-9) success");
 		} catch (e) {
 			logError("Range Request failed", e);
@@ -303,14 +327,19 @@ async function runTest() {
 		console.log("\n--- 7. Copy Object ---");
 		const copyKey = "test-copy.bin";
 		try {
-			await s3.send(new CopyObjectCommand({
-				Bucket: CONFIG.bucket,
-				CopySource: `${CONFIG.bucket}/${mediumKey}`,
-				Key: copyKey
-			}));
-			
-			const headCopy = await s3.send(new HeadObjectCommand({ Bucket: CONFIG.bucket, Key: copyKey }));
-			if (headCopy.ContentLength !== mediumSize) throw new Error("Copy size mismatch");
+			await s3.send(
+				new CopyObjectCommand({
+					Bucket: CONFIG.bucket,
+					CopySource: `${CONFIG.bucket}/${mediumKey}`,
+					Key: copyKey,
+				}),
+			);
+
+			const headCopy = await s3.send(
+				new HeadObjectCommand({ Bucket: CONFIG.bucket, Key: copyKey }),
+			);
+			if (headCopy.ContentLength !== mediumSize)
+				throw new Error("Copy size mismatch");
 			console.log("✅ CopyObject success");
 		} catch (e) {
 			logError("Copy Object failed", e);
@@ -320,30 +349,40 @@ async function runTest() {
 		console.log("\n--- 8. List Objects Pagination ---");
 		try {
 			// Create a few files to ensure we have something to list
-			for(let i=0; i<5; i++) {
-				await s3.send(new PutObjectCommand({
-					Bucket: CONFIG.bucket,
-					Key: `list-test/file-${i}.txt`,
-					Body: `Content ${i}`
-				}));
+			for (let i = 0; i < 5; i++) {
+				await s3.send(
+					new PutObjectCommand({
+						Bucket: CONFIG.bucket,
+						Key: `list-test/file-${i}.txt`,
+						Body: `Content ${i}`,
+					}),
+				);
 			}
 
-			const list = await s3.send(new ListObjectsV2Command({
-				Bucket: CONFIG.bucket,
-				Prefix: "list-test/",
-				MaxKeys: 2
-			}));
-			
-			if (list.KeyCount !== 2 || !list.IsTruncated) throw new Error("Pagination MaxKeys failed");
-			if (!list.NextContinuationToken) throw new Error("Missing NextContinuationToken");
+			const list = await s3.send(
+				new ListObjectsV2Command({
+					Bucket: CONFIG.bucket,
+					Prefix: "list-test/",
+					MaxKeys: 2,
+				}),
+			);
 
-			const list2 = await s3.send(new ListObjectsV2Command({
-				Bucket: CONFIG.bucket,
-				Prefix: "list-test/",
-				ContinuationToken: list.NextContinuationToken
-			}));
-			
-			console.log(`✅ List Pagination success (Found ${list.KeyCount} + ${list2.KeyCount} items)`);
+			if (list.KeyCount !== 2 || !list.IsTruncated)
+				throw new Error("Pagination MaxKeys failed");
+			if (!list.NextContinuationToken)
+				throw new Error("Missing NextContinuationToken");
+
+			const list2 = await s3.send(
+				new ListObjectsV2Command({
+					Bucket: CONFIG.bucket,
+					Prefix: "list-test/",
+					ContinuationToken: list.NextContinuationToken,
+				}),
+			);
+
+			console.log(
+				`✅ List Pagination success (Found ${list.KeyCount} + ${list2.KeyCount} items)`,
+			);
 		} catch (e) {
 			logError("List Pagination failed", e);
 		}
@@ -352,24 +391,31 @@ async function runTest() {
 		console.log("\n--- 9. Presigned URLs ---");
 		try {
 			const presignKey = "presign-test.txt";
-			const putCommand = new PutObjectCommand({ Bucket: CONFIG.bucket, Key: presignKey });
+			const putCommand = new PutObjectCommand({
+				Bucket: CONFIG.bucket,
+				Key: presignKey,
+			});
 			const putUrl = await getSignedUrl(s3, putCommand, { expiresIn: 3600 });
-			
+
 			console.log("Generated Put URL. Uploading...");
 			const putRes = await fetch(putUrl, {
 				method: "PUT",
-				body: "Presigned content"
+				body: "Presigned content",
 			});
 			if (!putRes.ok) throw new Error(`Presigned PUT failed: ${putRes.status}`);
 
-			const getCommand = new GetObjectCommand({ Bucket: CONFIG.bucket, Key: presignKey });
+			const getCommand = new GetObjectCommand({
+				Bucket: CONFIG.bucket,
+				Key: presignKey,
+			});
 			const getUrl = await getSignedUrl(s3, getCommand, { expiresIn: 3600 });
-			
+
 			console.log("Generated Get URL. Downloading...");
 			const getRes = await fetch(getUrl);
 			const getText = await getRes.text();
-			
-			if (getText !== "Presigned content") throw new Error("Presigned content mismatch");
+
+			if (getText !== "Presigned content")
+				throw new Error("Presigned content mismatch");
 			console.log("✅ Presigned URL PUT/GET success");
 		} catch (e) {
 			logError("Presigned URL failed", e);
@@ -388,20 +434,21 @@ async function runTest() {
 				"list-test/file-1.txt",
 				"list-test/file-2.txt",
 				"list-test/file-3.txt",
-				"list-test/file-4.txt"
+				"list-test/file-4.txt",
 			];
 
-			await s3.send(new DeleteObjectsCommand({
-				Bucket: CONFIG.bucket,
-				Delete: {
-					Objects: keysToDelete.map(k => ({ Key: k }))
-				}
-			}));
+			await s3.send(
+				new DeleteObjectsCommand({
+					Bucket: CONFIG.bucket,
+					Delete: {
+						Objects: keysToDelete.map((k) => ({ Key: k })),
+					},
+				}),
+			);
 			console.log("✅ Cleanup success");
 		} catch (e) {
 			logError("Cleanup failed", e);
 		}
-
 	} catch (e) {
 		console.error("\n💥 Fatal Error:", e);
 	}

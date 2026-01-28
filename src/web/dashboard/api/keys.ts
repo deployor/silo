@@ -72,10 +72,7 @@ export async function handleKeys(req: Request): Promise<Response> {
 	);
 	if (deleteKeyMatch && req.method === "DELETE") {
 		if (user.dataExported) {
-			return errorResponse(
-				"Account is frozen. Keys cannot be deleted.",
-				403,
-			);
+			return errorResponse("Account is frozen. Keys cannot be deleted.", 403);
 		}
 		const bucketName = deleteKeyMatch[1];
 		const keyId = deleteKeyMatch[2];
