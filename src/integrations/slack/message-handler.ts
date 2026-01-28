@@ -243,6 +243,8 @@ export async function handleMessage(event: SlackMessageEvent) {
 					undefined,
 					"Files Deleted",
 				);
+				// Standard emoji is 'scream' or 'panic' might be custom. Using 'scream' as fallback if 'panic' fails?
+				// But user specifically said :panic: so it's likely a custom emoji.
 				await addReaction(channelId, messageTs, "panic");
 			}
 			return;
@@ -583,19 +585,27 @@ async function postBlocks(
 	icon_url?: string,
 	text: string = "File Upload Summary",
 ) {
-	// The blocks passed in here are from slack-block-builder which have a buildToObject() method.
-	// But sometimes they might already be plain objects if we manipulated them.
-	// Actually, based on how we called it, we are passing arrays of builder objects.
-	// We should convert them to JSON using buildToJSON() then parse it, OR just map them to object using buildToObject which exists on them (but typescript was complaining).
-	// Let's use the Print() helper from slack-block-builder if we could, but we don't have it imported.
-	// Instead, let's just assume they are builders and call JSON.parse(b.buildToJSON()) on them if they have the method, or leave them as is.
-
+	// Ensure blocks are properly converted to JSON objects
 	const formattedBlocks = blocks.map((b: any) => {
-		if (typeof b.buildToJSON === "function") {
-			return JSON.parse(b.buildToJSON());
+		// If it's already a plain object, return it
+		if (Object.getPrototypeOf(b) === Object.prototype) {
+			return b;
 		}
+		// If it has buildToJSON (slack-block-builder), use it
+		if (typeof b.buildToJSON === "function") {
+			try {
+				return JSON.parse(b.buildToJSON());
+			} catch (e) {
+				console.error("Failed to build block to JSON:", e);
+				return b;
+			}
+		}
+		// Fallback
 		return b;
 	});
+
+	// Wrap in Message builder to ensure validity? No, that might be circular.
+	// We trust that formattedBlocks is now an array of valid block objects.
 
 	const res = await fetch("https://slack.com/api/chat.postMessage", {
 		method: "POST",
@@ -616,7 +626,11 @@ async function postBlocks(
 	});
 
 	if (!res.ok) {
-		console.error("Slack API Error (chat.postMessage):", res.status, res.statusText);
+		console.error(
+			"Slack API Error (chat.postMessage):",
+			res.status,
+			res.statusText,
+		);
 		const text = await res.text();
 		console.error("Response body:", text);
 		return;
@@ -626,7 +640,10 @@ async function postBlocks(
 	if (!data.ok) {
 		console.error("Slack API Error (chat.postMessage):", data.error);
 		if (data.errors) {
-			console.error("Block validation errors:", JSON.stringify(data.errors, null, 2));
+			console.error(
+				"Block validation errors:",
+				JSON.stringify(data.errors, null, 2),
+			);
 		}
 	}
 }
