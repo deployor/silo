@@ -1,4 +1,4 @@
-import { desc, eq, isNotNull } from "drizzle-orm";
+Eimport { desc, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { config } from "../../config";
 import { getInternalPath } from "../../core/s3/utils";
@@ -140,6 +140,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
 					user,
 					hackatimeProjects: MOCK_HACKATIME_PROJECTS,
 					quotaPerHour: appSettings.yswsQuotaPerHourBytes,
+					yswsBonusTiers: appSettings.yswsBonusTiers,
 					quotaPerHourFormatted:
 						(appSettings.yswsQuotaPerHourBytes / (1024 * 1024)).toFixed(0) +
 						" MB",
