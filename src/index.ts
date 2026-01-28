@@ -14,6 +14,7 @@ import { statsService } from "./services/stats-service";
 import { handleAdminRequest } from "./web/admin";
 import { handleDashboardRequest } from "./web/dashboard";
 import { handleYswsRequest } from "./web/ysws";
+import { handleRedeemRequest } from "./web/redemptions";
 
 const S3_DOMAIN = config.s3Domain;
 
@@ -79,6 +80,7 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 			"/api/onboarding/",
 			"/ysws",
 			"/api/ysws",
+			"/redeem",
 		];
 
 		// Exact match for root
@@ -151,6 +153,8 @@ Bun.serve({
 						response = await handleAdminRequest(req);
 					} else if (url.pathname.startsWith("/ysws")) {
 						response = await handleYswsRequest(req);
+					} else if (url.pathname.startsWith("/redeem")) {
+						response = await handleRedeemRequest(req);
 					} else if (url.pathname === "/api/slack/events") {
 						response = await handleSlackRequest(req);
 					} else if (url.pathname.startsWith("/assets/")) {

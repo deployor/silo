@@ -1,0 +1,116 @@
+{{!< main}}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <a href="/admin/redemptions" class="text-zinc-500 hover:text-zinc-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            </a>
+            <div>
+                <h1 class="text-2xl font-bold font-display text-zinc-100">{{program.name}}</h1>
+                <p class="text-zinc-400 mt-1 font-mono text-sm">{{program.prefix}} • {{formatBytes program.quotaCreditBytes}} Credit</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+             <form method="POST" action="/admin/redemptions/{{program.id}}/export" target="_blank">
+                <button type="submit" class="px-4 py-2 bg-zinc-800 text-zinc-300 text-sm font-medium rounded-md hover:bg-zinc-700 transition-colors">
+                    Export Codes (CSV)
+                </button>
+            </form>
+            <button onclick="document.getElementById('generate-codes-modal').showModal()" 
+                    class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-500 transition-colors">
+                Generate Codes
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+            <h3 class="text-sm font-medium text-zinc-400">Total Codes</h3>
+            <p class="text-3xl font-bold text-zinc-100 mt-2">{{pagination.total}}</p>
+        </div>
+        <!-- You could add more stats here like Redeemed Count if you aggregated them -->
+    </div>
+
+    <!-- Codes List -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
+        <div class="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-800/30">
+            <h3 class="font-medium text-zinc-200">Generated Codes</h3>
+            <div class="flex gap-2">
+                 {{#if (gt pagination.page 1)}}
+                    <a href="?page={{subtract pagination.page 1}}" class="px-3 py-1 bg-zinc-800 text-zinc-300 rounded text-xs hover:bg-zinc-700">Previous</a>
+                {{/if}}
+                <span class="text-zinc-500 text-xs py-1">Page {{pagination.page}} of {{pagination.totalPages}}</span>
+                {{#if (lt pagination.page pagination.totalPages)}}
+                    <a href="?page={{add pagination.page 1}}" class="px-3 py-1 bg-zinc-800 text-zinc-300 rounded text-xs hover:bg-zinc-700">Next</a>
+                {{/if}}
+            </div>
+        </div>
+        <table class="w-full text-left text-sm text-zinc-400">
+            <thead class="bg-zinc-800/50 text-zinc-200">
+                <tr>
+                    <th class="px-6 py-3 font-medium">Code</th>
+                    <th class="px-6 py-3 font-medium">Status</th>
+                    <th class="px-6 py-3 font-medium">Redeemed By</th>
+                    <th class="px-6 py-3 font-medium">Redeemed At</th>
+                    <th class="px-6 py-3 font-medium text-right">Link</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-800 font-mono text-xs">
+                {{#each codes}}
+                <tr class="hover:bg-zinc-800/30 transition-colors">
+                    <td class="px-6 py-4 text-zinc-200 select-all">{{this.code}}</td>
+                    <td class="px-6 py-4">
+                        {{#if this.isRedeemed}}
+                            <span class="text-green-400">Redeemed</span>
+                        {{else}}
+                            <span class="text-zinc-500">Available</span>
+                        {{/if}}
+                    </td>
+                    <td class="px-6 py-4">{{#if this.redeemedBy}}{{this.redeemedBy}}{{else}}-{{/if}}</td>
+                    <td class="px-6 py-4">{{#if this.redeemedAt}}{{formatDate this.redeemedAt}}{{else}}-{{/if}}</td>
+                    <td class="px-6 py-4 text-right">
+                         <button onclick="navigator.clipboard.writeText('https://silo.deployor.dev/redeem?code={{this.code}}')" class="text-blue-400 hover:text-blue-300">
+                            Copy Link
+                        </button>
+                    </td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Generate Codes Modal -->
+<dialog id="generate-codes-modal" class="bg-transparent backdrop:bg-black/80 p-0 w-full max-w-md">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl overflow-hidden">
+        <div class="px-6 py-4 border-b border-zinc-800 flex justify-between items-center">
+            <h3 class="text-lg font-medium text-zinc-100">Generate Codes</h3>
+            <button onclick="document.getElementById('generate-codes-modal').close()" class="text-zinc-500 hover:text-zinc-300">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <form method="POST" action="/admin/redemptions/{{program.id}}/generate" class="p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-zinc-300 mb-1">Number of Codes</label>
+                <input type="number" name="count" required min="1" max="1000" value="10"
+                       class="w-full bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
+            </div>
+            
+             <div class="bg-blue-900/20 border border-blue-900/50 rounded p-3 text-xs text-blue-200">
+                Codes will be generated immediately. For large batches, this might take a moment.
+            </div>
+
+            <div class="pt-2 flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('generate-codes-modal').close()" 
+                        class="px-4 py-2 text-zinc-400 hover:text-zinc-200 text-sm font-medium">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-md transition-colors">
+                    Generate
+                </button>
+            </div>
+        </form>
+    </div>
+</dialog>

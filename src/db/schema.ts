@@ -207,3 +207,61 @@ export const yswsSubmissions = pgTable(
 		};
 	},
 );
+
+export const redemptionPrograms = pgTable("redemption_programs", {
+	id: uuid("id").defaultRandom().primaryKey(),
+	name: text("name").notNull(),
+	prefix: text("prefix").notNull().unique(), // e.g. "HACK"
+	description: text("description"),
+	quotaCreditBytes: bigint("quota_credit_bytes", { mode: "number" })
+		.notNull()
+		.default(0),
+	isActive: boolean("is_active").default(true).notNull(),
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const redemptionCodes = pgTable(
+	"redemption_codes",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		programId: uuid("program_id")
+			.references(() => redemptionPrograms.id, { onDelete: "cascade" })
+			.notNull(),
+		code: text("code").notNull().unique(),
+		isRedeemed: boolean("is_redeemed").default(false).notNull(),
+		redeemedBy: text("redeemed_by").references(() => users.id),
+		redeemedAt: timestamp("redeemed_at"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(table) => {
+		return {
+			programIdx: index("redemption_code_program_idx").on(table.programId),
+			codeIdx: index("redemption_code_code_idx").on(table.code),
+			redeemedByIdx: index("redemption_code_redeemed_by_idx").on(
+				table.redeemedBy,
+			),
+		};
+	},
+);
+
+export const redemptionLogs = pgTable(
+	"redemption_logs",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		userId: text("user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		ipAddress: text("ip_address"),
+		codeAttempted: text("code_attempted"),
+		success: boolean("success").notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(table) => {
+		return {
+			userIdIdx: index("redemption_log_user_id_idx").on(table.userId),
+			ipIdx: index("redemption_log_ip_idx").on(table.ipAddress),
+			createdAtIdx: index("redemption_log_created_at_idx").on(table.createdAt),
+		};
+	},
+);
