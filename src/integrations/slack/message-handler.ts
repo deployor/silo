@@ -587,18 +587,21 @@ async function postBlocks(
 ) {
 	// Ensure blocks are properly converted to JSON objects
 	const formattedBlocks = blocks.map((b: any) => {
-		// Check for buildToJSON method (slack-block-builder)
-		if (b && typeof b.buildToJSON === "function") {
+		// Check for specific slack-block-builder methods
+		// Based on debug script, it seems to have .build(), .getResult(), etc but not buildToJSON/Object directly on instance sometimes?
+		// But previous code used .buildToObject().
+		// Let's try .build() if it exists, as that usually returns the object representation.
+		
+		if (b && typeof b.build === "function") {
 			try {
-				return JSON.parse(b.buildToJSON());
+				return b.build();
 			} catch (e) {
-				console.error("Failed to build block to JSON:", e);
+				console.error("Failed to build block:", e);
 				return b;
 			}
 		}
 
 		// Fallback: If it's already a plain object or unknown type, return it as is
-		// This handles cases where we might have accidentally parsed it already or it's a raw object
 		return b;
 	});
 
