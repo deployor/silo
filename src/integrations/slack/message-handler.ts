@@ -445,9 +445,7 @@ export async function postUploadSummary(params: {
 		uploaderEmail,
 	} = params;
 
-	// If we are posting as a summary (not a reply), we want to impersonate the user?
-	// User feedback: "make it go like xy uploaded or sum in the cdn channel when from /cdn ... it should be a like a notification that xy upaoded sum"
-	// So we will NOT impersonate the user for CDN uploads, but instead explicitly state "User uploaded X".
+	// If we are posting as a summary (not a reply), we want to impersonate the user.
 	
 	let uploaderName = undefined;
 	let uploaderIconUrl = undefined;
@@ -472,7 +470,8 @@ export async function postUploadSummary(params: {
 	let headerText = "";
 	let subHeaderText = "";
 
-	// If it's a CDN upload (no messageTs), we redesign the header
+	// If it's a CDN upload (no messageTs), we redesign the header.
+	// We want to impersonate the user AND ping them in the message body.
 	if (!messageTs) {
 		const userTag = uploaderSlackId ? `<@${uploaderSlackId}>` : uploaderName || "Someone";
 		
