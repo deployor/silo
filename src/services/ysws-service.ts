@@ -1,6 +1,6 @@
+import { desc, eq } from "drizzle-orm";
 import { db } from "../db";
-import { yswsSubmissions, users } from "../db/schema";
-import { eq, desc } from "drizzle-orm";
+import { users, yswsSubmissions } from "../db/schema";
 import { SettingsService } from "./settings-service";
 import { UserService } from "./user-service";
 
@@ -16,7 +16,10 @@ export async function createSubmission(submission: NewYswsSubmission) {
 }
 
 export async function getSubmissions() {
-	return await db.select().from(yswsSubmissions).orderBy(desc(yswsSubmissions.createdAt));
+	return await db
+		.select()
+		.from(yswsSubmissions)
+		.orderBy(desc(yswsSubmissions.createdAt));
 }
 
 export async function getSubmissionById(id: string) {
@@ -28,7 +31,10 @@ export async function getSubmissionById(id: string) {
 	return result[0];
 }
 
-export async function updateSubmission(id: string, update: Partial<YswsSubmission>) {
+export async function updateSubmission(
+	id: string,
+	update: Partial<YswsSubmission>,
+) {
 	const [result] = await db
 		.update(yswsSubmissions)
 		.set(update)
@@ -46,12 +52,14 @@ export async function approveSubmission(
 ) {
 	const submission = await getSubmissionById(id);
 	if (!submission) throw new Error("Submission not found");
-	if (submission.status !== "pending") throw new Error("Submission already processed");
+	if (submission.status !== "pending")
+		throw new Error("Submission already processed");
 
 	const appSettings = await SettingsService.getAppSettings();
 
 	// Calculate base reward
-	const baseRewardBytes = submission.hoursSpent * appSettings.yswsQuotaPerHourBytes;
+	const baseRewardBytes =
+		submission.hoursSpent * appSettings.yswsQuotaPerHourBytes;
 
 	// Determine Tier Bonus
 	let tierBonusPercent = 0;
@@ -105,7 +113,12 @@ export async function approveSubmission(
 	return { success: true, rewardBytes: finalRewardBytes };
 }
 
-export async function rejectSubmission(id: string, reviewerId: string, publicNotes?: string, privateNotes?: string) {
+export async function rejectSubmission(
+	id: string,
+	reviewerId: string,
+	publicNotes?: string,
+	privateNotes?: string,
+) {
 	await db
 		.update(yswsSubmissions)
 		.set({
@@ -116,7 +129,7 @@ export async function rejectSubmission(id: string, reviewerId: string, publicNot
 			adminNotesPrivate: privateNotes,
 		})
 		.where(eq(yswsSubmissions.id, id));
-	
+
 	return { success: true };
 }
 

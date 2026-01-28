@@ -12,11 +12,14 @@ import {
 } from "../../db/schema";
 import { jsonResponse } from "../../lib/api-utils";
 import { s3Client } from "../../lib/s3-client";
-import { getAppSettings, updateAppSettings } from "../../services/settings-service";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
-import { handleAdminYswsRequest } from "./ysws";
+import {
+	getAppSettings,
+	updateAppSettings,
+} from "../../services/settings-service";
 import { handleAdminRedemptionsRequest } from "../redemptions";
+import { handleAdminYswsRequest } from "./ysws";
 
 type AdminUpdateUserQuotaBody = {
 	storageLimitBytes?: unknown;
@@ -189,7 +192,7 @@ async function lockUser(userId: string, req: Request) {
 	return new Response("Updated", { status: 200 });
 }
 
-async function ageOutUser(userId: string, req: Request) {
+async function ageOutUser(userId: string, _req: Request) {
 	const user = await db
 		.select()
 		.from(users)
@@ -215,16 +218,16 @@ async function ageOutUser(userId: string, req: Request) {
 
 	// Send Slack Notification
 	if (user[0].slackId) {
-		const { Blocks, Header, Section, Button, Actions } = await import(
+		const { Header, Section, Button, Actions } = await import(
 			"slack-block-builder"
 		);
-		const { publishView } = await import("../../integrations/slack/client");
 		const { config } = await import("../../config");
 
-		const message = (await import("slack-block-builder")).Message({
-			channel: user[0].slackId,
-			text: "Action Required: You have aged out of Silo",
-		})
+		const message = (await import("slack-block-builder"))
+			.Message({
+				channel: user[0].slackId,
+				text: "Action Required: You have aged out of Silo",
+			})
 			.blocks(
 				Header({ text: "It's time to move on from Silo." }),
 				Section({
@@ -243,22 +246,23 @@ async function ageOutUser(userId: string, req: Request) {
 			)
 			.buildToObject();
 
-		const { postMessage } = await import("../../integrations/slack/message-handler");
 		// message-handler.ts exports postBlocks which is better for Block Kit
 		// but wait, postBlocks takes (channel, blocks, ...)
 		// The message object built by slack-block-builder is { channel, text, blocks }
-		
+
 		// Let's use fetch directly or the message-handler equivalent
 		// postBlocks expects an array of blocks, not the whole message object
-		
-		const { postBlocks } = await import("../../integrations/slack/message-handler");
+
+		const { postBlocks } = await import(
+			"../../integrations/slack/message-handler"
+		);
 		await postBlocks(
 			user[0].slackId,
 			message.blocks || [], // Access blocks array from built object
 			undefined, // threadTs
 			undefined, // username
 			undefined, // icon_url
-			message.text // fallback text
+			message.text, // fallback text
 		);
 	}
 
@@ -282,11 +286,14 @@ async function getBucketDetails(bucketName: string) {
 	// List files from S3 (limit 50 for preview)
 	let files: Array<{ key: string; size: number; url: string }> = [];
 	try {
-		const owner = await db
-			.select()
-			.from(users)
-			.where(eq(users.id, bucket[0].userId))
-			.limit(1);
+		let owner: typeof users.$inferSelect[] = [];
+		if (bucket[0].userId) {
+			owner = await db
+				.select()
+				.from(users)
+				.where(eq(users.id, bucket[0].userId))
+				.limit(1);
+		}
 		if (owner.length > 0) {
 			const internalPrefix = getInternalPath("", owner[0], bucket[0]);
 			const query = new URLSearchParams();
@@ -337,6 +344,9 @@ async function previewFile(bucketName: string, url: URL) {
 		.where(eq(buckets.name, bucketName))
 		.limit(1);
 	if (bucket.length === 0) return new Response("Not Found", { status: 404 });
+
+	if (!bucket[0].userId)
+		return new Response("Owner not found", { status: 404 });
 
 	const owner = await db
 		.select()
@@ -400,11 +410,14 @@ async function deleteBucket(bucketName: string, url: URL) {
 		.limit(1);
 
 	if (bucket.length > 0) {
-		const owner = await db
-			.select()
-			.from(users)
-			.where(eq(users.id, bucket[0].userId))
-			.limit(1);
+		let owner: typeof users.$inferSelect[] = [];
+		if (bucket[0].userId) {
+			owner = await db
+				.select()
+				.from(users)
+				.where(eq(users.id, bucket[0].userId))
+				.limit(1);
+		}
 
 		if (owner.length > 0) {
 			// CDN Bucket Handling
@@ -491,11 +504,14 @@ async function deleteFile(bucketName: string, url: URL) {
 		.where(eq(buckets.name, bucketName))
 		.limit(1);
 	if (bucket.length > 0) {
-		const owner = await db
-			.select()
-			.from(users)
-			.where(eq(users.id, bucket[0].userId))
-			.limit(1);
+		let owner: typeof users.$inferSelect[] = [];
+		if (bucket[0].userId) {
+			owner = await db
+				.select()
+				.from(users)
+				.where(eq(users.id, bucket[0].userId))
+				.limit(1);
+		}
 		if (owner.length > 0) {
 			const internalKey = getInternalPath(key, owner[0], bucket[0]);
 
@@ -646,7 +662,9 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	if (!user) {
 		return new Response(null, {
 			status: 302,
-			headers: { Location: "/auth/login?next=" + encodeURIComponent(url.pathname) },
+			headers: {
+				Location: `/auth/login?next=${encodeURIComponent(url.pathname)}`,
+			},
 		});
 	}
 
@@ -861,13 +879,15 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		// Global Settings API
 		if (path === "/api/admin/settings" && req.method === "GET") {
 			const user = await getCurrentUser(req);
-			if (!user || !user.isAdmin) return new Response("Forbidden", { status: 403 });
+			if (!user || !user.isAdmin)
+				return new Response("Forbidden", { status: 403 });
 			return jsonResponse(await getAppSettings());
 		}
 
 		if (path === "/api/admin/settings" && req.method === "POST") {
 			const user = await getCurrentUser(req);
-			if (!user || !user.isAdmin) return new Response("Forbidden", { status: 403 });
+			if (!user || !user.isAdmin)
+				return new Response("Forbidden", { status: 403 });
 
 			const schema = z.object({
 				defaultStorageLimitBytes: z.number().int().min(0),
@@ -914,7 +934,9 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		}
 
 		// Age Out User
-		const userAgeOutMatch = path.match(/^\/api\/admin\/users\/([^/]+)\/age-out$/);
+		const userAgeOutMatch = path.match(
+			/^\/api\/admin\/users\/([^/]+)\/age-out$/,
+		);
 		if (userAgeOutMatch && req.method === "POST") {
 			return ageOutUser(userAgeOutMatch[1], req);
 		}

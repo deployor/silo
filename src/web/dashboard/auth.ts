@@ -135,14 +135,18 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 			);
 
 			if (source === "slack") {
-				const { getAppSettings } = await import("../../services/settings-service");
+				const { getAppSettings } = await import(
+					"../../services/settings-service"
+				);
 				const { formatBytes } = await import("../../lib/format");
 				const settings = await getAppSettings();
 				headers.set("Content-Type", "text/html");
 				const html = await render("slack-success", {
 					title: "Silo - Account Linked",
 					layout: "blank",
-					defaultStorageLimitHuman: formatBytes(settings.defaultStorageLimitBytes),
+					defaultStorageLimitHuman: formatBytes(
+						settings.defaultStorageLimitBytes,
+					),
 				});
 				return new Response(html, { headers });
 			}

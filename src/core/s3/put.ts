@@ -201,13 +201,13 @@ export async function handlePutRequest(
 				return S3Errors.InvalidRequest("Missing request body").toResponse();
 			}
 
-			let seen = 0;
+			const _seen = 0;
 			// Only wrap the stream if we need to enforce quota or verify length.
 			// If declared length is trusted and within quota, we can technically pass body directly,
 			// BUT `aws4fetch` might need to read it to sign it? No, it streams.
 			// However, Bun's request.body is already a stream.
 			// Creating a new ReadableStream adds overhead but allows us to count bytes.
-			
+
 			// If we didn't receive Content-Length, we MUST calculate it if we want to forward it.
 			// But we can't calculate it without buffering the whole stream, which is bad for memory.
 			// Upstream S3 usually *requires* Content-Length for PUTs unless using chunked encoding.
@@ -219,7 +219,7 @@ export async function handlePutRequest(
 			// SOLUTION:
 			// If the client didn't send Content-Length, we cannot know it without buffering.
 			// Buffering large files is dangerous (DOS).
-			
+
 			// HACK: For scripts sending small payloads (like our tests), allow reading even if no content-length
 			// But for real S3 usage, we usually require it.
 			// If we are here, and declared is null, we can try to guess or just buffer if it's small?
@@ -276,13 +276,13 @@ export async function handlePutRequest(
 			//
 			// Maybe the issue is case sensitivity? "Content-Length" vs "content-length"?
 			// We are setting "Content-Length".
-			
+
 			// We should reject requests without Content-Length if we are not using chunked transfer to upstream.
 			// But `aws4fetch` doesn't support chunked upload easily?
 			// Actually, if we just read the stream, we can't add the header after.
-			
+
 			// If the client DID send Content-Length, we use it.
-			
+
 			// If we are here, we are wrapping the stream to count bytes for quota/verification.
 			//
 			// CRITICAL FOR UPSTREAM S3:
@@ -297,12 +297,12 @@ export async function handlePutRequest(
 			// The issue might be that we are modifying the body (by wrapping it) but not buffering it,
 			// so the runtime doesn't know the length anymore.
 
-			         // HACK: If we have a declared length, we can try to "trick" Bun/fetch into thinking
-			         // the stream has a known length if we use a Blob or ArrayBuffer?
-			         // But we want to stream.
-			         //
-			         // If `declared` is set, we added `Content-Length` to `upstreamHeaders`.
-			         // But `aws4fetch` or `fetch` might drop it if body is a stream.
+			// HACK: If we have a declared length, we can try to "trick" Bun/fetch into thinking
+			// the stream has a known length if we use a Blob or ArrayBuffer?
+			// But we want to stream.
+			//
+			// If `declared` is set, we added `Content-Length` to `upstreamHeaders`.
+			// But `aws4fetch` or `fetch` might drop it if body is a stream.
 			//
 			// For untrusted clients: We DO verify `seen` vs `declared` at the end of the stream.
 			// If they mismatch, we error the controller, which should abort the upstream connection.
@@ -310,7 +310,7 @@ export async function handlePutRequest(
 			//
 			// If they send NO Content-Length, we can't send one upstream either unless we buffer.
 			// Buffering is dangerous. We will rely on S3 411 response in that case.
-			
+
 			// We must buffer if Content-Length is missing to calculate it for upstream.
 			// Upstream requires Content-Length for PUT.
 			if (declared === null) {
@@ -366,7 +366,7 @@ export async function handlePutRequest(
 							`Content-Length mismatch: declared=${declared} actual=${totalLength}`,
 						).toResponse();
 					}
-					
+
 					// Update quota check just in case
 					if (limit !== null && user) {
 						if (
@@ -404,8 +404,13 @@ export async function handlePutRequest(
 		}
 
 		// Debug logging for Content-Length
-		if (upstreamHeaders.has("Content-Length") || upstreamHeaders.has("content-length")) {
-			console.log(`[PUT] Content-Length present in upstreamHeaders: ${upstreamHeaders.get("Content-Length") || upstreamHeaders.get("content-length")}`);
+		if (
+			upstreamHeaders.has("Content-Length") ||
+			upstreamHeaders.has("content-length")
+		) {
+			console.log(
+				`[PUT] Content-Length present in upstreamHeaders: ${upstreamHeaders.get("Content-Length") || upstreamHeaders.get("content-length")}`,
+			);
 		} else {
 			console.log("[PUT] Content-Length MISSING in upstreamHeaders");
 		}
@@ -439,7 +444,7 @@ export async function handlePutRequest(
 			// No, if declared is null, we buffered and actualSize is set.
 			// If declared is not null, actualSize is set to declared.
 			// So actualSize represents the intended Content-Length.
-			
+
 			// If actualSize is 0, explicitly set it to "0" to be safe.
 			// This covers empty files.
 			headersObj["Content-Length"] = "0";

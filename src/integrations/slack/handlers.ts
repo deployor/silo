@@ -1,5 +1,4 @@
 import { and, eq } from "drizzle-orm";
-import { getAppSettings } from "../../services/settings-service";
 import {
 	Actions,
 	Button,
@@ -15,6 +14,7 @@ import { db } from "../../db";
 import { bucketKeys, buckets } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
 import { createKey } from "../../services/key-service";
+import { getAppSettings } from "../../services/settings-service";
 import { getStorageUsage, getUserBySlackId } from "../../services/user-service";
 import { openModal, publishView } from "./client";
 import {
@@ -100,14 +100,10 @@ export async function handleAppHomeOpened(event: { user: string }) {
 
 	await publishView(
 		slackId,
-		homeView(
-			user,
-			userBuckets,
-			{
-				defaultMaxBucketsPerUser: settings.defaultMaxBucketsPerUser,
-				defaultMaxKeysPerBucket: settings.defaultMaxKeysPerBucket,
-			},
-		),
+		homeView(user, userBuckets, {
+			defaultMaxBucketsPerUser: settings.defaultMaxBucketsPerUser,
+			defaultMaxKeysPerBucket: settings.defaultMaxKeysPerBucket,
+		}),
 	);
 }
 
@@ -248,10 +244,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			})
 			.returning();
 
-		const { accessKey, secretKey } = await createKey(
-			newBucket[0].id,
-			"slack",
-		);
+		const { accessKey, secretKey } = await createKey(newBucket[0].id, "slack");
 
 		handleAppHomeOpened({ user: payload.user.id });
 
@@ -266,7 +259,10 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			view: manageKeysModal(
 				newBucket[0],
 				keys,
-				{ defaultMaxKeysPerBucket: (await getAppSettings()).defaultMaxKeysPerBucket },
+				{
+					defaultMaxKeysPerBucket: (await getAppSettings())
+						.defaultMaxKeysPerBucket,
+				},
 				newKeyObj,
 			),
 		};
@@ -287,11 +283,10 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 				.where(eq(bucketKeys.bucketId, bucketId));
 			await openModal(
 				payload.trigger_id,
-				manageKeysModal(
-					bucket[0],
-					keys,
-					{ defaultMaxKeysPerBucket: (await getAppSettings()).defaultMaxKeysPerBucket },
-				),
+				manageKeysModal(bucket[0], keys, {
+					defaultMaxKeysPerBucket: (await getAppSettings())
+						.defaultMaxKeysPerBucket,
+				}),
 			);
 		}
 	}
@@ -360,7 +355,10 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 					view: manageKeysModal(
 						bucket[0],
 						keys,
-						{ defaultMaxKeysPerBucket: (await getAppSettings()).defaultMaxKeysPerBucket },
+						{
+							defaultMaxKeysPerBucket: (await getAppSettings())
+								.defaultMaxKeysPerBucket,
+						},
 						newKeyObj,
 					),
 				}),
@@ -408,11 +406,10 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 				},
 				body: JSON.stringify({
 					view_id: payload.view.id,
-					view: manageKeysModal(
-						bucket[0],
-						keys,
-						{ defaultMaxKeysPerBucket: (await getAppSettings()).defaultMaxKeysPerBucket },
-					),
+					view: manageKeysModal(bucket[0], keys, {
+						defaultMaxKeysPerBucket: (await getAppSettings())
+							.defaultMaxKeysPerBucket,
+					}),
 				}),
 			});
 		}

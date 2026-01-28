@@ -1,5 +1,5 @@
+import { readFileSync } from "node:fs";
 import { z } from "zod";
-import { readFileSync } from "fs";
 
 const envSchema = z.object({
 	S3_DOMAIN: z.string().default("localhost:3000"),
@@ -16,7 +16,9 @@ const envSchema = z.object({
 	SLACK_SIGNING_SECRET: z.string().min(1, "SLACK_SIGNING_SECRET is required"),
 	SLACK_FILE_UPLOAD_CHANNEL_ID: z.string().optional(),
 	DEV_ACCESS_CODE: z.string().optional(),
-	NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
+	NODE_ENV: z
+		.enum(["development", "production", "test"])
+		.default("development"),
 	GIT_COMMIT_SHA: z.string().optional(),
 	GIT_COMMIT_DATE: z.string().optional(),
 });

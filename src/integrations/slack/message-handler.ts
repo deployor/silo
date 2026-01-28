@@ -420,8 +420,6 @@ export async function handleMessage(event: SlackMessageEvent) {
 	}
 }
 
-type SlackBlock = Record<string, unknown>;
-
 export async function postUploadSummary(params: {
 	channelId: string;
 	messageTs?: string;
@@ -446,9 +444,9 @@ export async function postUploadSummary(params: {
 	} = params;
 
 	// If we are posting as a summary (not a reply), we want to impersonate the user.
-	
-	let uploaderName = undefined;
-	let uploaderIconUrl = undefined;
+
+	let uploaderName: string | undefined;
+	let uploaderIconUrl: string | undefined;
 
 	if (!messageTs && uploaderSlackId) {
 		// Use Cachet for the avatar
@@ -465,21 +463,23 @@ export async function postUploadSummary(params: {
 		}
 	}
 
-	const blocks: any[] = [];
+	const blocks: unknown[] = [];
 
 	let headerText = "";
-	let subHeaderText = "";
+	const _subHeaderText = "";
 
 	// If it's a CDN upload (no messageTs), we redesign the header.
 	// We want to impersonate the user AND ping them in the message body.
 	if (!messageTs) {
-		const userTag = uploaderSlackId ? `<@${uploaderSlackId}>` : uploaderName || "Someone";
-		
+		const userTag = uploaderSlackId
+			? `<@${uploaderSlackId}>`
+			: uploaderName || "Someone";
+
 		if (successCount === 0) {
 			blocks.push(
 				Section({
-					text: `*Upload Failed*\n${userTag} tried to upload ${totalCount} ${plural(totalCount, "file", "files")} but failed.`
-				})
+					text: `*Upload Failed*\n${userTag} tried to upload ${totalCount} ${plural(totalCount, "file", "files")} but failed.`,
+				}),
 			);
 		} else {
 			// Success (partial or full)
@@ -512,7 +512,7 @@ export async function postUploadSummary(params: {
 		}
 		blocks.push(Section({ text: headerText }));
 	}
-	
+
 	blocks.push(Divider());
 
 	for (const r of results) {
@@ -554,7 +554,7 @@ export async function postUploadSummary(params: {
 	}
 
 	const CHUNK_SIZE = 40;
-	let currentBlocks: any[] = [blocks[0], blocks[1]].filter(Boolean);
+	let currentBlocks: unknown[] = [blocks[0], blocks[1]].filter(Boolean);
 
 	// Variables `username` and `iconUrl` are already set at the start of the function
 
@@ -626,15 +626,20 @@ export async function postBlocks(
 	unfurl: boolean = true,
 ) {
 	// Ensure blocks are properly converted to JSON objects
-	const formattedBlocks = blocks.map((b: any) => {
+	const formattedBlocks = blocks.map((b) => {
 		// Check for specific slack-block-builder methods
 		// Based on debug script, it seems to have .build(), .getResult(), etc but not buildToJSON/Object directly on instance sometimes?
 		// But previous code used .buildToObject().
 		// Let's try .build() if it exists, as that usually returns the object representation.
-		
-		if (b && typeof b.build === "function") {
+
+		if (
+			b &&
+			typeof b === "object" &&
+			"build" in b &&
+			typeof (b as { build: unknown }).build === "function"
+		) {
 			try {
-				return b.build();
+				return (b as { build: () => unknown }).build();
 			} catch (e) {
 				console.error("Failed to build block:", e);
 				return b;

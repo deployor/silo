@@ -47,14 +47,11 @@ export async function openModal(triggerId: string, view: unknown) {
 }
 
 export async function getUserInfo(userId: string) {
-	const response = await fetch(
-		`${SLACK_API_URL}/users.info?user=${userId}`,
-		{
-			headers: {
-				Authorization: `Bearer ${config.slack.botToken}`,
-			},
+	const response = await fetch(`${SLACK_API_URL}/users.info?user=${userId}`, {
+		headers: {
+			Authorization: `Bearer ${config.slack.botToken}`,
 		},
-	);
+	});
 
 	const responseData = await response.json();
 	if (!responseData.ok) {

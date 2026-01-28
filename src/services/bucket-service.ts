@@ -103,7 +103,8 @@ export async function emptyBucket(
 	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
 	if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
 
-	if (!bucket[0].userId) throw new Error("Cannot empty system bucket without owner");
+	if (!bucket[0].userId)
+		throw new Error("Cannot empty system bucket without owner");
 
 	const owner = await db
 		.select()

@@ -1,8 +1,8 @@
 import { config } from "../../config";
 import { formatBytes } from "../../lib/format";
-import { getAppSettings } from "../../services/settings-service";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
+import { getAppSettings } from "../../services/settings-service";
 import { handleApiRequest } from "./api/index";
 import { handleAuthRequest } from "./auth";
 import { handleOffboardingRequest } from "./offboarding";

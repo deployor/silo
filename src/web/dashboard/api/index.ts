@@ -1,14 +1,14 @@
 import { eq, sql } from "drizzle-orm";
 import { config } from "../../../config";
-import { postUploadSummary } from "../../../integrations/slack/message-handler";
-import { getAppSettings } from "../../../services/settings-service";
 import { getInternalPath } from "../../../core/s3/utils";
 import { db } from "../../../db";
 import { buckets, requestLogs, users } from "../../../db/schema";
+import { postUploadSummary } from "../../../integrations/slack/message-handler";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import { s3Client } from "../../../lib/s3-client";
 import { getCurrentUser } from "../../../lib/session";
 import { getBucketsForUser } from "../../../services/bucket-service";
+import { getAppSettings } from "../../../services/settings-service";
 import { handleBucketOperations, handleBuckets } from "./buckets";
 import { handleCors } from "./cors";
 import { handleFiles } from "./files";
@@ -77,7 +77,9 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 				.from(buckets)
 				.where(eq(buckets.userId, user.id));
 			const currentUsage = Number(usageResult[0]?.total) || 0;
-			const limit = user.storageLimitBytes || (await getAppSettings()).defaultStorageLimitBytes;
+			const limit =
+				user.storageLimitBytes ||
+				(await getAppSettings()).defaultStorageLimitBytes;
 
 			if (currentUsage + file.size > limit) {
 				return errorResponse("Quota exceeded", 403);
