@@ -250,10 +250,10 @@ export async function handleMessage(event: SlackMessageEvent) {
 			return;
 		}
 
-		const usageGB = (
-			(Number(user.storageUsageBytes) || 0) /
-			(1024 * 1024 * 1024)
-		).toFixed(2);
+		const currentUsageBytes = await getStorageUsage(user.id);
+		const usageGB = ((currentUsageBytes || 0) / (1024 * 1024 * 1024)).toFixed(
+			2,
+		);
 		const daysLeft = user.overAgeGracePeriodEndsAt
 			? Math.ceil(
 					(new Date(user.overAgeGracePeriodEndsAt).getTime() - Date.now()) /
