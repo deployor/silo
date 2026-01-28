@@ -597,7 +597,7 @@ async function postBlocks(
 		return b;
 	});
 
-	await fetch("https://slack.com/api/chat.postMessage", {
+	const res = await fetch("https://slack.com/api/chat.postMessage", {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
@@ -614,6 +614,21 @@ async function postBlocks(
 			icon_url,
 		}),
 	});
+
+	if (!res.ok) {
+		console.error("Slack API Error (chat.postMessage):", res.status, res.statusText);
+		const text = await res.text();
+		console.error("Response body:", text);
+		return;
+	}
+
+	const data = await res.json();
+	if (!data.ok) {
+		console.error("Slack API Error (chat.postMessage):", data.error);
+		if (data.errors) {
+			console.error("Block validation errors:", JSON.stringify(data.errors, null, 2));
+		}
+	}
 }
 
 async function addReaction(channel: string, timestamp: string, name: string) {
