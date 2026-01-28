@@ -567,9 +567,6 @@ export async function postUploadSummary(params: {
 	// Only unfurl if this is a CDN upload (no messageTs implies it's not a reply/reaction to a Slack message)
 	const shouldUnfurl = !messageTs;
 
-	// Note: We are explicitly passing undefined for username/iconUrl here to use the default bot identity
-	// This makes it look like a notification from the system rather than impersonating the user.
-
 	for (let i = 2; i < blocks.length; i++) {
 		currentBlocks.push(blocks[i]);
 		if (currentBlocks.length >= CHUNK_SIZE) {
