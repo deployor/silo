@@ -282,13 +282,31 @@
                 return `${this.selectedIds.length} Projects Selected`;
             },
 
-            get totalRewardBytes() {
+            get totalHours() {
                 let hours = 0;
                 this.selectedIds.forEach(id => {
                     const p = this.projects.find(x => x.id === id);
                     if (p) hours += p.hours;
                 });
-                return hours * window.yswsConfig.quotaPerHour;
+                return hours;
+            },
+
+            get activeTierBonus() {
+                 const tiers = window.yswsConfig.tiers || [];
+                 const sortedTiers = tiers
+                    .filter(t => t.enabled && this.totalHours >= t.hours)
+                    .sort((a, b) => b.hours - a.hours);
+                return sortedTiers.length > 0 ? sortedTiers[0].percent : 0;
+            },
+
+            get baseRewardBytes() {
+                return this.totalHours * window.yswsConfig.quotaPerHour;
+            },
+
+            get totalRewardBytes() {
+                const base = this.baseRewardBytes;
+                const multiplier = 1 + (this.activeTierBonus / 100);
+                return Math.floor(base * multiplier);
             },
             
             isSelected(id) {
