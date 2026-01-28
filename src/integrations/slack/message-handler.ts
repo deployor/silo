@@ -587,12 +587,8 @@ async function postBlocks(
 ) {
 	// Ensure blocks are properly converted to JSON objects
 	const formattedBlocks = blocks.map((b: any) => {
-		// If it's already a plain object, return it
-		if (Object.getPrototypeOf(b) === Object.prototype) {
-			return b;
-		}
-		// If it has buildToJSON (slack-block-builder), use it
-		if (typeof b.buildToJSON === "function") {
+		// Check for buildToJSON method (slack-block-builder)
+		if (b && typeof b.buildToJSON === "function") {
 			try {
 				return JSON.parse(b.buildToJSON());
 			} catch (e) {
@@ -600,7 +596,9 @@ async function postBlocks(
 				return b;
 			}
 		}
-		// Fallback
+
+		// Fallback: If it's already a plain object or unknown type, return it as is
+		// This handles cases where we might have accidentally parsed it already or it's a raw object
 		return b;
 	});
 
