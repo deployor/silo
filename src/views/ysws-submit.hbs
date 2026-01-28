@@ -142,9 +142,19 @@
                     </div>
                      
                     <!-- Summary -->
-                    <div class="mt-2 p-3 rounded-lg bg-black/20 border border-white/5 flex justify-between items-center" x-show="selectedIds.length > 0">
-                        <span class="text-sm text-text-muted">Total Reward:</span>
-                        <span class="text-sm font-bold text-hc-green" x-text="formatSize(totalRewardBytes)"></span>
+                    <div class="mt-2 p-3 rounded-lg bg-black/20 border border-white/5 flex flex-col gap-2" x-show="selectedIds.length > 0">
+                        <div class="flex justify-between items-center">
+                             <span class="text-sm text-text-muted">Base Reward:</span>
+                             <span class="text-sm font-bold text-white" x-text="formatSize(baseRewardBytes)"></span>
+                        </div>
+                        <div class="flex justify-between items-center" x-show="activeTierBonus > 0">
+                             <span class="text-sm text-text-muted">Tier Bonus:</span>
+                             <span class="text-sm font-bold text-hc-green" x-text="'+' + activeTierBonus + '%'"></span>
+                        </div>
+                         <div class="flex justify-between items-center pt-2 border-t border-white/5">
+                            <span class="text-sm font-bold text-white">Total Reward:</span>
+                            <span class="text-sm font-bold text-hc-green" x-text="formatSize(totalRewardBytes)"></span>
+                        </div>
                     </div>
 
                      {{#if errors.hackatimeProject}}<p class="text-red-400 text-xs mt-1">{{errors.hackatimeProject}}</p>{{/if}}
@@ -237,6 +247,7 @@
             {{/each}}
         ],
         quotaPerHour: {{quotaPerHour}},
+        tiers: {{{json yswsBonusTiers}}} || [],
         initialHackatimeSelection: '{{values.hackatimeProject}}',
         initialAiTool: '{{values.aiToolUsage}}',
         initialAiPercent: '{{values.aiPercent}}'
