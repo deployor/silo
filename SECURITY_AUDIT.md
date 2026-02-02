@@ -116,3 +116,93 @@ Findings:
 ## 6. Conclusion
 
 The codebase remains in good shape overall. The main actionable items are dependency remediation (notably `hono`) and incremental hardening around CSRF, CSP, and proxy-aware rate limiting.
+
+---
+
+# Security Audit Report - Addendum
+
+**Date:** 2026-01-30
+**Auditor:** Roo
+
+## 1. Findings Update
+
+### 1.1 Authentication (OAuth State Parameter)
+**Risk: Medium**
+The OAuth 2.0 flow initiated in [`src/web/dashboard/auth.ts`](src/web/dashboard/auth.ts:12) does not utilize the `state` parameter. This parameter is crucial for preventing Login CSRF attacks, where an attacker could trick a victim into logging into the attacker's account.
+- **Recommendation:** Generate a random state string, store it in a HttpOnly cookie, pass it to the authorization URL, and verify it upon callback.
+
+### 1.2 Authentication (Cookie Parsing)
+**Risk: Low (Reliability)**
+Confirmed the finding regarding manual cookie parsing (`split("=")`) in [`src/lib/session.ts`](src/lib/session.ts:11) and [`src/web/dashboard/auth.ts`](src/web/dashboard/auth.ts:76). This is fragile for cookie values containing `=`.
+- **Recommendation:** Use a standard cookie parsing library (e.g., `cookie` package) or improved regex splitting to handle edge cases robustly.
+
+### 1.3 Database Security
+**Status: Secure**
+The project correctly uses `drizzle-orm` for database interactions, effectively mitigating SQL injection risks through parameterized queries. Raw SQL fragments (e.g., `sql<number>`) are used safely within Drizzle's template system.
+
+### 1.4 Slack Integration
+**Status: Secure**
+Slack request verification in [`src/integrations/slack/verify.ts`](src/integrations/slack/verify.ts:4) is implemented correctly, using HMAC-SHA256, timing-safe comparison, and timestamp validation to prevent replay attacks.
+
+### 1.5 S3 Input Validation
+**Status: Secure**
+Path traversal protection in [`src/core/s3/utils.ts`](src/core/s3/utils.ts:31) (`getKeyFromRequest`, `getInternalPath`) is robust, explicitly checking for `..` segments and multiple layers of encoding.
+The `10MB` buffer threshold in `src/core/s3/put.ts` is a good safeguard against DoS when Content-Length is missing.
+
+### 1.6 Secrets
+**Status: Secure**
+No hardcoded secrets were found in the source code during a regex scan.
+
+### 1.7 Dependencies
+**Status: Update**
+`hono` was not found in `package.json` dependencies. If it was removed, the previous high-severity finding is resolved.
+
+## 2. Updated Recommendations
+
+1.  **Implement OAuth State Parameter:** Update the login flow to include and verify a `state` parameter.
+2.  **Robust Cookie Parsing:** Replace manual string splitting with a robust parsing function or library.
+3.  **CSRF Protection:** Continue with the recommendation to implement explicit CSRF tokens for dashboard POST/PUT/DELETE/PATCH endpoints.
+
+---
+
+# Security Audit Report - Addendum 2
+
+**Date:** 2026-02-02
+**Auditor:** Roo
+
+## 1. Findings Update
+
+### 1.1 Hardcoded Credentials in Offboarding Logic
+**Risk: Medium**
+Found hardcoded "debug" credentials in [`src/web/dashboard/offboarding.ts`](src/web/dashboard/offboarding.ts:247).
+```typescript
+if (
+    cleanAccessKey === "348f6572f69435b0d014457e5b385966" &&
+    cleanSecretKey ===
+        "01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d"
+)
+```
+While this appears to be a mock/debug feature, shipping hardcoded credential checks in production code is risky. If these hashes correspond to any real (even test) credentials, they should be rotated immediately. If they are purely "magic strings", this logic should still be wrapped in an environment check (e.g. `if (config.isProduction) return ...`) to prevent accidental activation in production.
+
+### 1.2 Path Traversal Protection Verified
+**Status: Secure**
+Re-verified `src/core/s3/utils.ts`. The implementation of `getKeyFromRequest` includes a multi-pass decode loop (3 rounds) to catch double-encoded traversal attempts (e.g. `%252e%252e`), which is a robust defense.
+
+### 1.3 Slack Signature Verification Verified
+**Status: Secure**
+Re-verified `src/integrations/slack/verify.ts`. It correctly computes the HMAC signature using the request body and timestamp, and uses `timingSafeEqual` to prevent timing attacks.
+
+## 2. Updated Recommendations
+
+1.  **Remove or Guard Debug Logic:** The hardcoded credential check in `offboarding.ts` should be removed or strictly guarded by `if (!config.isProduction)`.
+2.  **Maintain Previous Recommendations:**
+    - OAuth `state` parameter implementation is still pending.
+    - Robust cookie parsing is still pending.
+
+## 3. Resolutions (2026-02-02)
+
+The following items from this addendum have been remediated:
+
+1. **Hardcoded Credentials:** The debug logic in `src/web/dashboard/offboarding.ts` is now strictly guarded by `!config.isProduction`.
+2. **OAuth State:** The login flow now generates and verifies a `state` parameter using a short-lived `silo_oauth_state` cookie.
+3. **Cookie Parsing:** A robust `parseCookies` utility was added to `src/lib/api-utils.ts` and applied to `auth.ts` and `session.ts`.

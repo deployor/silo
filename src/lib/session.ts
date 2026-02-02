@@ -3,24 +3,16 @@ import { config } from "../config";
 import { db } from "../db";
 import { buckets, sessions, users } from "../db/schema";
 import { getAppSettings } from "../services/settings-service";
+import { parseCookies } from "./api-utils";
 import { context } from "./context";
 
 export async function getCurrentUser(req: Request) {
-	const cookieHeader = req.headers.get("Cookie");
-	if (cookieHeader) {
-		const cookies = cookieHeader.split(";").reduce(
-			(acc, cookie) => {
-				const [key, value] = cookie.trim().split("=");
-				acc[key] = value;
-				return acc;
-			},
-			{} as Record<string, string>,
-		);
+	const cookies = parseCookies(req.headers.get("Cookie"));
 
-		if (cookies.silo_session) {
-			const sessionResult = await db
-				.select({
-					user: users,
+	if (cookies.silo_session) {
+		const sessionResult = await db
+			.select({
+				user: users,
 					session: sessions,
 				})
 				.from(sessions)
@@ -154,7 +146,6 @@ export async function getCurrentUser(req: Request) {
 				};
 			}
 		}
-	}
-
+	
 	return null;
 }
