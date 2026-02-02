@@ -3,6 +3,7 @@ import { Readable, Transform } from "node:stream";
 import archiver from "archiver";
 import { AwsClient } from "aws4fetch";
 import { eq, sql } from "drizzle-orm";
+import { config } from "../../config";
 import { getInternalPath } from "../../core/s3/utils";
 import { db } from "../../db";
 import { buckets, users } from "../../db/schema";
@@ -244,6 +245,7 @@ async function analyzeMigration(
 
 	// DEBUG BYPASS: If using the specific debug credentials, return fake data
 	if (
+		!config.isProduction &&
 		cleanAccessKey === "348f6572f69435b0d014457e5b385966" &&
 		cleanSecretKey ===
 			"01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d"
@@ -415,6 +417,7 @@ async function migrateUserData(
 
 	// Check for Debug Creds
 	const isDebug =
+		!config.isProduction &&
 		cleanAccessKey === "348f6572f69435b0d014457e5b385966" &&
 		cleanSecretKey ===
 			"01e5df70067643e26b38c22780b621df26be0f089602492f2323a0747448378d";

@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { config } from "../../config";
 import { db } from "../../db";
 import { sessions, users } from "../../db/schema";
+import { parseCookies } from "../../lib/api-utils";
 import { render } from "../../lib/view-engine";
 
 export async function handleAuthRequest(req: Request): Promise<Response> {
@@ -16,14 +17,32 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 				? `${config.hcAuth.redirectUri}?source=slack`
 				: config.hcAuth.redirectUri;
 
-		const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${config.hcAuth.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20profile%20email%20slack_id%20verification_status`;
-		return Response.redirect(authUrl);
+		const state = randomUUID();
+		const authUrl = `https://auth.hackclub.com/oauth/authorize?client_id=${config.hcAuth.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20profile%20email%20slack_id%20verification_status&state=${state}`;
+
+		const headers = new Headers();
+		headers.set("Location", authUrl);
+		headers.set(
+			"Set-Cookie",
+			`silo_oauth_state=${state}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=300`,
+		);
+
+		return new Response(null, { status: 302, headers });
 	}
 
 	if (path === "/auth/callback") {
 		const code = url.searchParams.get("code");
+		const state = url.searchParams.get("state");
 		const source = url.searchParams.get("source");
+
 		if (!code) return new Response("Missing code", { status: 400 });
+
+		const cookies = parseCookies(req.headers.get("Cookie"));
+		const storedState = cookies.silo_oauth_state;
+
+		if (!state || !storedState || state !== storedState) {
+			return new Response("Invalid or missing state parameter", { status: 400 });
+		}
 
 		try {
 			const params = new URLSearchParams();
@@ -71,17 +90,7 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 				.limit(1);
 
 			if (existingUser.length === 0) {
-				const cookieHeader = req.headers.get("Cookie");
-				const cookies = cookieHeader
-					? cookieHeader.split(";").reduce(
-							(acc, cookie) => {
-								const [key, value] = cookie.trim().split("=");
-								acc[key] = value;
-								return acc;
-							},
-							{} as Record<string, string>,
-						)
-					: {};
+				// cookies is already parsed at top of handler
 
 				const expectedBypass = createHmac("sha256", config.hcAuth.clientSecret)
 					.update("wip_bypass")
@@ -129,9 +138,14 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 			});
 
 			const headers = new Headers();
-			headers.set(
+			headers.append(
 				"Set-Cookie",
 				`silo_session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Secure; Expires=${expiresAt.toUTCString()}`,
+			);
+			// Clear state cookie
+			headers.append(
+				"Set-Cookie",
+				"silo_oauth_state=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0",
 			);
 
 			if (source === "slack") {
@@ -161,18 +175,7 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 	}
 
 	if (path === "/auth/logout") {
-		const cookieHeader = req.headers.get("Cookie") || "";
-		const cookies = cookieHeader
-			? cookieHeader.split(";").reduce(
-					(acc, cookie) => {
-						const [key, value] = cookie.trim().split("=");
-						acc[key] = value;
-						return acc;
-					},
-					{} as Record<string, string>,
-				)
-			: ({} as Record<string, string>);
-
+		const cookies = parseCookies(req.headers.get("Cookie"));
 		const headers = new Headers();
 
 		// If the current session is impersonating, "logout" should *stop impersonation*
@@ -227,17 +230,7 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 	}
 
 	if (path === "/auth/wip" && req.method === "POST") {
-		const cookieHeader = req.headers.get("Cookie");
-		const cookies = cookieHeader
-			? cookieHeader.split(";").reduce(
-					(acc, cookie) => {
-						const [key, value] = cookie.trim().split("=");
-						acc[key] = value;
-						return acc;
-					},
-					{} as Record<string, string>,
-				)
-			: {};
+		const cookies = parseCookies(req.headers.get("Cookie"));
 
 		const lastAttempt = parseInt(cookies.silo_wip_attempt || "0", 10);
 		const now = Date.now();
