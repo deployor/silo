@@ -28,6 +28,7 @@ export const users = pgTable("users", {
 	createdAt: timestamp("created_at").defaultNow(),
 	updatedAt: timestamp("updated_at").defaultNow(),
 	isAdmin: boolean("is_admin").default(false).notNull(),
+	isReviewer: boolean("is_reviewer").default(false).notNull(),
 	isLocked: boolean("is_locked").default(false).notNull(),
 	lockReason: text("lock_reason"),
 	onboarded: boolean("onboarded").default(false).notNull(),

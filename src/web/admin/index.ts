@@ -668,10 +668,19 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		});
 	}
 
+	const path = url.pathname;
+
+	// YSWS reviewers can access YSWS admin
+	if (path.startsWith("/admin/ysws")) {
+		if (!user.isAdmin && !user.isReviewer) {
+			return new Response("Forbidden", { status: 403 });
+		}
+		return handleAdminYswsRequest(req, user);
+	}
+
 	if (!user.isAdmin) {
 		return new Response("Forbidden", { status: 403 });
 	}
-	const path = url.pathname;
 
 	// Admin UI Pages
 	// Keep /admin as a convenience redirect to the Users page.
@@ -680,10 +689,6 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 			status: 302,
 			headers: { Location: "/admin/users" },
 		});
-	}
-
-	if (path.startsWith("/admin/ysws")) {
-		return handleAdminYswsRequest(req, user);
 	}
 
 	if (path.startsWith("/admin/redemptions")) {
@@ -702,6 +707,10 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 
 	// API Routes
 	if (path.startsWith("/api/admin/")) {
+		if (!user.isAdmin) {
+			return new Response("Forbidden", { status: 403 });
+		}
+
 		// Start impersonation (admin-only): switches current session into impersonation mode.
 		// Behavior: always 30 minutes, no user-selectable TTL.
 		if (path === "/api/admin/impersonate" && req.method === "POST") {
