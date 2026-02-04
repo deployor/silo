@@ -116,14 +116,20 @@
         </div>
          <div class="bg-black/30 p-6 rounded-xl border border-white/10">
              <h4 class="text-white font-bold mb-4">Account Status</h4>
-             <div class="flex items-center gap-4">
+             <div class="flex flex-col gap-4">
                  <label class="inline-flex items-center cursor-pointer">
                      <input type="checkbox" id="modal-is-locked" class="sr-only peer" onchange="toggleUserLock(this.checked)">
                      <div class="relative w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-red rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-hc-red"></div>
                      <span class="ms-3 text-sm font-medium text-text-muted peer-checked:text-white">Account Locked</span>
                  </label>
+
+                 <label class="inline-flex items-center cursor-pointer">
+                     <input type="checkbox" id="modal-is-reviewer" class="sr-only peer" onchange="toggleUserReviewer(this.checked)">
+                     <div class="relative w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                     <span class="ms-3 text-sm font-medium text-text-muted peer-checked:text-white">YSWS Reviewer</span>
+                 </label>
              </div>
-             <p class="text-xs text-text-muted mt-2">Locking an account denies all access immediately.</p>
+             <p class="text-xs text-text-muted mt-2">Locking an account denies all access immediately. Reviewers can access YSWS admin routes.</p>
          </div>
 
          <div class="bg-black/30 p-6 rounded-xl border border-white/10">
@@ -416,13 +422,24 @@
                         }
 
                         // Standard Status
+                        const badges = [];
                         if (u.isLocked) {
-                            return `<div class="flex flex-col items-start gap-1 cursor-help" title="Account Manually Locked${u.lockReason ? ': ' + escapeHtml(u.lockReason) : ''}">
+                            badges.push(`<div class="flex flex-col items-start gap-1 cursor-help" title="Account Manually Locked${u.lockReason ? ': ' + escapeHtml(u.lockReason) : ''}">
                                 <span class="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded text-xs font-bold border border-blue-500/30">LOCKED</span>
-                            </div>`;
+                            </div>`);
+                        }
+                        
+                        if (u.isAdmin) {
+                             badges.push(`<span class="bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded text-xs font-bold border border-purple-500/30 cursor-help" title="Full Admin Access">ADMIN</span>`);
+                        } else if (u.isReviewer) {
+                             badges.push(`<span class="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-bold border border-emerald-500/30 cursor-help" title="YSWS Reviewer Access">REVIEWER</span>`);
                         }
 
-                        return `<span class="bg-white/10 text-white px-2 py-0.5 rounded text-xs font-bold border border-white/20 cursor-help" title="Normal Active Account">ACTIVE</span>`;
+                        if (badges.length === 0) {
+                            return `<span class="bg-white/10 text-white px-2 py-0.5 rounded text-xs font-bold border border-white/20 cursor-help" title="Normal Active Account">ACTIVE</span>`;
+                        }
+                        
+                        return `<div class="flex gap-1 flex-wrap">${badges.join('')}</div>`;
                     })()}
                 </td>
                 <td class="px-6 py-4 text-right">
@@ -471,6 +488,7 @@
         document.getElementById("modal-egress-usage").textContent = formatBytes(user.egressBytes);
 
         document.getElementById("modal-is-locked").checked = user.isLocked;
+        document.getElementById("modal-is-reviewer").checked = user.isReviewer;
 
         // Age Out UI state
         const ageOutBtn = document.getElementById("btn-age-out");
@@ -614,6 +632,18 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ isLocked: locked, lockReason: reason })
+        });
+
+        loadUsers();
+    }
+
+    async function toggleUserReviewer(isReviewer) {
+        if (!currentUser) return;
+
+        await fetch(`/api/admin/users/${currentUser.id}/reviewer`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isReviewer: isReviewer })
         });
 
         loadUsers();
