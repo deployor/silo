@@ -94,7 +94,7 @@ ${rulesXml}
 	}
 
 	let egressLimit: bigint | null = null;
-	if (user) {
+	if (user && !user.isImmortal) {
 		if (user.egressLimitBytes !== null) {
 			const manualLimit = BigInt(user.egressLimitBytes);
 			if (manualLimit !== -1n) {

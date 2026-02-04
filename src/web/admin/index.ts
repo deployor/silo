@@ -107,6 +107,7 @@ async function listUsers(url: URL, user: typeof users.$inferSelect) {
 			updatedAt: users.updatedAt,
 			isAdmin: users.isAdmin,
 			isReviewer: users.isReviewer,
+			isImmortal: users.isImmortal,
 			isLocked: users.isLocked,
 			lockReason: users.lockReason,
 			markedAsOverAge: users.markedAsOverAge,
@@ -186,6 +187,21 @@ async function updateUserQuota(userId: string, req: Request) {
 
 async function lockUser(userId: string, req: Request) {
 	const body = await req.json();
+
+	if (body.isLocked) {
+		const user = await db
+			.select({ isImmortal: users.isImmortal })
+			.from(users)
+			.where(eq(users.id, userId))
+			.limit(1);
+
+		if (user.length > 0 && user[0].isImmortal) {
+			return new Response("User is immortal and cannot be locked", {
+				status: 400,
+			});
+		}
+	}
+
 	await db
 		.update(users)
 		.set({ isLocked: body.isLocked, lockReason: body.lockReason || null })
@@ -202,6 +218,15 @@ async function toggleUserReviewer(userId: string, req: Request) {
 	return new Response("Updated", { status: 200 });
 }
 
+async function toggleUserImmortal(userId: string, req: Request) {
+	const body = await req.json();
+	await db
+		.update(users)
+		.set({ isImmortal: body.isImmortal })
+		.where(eq(users.id, userId));
+	return new Response("Updated", { status: 200 });
+}
+
 async function ageOutUser(userId: string, _req: Request) {
 	const user = await db
 		.select()
@@ -210,6 +235,12 @@ async function ageOutUser(userId: string, _req: Request) {
 		.limit(1);
 
 	if (user.length === 0) return new Response("User not found", { status: 404 });
+
+	if (user[0].isImmortal) {
+		return new Response("User is immortal and cannot be aged out", {
+			status: 400,
+		});
+	}
 
 	if (user[0].markedAsOverAge) {
 		return new Response("User is already marked as over-age", { status: 400 });
@@ -958,6 +989,14 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		);
 		if (userReviewerMatch && req.method === "POST") {
 			return toggleUserReviewer(userReviewerMatch[1], req);
+		}
+
+		// Toggle Immortal Status
+		const userImmortalMatch = path.match(
+			/^\/api\/admin\/users\/([^/]+)\/immortal$/,
+		);
+		if (userImmortalMatch && req.method === "POST") {
+			return toggleUserImmortal(userImmortalMatch[1], req);
 		}
 
 		// Age Out User

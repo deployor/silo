@@ -183,7 +183,7 @@ export async function handlePutRequest(
 					upstreamHeaders.set("Content-Length", contentLengthHeader);
 				}
 
-				if (limit !== null && user) {
+				if (limit !== null && user && !user.isImmortal) {
 					if (
 						BigInt(user.storageUsageBytes) + BigInt(actualSize) >
 						BigInt(limit)
@@ -324,7 +324,7 @@ export async function handlePutRequest(
 				// Explicitly set the Content-Length header for the upstream request
 				upstreamHeaders.set("Content-Length", actualSize.toString());
 
-				if (limit !== null && user) {
+				if (limit !== null && user && !user.isImmortal) {
 					if (
 						BigInt(user.storageUsageBytes) + BigInt(actualSize) >
 						BigInt(limit)
@@ -368,7 +368,7 @@ export async function handlePutRequest(
 					}
 
 					// Update quota check just in case
-					if (limit !== null && user) {
+					if (limit !== null && user && !user.isImmortal) {
 						if (
 							BigInt(user.storageUsageBytes) + BigInt(totalLength) >
 							BigInt(limit)
