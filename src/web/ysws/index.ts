@@ -196,7 +196,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
 				}
 
 				if (
-					["ask", "tab-completion", "command-k", "inline", "chat"].includes(
+					["tab-completion", "command-k", "inline", "chat"].includes(
 						validData.aiToolUsage || "",
 					)
 				) {
