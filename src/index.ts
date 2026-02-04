@@ -15,6 +15,7 @@ import { handleAdminRequest } from "./web/admin";
 import { handleDashboardRequest } from "./web/dashboard";
 import { handleRedeemRequest } from "./web/redemptions";
 import { handleYswsRequest } from "./web/ysws";
+import { handleGalleryRequest } from "./web/gallery";
 
 const S3_DOMAIN = config.s3Domain;
 
@@ -80,6 +81,7 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 			"/api/onboarding/",
 			"/ysws",
 			"/api/ysws",
+			"/gallery",
 			"/redeem",
 		];
 
@@ -153,6 +155,8 @@ Bun.serve({
 						response = await handleAdminRequest(req);
 					} else if (url.pathname.startsWith("/ysws")) {
 						response = await handleYswsRequest(req);
+					} else if (url.pathname.startsWith("/gallery")) {
+						response = await handleGalleryRequest(req);
 					} else if (url.pathname.startsWith("/redeem")) {
 						response = await handleRedeemRequest(req);
 					} else if (url.pathname === "/api/slack/events") {

@@ -22,6 +22,15 @@ export async function getSubmissions() {
 		.orderBy(desc(yswsSubmissions.createdAt));
 }
 
+export async function getPublicApprovedSubmissions(limit = 50) {
+	return await db
+		.select()
+		.from(yswsSubmissions)
+		.where(eq(yswsSubmissions.status, "approved"))
+		.orderBy(desc(yswsSubmissions.reviewedAt))
+		.limit(limit);
+}
+
 export async function getSubmissionById(id: string) {
 	const result = await db
 		.select()
@@ -136,6 +145,7 @@ export async function rejectSubmission(
 export const YswsService = {
 	createSubmission,
 	getSubmissions,
+	getPublicApprovedSubmissions,
 	getSubmissionById,
 	updateSubmission,
 	approveSubmission,

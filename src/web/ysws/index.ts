@@ -111,12 +111,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
 				.orderBy(desc(yswsSubmissions.createdAt));
 
 			// Get Public Gallery (Approved Projects)
-			const galleryProjects = await db
-				.select()
-				.from(yswsSubmissions)
-				.where(eq(yswsSubmissions.status, "approved"))
-				.orderBy(desc(yswsSubmissions.reviewedAt))
-				.limit(12);
+			const galleryProjects = await YswsService.getPublicApprovedSubmissions();
 
 			return new Response(
 				await render("ysws-list", {
@@ -126,6 +121,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
 					galleryProjects,
 					estimatedReviewTime,
 					success: url.searchParams.get("success") === "true",
+					activeTab: url.searchParams.get("tab") || "my-ships",
 				}),
 				{
 					headers: { "Content-Type": "text/html" },

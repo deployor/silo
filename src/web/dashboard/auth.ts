@@ -90,8 +90,6 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 				.limit(1);
 
 			if (existingUser.length === 0) {
-				// cookies is already parsed at top of handler
-
 				const expectedBypass = createHmac("sha256", config.hcAuth.clientSecret)
 					.update("wip_bypass")
 					.digest("hex");
@@ -142,7 +140,6 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 				"Set-Cookie",
 				`silo_session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Secure; Expires=${expiresAt.toUTCString()}`,
 			);
-			// Clear state cookie
 			headers.append(
 				"Set-Cookie",
 				"silo_oauth_state=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0",
@@ -178,8 +175,7 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 		const cookies = parseCookies(req.headers.get("Cookie"));
 		const headers = new Headers();
 
-		// If the current session is impersonating, "logout" should *stop impersonation*
-		// (best UX for admins) without destroying the admin session.
+		// If impersonating, logout stops impersonation but keeps the admin session
 		if (cookies.silo_session) {
 			const sess = await db
 				.select({
@@ -213,7 +209,6 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 				return new Response(null, { status: 302, headers });
 			}
 
-			// Normal logout
 			await db.delete(sessions).where(eq(sessions.id, cookies.silo_session));
 		}
 

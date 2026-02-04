@@ -11,11 +11,9 @@ import { s3Client } from "../../lib/s3-client";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
 
-// Simple in-memory rate limiting for exports
-// In a production environment with multiple instances, this should be in Redis
+// Simple in-memory rate limiting (use Redis in production)
 const EXPORT_LIMITS = new Map<string, number[]>();
 const MAX_EXPORTS_PER_HOUR = 3;
-// Lock to prevent multiple simultaneous migrations for the same user
 const MIGRATION_LOCKS = new Set<string>();
 
 async function getS3Error(res: Response): Promise<string> {
@@ -61,15 +59,12 @@ export async function handleOffboardingRequest(
 
 	const url = new URL(req.url);
 
-	// Ensure user is actually offboarding
-	// If dataExported is true, they can still access this page to re-download or check status
+	// Ensure user is actually offboarding or has already exported
 	if (!user.markedAsOverAge && !user.dataExported) {
 		return Response.redirect("/");
 	}
 
-	// GET /dashboard/offboarding - Show export portal
 	if (req.method === "GET" && url.pathname === "/dashboard/offboarding") {
-		// If files already deleted, show "Aged Out" page
 		if (user.filesDeleted) {
 			const html = await render("aged-out", {
 				title: "Silo - Offboarding",
@@ -79,7 +74,6 @@ export async function handleOffboardingRequest(
 			return new Response(html, { headers: { "Content-Type": "text/html" } });
 		}
 
-		// Calculate days remaining
 		const now = new Date();
 		const ends = user.overAgeGracePeriodEndsAt
 			? new Date(user.overAgeGracePeriodEndsAt)
@@ -93,9 +87,6 @@ export async function handleOffboardingRequest(
 			Math.max(0, ((totalDays - daysRemaining) / totalDays) * 100),
 		);
 
-		// Calculate Usage for Estimator
-		// This is a rough sum of all stats if available, or just a placeholder if not calculated
-		// For now, we'll fetch stats sum
 		const stats = await db.execute(sql`
 		          SELECT SUM(total_bytes) as total_size
 		          FROM buckets
@@ -103,7 +94,6 @@ export async function handleOffboardingRequest(
 		      `);
 		const totalBytes = Number(stats[0]?.total_size || 0);
 
-		// Format bytes
 		const units = ["B", "KB", "MB", "GB", "TB"];
 		let size = totalBytes;
 		let unitIndex = 0;
@@ -127,7 +117,6 @@ export async function handleOffboardingRequest(
 		return new Response(html, { headers: { "Content-Type": "text/html" } });
 	}
 
-	// GET /dashboard/offboarding/archive - Actual download stream
 	if (
 		req.method === "GET" &&
 		url.pathname === "/dashboard/offboarding/archive"
@@ -141,27 +130,22 @@ export async function handleOffboardingRequest(
 		return streamUserData(user);
 	}
 
-	// POST /dashboard/offboarding/download - Trigger state change + redirect
 	if (
 		req.method === "POST" &&
 		url.pathname === "/dashboard/offboarding/download"
 	) {
-		// 1. Mark as data exported (Freezes account) if not already
 		if (!user.dataExported) {
 			await db
 				.update(users)
 				.set({ dataExported: true })
 				.where(eq(users.id, user.id));
 
-			// Redirect to success page for the first time
 			return Response.redirect("/dashboard/offboarding?success=1");
 		}
 
-		// If already exported, just redirect to the archive download
 		return Response.redirect("/dashboard/offboarding/archive");
 	}
 
-	// POST /dashboard/offboarding/analyze - Check destination and plan buckets
 	if (
 		req.method === "POST" &&
 		url.pathname === "/dashboard/offboarding/analyze"
@@ -176,7 +160,6 @@ export async function handleOffboardingRequest(
 		return analyzeMigration(user, body as MigrationParams);
 	}
 
-	// POST /dashboard/offboarding/migrate - Handle automated migration
 	if (
 		req.method === "POST" &&
 		url.pathname === "/dashboard/offboarding/migrate"
@@ -211,13 +194,11 @@ async function analyzeMigration(
 ) {
 	const { endpoint, accessKeyId, secretAccessKey, bucketMapping } = params;
 
-	// Basic cleaning
 	const cleanEndpoint = endpoint ? endpoint.trim() : "";
 	const cleanAccessKey = accessKeyId ? accessKeyId.trim() : "";
 	const cleanSecretKey = secretAccessKey ? secretAccessKey.trim() : "";
 
 	if (!cleanEndpoint || !cleanAccessKey || !cleanSecretKey) {
-		// Detailed error for debugging
 		return new Response(
 			JSON.stringify({
 				error: "Missing required credentials",
@@ -231,9 +212,7 @@ async function analyzeMigration(
 		);
 	}
 
-	// Check for placeholder
 	if (cleanEndpoint.includes("<account_id>")) {
-		// If it's R2, we might be able to help? No, we can't guess the account ID.
 		return new Response(
 			JSON.stringify({
 				error:
@@ -243,7 +222,7 @@ async function analyzeMigration(
 		);
 	}
 
-	// DEBUG BYPASS: If using the specific debug credentials, return fake data
+	// Debug bypass for testing
 	if (
 		!config.isProduction &&
 		cleanAccessKey === "348f6572f69435b0d014457e5b385966" &&
@@ -286,13 +265,11 @@ async function analyzeMigration(
 			region: "auto",
 		});
 
-		// 1. Fetch Local Buckets
 		const localBuckets = await db
 			.select()
 			.from(buckets)
 			.where(eq(buckets.userId, user.id));
 
-		// 2. Fetch Remote Buckets (ListAllMyBuckets) - Ownership Check
 		const listRes = await destClient.fetch(cleanEndpoint, { method: "GET" });
 
 		if (!listRes.ok) {
@@ -324,23 +301,20 @@ async function analyzeMigration(
 			}
 		}
 
-		// 3. Match & Check Availability
 		const plan = await Promise.all(
 			localBuckets.map(async (b) => {
 				const targetName = bucketMapping?.[b.name]
 					? bucketMapping[b.name]
 					: b.name;
 
-				// Status 1: Do we own it?
 				if (remoteBuckets.has(targetName)) {
 					return {
 						localName: b.name,
 						targetName: targetName,
-						status: "EXISTS", // We own it, safe to merge
+						status: "EXISTS",
 					};
 				}
 
-				// Status 2: Is it available globally? (HEAD Check)
 				try {
 					const bucketUrl = `${cleanEndpoint.replace(/\/+$/, "")}/${targetName}`;
 					const headRes = await destClient.fetch(bucketUrl, { method: "HEAD" });
@@ -359,7 +333,6 @@ async function analyzeMigration(
 						};
 					}
 				} catch (_e) {
-					// If we can't even HEAD it (e.g. DNS error), assume available for creation
 					return {
 						localName: b.name,
 						targetName: targetName,
@@ -384,12 +357,10 @@ async function migrateUserData(
 ) {
 	const { endpoint, accessKeyId, secretAccessKey, bucketMapping } = params;
 
-	// Basic cleaning
 	const cleanEndpoint = endpoint ? endpoint.trim() : "";
 	const cleanAccessKey = accessKeyId ? accessKeyId.trim() : "";
 	const cleanSecretKey = secretAccessKey ? secretAccessKey.trim() : "";
 
-	// 1. Validation
 	if (!cleanEndpoint || !cleanAccessKey || !cleanSecretKey || !bucketMapping) {
 		return new Response(JSON.stringify({ error: "Missing required fields" }), {
 			status: 400,
@@ -404,7 +375,6 @@ async function migrateUserData(
 		});
 	}
 
-	// 2. Loop Prevention
 	const currentEndpoint = s3Client.getEndpoint();
 	if (cleanEndpoint.includes(currentEndpoint)) {
 		return new Response(
@@ -415,7 +385,6 @@ async function migrateUserData(
 
 	MIGRATION_LOCKS.add(user.id);
 
-	// Check for Debug Creds
 	const isDebug =
 		!config.isProduction &&
 		cleanAccessKey === "348f6572f69435b0d014457e5b385966" &&
@@ -433,7 +402,6 @@ async function migrateUserData(
 				controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
 			};
 
-			// DEBUG MODE MIGRATION
 			if (isDebug) {
 				try {
 					send(
@@ -442,7 +410,6 @@ async function migrateUserData(
 					);
 					await new Promise((r) => setTimeout(r, 1000));
 
-					// Freeze Account Mock
 					if (!user.dataExported) {
 						send("Freezing Silo account...", "info");
 						await db
@@ -460,7 +427,6 @@ async function migrateUserData(
 
 					let totalFiles = 0;
 
-					// 1. Create Buckets Phase
 					send("Phase 1: Creating destination buckets...", "info");
 					for (const sourceBucket of userBuckets) {
 						const targetName = bucketMapping[sourceBucket.name];
@@ -472,7 +438,6 @@ async function migrateUserData(
 					send("All buckets ready.", "success");
 					await new Promise((r) => setTimeout(r, 500));
 
-					// 2. Migration Phase
 					send("Phase 2: Migrating files...", "info");
 					for (const sourceBucket of userBuckets) {
 						const targetName = bucketMapping[sourceBucket.name];
@@ -516,11 +481,9 @@ async function migrateUserData(
 				return;
 			}
 
-			// REAL MIGRATION
 			try {
 				send("Initializing migration...", "info");
 
-				// Initialize Destination Client
 				const destClient = new AwsClient({
 					accessKeyId: cleanAccessKey,
 					secretAccessKey: cleanSecretKey,
@@ -528,13 +491,11 @@ async function migrateUserData(
 					region: "auto",
 				});
 
-				// Fetch User Buckets
 				const userBuckets = await db
 					.select()
 					.from(buckets)
 					.where(eq(buckets.userId, user.id));
 
-				// Pre-flight: Create/Check Destination Buckets
 				send("Verifying destination buckets...", "info");
 				let bucketCreationErrors = 0;
 
@@ -546,15 +507,10 @@ async function migrateUserData(
 
 					try {
 						send(`Ensuring target bucket '${targetName}' exists...`);
-						// Attempt to create bucket (idempotent if owned)
 						const putRes = await destClient.fetch(bucketUrl, { method: "PUT" });
 
 						if (!putRes.ok) {
 							if (putRes.status === 409) {
-								// Conflict: Bucket exists.
-								// If we own it (BucketAlreadyOwnedByYou), it's fine.
-								// If someone else owns it (BucketAlreadyExists), we can't write to it.
-								// We'll try to ListObjects to verify ownership/access.
 								const listRes = await destClient.fetch(
 									`${bucketUrl}?max-keys=1`,
 									{ method: "GET" },
@@ -602,10 +558,8 @@ async function migrateUserData(
 						"We will attempt to migrate the remaining accessible buckets.",
 						"info",
 					);
-					// Do not abort, proceed with migration for other buckets
 				}
 
-				// Freeze Account
 				if (!user.dataExported) {
 					send("Freezing Silo account to ensure data integrity...");
 					await db
@@ -637,7 +591,6 @@ async function migrateUserData(
 					let continuationToken: string | undefined;
 
 					do {
-						// List Objects from Silo
 						const query = new URLSearchParams();
 						query.set("list-type", "2");
 						query.set("prefix", internalPrefix);
@@ -671,18 +624,13 @@ async function migrateUserData(
 							const key = item.Key;
 							const relativeKey = key.replace(internalPrefix, "");
 
-							// Destination Path: /{targetBucket}/{relativeKey}
-							// IMPORTANT: aws4fetch/S3 url structure depends on path-style vs virtual-hosted
-							// We'll stick to constructing the URL manually for path-style support which R2 supports well enough
 							const destUrl = `${cleanEndpoint.replace(/\/+$/, "")}/${targetName}/${relativeKey}`;
 
 							try {
-								// 1. Get from Silo
 								const getRes = await s3Client.fetch(key, { method: "GET" });
 								if (!getRes.ok)
 									throw new Error(`Read failed: ${getRes.status}`);
 
-								// 2. Prepare Metadata & Tags
 								const headers: Record<string, string> = {};
 								if (getRes.headers.get("content-type")) {
 									headers["Content-Type"] =
@@ -693,15 +641,12 @@ async function migrateUserData(
 								let body: ReadableStream | Blob | null = getRes.body;
 								let contentLength = getRes.headers.get("content-length");
 
-								// Fallback 1: Use Size from ListObjects if header is missing
 								if (!contentLength && item.Size !== undefined) {
 									contentLength = item.Size.toString();
 								}
 
-								// Fallback 2: Try HEAD request if still missing
 								if (!contentLength) {
 									try {
-										// send(`DEBUG: Fetching HEAD for ${relativeKey} to find size...`, "info");
 										const headRes = await s3Client.fetch(key, {
 											method: "HEAD",
 										});
@@ -717,23 +662,15 @@ async function migrateUserData(
 									}
 								}
 
-								// IMPORTANT FIX: Convert stream to Blob to ensure Content-Length is sent to destination
-								// Upstream S3 providers reject PUT requests with Transfer-Encoding: chunked (no Content-Length)
-								// Even if we set the Content-Length header manually, passing a raw stream often causes the
-								// runtime to ignore it and use chunked encoding anyway. Converting to a Blob forces the
-								// correct Content-Length header to be respected and disables chunked encoding.
+								// Convert stream to Blob to ensure Content-Length is sent.
+								// Upstream S3 providers often reject chunked encoding.
 								if (
 									body &&
 									typeof body === "object" &&
 									"getReader" in body &&
 									typeof (body as ReadableStream).getReader === "function"
 								) {
-									// It's a ReadableStream, convert to Blob
-									// Note: Bun/Node efficiently handles large blobs (often backed by disk)
-									// preventing memory exhaustion for reasonably sized files.
 									body = await getRes.blob();
-
-									// Update Content-Length to match exactly what we are sending
 									contentLength = (body as Blob).size.toString();
 								}
 
@@ -745,14 +682,12 @@ async function migrateUserData(
 									);
 								}
 
-								// Copy User Metadata
 								getRes.headers.forEach((val, name) => {
 									if (name.toLowerCase().startsWith("x-amz-meta-")) {
 										headers[name] = val;
 									}
 								});
 
-								// Fetch Tags (best effort)
 								try {
 									const tagRes = await s3Client.fetch(`${key}?tagging`, {
 										method: "GET",
@@ -778,11 +713,10 @@ async function migrateUserData(
 									/* ignore tag fetch errors */
 								}
 
-								// 3. Put to Destination
 								const putRes = await destClient.fetch(destUrl, {
 									method: "PUT",
 									headers,
-									body: body, // Use the prepared body (stream or buffer)
+									body: body,
 								});
 
 								if (!putRes.ok) {
@@ -876,7 +810,6 @@ async function streamUserData(user: typeof users.$inferSelect) {
 		try {
 			const manifestEntries: string[] = [];
 
-			// BagIt: bagit.txt
 			const bagitTxt =
 				"BagIt-Version: 0.97\nTag-File-Character-Encoding: UTF-8\n";
 			archive.append(bagitTxt, { name: "bagit.txt" });
@@ -908,16 +841,14 @@ async function streamUserData(user: typeof users.$inferSelect) {
 							: [result.Contents]
 						: [];
 
-					// SEQUENTIAL PROCESSING to avoid RAM explosion with Promise.all on huge buckets
+					// Sequential processing to avoid high memory usage
 					for (const item of contents) {
 						const key = item.Key;
 						const relativeKey = key.replace(internalPrefix, "");
 						const bagPath = `data/${bucket.name}/${relativeKey}`;
 
-						// 1. Fetch File Content
 						const fileRes = await s3Client.fetch(key, { method: "GET" });
 
-						// 2. Fetch Object Tags
 						const tags: Record<string, string> = {};
 						try {
 							const taggingRes = await s3Client.fetch(`${key}?tagging`, {
@@ -939,7 +870,6 @@ async function streamUserData(user: typeof users.$inferSelect) {
 							// Ignore tagging errors
 						}
 
-						// 3. User Metadata
 						const userMetadata: Record<string, string> = {};
 						if (fileRes.headers) {
 							fileRes.headers.forEach((value, key) => {
@@ -949,7 +879,6 @@ async function streamUserData(user: typeof users.$inferSelect) {
 							});
 						}
 
-						// 4. Create Metadata JSON Sidecar
 						if (
 							Object.keys(tags).length > 0 ||
 							Object.keys(userMetadata).length > 0 ||
@@ -1004,19 +933,9 @@ async function streamUserData(user: typeof users.$inferSelect) {
 								nodeStream.on("error", reject);
 								checksumTransform.on("error", reject);
 
-								// We append the TRANSFORMED stream to archive
-								// Archiver will drain this stream before accepting the next append?
-								// Actually, archiver queues appends. But since we await the stream completion (resolve)
-								// inside this loop, we effectively serialize the download -> zip pipe.
-								// This ensures we don't open 1000 connections or buffer 1TB of data.
 								archive.append(nodeStream.pipe(checksumTransform), {
 									name: bagPath,
 								});
-
-								// IMPORTANT: We must wait for the stream to be fully consumed by archiver
-								// before moving to the next file to prevent memory buildup?
-								// 'flush' on checksumTransform is called when the stream ends.
-								// So awaiting this Promise ensures the file is fully processed.
 							});
 						}
 					}
@@ -1024,18 +943,15 @@ async function streamUserData(user: typeof users.$inferSelect) {
 				} while (continuationToken);
 			}
 
-			// Append Manifest
 			const manifestContent = manifestEntries.join("\n");
 			archive.append(manifestContent, { name: "manifest-sha256.txt" });
 
-			// Append Bag Info
 			const bagInfo =
 				`Payload-Oxum: ${manifestEntries.reduce((acc, _entry) => acc + 0, 0)}.0\n` +
 				`Bagging-Date: ${new Date().toISOString().split("T")[0]}\n` +
 				`Contact-Name: HackClub\n`;
 			archive.append(bagInfo, { name: "bag-info.txt" });
 
-			// Finalize Archive
 			await archive.finalize();
 		} catch (e) {
 			console.error("Error generating export archive:", e);
