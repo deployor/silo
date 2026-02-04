@@ -105,7 +105,7 @@
                         <td class="p-4 font-mono text-sm text-white/80">
                             {{this.hoursSpent}}h
                             {{#if (gt (add (or this.tierBonusPercent 0) (or this.adminBonusPercent 0)) 0)}}
-                                <div class="inline-flex items-center gap-1 text-[10px] text-hc-green border border-hc-green/30 bg-hc-green/10 px-1.5 py-0.5 rounded ml-1" title="Bonus: {{add (or this.tierBonusPercent 0) (or this.adminBonusPercent 0)}}% (Tier: {{or this.tierBonusPercent 0}}%, Admin: {{or this.adminBonusPercent 0}}%)">
+                                <div class="inline-flex items-center gap-1 text-[10px] text-hc-green font-bold ml-1 cursor-help" title="Bonus: {{add (or this.tierBonusPercent 0) (or this.adminBonusPercent 0)}}% (Tier: {{or this.tierBonusPercent 0}}%, Admin: {{or this.adminBonusPercent 0}}%)">
                                     <i class="ph-bold ph-trend-up"></i>
                                     +{{add (or this.tierBonusPercent 0) (or this.adminBonusPercent 0)}}%
                                 </div>
