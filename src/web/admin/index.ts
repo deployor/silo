@@ -192,6 +192,15 @@ async function lockUser(userId: string, req: Request) {
 	return new Response("Updated", { status: 200 });
 }
 
+async function toggleUserReviewer(userId: string, req: Request) {
+	const body = await req.json();
+	await db
+		.update(users)
+		.set({ isReviewer: body.isReviewer })
+		.where(eq(users.id, userId));
+	return new Response("Updated", { status: 200 });
+}
+
 async function ageOutUser(userId: string, _req: Request) {
 	const user = await db
 		.select()
@@ -940,6 +949,14 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		const userLockMatch = path.match(/^\/api\/admin\/users\/([^/]+)\/lock$/);
 		if (userLockMatch && req.method === "POST") {
 			return lockUser(userLockMatch[1], req);
+		}
+
+		// Toggle Reviewer Status
+		const userReviewerMatch = path.match(
+			/^\/api\/admin\/users\/([^/]+)\/reviewer$/,
+		);
+		if (userReviewerMatch && req.method === "POST") {
+			return toggleUserReviewer(userReviewerMatch[1], req);
 		}
 
 		// Age Out User
