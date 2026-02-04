@@ -189,7 +189,7 @@
                         :class="{'border-red-500/50 bg-red-500/10': isRejected, 'border-hc-green/30 bg-hc-green/10': aiLevel === 0}">
                         <h4 class="font-bold text-lg text-white" x-text="currentLevel.label"></h4>
                         <p class="text-sm text-text-muted" x-text="currentLevel.desc"></p>
-                        <p x-show="aiLevel === 4" x-cloak class="text-red-400 text-sm mt-2 font-bold">Purely AI-generated / No Code projects are not eligible for rewards.</p>
+                        <p x-show="aiLevel === 5" x-cloak class="text-red-400 text-sm mt-2 font-bold">Purely AI-generated / No Code projects are not eligible for rewards.</p>
                         <p x-show="requiresDetails && aiPercent > 30" x-cloak class="text-red-400 text-sm mt-2 font-bold">Projects with >30% AI generation are not eligible.</p>
                     </div>
 
