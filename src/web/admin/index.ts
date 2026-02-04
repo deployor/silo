@@ -106,6 +106,7 @@ async function listUsers(url: URL, user: typeof users.$inferSelect) {
 			createdAt: users.createdAt,
 			updatedAt: users.updatedAt,
 			isAdmin: users.isAdmin,
+			isReviewer: users.isReviewer,
 			isLocked: users.isLocked,
 			lockReason: users.lockReason,
 			markedAsOverAge: users.markedAsOverAge,
