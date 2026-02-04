@@ -73,8 +73,12 @@
               <img id="user-avatar" src="{{user.avatarUrl}}" alt="User Avatar" class="w-6 h-6 rounded-full {{#unless user.avatarUrl}}hidden{{/unless}}" />
               <span class="text-text-muted font-mono truncate max-w-[14rem]" id="user-id">{{user.id}}</span>
             </div>
-            {{#if (or user.isAdmin user.isReviewer)}}
-              <a href="/admin/ysws" id="admin-link" class="text-text-muted hover:text-white transition-colors">Admin</a>
+            {{#if user.isAdmin}}
+              <a href="/admin" id="admin-link" class="text-text-muted hover:text-white transition-colors">Admin</a>
+            {{else}}
+              {{#if user.isReviewer}}
+                <a href="/admin/ysws" id="admin-link" class="text-text-muted hover:text-white transition-colors">Admin</a>
+              {{/if}}
             {{/if}}
             <a href="/auth/logout" class="text-hc-red hover:text-white transition-colors" id="logout-link">Logout</a>
             <script>
