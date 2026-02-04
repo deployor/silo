@@ -116,3 +116,7 @@ Handlebars.registerHelper("add", (a, b) => {
 Handlebars.registerHelper("subtract", (a, b) => {
 	return Number(a) - Number(b);
 });
+
+Handlebars.registerHelper("or", (a, b) => {
+	return a || b;
+});
