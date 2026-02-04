@@ -1,6 +1,6 @@
 <div class="max-w-3xl mx-auto py-12">
     <div class="mb-8 text-center">
-        <h1 class="text-4xl font-extrabold tracking-tight mb-2">YSWS</h1>
+        <h1 class="text-4xl font-extrabold tracking-tight mb-2 text-white">YSWS</h1>
         <p class="text-xl text-white/60">Ship your projects, earn more storage. Simple as that.</p>
         <p class="mt-4 text-sm text-hc-green bg-hc-green/10 border border-hc-green/20 rounded-full px-4 py-1 inline-block">
             Earn {{quotaPerHourFormatted}} per hour tracked on Hackatime
@@ -110,7 +110,7 @@
                         <i class="ph ph-caret-down text-xl text-text-muted group-hover:text-white transition-colors"></i>
                     </button>
 
-                    <div x-show="open" style="display: none;" x-transition.opacity.duration.200ms
+                    <div x-show="open" x-cloak x-transition.opacity.duration.200ms
                         class="absolute z-50 w-full mt-2 bg-hc-dark border border-white/10 rounded-xl shadow-xl max-h-60 overflow-hidden flex flex-col">
                         
                         <div class="p-2 border-b border-white/10 bg-black/20">
@@ -142,7 +142,7 @@
                     </div>
                      
                     <!-- Summary -->
-                    <div class="mt-2 p-3 rounded-lg bg-black/20 border border-white/5 flex flex-col gap-2" x-show="selectedIds.length > 0">
+                    <div class="mt-2 p-3 rounded-lg bg-black/20 border border-white/5 flex flex-col gap-2" x-show="selectedIds.length > 0" x-cloak>
                         <div class="flex justify-between items-center">
                              <span class="text-sm text-text-muted">Base Reward:</span>
                              <span class="text-sm font-bold text-white" x-text="formatSize(baseRewardBytes)"></span>
@@ -188,11 +188,11 @@
                         :class="{'border-red-500/50 bg-red-500/10': isRejected, 'border-hc-green/30 bg-hc-green/10': aiLevel === 0}">
                         <h4 class="font-bold text-lg text-white" x-text="currentLevel.label"></h4>
                         <p class="text-sm text-text-muted" x-text="currentLevel.desc"></p>
-                        <p x-show="aiLevel === 4" style="display: none;" class="text-red-400 text-sm mt-2 font-bold">Purely AI-generated / No Code projects are not eligible for rewards.</p>
-                        <p x-show="requiresDetails && aiPercent > 30" style="display: none;" class="text-red-400 text-sm mt-2 font-bold">Projects with >30% AI generation are not eligible.</p>
+                        <p x-show="aiLevel === 4" x-cloak class="text-red-400 text-sm mt-2 font-bold">Purely AI-generated / No Code projects are not eligible for rewards.</p>
+                        <p x-show="requiresDetails && aiPercent > 30" x-cloak class="text-red-400 text-sm mt-2 font-bold">Projects with >30% AI generation are not eligible.</p>
                     </div>
 
-                    <div x-show="requiresDetails" style="display: none;" x-transition.opacity.duration.300ms class="space-y-6">
+                    <div x-show="requiresDetails" x-cloak x-transition.opacity.duration.300ms class="space-y-6">
                          <div>
                             <div class="flex justify-between items-center mb-2">
                                 <label class="block text-sm font-bold text-text-muted uppercase tracking-wider">Percentage of AI Generated Code</label>
@@ -203,7 +203,7 @@
                                 <span>0%</span>
                                 <span>100%</span>
                             </div>
-                            <p class="text-xs text-red-400 mt-2 font-bold" x-show="aiPercent > 30" style="display: none;">Projects with >30% AI generation are not eligible for rewards.</p>
+                            <p class="text-xs text-red-400 mt-2 font-bold" x-show="aiPercent > 30" x-cloak>Projects with >30% AI generation are not eligible for rewards.</p>
                         </div>
 
                         <div>
@@ -239,88 +239,150 @@
 
 {{#section "extraScripts"}}
 <script>
-    // Global Config
-    window.yswsConfig = {
-        projects: [
-            {{#each hackatimeProjects}}
-            { id: '{{this.id}}', name: '{{this.name}}', hours: {{this.hours}} },
-            {{/each}}
-        ],
-        quotaPerHour: {{quotaPerHour}},
-        tiers: {{{json yswsBonusTiers}}} || [],
-        initialHackatimeSelection: '{{values.hackatimeProject}}',
-        initialAiTool: '{{values.aiToolUsage}}',
-        initialAiPercent: '{{values.aiPercent}}'
-    };
-    console.log('YSWS Config:', window.yswsConfig);
+    // File Upload Logic
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const uploadPlaceholder = document.getElementById('upload-placeholder');
+    const uploadPreviewContainer = document.getElementById('upload-preview-container');
+    const uploadPreview = document.getElementById('upload-preview');
+    const removeFileBtn = document.getElementById('remove-file');
 
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight(e) {
+        dropZone.classList.add('border-white/40', 'bg-white/5');
+    }
+
+    function unhighlight(e) {
+        dropZone.classList.remove('border-white/40', 'bg-white/5');
+    }
+
+    dropZone.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles(files);
+    }
+
+    fileInput.addEventListener('change', function() {
+        handleFiles(this.files);
+    });
+
+    function handleFiles(files) {
+        if (files.length > 0) {
+            const file = files[0];
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    uploadPreview.src = e.target.result;
+                    uploadPlaceholder.classList.add('hidden');
+                    uploadPreviewContainer.classList.remove('hidden');
+                    uploadPreviewContainer.classList.add('flex');
+                }
+                reader.readAsDataURL(file);
+                
+                // Manually set files for input if coming from drop
+                if (fileInput.files !== files) {
+                     // DataTransfer to set files property
+                     const dataTransfer = new DataTransfer();
+                     dataTransfer.items.add(file);
+                     fileInput.files = dataTransfer.files;
+                }
+            }
+        }
+    }
+
+    removeFileBtn.addEventListener('click', function(e) {
+        e.preventDefault(); // Prevent label click
+        e.stopPropagation();
+        fileInput.value = ''; // Clear input
+        uploadPreview.src = '';
+        uploadPreviewContainer.classList.add('hidden');
+        uploadPreviewContainer.classList.remove('flex');
+        uploadPlaceholder.classList.remove('hidden');
+    });
+
+
+    // Alpine Data
     document.addEventListener('alpine:init', () => {
         Alpine.data('hackatimeSelector', () => ({
             open: false,
             search: '',
             selectedIds: [],
-            projects: [],
-            
-            init() {
-                this.projects = window.yswsConfig.projects || [];
-                console.log('Hackatime Selector Init. Projects:', this.projects);
-                const initial = window.yswsConfig.initialHackatimeSelection;
-                this.selectedIds = initial ? initial.split(',').filter(Boolean) : [];
-            },
-            
+            projects: {{{json hackatimeProjects}}},
+            quotaPerHour: {{quotaPerHour}},
+            yswsBonusTiers: {{{json yswsBonusTiers}}},
+
             get filteredProjects() {
-                if (this.search === '') return this.projects;
+                if (!this.search) return this.projects;
                 return this.projects.filter(p => p.name.toLowerCase().includes(this.search.toLowerCase()));
             },
-            
+
             get selectedLabel() {
-                if (this.selectedIds.length === 0) return 'Select Hackatime Project(s)...';
-                if (this.selectedIds.length === 1) {
-                    const p = this.projects.find(x => x.id === this.selectedIds[0]);
-                    return p ? p.name : '1 Project Selected';
-                }
-                return `${this.selectedIds.length} Projects Selected`;
-            },
-
-            get totalHours() {
-                let hours = 0;
-                this.selectedIds.forEach(id => {
-                    const p = this.projects.find(x => x.id === id);
-                    if (p) hours += p.hours;
-                });
-                return hours;
-            },
-
-            get activeTierBonus() {
-                 const tiers = window.yswsConfig.tiers || [];
-                 const sortedTiers = tiers
-                    .filter(t => t.enabled && this.totalHours >= t.hours)
-                    .sort((a, b) => b.hours - a.hours);
-                return sortedTiers.length > 0 ? sortedTiers[0].percent : 0;
+                if (this.selectedIds.length === 0) return 'Select Project(s)...';
+                return `${this.selectedIds.length} Project${this.selectedIds.length > 1 ? 's' : ''} Selected`;
             },
 
             get baseRewardBytes() {
-                return this.totalHours * window.yswsConfig.quotaPerHour;
+                const totalHours = this.projects
+                    .filter(p => this.selectedIds.includes(p.id))
+                    .reduce((sum, p) => sum + p.hours, 0);
+                return totalHours * this.quotaPerHour;
+            },
+
+            get activeTierBonus() {
+                const base = this.baseRewardBytes;
+                // Find highest tier applicable
+                // Tiers are sorted by threshold ascending usually? Let's assume so or sort
+                // Example: [{threshold: 1GB, bonusPercent: 10}]
+                // Wait, tiers based on *bytes* or *hours*? Usually bytes.
+                let bonus = 0;
+                // Sort desc to find highest matching
+                const tiers = [...this.yswsBonusTiers].sort((a, b) => b.threshold - a.threshold);
+                
+                for (const tier of tiers) {
+                    if (base >= tier.threshold) {
+                        bonus = tier.bonusPercent;
+                        break;
+                    }
+                }
+                return bonus;
             },
 
             get totalRewardBytes() {
                 const base = this.baseRewardBytes;
-                const multiplier = 1 + (this.activeTierBonus / 100);
-                return Math.floor(base * multiplier);
-            },
-            
-            isSelected(id) {
-                return this.selectedIds.includes(id);
+                const bonus = this.activeTierBonus;
+                return base + (base * (bonus / 100));
             },
 
             toggle(project) {
-                if (this.selectedIds.includes(project.id)) {
+                if (this.isSelected(project.id)) {
                     this.selectedIds = this.selectedIds.filter(id => id !== project.id);
                 } else {
                     this.selectedIds.push(project.id);
                 }
             },
-            
+
+            isSelected(id) {
+                return this.selectedIds.includes(id);
+            },
+
             formatSize(bytes) {
                 if (bytes === 0) return '0 B';
                 const k = 1024;
@@ -334,115 +396,26 @@
             aiLevel: 0,
             aiPercent: 0,
             levels: [
-                { val: 'none', label: 'No AI', desc: 'I wrote everything manually' },
-                { val: 'tab-completion', label: 'Tab Completion', desc: 'Copilot Tab' },
-                { val: 'command-k', label: 'Inline Edits', desc: 'Command-K' },
-                { val: 'chat', label: 'Chat / Generation', desc: 'ChatGPT / Copilot Chat / AMP' },
-                { val: 'no-code', label: 'No Code', desc: 'v0 / Lovable / Bolt' }
+                { val: 'none', label: 'No AI Used', desc: '100% human written code.' },
+                { val: 'tab-completion', label: 'Tab Completion', desc: 'Used Copilot/Ghostwriter for line completions.' },
+                { val: 'inline', label: 'Inline Generation', desc: 'Used Ctrl+I / Cmd+K to generate small blocks.' },
+                { val: 'chat', label: 'Chat Assistant', desc: 'Used ChatGPT/Claude to write functions or debug.' },
+                { val: 'no-code', label: 'Purely AI / No Code', desc: 'Entirely generated by AI tools (v0, bolt, etc).' }
             ],
 
-            init() {
-                const initialTool = window.yswsConfig.initialAiTool;
-                const initialPercent = window.yswsConfig.initialAiPercent;
-                
-                if (initialTool) {
-                    const foundIdx = this.levels.findIndex(l => l.val === initialTool);
-                    if (foundIdx > -1) this.aiLevel = foundIdx;
-                    this.aiPercent = Number(initialPercent) || 0;
-                }
+            get currentLevel() {
+                return this.levels[this.aiLevel] || this.levels[0];
             },
 
-            get currentLevel() { return this.levels[this.aiLevel] || this.levels[0]; },
-            get isRejected() { return this.aiLevel === 4 || (this.requiresDetails && this.aiPercent > 30); },
-            get requiresDetails() { return this.aiLevel >= 1 && this.aiLevel <= 3; }
+            get requiresDetails() {
+                return this.aiLevel > 0 && this.aiLevel < 4;
+            },
+
+            get isRejected() {
+                // Reject if no-code (level 4) OR (requires details AND > 30%)
+                return this.aiLevel === 4 || (this.requiresDetails && this.aiPercent > 30);
+            }
         }));
     });
-
-    // Drag and Drop Logic
-    const dropZone = document.getElementById('drop-zone');
-    const fileInput = document.getElementById('file-input');
-    const uploadPlaceholder = document.getElementById('upload-placeholder');
-    const uploadPreviewContainer = document.getElementById('upload-preview-container');
-    const uploadPreview = document.getElementById('upload-preview');
-    const removeFileBtn = document.getElementById('remove-file');
-
-    // Prevent default drag behaviors
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        if(dropZone) dropZone.addEventListener(eventName, preventDefaults, false);
-        document.body.addEventListener(eventName, preventDefaults, false);
-    });
-
-    function preventDefaults (e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-
-    // Highlight drop zone when item is dragged over it
-    ['dragenter', 'dragover'].forEach(eventName => {
-        if(dropZone) dropZone.addEventListener(eventName, highlight, false);
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-        if(dropZone) dropZone.addEventListener(eventName, unhighlight, false);
-    });
-
-    function highlight(e) {
-        if(dropZone) dropZone.classList.add('border-hc-red', 'bg-white/5');
-    }
-
-    function unhighlight(e) {
-        if(dropZone) dropZone.classList.remove('border-hc-red', 'bg-white/5');
-    }
-
-    // Handle dropped files
-    if(dropZone) dropZone.addEventListener('drop', handleDrop, false);
-
-    function handleDrop(e) {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        handleFiles(files);
-    }
-
-    // Handle file input change
-    if(fileInput) fileInput.addEventListener('change', function() {
-        handleFiles(this.files);
-    });
-
-    function handleFiles(files) {
-        if (files.length > 0) {
-            const file = files[0];
-            if (file.type.startsWith('image/')) {
-                previewFile(file);
-                // Update file input files if coming from drop
-                if (fileInput.files !== files) {
-                    fileInput.files = files;
-                }
-            } else {
-                alert('Please upload an image file.');
-            }
-        }
-    }
-
-    function previewFile(file) {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onloadend = function() {
-            uploadPreview.src = reader.result;
-            uploadPlaceholder.classList.add('hidden');
-            uploadPreviewContainer.classList.remove('hidden');
-            uploadPreviewContainer.classList.add('flex');
-        }
-    }
-
-    if(removeFileBtn) removeFileBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation(); // Prevent opening file dialog
-        fileInput.value = ''; // Clear input
-        uploadPreview.src = '';
-        uploadPreviewContainer.classList.add('hidden');
-        uploadPreviewContainer.classList.remove('flex');
-        uploadPlaceholder.classList.remove('hidden');
-    });
 </script>
-<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/csp@3.x.x/dist/cdn.min.js"></script>
 {{/section}}
