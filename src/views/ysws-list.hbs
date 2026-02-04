@@ -1,4 +1,13 @@
-<div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8" x-data="{ activeTab: '{{activeTab}}' }">
+<div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8"
+    x-data="{
+        activeTab: new URLSearchParams(window.location.search).get('tab') || 'my-ships'
+    }"
+    x-init="$watch('activeTab', value => {
+        const url = new URL(window.location);
+        url.searchParams.set('tab', value);
+        window.history.replaceState({}, '', url);
+    })"
+>
     <!-- Header with Action -->
     <div class="flex flex-col md:flex-row justify-between items-end mb-8 gap-6 border-b border-white/10 pb-6">
         <div>
@@ -15,16 +24,16 @@
     <!-- Segmented Control Tab Switcher -->
     <div class="flex justify-start mb-8">
         <div class="bg-white/5 p-1 rounded-lg inline-flex border border-white/10">
-            <button 
-                @click="activeTab = 'my-ships'; window.history.replaceState({}, '', '?tab=my-ships')"
+            <button
+                @click="activeTab = 'my-ships'"
                 :class="activeTab === 'my-ships' ? 'bg-hc-blue text-white shadow-sm' : 'text-white/60 hover:text-white hover:bg-white/5'"
                 class="px-6 py-2 rounded-md font-bold transition-all text-sm flex items-center gap-2"
             >
                 <i class="ph-bold ph-rocket-launch"></i>
                 My Ships
             </button>
-            <button 
-                @click="activeTab = 'gallery'; window.history.replaceState({}, '', '?tab=gallery')"
+            <button
+                @click="activeTab = 'gallery'"
                 :class="activeTab === 'gallery' ? 'bg-hc-green text-white shadow-sm' : 'text-white/60 hover:text-white hover:bg-white/5'"
                 class="px-6 py-2 rounded-md font-bold transition-all text-sm flex items-center gap-2"
             >
@@ -35,7 +44,7 @@
     </div>
 
     {{#if success}}
-    <div class="mb-8 bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-center gap-4" x-show="activeTab === 'my-ships'">
+    <div class="mb-8 bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-center gap-4" x-show="activeTab === 'my-ships'" x-cloak>
         <div class="bg-green-500/20 p-2 rounded-full">
             <i class="ph-bold ph-check text-green-400"></i>
         </div>
@@ -47,7 +56,7 @@
     {{/if}}
 
     <!-- My Ships Tab (Compact List View) -->
-    <div x-show="activeTab === 'my-ships'" style="display: none;">
+    <div x-show="activeTab === 'my-ships'" x-cloak>
         {{#if submissions}}
         <div class="bg-hc-dark border border-white/10 rounded-xl overflow-hidden">
             <table class="w-full text-left border-collapse">
@@ -129,7 +138,7 @@
     </div>
 
     <!-- Gallery Tab -->
-    <div x-show="activeTab === 'gallery'" style="display: none;">
+    <div x-show="activeTab === 'gallery'" x-cloak>
         {{#if galleryProjects}}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {{#each galleryProjects}}
