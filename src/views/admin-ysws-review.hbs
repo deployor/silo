@@ -1,5 +1,18 @@
 <div class="max-w-4xl mx-auto space-y-8">
     
+    <!-- Admin Subnav (for Reviewers too) -->
+    <div class="flex gap-4 mb-6 border-b border-white/10 pb-4">
+      {{#if user.isAdmin}}
+      <a href="/admin/users" id="tab-users" class="text-text-muted font-bold px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">Users</a>
+      {{/if}}
+      <a href="/admin/ysws" id="tab-ysws" class="text-white font-bold px-4 py-2 rounded-lg bg-white/10 transition-colors">YSWS</a>
+      {{#if user.isAdmin}}
+      <a href="/admin/redemptions" id="tab-redemptions" class="text-text-muted font-bold px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">Redemptions</a>
+      <a href="/admin/logs" id="tab-logs" class="text-text-muted font-bold px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">Logs</a>
+      <a href="/admin/settings" id="tab-settings" class="text-text-muted font-bold px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">Settings</a>
+      {{/if}}
+    </div>
+
     <div class="flex items-center gap-4">
         <a href="/admin/ysws" class="text-text-muted hover:text-white transition-colors flex items-center gap-2">
             <i class="ph ph-arrow-left"></i>

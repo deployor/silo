@@ -8,7 +8,7 @@ export async function handleAdminYswsRequest(
 ): Promise<Response> {
 	const url = new URL(req.url);
 
-	if (!user.isAdmin) {
+	if (!user.isAdmin && !user.isReviewer) {
 		return new Response("Forbidden", { status: 403 });
 	}
 
