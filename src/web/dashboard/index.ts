@@ -25,10 +25,13 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 	if (path === "/docs" || path === "/docs/") {
 		const user = await getCurrentUser(req);
+		const settings = await getAppSettings();
 		const html = await render("docs", {
 			title: "Documentation - Silo",
 			user,
 			s3Domain: config.s3Domain,
+			yswsQuotaPerHour: settings.yswsQuotaPerHourBytes,
+			yswsBonusTiers: settings.yswsBonusTiers,
 		});
 
 		return new Response(html, {
