@@ -1,0 +1,86 @@
+<div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-16">
+        <h1 class="text-5xl font-extrabold tracking-tight mb-4 bg-clip-text text-transparent bg-gradient-to-r from-hc-red to-orange-500">YSWS Gallery</h1>
+        <p class="text-xl text-white/60 max-w-2xl mx-auto">Discover amazing projects built by teenagers with High Seas & Silo.</p>
+        
+        <div class="mt-8 flex justify-center gap-4">
+             <a href="/ysws/submit" class="bg-hc-red hover:bg-red-600 text-white font-bold py-3 px-8 rounded-xl transition-all shadow-lg shadow-hc-red/20 transform hover:-translate-y-1">
+                Submit Your Project
+            </a>
+            <a href="/" class="bg-white/10 hover:bg-white/20 text-white font-bold py-3 px-8 rounded-xl transition-all backdrop-blur-sm border border-white/10">
+                Back to Home
+            </a>
+        </div>
+    </div>
+
+    {{#if galleryProjects}}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {{#each galleryProjects}}
+        <a href="{{this.demoUrl}}" target="_blank" class="group block bg-hc-dark border border-white/10 rounded-2xl overflow-hidden card-shadow transition-all hover:border-white/30 hover:shadow-2xl hover:shadow-hc-blue/10 hover:-translate-y-1 duration-300">
+            <div class="aspect-video bg-black/50 relative overflow-hidden" x-data="{ error: false }">
+                {{#if this.screenshotUrl}}
+                <img src="{{this.screenshotUrl}}" alt="{{this.projectName}}"
+                    class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    @error="error = true"
+                    x-init="$el.complete && $el.naturalWidth === 0 && (error = true)"
+                    x-show="!error"
+                >
+                <div x-show="error" class="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-md z-50">
+                        <div class="text-center p-4 flex flex-col items-center gap-2 text-white/50">
+                        <i class="ph ph-image-broken text-3xl"></i>
+                        <p class="text-xs font-mono uppercase tracking-widest">Error Loading Image</p>
+                    </div>
+                </div>
+                {{else}}
+                <div class="w-full h-full flex items-center justify-center text-white/20 bg-gradient-to-br from-white/5 to-transparent">
+                    <i class="ph ph-image text-5xl"></i>
+                </div>
+                {{/if}}
+                
+                <div class="absolute top-0 left-0 w-full h-full bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
+                     <span class="text-white font-bold flex items-center gap-2">
+                        View Demo <i class="ph-bold ph-arrow-right"></i>
+                    </span>
+                </div>
+
+                <div class="absolute top-3 right-3 bg-black/60 backdrop-blur-md border border-white/10 rounded-lg px-3 py-1.5 text-xs font-mono text-white flex items-center gap-1.5 shadow-lg">
+                    <i class="ph-fill ph-check-circle text-hc-green"></i>
+                    {{this.hoursSpent}}h
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <div class="flex justify-between items-start gap-4 mb-2">
+                    <h3 class="text-xl font-bold text-white group-hover:text-hc-blue transition-colors line-clamp-1">{{this.projectName}}</h3>
+                    {{#if this.repoUrl}}
+                    <div class="flex gap-2 shrink-0" @click.stop>
+                        <a href="{{this.repoUrl}}" target="_blank" class="text-white/40 hover:text-white transition-colors p-1" title="View Code">
+                            <i class="ph-fill ph-github-logo text-xl"></i>
+                        </a>
+                    </div>
+                    {{/if}}
+                </div>
+                
+                <p class="text-text-muted text-sm line-clamp-2 leading-relaxed mb-4 min-h-[2.5rem]">{{this.shortDescription}}</p>
+                
+                <div class="flex items-center gap-2 text-xs text-white/40 font-mono">
+                    <i class="ph ph-calendar-blank"></i>
+                    <span>Shipped {{formatDate this.reviewedAt}}</span>
+                </div>
+            </div>
+        </a>
+        {{/each}}
+    </div>
+    {{else}}
+    <div class="text-center py-24 bg-white/5 border border-white/10 rounded-3xl border-dashed">
+        <div class="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
+            <i class="ph ph-rocket-launch text-4xl text-white/30"></i>
+        </div>
+        <h3 class="text-2xl font-bold text-white mb-3">No Projects Yet</h3>
+        <p class="text-text-muted max-w-md mx-auto mb-8">Be the first to ship a project to the gallery! Build something awesome and share it with the world.</p>
+        <a href="/ysws/submit" class="inline-flex items-center gap-2 bg-hc-blue hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-xl transition-colors">
+            Start Shipping
+        </a>
+    </div>
+    {{/if}}
+</div>

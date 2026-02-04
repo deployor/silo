@@ -1,9 +1,29 @@
-<div class="max-w-5xl mx-auto py-12">
-    <div class="flex justify-between items-end mb-8">
+<div class="max-w-6xl mx-auto py-12" x-data="{ activeTab: '{{activeTab}}' }">
+    <div class="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
         <div>
-            <h1 class="text-4xl font-extrabold tracking-tight mb-2">Your YSWS Projects</h1>
-            <p class="text-xl text-white/60">Track your submissions and rewards.</p>
+            <h1 class="text-4xl font-extrabold tracking-tight mb-2">YSWS Dashboard</h1>
+            <p class="text-xl text-white/60">Manage your submissions and explore the gallery.</p>
         </div>
+        
+        <div class="flex items-center gap-4 bg-black/20 p-1 rounded-xl border border-white/10">
+            <button 
+                @click="activeTab = 'my-ships'; window.history.pushState({}, '', '?tab=my-ships')"
+                :class="activeTab === 'my-ships' ? 'bg-hc-blue text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'"
+                class="px-5 py-2 rounded-lg font-bold transition-all text-sm flex items-center gap-2"
+            >
+                <i class="ph-bold ph-rocket-launch"></i>
+                My Ships
+            </button>
+            <button 
+                @click="activeTab = 'gallery'; window.history.pushState({}, '', '?tab=gallery')"
+                :class="activeTab === 'gallery' ? 'bg-hc-green text-white shadow-lg' : 'text-white/60 hover:text-white hover:bg-white/5'"
+                class="px-5 py-2 rounded-lg font-bold transition-all text-sm flex items-center gap-2"
+            >
+                <i class="ph-bold ph-images"></i>
+                Gallery
+            </button>
+        </div>
+
         <a href="/ysws/submit" class="bg-hc-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-xl transition-colors shadow-lg shadow-hc-red/20 flex items-center gap-2">
             <i class="ph ph-plus text-lg"></i>
             New Submission
@@ -11,139 +31,139 @@
     </div>
 
     {{#if success}}
-{{#if success}}
-<div class="mb-8 bg-green-500/10 border border-green-500/20 rounded-xl p-6">
-    <div class="flex items-center gap-4 mb-4">
-        <div class="bg-green-500/20 p-2 rounded-full flex items-center justify-center">
-            <i class="ph ph-check text-green-400 text-xl"></i>
+    <div class="mb-8 bg-green-500/10 border border-green-500/20 rounded-xl p-6" x-show="activeTab === 'my-ships'">
+        <div class="flex items-center gap-4 mb-4">
+            <div class="bg-green-500/20 p-2 rounded-full flex items-center justify-center">
+                <i class="ph ph-check text-green-400 text-xl"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-green-400 text-lg">Submission Received!</h3>
+                <p class="text-green-300/80">Your project is in the queue. Watch this space for updates.</p>
+            </div>
         </div>
-        <div>
-            <h3 class="font-bold text-green-400 text-lg">Submission Received!</h3>
-            <p class="text-green-300/80">Your project is in the queue. Watch this space for updates.</p>
+        
+        {{#if estimatedReviewTime}}
+        <div class="bg-black/20 rounded-lg p-4 flex items-center gap-3 border border-white/5 max-w-md">
+             <i class="ph ph-clock text-hc-blue text-xl"></i>
+            <div>
+                <span class="text-sm text-text-muted uppercase tracking-wider font-bold">Estimated Review Time:</span>
+                <span class="text-white font-bold ml-1">{{estimatedReviewTime}}</span>
+            </div>
         </div>
+        {{/if}}
     </div>
-    
-    {{#if estimatedReviewTime}}
-    <div class="bg-black/20 rounded-lg p-4 flex items-center gap-3 border border-white/5 max-w-md">
-         <i class="ph ph-clock text-hc-blue text-xl"></i>
-        <div>
-            <span class="text-sm text-text-muted uppercase tracking-wider font-bold">Estimated Review Time:</span>
-            <span class="text-white font-bold ml-1">{{estimatedReviewTime}}</span>
-        </div>
-    </div>
-    {{/if}}
-</div>
-{{/if}}
     {{/if}}
 
-    <div class="space-y-6">
-        {{#each submissions}}
-        <div class="bg-hc-dark border border-white/10 rounded-2xl overflow-hidden card-shadow transition-all hover:border-white/20">
-            <div class="p-6 md:p-8">
-                <div class="flex flex-col md:flex-row gap-6 justify-between items-start">
-                    <div class="flex-1 space-y-4">
-                        <div class="flex items-center gap-3">
-                            <h2 class="text-2xl font-bold text-white">{{this.projectName}}</h2>
+    <!-- My Ships Tab -->
+    <div x-show="activeTab === 'my-ships'" x-transition.opacity.duration.300ms>
+        <div class="space-y-6">
+            {{#each submissions}}
+            <div class="bg-hc-dark border border-white/10 rounded-2xl overflow-hidden card-shadow transition-all hover:border-white/20">
+                <div class="p-6 md:p-8">
+                    <div class="flex flex-col md:flex-row gap-6 justify-between items-start">
+                        <div class="flex-1 space-y-4">
+                            <div class="flex items-center gap-3">
+                                <h2 class="text-2xl font-bold text-white">{{this.projectName}}</h2>
+                                
+                                {{#if (eq this.status 'pending')}}
+                                    <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-yellow-500/20 text-yellow-400 border border-yellow-500/20">
+                                        Pending Review
+                                    </span>
+                                {{else if (eq this.status 'approved')}}
+                                    <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-green-500/20 text-green-400 border border-green-500/20">
+                                        Approved
+                                    </span>
+                                {{else if (eq this.status 'rejected')}}
+                                    <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-red-500/20 text-red-400 border border-red-500/20">
+                                        Rejected
+                                    </span>
+                                {{/if}}
+                            </div>
+
+                            <p class="text-text-muted">{{this.shortDescription}}</p>
                             
-                            {{#if (eq this.status 'pending')}}
-                                <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-yellow-500/20 text-yellow-400 border border-yellow-500/20">
-                                    Pending Review
+                            <div class="flex flex-wrap gap-4 text-sm font-mono text-white/60">
+                                {{#if this.repoUrl}}
+                                <a href="{{this.repoUrl}}" target="_blank" class="hover:text-white transition-colors flex items-center gap-1">
+                                    <i class="ph ph-code"></i>
+                                    Code
+                                </a>
+                                {{/if}}
+                                {{#if this.demoUrl}}
+                                <a href="{{this.demoUrl}}" target="_blank" class="hover:text-white transition-colors flex items-center gap-1">
+                                    <i class="ph ph-eye"></i>
+                                    Demo
+                                </a>
+                                {{/if}}
+                                <span class="flex items-center gap-1" title="Submitted on">
+                                    <i class="ph ph-calendar-blank"></i>
+                                    {{formatDate this.createdAt}}
                                 </span>
-                            {{else if (eq this.status 'approved')}}
-                                <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-green-500/20 text-green-400 border border-green-500/20">
-                                    Approved
-                                </span>
-                            {{else if (eq this.status 'rejected')}}
-                                <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-red-500/20 text-red-400 border border-red-500/20">
-                                    Rejected
-                                </span>
-                            {{/if}}
-                        </div>
-
-                        <p class="text-text-muted">{{this.shortDescription}}</p>
-                        
-                        <div class="flex flex-wrap gap-4 text-sm font-mono text-white/60">
-                            {{#if this.repoUrl}}
-                            <a href="{{this.repoUrl}}" target="_blank" class="hover:text-white transition-colors flex items-center gap-1">
-                                <i class="ph ph-code"></i>
-                                Code
-                            </a>
-                            {{/if}}
-                            {{#if this.demoUrl}}
-                            <a href="{{this.demoUrl}}" target="_blank" class="hover:text-white transition-colors flex items-center gap-1">
-                                <i class="ph ph-eye"></i>
-                                Demo
-                            </a>
-                            {{/if}}
-                            <span class="flex items-center gap-1" title="Submitted on">
-                                <i class="ph ph-calendar-blank"></i>
-                                {{formatDate this.createdAt}}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="w-full md:w-48 aspect-video rounded-lg overflow-hidden border border-white/10 bg-black/20 shrink-0 relative" x-data="{ error: false }">
-                        {{#if this.screenshotUrl}}
-                        <img src="{{this.screenshotUrl}}" alt="Screenshot of {{this.projectName}}"
-                             class="w-full h-full object-cover"
-                             @error="error = true"
-                             x-init="$el.complete && $el.naturalWidth === 0 && (error = true)"
-                             x-show="!error"
-                        >
-                        <div x-show="error" class="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-md z-50">
-                             <div class="text-center p-4 flex flex-col items-center gap-2 text-white/50">
-                                <i class="ph ph-image-broken text-3xl"></i>
-                                <p class="text-xs font-mono uppercase tracking-widest">Error Loading Image</p>
                             </div>
                         </div>
-                        {{else}}
-                        <div class="w-full h-full flex items-center justify-center text-white/20">
-                            <i class="ph ph-image text-3xl"></i>
+
+                        <div class="w-full md:w-48 aspect-video rounded-lg overflow-hidden border border-white/10 bg-black/20 shrink-0 relative" x-data="{ error: false }">
+                            {{#if this.screenshotUrl}}
+                            <img src="{{this.screenshotUrl}}" alt="Screenshot of {{this.projectName}}"
+                                 class="w-full h-full object-cover"
+                                 @error="error = true"
+                                 x-init="$el.complete && $el.naturalWidth === 0 && (error = true)"
+                                 x-show="!error"
+                            >
+                            <div x-show="error" class="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-md z-50">
+                                 <div class="text-center p-4 flex flex-col items-center gap-2 text-white/50">
+                                    <i class="ph ph-image-broken text-3xl"></i>
+                                    <p class="text-xs font-mono uppercase tracking-widest">Error Loading Image</p>
+                                </div>
+                            </div>
+                            {{else}}
+                            <div class="w-full h-full flex items-center justify-center text-white/20">
+                                <i class="ph ph-image text-3xl"></i>
+                            </div>
+                            {{/if}}
                         </div>
-                        {{/if}}
                     </div>
-                </div>
-                
-                {{#if this.adminNotesPublic}}
-                <div class="mt-6 p-4 bg-white/5 border-l-4 border-hc-blue rounded-r-lg">
-                    <h4 class="text-xs font-bold text-hc-blue uppercase tracking-wider mb-1">Feedback from Reviewer</h4>
-                    <p class="text-white/90 text-sm">{{this.adminNotesPublic}}</p>
-                </div>
-                {{/if}}
-            </div>
-            
-            <div class="px-6 py-3 bg-black/20 border-t border-white/5 flex justify-between items-center text-xs font-mono text-text-muted">
-                <div class="flex gap-4">
-                    <span>Hours: <span class="text-white">{{this.hoursSpent}}</span></span>
-                    {{#if this.usedAi}}
-                    <span>AI: <span class="text-white">{{this.aiPercent}}%</span></span>
+                    
+                    {{#if this.adminNotesPublic}}
+                    <div class="mt-6 p-4 bg-white/5 border-l-4 border-hc-blue rounded-r-lg">
+                        <h4 class="text-xs font-bold text-hc-blue uppercase tracking-wider mb-1">Feedback from Reviewer</h4>
+                        <p class="text-white/90 text-sm">{{this.adminNotesPublic}}</p>
+                    </div>
                     {{/if}}
                 </div>
-                <div>
-                   ID: {{this.id}}
+                
+                <div class="px-6 py-3 bg-black/20 border-t border-white/5 flex justify-between items-center text-xs font-mono text-text-muted">
+                    <div class="flex gap-4">
+                        <span>Hours: <span class="text-white">{{this.hoursSpent}}</span></span>
+                        {{#if this.usedAi}}
+                        <span>AI: <span class="text-white">{{this.aiPercent}}%</span></span>
+                        {{/if}}
+                    </div>
+                    <div>
+                       ID: {{this.id}}
+                    </div>
                 </div>
             </div>
-        </div>
-        {{/each}}
+            {{/each}}
 
-        {{#unless submissions}}
-        <div class="text-center py-20 bg-hc-dark border border-white/10 rounded-2xl border-dashed">
-            <div class="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i class="ph ph-package text-3xl text-white/40"></i>
+            {{#unless submissions}}
+            <div class="text-center py-20 bg-hc-dark border border-white/10 rounded-2xl border-dashed">
+                <div class="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="ph ph-package text-3xl text-white/40"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">No Projects Yet</h3>
+                <p class="text-text-muted max-w-sm mx-auto mb-6">You haven't submitted any projects yet. Ship something awesome and earn storage!</p>
+                <a href="/ysws/submit" class="inline-flex items-center gap-2 bg-hc-red hover:bg-red-600 text-white font-bold py-2 px-5 rounded-lg transition-colors">
+                    Start Shipping
+                </a>
             </div>
-            <h3 class="text-xl font-bold text-white mb-2">No Projects Yet</h3>
-            <p class="text-text-muted max-w-sm mx-auto mb-6">You haven't submitted any projects yet. Ship something awesome and earn storage!</p>
-            <a href="/ysws/submit" class="inline-flex items-center gap-2 bg-hc-red hover:bg-red-600 text-white font-bold py-2 px-5 rounded-lg transition-colors">
-                Start Shipping
-            </a>
+            {{/unless}}
         </div>
-        {{/unless}}
     </div>
 
-    {{#if galleryProjects}}
-    <div class="mt-16 pt-16 border-t border-white/10">
-        <h2 class="text-3xl font-extrabold tracking-tight mb-8 text-center">Recently Shipped</h2>
-        
+    <!-- Gallery Tab -->
+    <div x-show="activeTab === 'gallery'" x-transition.opacity.duration.300ms style="display: none;">
+        {{#if galleryProjects}}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {{#each galleryProjects}}
             <a href="{{this.demoUrl}}" target="_blank" class="group block bg-hc-dark border border-white/10 rounded-xl overflow-hidden card-shadow transition-all hover:border-white/30 hover:scale-[1.02]">
@@ -179,6 +199,14 @@
             </a>
             {{/each}}
         </div>
+        {{else}}
+         <div class="text-center py-20 bg-hc-dark border border-white/10 rounded-2xl border-dashed">
+            <div class="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="ph ph-images text-3xl text-white/40"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-2">Gallery is Empty</h3>
+            <p class="text-text-muted max-w-sm mx-auto">No approved projects yet. Be the first to be featured!</p>
+        </div>
+        {{/if}}
     </div>
-    {{/if}}
 </div>
