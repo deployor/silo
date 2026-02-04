@@ -128,8 +128,17 @@
                      <div class="relative w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-emerald-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
                      <span class="ms-3 text-sm font-medium text-text-muted peer-checked:text-white">YSWS Reviewer</span>
                  </label>
+
+                 <label class="inline-flex items-center cursor-pointer">
+                     <input type="checkbox" id="modal-is-immortal" class="sr-only peer" onchange="toggleUserImmortal(this.checked)">
+                     <div class="relative w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                     <span class="ms-3 text-sm font-medium text-text-muted peer-checked:text-white">Immortal</span>
+                 </label>
              </div>
-             <p class="text-xs text-text-muted mt-2">Locking an account denies all access immediately. Reviewers can access YSWS admin routes.</p>
+             <p class="text-xs text-text-muted mt-2">
+                 <strong>Locking:</strong> Denies all access.<br>
+                 <strong>Immortal:</strong> Bypasses all quotas, cannot be locked, cannot age out.
+             </p>
          </div>
 
          <div class="bg-black/30 p-6 rounded-xl border border-white/10">
@@ -428,6 +437,10 @@
                                 <span class="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded text-xs font-bold border border-blue-500/30">LOCKED</span>
                             </div>`);
                         }
+
+                        if (u.isImmortal) {
+                            badges.push(`<span class="bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded text-xs font-bold border border-amber-500/30 cursor-help" title="Immortal: Unlimited Quota, No Aging, No Locks">IMMORTAL</span>`);
+                        }
                         
                         if (u.isAdmin) {
                              badges.push(`<span class="bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded text-xs font-bold border border-purple-500/30 cursor-help" title="Full Admin Access">ADMIN</span>`);
@@ -489,6 +502,7 @@
 
         document.getElementById("modal-is-locked").checked = user.isLocked;
         document.getElementById("modal-is-reviewer").checked = user.isReviewer;
+        document.getElementById("modal-is-immortal").checked = user.isImmortal;
 
         // Age Out UI state
         const ageOutBtn = document.getElementById("btn-age-out");
@@ -644,6 +658,18 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ isReviewer: isReviewer })
+        });
+
+        loadUsers();
+    }
+
+    async function toggleUserImmortal(isImmortal) {
+        if (!currentUser) return;
+
+        await fetch(`/api/admin/users/${currentUser.id}/immortal`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isImmortal: isImmortal })
         });
 
         loadUsers();
