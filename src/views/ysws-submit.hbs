@@ -172,11 +172,12 @@
                     <label class="block text-sm font-bold text-text-muted uppercase tracking-wider mb-6">How much AI did you use?</label>
                     
                     <div class="relative mb-8 px-2">
-                        <input type="range" x-model.number="aiLevel" min="0" max="4" step="1"
+                        <input type="range" x-model.number="aiLevel" min="0" max="5" step="1"
                             class="w-full accent-hc-red cursor-pointer relative z-10"
                         >
                         <div class="flex justify-between text-[10px] text-text-muted mt-2 font-mono uppercase tracking-wider">
                             <span>None</span>
+                            <span>Ask</span>
                             <span>Tab</span>
                             <span>Inline</span>
                             <span>Chat</span>
@@ -397,6 +398,7 @@
             aiPercent: 0,
             levels: [
                 { val: 'none', label: 'No AI Used', desc: '100% human written code.' },
+                { val: 'ask', label: 'Asked Questions', desc: 'Used AI (ChatGPT/Claude) to ask questions, but wrote the code yourself.' },
                 { val: 'tab-completion', label: 'Tab Completion', desc: 'Used Copilot/Ghostwriter for line completions.' },
                 { val: 'inline', label: 'Inline Generation', desc: 'Used Ctrl+I / Cmd+K to generate small blocks.' },
                 { val: 'chat', label: 'Chat Assistant', desc: 'Used ChatGPT/Claude to write functions or debug.' },
@@ -408,12 +410,12 @@
             },
 
             get requiresDetails() {
-                return this.aiLevel > 0 && this.aiLevel < 4;
+                return this.aiLevel > 0 && this.aiLevel < 5;
             },
 
             get isRejected() {
-                // Reject if no-code (level 4) OR (requires details AND > 30%)
-                return this.aiLevel === 4 || (this.requiresDetails && this.aiPercent > 30);
+                // Reject if no-code (level 5) OR (requires details AND > 30%)
+                return this.aiLevel === 5 || (this.requiresDetails && this.aiPercent > 30);
             }
         }));
     });
