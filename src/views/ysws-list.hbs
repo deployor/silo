@@ -103,13 +103,23 @@
                             {{/if}}
                         </td>
                         <td class="p-4 font-mono text-sm text-white/80">
-                            {{this.hoursSpent}}h
-                            {{#if (gt (add (or this.tierBonusPercent 0) (or this.adminBonusPercent 0)) 0)}}
-                                <div class="inline-flex items-center gap-1 text-[10px] text-hc-green font-bold ml-1 cursor-help" title="Bonus: {{add (or this.tierBonusPercent 0) (or this.adminBonusPercent 0)}}% (Tier: {{or this.tierBonusPercent 0}}%, Admin: {{or this.adminBonusPercent 0}}%)">
-                                    <i class="ph-bold ph-trend-up"></i>
-                                    +{{add (or this.tierBonusPercent 0) (or this.adminBonusPercent 0)}}%
+                            <div class="flex flex-col items-start gap-1">
+                                <span>{{this.hoursSpent}}h</span>
+                                <div class="flex flex-wrap gap-1">
+                                    {{#if (gt (or this.tierBonusPercent 0) 0)}}
+                                        <div class="inline-flex items-center gap-1 text-[10px] text-hc-green border border-hc-green/30 bg-hc-green/10 px-1.5 py-0.5 rounded cursor-help" title="Tier Bonus">
+                                            <i class="ph-bold ph-trend-up"></i>
+                                            +{{this.tierBonusPercent}}%
+                                        </div>
+                                    {{/if}}
+                                    {{#if (gt (or this.adminBonusPercent 0) 0)}}
+                                        <div class="inline-flex items-center gap-1 text-[10px] text-yellow-500 border border-yellow-500/30 bg-yellow-500/10 px-1.5 py-0.5 rounded cursor-help" title="Bonus given from the reviewer">
+                                            <i class="ph-fill ph-star"></i>
+                                            +{{this.adminBonusPercent}}%
+                                        </div>
+                                    {{/if}}
                                 </div>
-                            {{/if}}
+                            </div>
                         </td>
                         <td class="p-4 text-sm text-text-muted">
                             {{formatDate this.createdAt}}
