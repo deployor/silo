@@ -20,6 +20,7 @@ async function processAgedUsers() {
 				eq(users.markedAsOverAge, true),
 				lte(users.overAgeGracePeriodEndsAt, now),
 				eq(users.filesDeleted, false),
+				eq(users.isImmortal, false),
 			),
 		);
 

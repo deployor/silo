@@ -114,7 +114,7 @@ export async function handleS3Request(
 			).toResponse();
 		}
 
-		if (user.markedAsOverAge) {
+		if (user.markedAsOverAge && !user.isImmortal) {
 			if (method === "PUT" || method === "POST" || method === "DELETE") {
 				return S3Errors.AccessDenied(
 					"Account is in migration grace period. New uploads are disabled.",
