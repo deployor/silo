@@ -55,6 +55,13 @@ export async function createBucket(
 		throw new Error("Bucket name is reserved for system use");
 	}
 
+	// Check user for immortality
+	const user = await db.query.users.findFirst({
+		where: eq(users.id, userId),
+	});
+
+	if (!user) throw new Error("User not found");
+
 	const settings = await getAppSettings();
 	const maxBuckets = settings.defaultMaxBucketsPerUser;
 
@@ -62,7 +69,8 @@ export async function createBucket(
 		.select()
 		.from(buckets)
 		.where(eq(buckets.userId, userId));
-	if (userBuckets.length >= maxBuckets) {
+	
+	if (!user.isImmortal && userBuckets.length >= maxBuckets) {
 		throw new Error(`Bucket limit reached (${maxBuckets})`);
 	}
 
