@@ -1,7 +1,7 @@
 import { count, eq } from "drizzle-orm";
 import { config } from "../config";
 import { db } from "../db";
-import { bucketKeys, buckets } from "../db/schema";
+import { bucketKeys, buckets, users } from "../db/schema";
 import { getAppSettings } from "./settings-service";
 
 export async function createKey(
@@ -11,12 +11,25 @@ export async function createKey(
 	const settings = await getAppSettings();
 	const maxKeys = settings.defaultMaxKeysPerBucket;
 
+	// Check owner of bucket for immortality
+	const bucket = await db.query.buckets.findFirst({
+		where: eq(buckets.id, bucketId),
+		with: {
+			user: true,
+		},
+	});
+
+	if (!bucket) throw new Error("Bucket not found");
+	
+	// Relation user is fetched but TS might complain depending on schema inference
+	const isImmortal = (bucket.user as typeof users.$inferSelect | null)?.isImmortal;
+
 	const existingCount = await db
 		.select({ count: count() })
 		.from(bucketKeys)
 		.where(eq(bucketKeys.bucketId, bucketId));
 
-	if ((existingCount[0]?.count ?? 0) >= maxKeys) {
+	if (!isImmortal && (existingCount[0]?.count ?? 0) >= maxKeys) {
 		throw new Error(
 			`Key limit reached (${maxKeys}). Delete an existing key to create a new one.`,
 		);
