@@ -3,7 +3,6 @@ import { db } from "../db";
 import { bucketKeys, buckets, users } from "../db/schema";
 
 export async function revokeKey(accessKey: string) {
-	// Find the key and related info using manual joins to avoid relation issues
 	const result = await db
 		.select({
 			keyId: bucketKeys.id,
