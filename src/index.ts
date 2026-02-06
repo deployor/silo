@@ -84,6 +84,7 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 			"/api/ysws",
 			"/gallery",
 			"/redeem",
+			"/api/revocation",
 		];
 
 		// Exact match for root
