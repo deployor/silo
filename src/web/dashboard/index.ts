@@ -164,11 +164,13 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	const submissions = await YswsService.getSubmissionsByUserId(user.id);
 	const latestSubmission = submissions.length > 0 ? submissions[0] : null;
 
+	const settings = await getAppSettings();
 	const html = await render("dashboard", {
 		title: "Dashboard - Silo",
 		user,
 		s3Domain: config.s3Domain,
 		latestSubmission,
+		yswsQuotaPerHourHuman: formatBytes(settings.yswsQuotaPerHourBytes),
 	});
 
 	return new Response(html, {
