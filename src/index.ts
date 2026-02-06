@@ -141,6 +141,7 @@ Bun.serve({
 					if (
 						url.pathname.startsWith("/api/") &&
 						!url.pathname.startsWith("/api/slack/") &&
+						!url.pathname.startsWith("/api/revocation") &&
 						req.method !== "GET" &&
 						req.method !== "HEAD"
 					) {
