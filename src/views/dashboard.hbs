@@ -375,7 +375,7 @@
       const storageLimitContainer = document.getElementById("storage-limit-container");
 
       if (data.user.isImmortal) {
-        if (storageLimitContainer) storageLimitContainer.innerHTML = '/ Unlimited';
+        if (storageLimitContainer) storageLimitContainer.innerHTML = '/ ∞';
         
         const bar = document.getElementById("storage-bar");
         bar.style.width = "100%";
@@ -407,7 +407,7 @@
       
       if (data.user.isImmortal) {
          egressLimitBytes = Infinity;
-         egressLimitText = "/ Unlimited";
+         egressLimitText = "/ ∞";
       } else if (data.user.egressLimit === null || data.user.egressLimit === undefined) {
          // Default: Max(10GB, 3x Storage)
          const calculated = storageLimit * 3;
@@ -449,7 +449,7 @@
       const bucketLimitEl = document.getElementById("bucket-limit");
       if (bucketLimitEl) {
           if (data?.user?.isImmortal) {
-              bucketLimitEl.textContent = "Unlimited";
+              bucketLimitEl.textContent = "∞";
           } else {
               bucketLimitEl.textContent = String(Number(data?.limits?.maxBucketsPerUser) || 0);
           }
@@ -700,7 +700,7 @@
     const limitEl = document.getElementById('manage-keys-limit');
     if (limitEl) {
          if (currentDashboardData?.user?.isImmortal) {
-            limitEl.textContent = "Unlimited";
+            limitEl.textContent = "∞";
          } else {
             limitEl.textContent = String(Number(currentDashboardData?.limits?.maxKeysPerBucket) || 0);
          }

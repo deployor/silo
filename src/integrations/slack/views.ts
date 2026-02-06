@@ -69,8 +69,8 @@ export const homeView = (
 			Divider(),
 			Section({ text: "*:ms-increasing-graph: Usage Overview*" }),
 			Section().fields(
-				`*Storage Used*\n${formatBytes(user.storageUsageBytes)} / ${user.isImmortal ? 'Unlimited' : formatBytes(user.storageLimitBytes ?? 0)} ${user.isImmortal ? '' : `(${usagePercent.toFixed(1)}%)`}`,
-				`*Active Buckets*\n${buckets.length} / ${user.isImmortal ? 'Unlimited' : settings.defaultMaxBucketsPerUser}`,
+				`*Storage Used*\n${formatBytes(user.storageUsageBytes)} / ${user.isImmortal ? '∞' : formatBytes(user.storageLimitBytes ?? 0)} ${user.isImmortal ? '' : `(${usagePercent.toFixed(1)}%)`}`,
+				`*Active Buckets*\n${buckets.length} / ${user.isImmortal ? '∞' : settings.defaultMaxBucketsPerUser}`,
 			),
 			Section().fields(
 				`*Total Requests*\n${user.totalRequests.toLocaleString()}`,
@@ -215,7 +215,7 @@ export const manageKeysModal = (
 			),
 			Context().elements(
 				isImmortal
-					? `Keys: ${keys.length} / Unlimited`
+					? `Keys: ${keys.length} / ∞`
 					: isAtLimit
 					? `Keys: ${keys.length} / ${settings.defaultMaxKeysPerBucket} (limit reached… delete one to create another)`
 					: `Keys: ${keys.length} / ${settings.defaultMaxKeysPerBucket}`,
