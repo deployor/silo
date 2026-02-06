@@ -191,7 +191,10 @@ export const manageKeysModal = (
 	keys: BucketKey[],
 	settings: { defaultMaxKeysPerBucket: number },
 	newKey?: { accessKey: string; secretKey: string },
+	isImmortal = false,
 ) => {
+	const isAtLimit = !isImmortal && keys.length >= settings.defaultMaxKeysPerBucket;
+
 	return Modal({
 		title: `Keys: ${bucket.name}`,
 		callbackId: "manage_keys_view",
@@ -203,29 +206,17 @@ export const manageKeysModal = (
 				text: "Here are the keys :ms-wrench:",
 			}).accessory(
 				Button({
-					text:
-						// @ts-ignore - user relation not always fetched but safe to assume undefined check works or we pass user in future
-						// Wait, we don't have user object here easily. We rely on key-service check for actual enforcement.
-						// Visual check: if not immortal AND limit reached.
-						// Since we can't easily check immortal status here without changing signature or query,
-						// let's just relax the visual "Key Limit Reached" text if it *seems* high,
-						// OR better, since this is just a view, we should probably pass user or isImmortal flag.
-						// For now, let's just rely on the button action failing with a modal if limit reached for mortals.
-						// Actually, we can check if keys.length >= settings.defaultMaxKeysPerBucket.
-						// If user IS immortal, they can have more. If they have more, we shouldn't show "Limit Reached".
-						// But we don't know if they are immortal here.
-						// Let's assume for this specific view helper we might need to be careful.
-						// However, to fix the user request "make it say unlimited", we need to know.
-						// Let's modify the signature of manageKeysModal to accept isImmortal.
-						 keys.length >= settings.defaultMaxKeysPerBucket
-							? "Key Limit Reached?" // We'll update this below with a better approach
-							: "Make New Key :blobby-lock:",
+					text: isAtLimit
+						? "Key Limit Reached"
+						: "Make New Key :blobby-lock:",
 					actionId: "generate_key",
 					value: bucket.id,
 				}).primary(),
 			),
 			Context().elements(
-				keys.length >= settings.defaultMaxKeysPerBucket
+				isImmortal
+					? `Keys: ${keys.length} / Unlimited`
+					: isAtLimit
 					? `Keys: ${keys.length} / ${settings.defaultMaxKeysPerBucket} (limit reached… delete one to create another)`
 					: `Keys: ${keys.length} / ${settings.defaultMaxKeysPerBucket}`,
 			),

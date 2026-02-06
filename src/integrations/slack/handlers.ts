@@ -264,6 +264,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 						.defaultMaxKeysPerBucket,
 				},
 				newKeyObj,
+				user.isImmortal,
 			),
 		};
 	}
@@ -286,7 +287,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 				manageKeysModal(bucket[0], keys, {
 					defaultMaxKeysPerBucket: (await getAppSettings())
 						.defaultMaxKeysPerBucket,
-				}),
+				}, undefined, user.isImmortal),
 			);
 		}
 	}
@@ -360,6 +361,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 								.defaultMaxKeysPerBucket,
 						},
 						newKeyObj,
+						user.isImmortal,
 					),
 				}),
 			});
@@ -409,7 +411,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 					view: manageKeysModal(bucket[0], keys, {
 						defaultMaxKeysPerBucket: (await getAppSettings())
 							.defaultMaxKeysPerBucket,
-					}),
+					}, undefined, user.isImmortal),
 				}),
 			});
 		}
