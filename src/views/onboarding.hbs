@@ -24,23 +24,38 @@
   <!-- Step 2: Storage -->
   <div x-show="step === 2" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" class="text-center max-w-3xl mx-auto w-full">
     <div class="mb-8 flex justify-center">
-        <i class="ph-duotone ph-hard-drives text-8xl text-blue-500"></i>
+        <i class="ph-duotone ph-rocket-launch text-8xl text-blue-500"></i>
     </div>
     <h1 class="text-6xl md:text-8xl font-black text-white mb-8 tracking-tighter italic">
-      {{defaultStorageLimitHuman}} Free Storage
+      Ship Projects.
+      <span class="block text-4xl md:text-6xl mt-2 text-white/50">Get Paid in Storage.</span>
     </h1>
     
     <p class="text-text-muted text-2xl max-w-3xl mx-auto font-medium mb-8 leading-relaxed">
-      Every Hack Clubber on Slack gets <span class="text-white font-bold">{{defaultStorageLimitHuman}} for free</span>.
+      Every YSWS project you ship unlocks more permanent cloud storage.
       <br>
-      Need more? Ship projects! Storage can be used for public CDN hosting or private S3 buckets.
+      <span class="text-white font-bold">Shipping is the currency.</span> Storage is the reward.
     </p>
     
-    <div class="bg-white/5 rounded-xl p-4 mb-12 max-w-2xl mx-auto border border-white/10 flex items-start gap-4 text-left">
-        <i class="ph-fill ph-info text-text-muted text-xl mt-1"></i>
-        <p class="text-text-muted/70 text-sm font-medium leading-relaxed">
-            When you turn 18, we'll archive your data and send you a download link before deleting it. But that's a problem for future you!
-        </p>
+    <div class="bg-white/5 rounded-xl p-6 mb-12 max-w-2xl mx-auto border border-white/10 flex flex-col gap-4 text-left">
+        <div class="flex items-start gap-4">
+            <div class="bg-green-500/20 p-2 rounded-lg">
+                <i class="ph-bold ph-check text-green-500 text-xl"></i>
+            </div>
+            <div>
+                <h3 class="text-white font-bold text-lg">You ship a project</h3>
+                <p class="text-text-muted">Submit your YSWS project through Cargo.</p>
+            </div>
+        </div>
+        <div class="flex items-start gap-4">
+            <div class="bg-blue-500/20 p-2 rounded-lg">
+                <i class="ph-bold ph-hard-drives text-blue-500 text-xl"></i>
+            </div>
+            <div>
+                <h3 class="text-white font-bold text-lg">We expand your quota</h3>
+                <p class="text-text-muted">Earn 1GB+ of permanent storage for every ship.</p>
+            </div>
+        </div>
     </div>
 
     <div class="flex items-center justify-between w-full max-w-md mx-auto">

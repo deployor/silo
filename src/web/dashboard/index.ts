@@ -3,6 +3,7 @@ import { formatBytes } from "../../lib/format";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
 import { getAppSettings } from "../../services/settings-service";
+import { YswsService } from "../../services/ysws-service";
 import { handleApiRequest } from "./api/index";
 import { handleAuthRequest } from "./auth";
 import { handleOffboardingRequest } from "./offboarding";
@@ -159,10 +160,14 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		});
 	}
 
+	const submissions = await YswsService.getSubmissionsByUserId(user.id);
+	const latestSubmission = submissions.length > 0 ? submissions[0] : null;
+
 	const html = await render("dashboard", {
 		title: "Dashboard - Silo",
 		user,
 		s3Domain: config.s3Domain,
+		latestSubmission,
 	});
 
 	return new Response(html, {

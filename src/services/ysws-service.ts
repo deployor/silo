@@ -52,6 +52,14 @@ export async function updateSubmission(
 	return result;
 }
 
+export async function getSubmissionsByUserId(userId: string) {
+	return await db
+		.select()
+		.from(yswsSubmissions)
+		.where(eq(yswsSubmissions.userId, userId))
+		.orderBy(desc(yswsSubmissions.createdAt));
+}
+
 export async function approveSubmission(
 	id: string,
 	reviewerId: string,
@@ -148,6 +156,7 @@ export const YswsService = {
 	getPublicApprovedSubmissions,
 	getSubmissionById,
 	updateSubmission,
+	getSubmissionsByUserId,
 	approveSubmission,
 	rejectSubmission,
 };
