@@ -70,6 +70,7 @@ async function runRevocationTest() {
 			headers: {
 				"Content-Type": "application/json",
 				Authorization: `${config.revocationSecret}`,
+				Origin: "https://dashboard.hackclub.com", // Try faking origin
 			},
 			body: JSON.stringify({ accessKey: "NON_EXISTENT_KEY" }),
 		});
@@ -88,6 +89,7 @@ async function runRevocationTest() {
 			headers: {
 				"Content-Type": "application/json",
 				Authorization: `${config.revocationSecret}`,
+				Origin: "https://dashboard.hackclub.com", // Try faking origin
 			},
 			body: JSON.stringify({ accessKey }),
 		});
