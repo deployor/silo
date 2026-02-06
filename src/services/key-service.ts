@@ -35,8 +35,8 @@ export async function createKey(
 		);
 	}
 
-	const envPrefix = config.isProduction ? "SILO_PROD" : "SILO_DEV";
-	const sourcePrefix = source === "dashboard" ? "DK" : "SK"; // SK = SlackKey DK = DashboardKey
+	const envPrefix = config.isProduction ? "SILO_P" : "SILO_D";
+
 	const randomPart = Array.from(
 		crypto.getRandomValues(new Uint8Array(10)),
 		(b) => b.toString(16).padStart(2, "0"),
@@ -44,18 +44,24 @@ export async function createKey(
 		.join("")
 		.toUpperCase();
 
-	// Format: SILO_PROD_DK_7F3A9B...
-	const accessKey = `${envPrefix}_${sourcePrefix}_${randomPart}`;
+	// Format: SILO_P_AK_[RANDOM]
+	// Example: SILO_P_AK_7F3A9B...
+	const accessKey = `${envPrefix}_AK_${randomPart}`;
 
-	const secretKey = Array.from(
+	const secretRandomPart = Array.from(
 		crypto.getRandomValues(new Uint8Array(20)),
 		(b) => b.toString(16).padStart(2, "0"),
 	).join("");
+
+	// Format: SILO_P_SK_[RANDOM]
+	// Example: SILO_P_SK_8E2D1C...
+	const secretKey = `${envPrefix}_SK_${secretRandomPart}`;
 
 	await db.insert(bucketKeys).values({
 		bucketId,
 		accessKey,
 		secretKey,
+		source,
 	});
 
 	return { accessKey, secretKey };
