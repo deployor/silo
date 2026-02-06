@@ -202,7 +202,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			.select()
 			.from(buckets)
 			.where(eq(buckets.userId, user.id));
-		if (userBuckets.length >= settings.defaultMaxBucketsPerUser) {
+		if (!user.isImmortal && userBuckets.length >= settings.defaultMaxBucketsPerUser) {
 			return {
 				response_action: "errors",
 				errors: {
@@ -308,7 +308,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 
 			const settings = await getAppSettings();
 			const MAX_KEYS_PER_BUCKET = settings.defaultMaxKeysPerBucket;
-			if (keysBefore.length >= MAX_KEYS_PER_BUCKET) {
+			if (!user.isImmortal && keysBefore.length >= MAX_KEYS_PER_BUCKET) {
 				await openModal(
 					payload.trigger_id,
 					Modal({ title: "Key Limit Reached" })

@@ -447,7 +447,13 @@
       // Update Buckets List
       document.getElementById("bucket-count").textContent = data.buckets ? data.buckets.length : 0;
       const bucketLimitEl = document.getElementById("bucket-limit");
-      if (bucketLimitEl) bucketLimitEl.textContent = String(Number(data?.limits?.maxBucketsPerUser) || 0);
+      if (bucketLimitEl) {
+          if (data?.user?.isImmortal) {
+              bucketLimitEl.textContent = "Unlimited";
+          } else {
+              bucketLimitEl.textContent = String(Number(data?.limits?.maxBucketsPerUser) || 0);
+          }
+      }
       const tbody = document.getElementById("buckets-table");
       tbody.innerHTML = data.buckets
         .map(
@@ -692,16 +698,28 @@
     if (countEl) countEl.textContent = String(keyCount);
 
     const limitEl = document.getElementById('manage-keys-limit');
-    if (limitEl) limitEl.textContent = String(Number(currentDashboardData?.limits?.maxKeysPerBucket) || 0);
+    if (limitEl) {
+         if (currentDashboardData?.user?.isImmortal) {
+            limitEl.textContent = "Unlimited";
+         } else {
+            limitEl.textContent = String(Number(currentDashboardData?.limits?.maxKeysPerBucket) || 0);
+         }
+    }
 
     const genBtn = document.getElementById('manage-keys-generate-btn');
     if (genBtn) {
-        const keyLimit = Number(currentDashboardData?.limits?.maxKeysPerBucket) || 0;
-        const atLimit = keyLimit > 0 ? keyCount >= keyLimit : false;
-        genBtn.disabled = atLimit;
-        genBtn.classList.toggle('opacity-50', atLimit);
-        genBtn.classList.toggle('cursor-not-allowed', atLimit);
-        genBtn.title = atLimit ? `Key limit reached (${keyLimit}). Delete one to create another.` : '';
+        if (currentDashboardData?.user?.isImmortal) {
+             genBtn.disabled = false;
+             genBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+             genBtn.title = '';
+        } else {
+            const keyLimit = Number(currentDashboardData?.limits?.maxKeysPerBucket) || 0;
+            const atLimit = keyLimit > 0 ? keyCount >= keyLimit : false;
+            genBtn.disabled = atLimit;
+            genBtn.classList.toggle('opacity-50', atLimit);
+            genBtn.classList.toggle('cursor-not-allowed', atLimit);
+            genBtn.title = atLimit ? `Key limit reached (${keyLimit}). Delete one to create another.` : '';
+        }
     }
 
     renderManageKeysTable(bucket);
