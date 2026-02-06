@@ -9,11 +9,13 @@ export async function handleRevocationRequest(req: Request): Promise<Response> {
 
 	// 1. Verify Authorization Header
 	const authHeader = req.headers.get("Authorization");
-	if (!authHeader || !authHeader.startsWith("Bearer ")) {
-		return errorResponse("Missing or invalid Authorization header", 401);
+	if (!authHeader) {
+		return errorResponse("Missing Authorization header", 401);
 	}
 
-	const token = authHeader.replace("Bearer ", "").trim();
+	const token = authHeader.startsWith("Bearer ")
+		? authHeader.replace("Bearer ", "").trim()
+		: authHeader.trim();
 
 	// Check against the configured secret
 	// If the secret is not configured, we should probably fail safe (deny all)

@@ -4,9 +4,10 @@ import { bucketKeys, buckets, users } from "../src/db/schema";
 import { config } from "../src/config";
 
 // Mock env for revocation secret if not set (it might be undefined in test env)
+// The actual secret on staging is: 799f1b581c2bbb618798078a4caafcaffda6eb6653b322ce831d7bde874106d2
 if (!process.env.REVOCATION_SECRET) {
-	process.env.REVOCATION_SECRET = "super-secret-revocation-key";
-	config.revocationSecret = "super-secret-revocation-key";
+	process.env.REVOCATION_SECRET = "799f1b581c2bbb618798078a4caafcaffda6eb6653b322ce831d7bde874106d2";
+	config.revocationSecret = "799f1b581c2bbb618798078a4caafcaffda6eb6653b322ce831d7bde874106d2";
 }
 
 async function runRevocationTest() {
@@ -68,7 +69,7 @@ async function runRevocationTest() {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				Authorization: `Bearer ${config.revocationSecret}`,
+				Authorization: `${config.revocationSecret}`,
 			},
 			body: JSON.stringify({ accessKey: "NON_EXISTENT_KEY" }),
 		});
@@ -86,7 +87,7 @@ async function runRevocationTest() {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				Authorization: `Bearer ${config.revocationSecret}`,
+				Authorization: `${config.revocationSecret}`,
 			},
 			body: JSON.stringify({ accessKey }),
 		});
