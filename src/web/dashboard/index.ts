@@ -56,6 +56,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			hideNavLinks: true,
 			mainClass: "flex flex-col items-center justify-center",
 			defaultStorageLimitHuman: formatBytes(settings.defaultStorageLimitBytes),
+			yswsQuotaPerHourHuman: formatBytes(settings.yswsQuotaPerHourBytes),
 		});
 		return new Response(html, {
 			headers: { "Content-Type": "text/html" },
