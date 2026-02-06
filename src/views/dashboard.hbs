@@ -34,7 +34,7 @@
     </h3>
     <div class="flex items-baseline gap-2">
       <span class="text-3xl font-bold text-white" id="storage-usage">0</span>
-      <span class="text-text-muted text-sm font-mono">/ <span id="storage-limit">0</span> GB</span>
+      <span class="text-text-muted text-sm font-mono" id="storage-limit-container">/ <span id="storage-limit">0</span> GB</span>
     </div>
     <div class="w-full bg-white/5 rounded-full h-2 mt-4 overflow-hidden">
       <div class="bg-hc-red h-2 rounded-full transition-all duration-500" id="storage-bar" style="width: 0%"></div>
@@ -369,17 +369,30 @@
 
       // Update Storage Stats
       const storageUsage = Number(data.user.storageUsage) || 0;
-      const storageLimit = Number(data.user.storageLimit) || 1073741824; // fallback; server should provide default
+      const storageLimit = Number(data.user.storageLimit) || 1073741824;
 
-      const limitGB = (storageLimit / (1024 * 1024 * 1024)).toFixed(0);
-      
       document.getElementById("storage-usage").textContent = formatBytes(storageUsage);
-      document.getElementById("storage-limit").textContent = limitGB;
+      const storageLimitContainer = document.getElementById("storage-limit-container");
 
-      const percent = Math.min((storageUsage / storageLimit) * 100, 100);
-      document.getElementById("storage-bar").style.width = `${percent}%`;
-      if (percent > 90)
-        document.getElementById("storage-bar").classList.add("bg-hc-red");
+      if (data.user.isImmortal) {
+        if (storageLimitContainer) storageLimitContainer.innerHTML = '/ Unlimited';
+        
+        const bar = document.getElementById("storage-bar");
+        bar.style.width = "100%";
+        bar.className = "bg-amber-400 h-2 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(251,191,36,0.3)]";
+      } else {
+        const limitGB = (storageLimit / (1024 * 1024 * 1024)).toFixed(0);
+        if (storageLimitContainer && !document.getElementById("storage-limit")) {
+             storageLimitContainer.innerHTML = `/ <span id="storage-limit">${limitGB}</span> GB`;
+        } else if (document.getElementById("storage-limit")) {
+             document.getElementById("storage-limit").textContent = limitGB;
+        }
+
+        const percent = Math.min((storageUsage / storageLimit) * 100, 100);
+        const bar = document.getElementById("storage-bar");
+        bar.style.width = `${percent}%`;
+        bar.className = "bg-hc-red h-2 rounded-full transition-all duration-500";
+      }
 
       // Update Traffic Stats
       const ingressBytes = Number(data.user.ingressBytes) || 0;
@@ -392,7 +405,10 @@
       let egressLimitBytes;
       let egressLimitText;
       
-      if (data.user.egressLimit === null || data.user.egressLimit === undefined) {
+      if (data.user.isImmortal) {
+         egressLimitBytes = Infinity;
+         egressLimitText = "/ Unlimited";
+      } else if (data.user.egressLimit === null || data.user.egressLimit === undefined) {
          // Default: Max(10GB, 3x Storage)
          const calculated = storageLimit * 3;
          const minLimit = 10 * 1024 * 1024 * 1024; // 10GB
@@ -410,13 +426,20 @@
 
       document.getElementById("egress-limit").textContent = egressLimitText;
       
-      let egressPercent = 0;
-      if (egressLimitBytes === Infinity) {
-         egressPercent = 0;
+      const egressBar = document.getElementById("egress-bar");
+      if (data.user.isImmortal) {
+         egressBar.style.width = "100%";
+         egressBar.className = "bg-amber-400 h-1.5 rounded-full transition-all duration-500 shadow-[0_0_10px_rgba(251,191,36,0.3)]";
       } else {
-         egressPercent = Math.min((egressBytes / egressLimitBytes) * 100, 100);
+         let egressPercent = 0;
+         if (egressLimitBytes === Infinity) {
+            egressPercent = 0;
+         } else {
+            egressPercent = Math.min((egressBytes / egressLimitBytes) * 100, 100);
+         }
+         egressBar.style.width = `${egressPercent}%`;
+         egressBar.className = "bg-hc-red h-1.5 rounded-full transition-all duration-500";
       }
-      document.getElementById("egress-bar").style.width = `${egressPercent}%`;
       
       document.getElementById("total-bytes").textContent = formatBytes(ingressBytes + egressBytes);
       document.getElementById("total-requests").textContent = (Number(data.user.totalRequests) || 0).toLocaleString();
