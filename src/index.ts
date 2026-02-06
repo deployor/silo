@@ -60,11 +60,6 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 			url.searchParams.has("X-Amz-Algorithm") ||
 			url.searchParams.has("x-amz-algorithm");
 
-		// If it looks like an S3 request (Auth header or params), treat as S3
-		if (hasAuthHeader || hasAmzParams) {
-			return false;
-		}
-
 		// Known dashboard paths
 		const dashboardPaths = [
 			"/",
@@ -93,6 +88,11 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 		// Prefix match for others
 		if (dashboardPaths.some((p) => p !== "/" && path.startsWith(p))) {
 			return true;
+		}
+
+		// If it looks like an S3 request (Auth header or params), treat as S3
+		if (hasAuthHeader || hasAmzParams) {
+			return false;
 		}
 
 		// Default to S3 for unknown paths (public bucket access)
