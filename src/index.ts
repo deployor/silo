@@ -16,6 +16,7 @@ import { handleDashboardRequest } from "./web/dashboard";
 import { handleRedeemRequest } from "./web/redemptions";
 import { handleYswsRequest } from "./web/ysws";
 import { handleGalleryRequest } from "./web/gallery";
+import { handleRevocationRequest } from "./web/api/revocation";
 
 const S3_DOMAIN = config.s3Domain;
 
@@ -182,6 +183,8 @@ Bun.serve({
 						response = new Response(html, {
 							headers: { "Content-Type": "text/html" },
 						});
+					} else if (url.pathname === "/api/revocation") {
+						response = await handleRevocationRequest(req);
 					} else {
 						response = await handleDashboardRequest(req);
 					}

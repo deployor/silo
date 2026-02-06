@@ -15,6 +15,7 @@ const envSchema = z.object({
 	SLACK_BOT_TOKEN: z.string().min(1, "SLACK_BOT_TOKEN is required"),
 	SLACK_SIGNING_SECRET: z.string().min(1, "SLACK_SIGNING_SECRET is required"),
 	SLACK_FILE_UPLOAD_CHANNEL_ID: z.string().optional(),
+	REVOCATION_SECRET: z.string().optional(),
 	DEV_ACCESS_CODE: z.string().optional(),
 	NODE_ENV: z
 		.enum(["development", "production", "test"])
@@ -96,5 +97,6 @@ export const config = {
 		signingSecret: env.SLACK_SIGNING_SECRET,
 		fileUploadChannelId: env.SLACK_FILE_UPLOAD_CHANNEL_ID,
 	},
+	revocationSecret: env.REVOCATION_SECRET,
 	devAccessCode: env.DEV_ACCESS_CODE,
 };

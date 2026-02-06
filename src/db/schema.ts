@@ -97,6 +97,7 @@ export const bucketKeys = pgTable(
 			.notNull(),
 		accessKey: text("access_key").notNull().unique(),
 		secretKey: text("secret_key").notNull(),
+		source: text("source").default("dashboard").notNull(),
 		isPaused: boolean("is_paused").default(false).notNull(),
 		pauseReason: text("pause_reason"),
 		createdAt: timestamp("created_at").defaultNow(),
