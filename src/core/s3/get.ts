@@ -109,7 +109,11 @@ ${rulesXml}
 			}
 		}
 
-		if (egressLimit !== null && BigInt(user.egressBytes) > egressLimit) {
+		if (
+			egressLimit !== null &&
+			BigInt(user.egressBytes) > egressLimit &&
+			!user.isImmortal
+		) {
 			return S3Errors.QuotaExceeded(
 				"You have exceeded your egress quota.",
 			).toResponse();

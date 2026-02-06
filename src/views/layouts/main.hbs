@@ -71,7 +71,12 @@
             <a href="/docs" class="text-text-muted hover:text-white transition-colors">Docs</a>
             <div class="flex items-center gap-2 min-w-0">
               <img id="user-avatar" src="{{user.avatarUrl}}" alt="User Avatar" class="w-6 h-6 rounded-full {{#unless user.avatarUrl}}hidden{{/unless}}" />
-              <span class="text-text-muted font-mono truncate max-w-[14rem]" id="user-id">{{user.id}}</span>
+              <div class="flex items-center gap-2">
+                <span class="text-text-muted font-mono truncate max-w-[14rem]" id="user-id">{{user.id}}</span>
+                {{#if user.isImmortal}}
+                  <i class="ph ph-crown text-amber-400 text-lg cursor-help" title="Immortal Status Active: Unlimited storage & bandwidth. Account will never expire."></i>
+                {{/if}}
+              </div>
             </div>
             {{#if user.isAdmin}}
               <a href="/admin" id="admin-link" class="text-text-muted hover:text-white transition-colors">Admin</a>
