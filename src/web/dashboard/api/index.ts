@@ -196,6 +196,7 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 						(Number(user.ingressBytes) || 0) + (Number(user.egressBytes) || 0),
 					totalRequests: Number(user.totalRequests) || 0,
 					isAdmin: user.isAdmin,
+					isImmortal: user.isImmortal,
 				},
 				limits: {
 					maxBucketsPerUser: settings.defaultMaxBucketsPerUser,

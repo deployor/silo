@@ -26,6 +26,23 @@
   {{/if}}
 {{/if}}
 
+{{#if user.isImmortal}}
+<div class="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-6 mb-8 flex flex-col md:flex-row items-center gap-6 relative overflow-hidden">
+    <div class="absolute -right-10 -top-10 text-amber-500/10 rotate-12 pointer-events-none">
+        <i class="ph ph-crown text-9xl"></i>
+    </div>
+    <div class="shrink-0 p-3 bg-amber-500/20 rounded-xl text-amber-400 z-10">
+        <i class="ph ph-crown text-3xl"></i>
+    </div>
+    <div class="z-10">
+        <h3 class="text-amber-400 font-bold text-lg">Immortal Status Active</h3>
+        <p class="text-amber-200/80 text-sm mt-1 max-w-2xl">
+            You have been granted Immortal status. You have <strong>unlimited storage and bandwidth</strong>, and your account will never be locked or aged out.
+        </p>
+    </div>
+</div>
+{{/if}}
+
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
   <div class="bg-hc-dark rounded-3xl p-6 border border-white/10 card-shadow">
     <h3 class="text-text-muted text-sm font-bold uppercase tracking-wider mb-2">
