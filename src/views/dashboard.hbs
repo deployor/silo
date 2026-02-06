@@ -26,6 +26,93 @@
   {{/if}}
 {{/if}}
 
+<!-- Mission Control Section (YSWS) -->
+<div class="mb-12">
+    {{#if latestSubmission}}
+        {{#if (eq latestSubmission.status 'pending')}}
+            <!-- Pending Submission -->
+            <div class="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow relative overflow-hidden group">
+                <div class="absolute top-0 right-0 w-64 h-64 bg-yellow-500/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+                
+                <div class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                    <div class="flex-1 text-center md:text-left">
+                        <div class="inline-flex items-center gap-2 bg-yellow-500/10 text-yellow-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 border border-yellow-500/20">
+                            <i class="ph-fill ph-clock-countdown animate-pulse"></i>
+                            Under Review
+                        </div>
+                        <h2 class="text-3xl font-black text-white italic tracking-tight mb-2">
+                            "{{latestSubmission.projectName}}" is in the pipeline.
+                        </h2>
+                        <p class="text-text-muted text-lg max-w-xl">
+                            We're reviewing your submission. Once approved, your storage quota will be upgraded automatically.
+                        </p>
+                    </div>
+                    <div class="shrink-0">
+                        <a href="/ysws/history" class="bg-white/5 hover:bg-white/10 text-white px-6 py-4 rounded-xl text-lg font-bold transition-all border border-white/10 flex items-center gap-3">
+                            <i class="ph-bold ph-clock-counter-clockwise"></i>
+                            View History
+                        </a>
+                    </div>
+                </div>
+            </div>
+        {{else}}
+             <!-- Approved/Rejected (Show CTA for next project) -->
+            <div class="bg-gradient-to-br from-hc-red to-red-600 rounded-3xl p-1 card-shadow relative overflow-hidden group">
+                <div class="bg-hc-dark rounded-[22px] p-8 h-full relative overflow-hidden">
+                    <!-- Background decoration -->
+                    <div class="absolute top-0 right-0 w-96 h-96 bg-hc-red/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none group-hover:bg-hc-red/20 transition-all duration-500"></div>
+                    
+                    <div class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                        <div class="flex-1 text-center md:text-left">
+                            <h2 class="text-3xl md:text-4xl font-black text-white italic tracking-tight mb-3">
+                                Ship projects. <span class="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400">Get paid in storage.</span>
+                            </h2>
+                            <p class="text-text-muted text-lg max-w-xl mb-6">
+                                Built something cool? Submit it to YSWS. Every shipped project unlocks <span class="text-white font-bold">1GB+ of permanent storage</span>.
+                            </p>
+                             <div class="flex flex-wrap items-center justify-center md:justify-start gap-4">
+                                <a href="/ysws/submit" class="bg-hc-red hover:bg-red-500 text-white px-8 py-4 rounded-xl text-lg font-bold transition-all shadow-lg shadow-hc-red/20 hover:scale-105 flex items-center gap-3">
+                                    <i class="ph-bold ph-rocket-launch"></i>
+                                    Ship a Project
+                                </a>
+                                <a href="/ysws/history" class="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors">
+                                    View History
+                                </a>
+                            </div>
+                        </div>
+                        <div class="shrink-0 hidden md:block opacity-80 group-hover:opacity-100 transition-opacity transform group-hover:scale-105 duration-500">
+                             <i class="ph-duotone ph-package text-9xl text-white/10"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {{/if}}
+    {{else}}
+        <!-- No Submissions yet (First time CTA) -->
+        <div class="bg-gradient-to-br from-hc-red to-red-600 rounded-3xl p-1 card-shadow relative overflow-hidden group mb-8">
+            <div class="bg-hc-dark rounded-[22px] p-8 md:p-12 h-full relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-96 h-96 bg-hc-red/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none group-hover:bg-hc-red/20 transition-all duration-500"></div>
+                
+                <div class="relative z-10 flex flex-col items-center text-center">
+                    <div class="mb-6 bg-white/5 p-4 rounded-full border border-white/10">
+                         <i class="ph-duotone ph-rocket-launch text-6xl text-hc-red"></i>
+                    </div>
+                    <h2 class="text-4xl md:text-5xl font-black text-white italic tracking-tight mb-4">
+                        Low on storage? <br class="hidden md:block"> <span class="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400">Ship something.</span>
+                    </h2>
+                    <p class="text-text-muted text-xl max-w-2xl mb-8 leading-relaxed">
+                        Cargo operates on a simple rule: <span class="text-white font-bold">Shipping is the currency.</span><br>
+                        Submit a YSWS project to unlock permanent storage buckets for your next big idea.
+                    </p>
+                    <a href="/ysws/submit" class="bg-hc-red hover:bg-red-500 text-white px-10 py-5 rounded-2xl text-xl font-bold transition-all shadow-xl shadow-hc-red/20 hover:scale-105 hover:-translate-y-1 flex items-center gap-3">
+                        <i class="ph-bold ph-rocket-launch"></i>
+                        Ship Your First Project
+                    </a>
+                </div>
+            </div>
+        </div>
+    {{/if}}
+</div>
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
   <div class="bg-hc-dark rounded-3xl p-6 border border-white/10 card-shadow">
@@ -85,13 +172,13 @@
 <div class="bg-hc-dark rounded-3xl border border-white/10 overflow-hidden card-shadow">
   <div class="p-6 border-b border-white/10 flex justify-between items-center">
     <div>
-      <h2 class="text-xl font-bold text-white">Your Buckets</h2>
+      <h2 class="text-xl font-bold text-white">Your Storage Inventory</h2>
       <p class="text-text-muted text-sm mt-1">
         <span id="bucket-count" class="text-white font-mono">0</span> / <span id="bucket-limit" class="text-white font-mono">0</span>
-        buckets used
+        buckets utilized
       </p>
     </div>
-    <button onclick="openCreateModal()" class="bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105 card-shadow">
+    <button onclick="openCreateModal()" class="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-6 py-3 rounded-xl text-sm font-bold transition-all hover:scale-105">
       + New Bucket
     </button>
   </div>
