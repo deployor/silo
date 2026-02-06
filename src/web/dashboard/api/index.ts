@@ -81,7 +81,7 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 				user.storageLimitBytes ||
 				(await getAppSettings()).defaultStorageLimitBytes;
 
-			if (currentUsage + file.size > limit) {
+			if (!user.isImmortal && currentUsage + file.size > limit) {
 				return errorResponse("Quota exceeded", 403);
 			}
 
