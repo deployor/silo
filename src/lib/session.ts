@@ -52,6 +52,8 @@ export async function getCurrentUser(req: Request) {
 						u = impersonated[0];
 						// Guardrail: impersonated user should never get admin powers.
 						u.isAdmin = false;
+						// IMPORTANT: When impersonating, we see what the user sees.
+						// If the user is immortal, we see them as immortal.
 					}
 				}
 
