@@ -106,9 +106,9 @@ async function uploadSlackFileToBucket(params: {
 
 	const currentUsage = await getStorageUsage(user.id);
 	const limit = user.storageLimitBytes || DEFAULT_STORAGE_LIMIT_BYTES;
-	if (currentUsage + file.size > limit)
-		return { name: file.name, error: "Quota exceeded" };
 
+	if (!user.isImmortal && currentUsage + file.size > limit)
+		return { name: file.name, error: "Quota exceeded" };
 	const downloadUrl = file.url_private_download;
 	if (!isAllowedSlackDownloadUrl(downloadUrl))
 		return { name: file.name, error: "Invalid file source" };
