@@ -3,6 +3,7 @@ export class AwsChunkedDecoder extends TransformStream<Uint8Array, Uint8Array> {
 	private leftover: Uint8Array | null = null;
 	private phase: "size" | "data" | "crlf" = "size";
 	private chunkSize = 0;
+	private readonly MAX_HEADER_SIZE = 4096; // Safety limit for chunk size header
 
 	constructor() {
 		super({
@@ -11,8 +12,10 @@ export class AwsChunkedDecoder extends TransformStream<Uint8Array, Uint8Array> {
 			},
 			flush: (controller) => {
 				if (this.leftover && this.leftover.length > 0) {
-					// Stream ended with incomplete data
-					// We can warn or ignore. For S3, it usually ends cleanly.
+					console.warn(
+						"[AwsChunkedDecoder] Stream ended with incomplete data",
+						this.leftover.length,
+					);
 				}
 			},
 		});
@@ -25,29 +28,55 @@ export class AwsChunkedDecoder extends TransformStream<Uint8Array, Uint8Array> {
 		let cursor = 0;
 		let currentChunk = chunk;
 
-		// If we have leftovers from previous chunk, prepend them
+		// Efficiently handle leftovers:
+		// Only allocate a new buffer if we have leftovers.
 		if (this.leftover) {
-			const temp = new Uint8Array(this.leftover.length + chunk.length);
+			const totalLen = this.leftover.length + chunk.length;
+			const temp = new Uint8Array(totalLen);
 			temp.set(this.leftover);
 			temp.set(chunk, this.leftover.length);
 			currentChunk = temp;
 			this.leftover = null;
 		}
 
-		while (cursor < currentChunk.length) {
+		const len = currentChunk.length;
+
+		while (cursor < len) {
 			if (this.phase === "size") {
-				// Search for CRLF in currentChunk starting at cursor
-				const idx = this.indexOfCRLF(currentChunk, cursor);
+				// We need to find CRLF
+				// Use Buffer.indexOf if available for speed, otherwise loop.
+				// In Bun/Node, Uint8Array can be viewed as Buffer without copy usually?
+				// To be safe and portable-ish (but relying on Buffer for speed):
+				// Buffer.from(buffer, offset, length) shares memory in Node/Bun?
+				// Actually, standard loop is fine for short headers, but let's try to be efficient.
+				
+				// Search limit for header to prevent DoS
+				const searchLimit = Math.min(len, cursor + this.MAX_HEADER_SIZE);
+				let idx = -1;
+
+				for (let i = cursor; i < searchLimit - 1; i++) {
+					if (currentChunk[i] === 13 && currentChunk[i + 1] === 10) {
+						idx = i;
+						break;
+					}
+				}
+
 				if (idx === -1) {
-					// CRLF not found in this chunk, save the rest as leftover and wait for more
+					// Not found
+					if (len - cursor > this.MAX_HEADER_SIZE) {
+						throw new Error("Chunk header exceeded maximum size");
+					}
+					// Save remaining as leftover
 					this.leftover = currentChunk.slice(cursor);
 					return;
 				}
 
-				// Parse size line
-				const lineBytes = currentChunk.slice(cursor, idx);
+				// Found CRLF at idx
+				// Extract size string
+				// Use subarray to avoid copy, TextDecoder decodes from view
+				const lineBytes = currentChunk.subarray(cursor, idx);
 				const line = new TextDecoder().decode(lineBytes);
-				
+
 				// Format: hex-size;key=value...
 				const semiColon = line.indexOf(";");
 				const sizeStr = semiColon === -1 ? line : line.slice(0, semiColon);
@@ -61,37 +90,33 @@ export class AwsChunkedDecoder extends TransformStream<Uint8Array, Uint8Array> {
 				cursor = idx + 2; // Skip \r\n
 
 				if (this.chunkSize === 0) {
-					// End of stream (0-sized chunk)
-					// We can stop processing here.
-					// technically we should consume trailers, but for body extraction it's fine.
+					// End of stream.
+					// We treat this as the end of the body data.
+					// Any subsequent data (trailers) is ignored for the PUT body.
 					return;
 				}
 
 				this.phase = "data";
 			} else if (this.phase === "data") {
-				const available = currentChunk.length - cursor;
+				const available = len - cursor;
 				const needed = this.chunkSize;
-				const toEmit = Math.min(available, needed);
 
-				if (toEmit > 0) {
-					// Zero-copy slice if possible (Buffer.subarray in Node, slice in Uint8Array)
-					// In standard JS Uint8Array.slice copies. subarray does not.
-					// Bun supports subarray.
-					controller.enqueue(currentChunk.subarray(cursor, cursor + toEmit));
-					cursor += toEmit;
-					this.chunkSize -= toEmit;
-				}
-
-				if (this.chunkSize === 0) {
+				if (available >= needed) {
+					// We have the full chunk data (and possibly more)
+					controller.enqueue(currentChunk.subarray(cursor, cursor + needed));
+					cursor += needed;
+					this.chunkSize = 0;
 					this.phase = "crlf";
 				} else {
-					// We ran out of data in this chunk, but still need more for this chunk body
-					return;
+					// We have partial data
+					controller.enqueue(currentChunk.subarray(cursor));
+					this.chunkSize -= available;
+					// No leftover, we consumed everything
+					return; 
 				}
 			} else if (this.phase === "crlf") {
-				const available = currentChunk.length - cursor;
+				const available = len - cursor;
 				if (available < 2) {
-					// Need at least 2 bytes for \r\n
 					this.leftover = currentChunk.slice(cursor);
 					return;
 				}
@@ -104,14 +129,5 @@ export class AwsChunkedDecoder extends TransformStream<Uint8Array, Uint8Array> {
 				this.phase = "size";
 			}
 		}
-	}
-
-	private indexOfCRLF(buf: Uint8Array, start: number): number {
-		for (let i = start; i < buf.length - 1; i++) {
-			if (buf[i] === 13 && buf[i + 1] === 10) {
-				return i;
-			}
-		}
-		return -1;
 	}
 }
