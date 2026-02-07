@@ -1,3 +1,4 @@
+import { relations } from "drizzle-orm";
 import {
 	bigint,
 	boolean,
@@ -279,3 +280,22 @@ export const redemptionLogs = pgTable(
 		};
 	},
 );
+
+export const usersRelations = relations(users, ({ many }) => ({
+	buckets: many(buckets),
+}));
+
+export const bucketsRelations = relations(buckets, ({ one, many }) => ({
+	user: one(users, {
+		fields: [buckets.userId],
+		references: [users.id],
+	}),
+	keys: many(bucketKeys),
+}));
+
+export const bucketKeysRelations = relations(bucketKeys, ({ one }) => ({
+	bucket: one(buckets, {
+		fields: [bucketKeys.bucketId],
+		references: [buckets.id],
+	}),
+}));
