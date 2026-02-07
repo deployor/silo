@@ -199,46 +199,40 @@ export async function handlePutRequest(
 				const decoder = new AwsChunkedDecoder();
 				const decodedStream = body.pipeThrough(decoder);
 
-				// For simplicity and correctness with upstream S3 requiring Content-Length,
-				// we buffer the DECODED stream.
-				// This might use memory/disk space, but it's safe.
-				const chunks: Uint8Array[] = [];
-				const reader = decodedStream.getReader();
-				let totalDecodedLength = 0;
-
-				while (true) {
-					const { done, value } = await reader.read();
-					if (done) break;
-					chunks.push(value);
-					totalDecodedLength += value.byteLength;
-				}
-
-				const combined = new Uint8Array(totalDecodedLength);
-				let offset = 0;
-				for (const chunk of chunks) {
-					combined.set(chunk, offset);
-					offset += chunk.byteLength;
-				}
-
-				requestBody = combined;
-				actualSize = totalDecodedLength;
-
-				// Update headers for upstream
-				upstreamHeaders.set("Content-Length", actualSize.toString());
-
-				// Also retrieve the original decoded length header if present (x-amz-decoded-content-length)
-				// to verify?
 				const decodedLengthHeader = req.headers.get(
 					"x-amz-decoded-content-length",
 				);
+
 				if (decodedLengthHeader) {
-					const expectedSize = parseInt(decodedLengthHeader, 10);
-					if (expectedSize !== actualSize) {
-						console.warn(
-							`[PUT] Decoded size mismatch: expected ${expectedSize}, got ${actualSize}`,
-						);
-						// We could throw, but let's proceed with actual size
+					// Optimization: If we have the decoded length, we can stream directly
+					// without buffering the whole file in memory.
+					actualSize = parseInt(decodedLengthHeader, 10);
+					requestBody = decodedStream;
+					upstreamHeaders.set("Content-Length", actualSize.toString());
+				} else {
+					// Fallback: Buffer if we don't know the size
+					// This should be rare for valid aws-chunked requests
+					const chunks: Uint8Array[] = [];
+					const reader = decodedStream.getReader();
+					let totalDecodedLength = 0;
+
+					while (true) {
+						const { done, value } = await reader.read();
+						if (done) break;
+						chunks.push(value);
+						totalDecodedLength += value.byteLength;
 					}
+
+					const combined = new Uint8Array(totalDecodedLength);
+					let offset = 0;
+					for (const chunk of chunks) {
+						combined.set(chunk, offset);
+						offset += chunk.byteLength;
+					}
+
+					requestBody = combined;
+					actualSize = totalDecodedLength;
+					upstreamHeaders.set("Content-Length", actualSize.toString());
 				}
 
 				// Quota Check
