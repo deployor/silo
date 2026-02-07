@@ -4,6 +4,7 @@ export class AwsChunkedDecoder extends TransformStream<Uint8Array, Uint8Array> {
 	private phase: "size" | "data" | "crlf" = "size";
 	private chunkSize = 0;
 	private readonly MAX_HEADER_SIZE = 4096; // Safety limit for chunk size header
+	private readonly textDecoder = new TextDecoder();
 
 	constructor() {
 		super({
@@ -43,13 +44,6 @@ export class AwsChunkedDecoder extends TransformStream<Uint8Array, Uint8Array> {
 
 		while (cursor < len) {
 			if (this.phase === "size") {
-				// We need to find CRLF
-				// Use Buffer.indexOf if available for speed, otherwise loop.
-				// In Bun/Node, Uint8Array can be viewed as Buffer without copy usually?
-				// To be safe and portable-ish (but relying on Buffer for speed):
-				// Buffer.from(buffer, offset, length) shares memory in Node/Bun?
-				// Actually, standard loop is fine for short headers, but let's try to be efficient.
-				
 				// Search limit for header to prevent DoS
 				const searchLimit = Math.min(len, cursor + this.MAX_HEADER_SIZE);
 				let idx = -1;
@@ -75,7 +69,7 @@ export class AwsChunkedDecoder extends TransformStream<Uint8Array, Uint8Array> {
 				// Extract size string
 				// Use subarray to avoid copy, TextDecoder decodes from view
 				const lineBytes = currentChunk.subarray(cursor, idx);
-				const line = new TextDecoder().decode(lineBytes);
+				const line = this.textDecoder.decode(lineBytes);
 
 				// Format: hex-size;key=value...
 				const semiColon = line.indexOf(";");
@@ -91,8 +85,6 @@ export class AwsChunkedDecoder extends TransformStream<Uint8Array, Uint8Array> {
 
 				if (this.chunkSize === 0) {
 					// End of stream.
-					// We treat this as the end of the body data.
-					// Any subsequent data (trailers) is ignored for the PUT body.
 					return;
 				}
 
