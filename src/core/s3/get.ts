@@ -7,7 +7,6 @@ import {
 	rewriteMultipartUploadResponse,
 } from "../../lib/xml-rewriter";
 import { redis } from "../../lib/redis";
-import { diskCache } from "../../lib/disk-cache";
 import {
 	filterUpstreamHeaders,
 	getInternalPath,
@@ -261,13 +260,12 @@ ${rulesXml}
 	}
 
 	try {
-		// Redis & Disk Cache Check for Object
+		// Redis Cache Check for Object
 		const cacheKeyBody = `s3:body:${bucket.name}:${key}`;
 		const cacheKeyMeta = `s3:meta:${bucket.name}:${key}`;
 
 		if (!url.searchParams.has("uploadId") && !req.headers.has("range")) {
 			try {
-	               // 1. Try Redis first (faster)
 				const [cachedBody, cachedMeta] = await Promise.all([
 					redis.getBuffer(cacheKeyBody),
 					redis.get(cacheKeyMeta),
@@ -283,32 +281,8 @@ ${rulesXml}
 						headers,
 					});
 				}
-
-	               // 2. Try Disk Cache (if Redis miss)
-	               // We still need the metadata from Redis to serve the response correctly.
-	               // If Redis meta is missing, we must go to upstream anyway to get fresh metadata (and likely body).
-	               // However, if we found Redis meta but body was evicted/missing from Redis,
-	               // we can check Disk Cache for the body.
-	               
-	               // BUT: The previous logic returned early if `cachedBody && cachedMeta`.
-	               // If we are here, one or both are missing.
-	               
-	               // If we have meta but no body, check disk.
-	               if (cachedMeta && !cachedBody) {
-	               	const diskBody = await diskCache.get(bucket.name, key);
-	               	if (diskBody) {
-	               		const headers = new Headers(JSON.parse(cachedMeta));
-	               		for (const [k, v] of corsHeaders.entries()) {
-	               			headers.set(k, v);
-	               		}
-	               		return new Response(diskBody, {
-	               			status: 200,
-	               			headers,
-	               		});
-	               	}
-	               }
 			} catch (e) {
-				console.error("Cache read error:", e);
+				console.error("Redis object cache error:", e);
 			}
 		}
 
@@ -372,73 +346,56 @@ ${rulesXml}
 
 		let responseBody: ReadableStream | Blob | null = response.body;
 
-		// Redis & Disk Cache Write (Side Effect)
+		// Redis Cache Write (Side Effect)
 		if (
 			!url.searchParams.has("uploadId") &&
 			response.status === 200 &&
 			response.body
 		) {
 			const sizeHint = contentLength ? parseInt(contentLength) : 0;
-		          // 10MB limit for Redis, 1GB limit for Disk
-			const shouldCacheRedis = sizeHint > 0 && sizeHint < 10 * 1024 * 1024;
-		          const shouldCacheDisk = sizeHint > 0 && sizeHint < 1024 * 1024 * 1024;
+			const shouldCacheBody = sizeHint > 0 && sizeHint < 10 * 1024 * 1024; // 10MB limit
 
-			if (shouldCacheRedis || shouldCacheDisk) {
+			// If likely cacheable, tee the stream
+			if (shouldCacheBody) {
 				const [stream1, stream2] = response.body.tee();
 				responseBody = stream1;
 
 				// Background cache population
 				(async () => {
 					try {
-		                      // If it fits in Redis, we read it all into memory first
-		                      if (shouldCacheRedis) {
-		                          const reader = stream2.getReader();
-		                          const chunks: Uint8Array[] = [];
-		                          let totalSize = 0;
-		                          const MAX_REDIS_SIZE = 10 * 1024 * 1024;
+						const reader = stream2.getReader();
+						const chunks: Uint8Array[] = [];
+						let totalSize = 0;
+						const MAX_CACHE_SIZE = 10 * 1024 * 1024;
 
-		                          while (true) {
-		                              const { done, value } = await reader.read();
-		                              if (done) break;
+						while (true) {
+							const { done, value } = await reader.read();
+							if (done) break;
 
-		                              totalSize += value.length;
-		                              if (totalSize > MAX_REDIS_SIZE) {
-		                                  reader.cancel();
-		                                  return;
-		                              }
-		                              chunks.push(value);
-		                          }
+							totalSize += value.length;
+							if (totalSize > MAX_CACHE_SIZE) {
+								// Too big, abandon caching this object
+								reader.cancel();
+								return;
+							}
+							chunks.push(value);
+						}
 
-		                          const buffer = new Uint8Array(totalSize);
-		                          let offset = 0;
-		                          for (const chunk of chunks) {
-		                              buffer.set(chunk, offset);
-		                              offset += chunk.length;
-		                          }
+						// Combine chunks
+						const buffer = new Uint8Array(totalSize);
+						let offset = 0;
+						for (const chunk of chunks) {
+							buffer.set(chunk, offset);
+							offset += chunk.length;
+						}
 
-		                          const headersObj: Record<string, string> = {};
-		                          headers.forEach((v, k) => (headersObj[k] = v));
+						const headersObj: Record<string, string> = {};
+						headers.forEach((v, k) => (headersObj[k] = v));
 
-		                          await Promise.all([
-		                              redis.set(cacheKeyMeta, JSON.stringify(headersObj)),
-		                              redis.set(cacheKeyBody, Buffer.from(buffer)),
-		                          ]);
-		     // Opportunistically write to disk too if it fits
-		     if (shouldCacheDisk) {
-		      diskCache.put(bucket.name, key, buffer).catch(console.error);
-		     }
-		                      }
-		                      // If too big for Redis but fits in Disk, stream to disk
-		                      else if (shouldCacheDisk) {
-		     // We still need to cache metadata in Redis so we know it exists!
-		     const headersObj: Record<string, string> = {};
-		     headers.forEach((v, k) => (headersObj[k] = v));
-		     
-		     await Promise.all([
-		      redis.set(cacheKeyMeta, JSON.stringify(headersObj)),
-		      diskCache.put(bucket.name, key, stream2)
-		     ]);
-		                      }
+						await Promise.all([
+							redis.set(cacheKeyMeta, JSON.stringify(headersObj)),
+							redis.set(cacheKeyBody, Buffer.from(buffer)),
+						]);
 					} catch (e) {
 						console.error("Failed to cache S3 object in background:", e);
 					}

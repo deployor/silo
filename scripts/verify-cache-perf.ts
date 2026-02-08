@@ -57,8 +57,7 @@ async function run() {
     console.log(`Duration: ${TEST_DURATION_MS}ms`);
 
     // Generate random buffer
-    // Use > 10MB to bypass Redis cache and force Disk Cache
-    const body = new Uint8Array(1024 * 1024 * 15); // 15MB
+    const body = new Uint8Array(1024 * 50); // 50KB
     for(let i=0; i<body.length; i++) body[i] = Math.floor(Math.random() * 255);
 
     // 1. Prime Cache (PUT)

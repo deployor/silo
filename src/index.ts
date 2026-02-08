@@ -17,8 +17,6 @@ import { handleRedeemRequest } from "./web/redemptions";
 import { handleYswsRequest } from "./web/ysws";
 import { handleGalleryRequest } from "./web/gallery";
 import { handleRevocationRequest } from "./web/api/revocation";
-// Initialize disk cache
-import "./lib/disk-cache";
 
 const S3_DOMAIN = config.s3Domain;
 

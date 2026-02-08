@@ -4,7 +4,6 @@ import { db } from "../../db";
 import { buckets, type users } from "../../db/schema";
 import { AwsChunkedDecoder } from "../../lib/aws-chunked-decoder";
 import { redis } from "../../lib/redis";
-import { diskCache } from "../../lib/disk-cache";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
 import {
@@ -442,7 +441,6 @@ export async function handlePutRequest(
 				(async () => {
 					try {
 						await redis.del(keys);
-				                    await diskCache.del(bucket.name, key);
 
 						// SCAN is slow, but acceptable in background for "eventual" list consistency
 						const stream = redis.scanStream({
