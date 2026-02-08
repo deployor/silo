@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import { buckets } from "../../db/schema";
 import { redis } from "../../lib/redis";
-import { diskCache } from "../../lib/disk-cache";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
 import { filterUpstreamHeaders, stripAuthQueryParams } from "./utils";
@@ -46,7 +45,6 @@ export async function handleDeleteRequest(
 					];
 
 					await redis.del(keys);
-					               await diskCache.del(bucket.name, key);
 
 					// Same eventual consistency pattern as PUT
 					const stream = redis.scanStream({
