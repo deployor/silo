@@ -9,6 +9,7 @@ const envSchema = z.object({
 	S3_ENDPOINT: z.string().min(1, "S3_ENDPOINT is required"),
 	S3_BUCKET_NAME: z.string().min(1, "S3_BUCKET_NAME is required"),
 	S3_REGION: z.string().default("auto"),
+	REDIS_URL: z.string().default("redis://localhost:6379"),
 	HC_AUTH_CLIENT_ID: z.string().min(1, "HC_AUTH_CLIENT_ID is required"),
 	HC_AUTH_CLIENT_SECRET: z.string().min(1, "HC_AUTH_CLIENT_SECRET is required"),
 	HC_AUTH_REDIRECT_URI: z.string().min(1, "HC_AUTH_REDIRECT_URI is required"),
@@ -80,6 +81,7 @@ export const config = {
 	isProduction: env.NODE_ENV === "production",
 	s3Domain: env.S3_DOMAIN,
 	databaseUrl: env.DATABASE_URL,
+	redisUrl: env.REDIS_URL,
 	s3: {
 		accessKeyId: env.S3_ACCESS_KEY_ID,
 		secretAccessKey: env.S3_SECRET_ACCESS_KEY,

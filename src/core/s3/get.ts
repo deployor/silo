@@ -6,6 +6,7 @@ import {
 	rewriteListObjectsV2Response,
 	rewriteMultipartUploadResponse,
 } from "../../lib/xml-rewriter";
+import { redis } from "../../lib/redis";
 import {
 	filterUpstreamHeaders,
 	getInternalPath,
@@ -137,6 +138,23 @@ ${rulesXml}
 
 	if (isListObjects) {
 		const query = url.searchParams;
+		// Redis Cache Check for ListObjects
+		const queryStr = query.toString();
+		const cacheKeyList = `s3:list:${bucket.name}:${queryStr}`;
+
+		try {
+			const cachedList = await redis.get(cacheKeyList);
+			if (cachedList) {
+				const headers = new Headers({ "Content-Type": "application/xml" });
+				for (const [k, v] of corsHeaders.entries()) {
+					headers.set(k, v);
+				}
+				return new Response(cachedList, { headers });
+			}
+		} catch (e) {
+			console.error("Redis list cache error:", e);
+		}
+
 		const userPrefix = query.get("prefix") || "";
 		const internalPrefix = getInternalPath(
 			userPrefix,
@@ -173,6 +191,12 @@ ${rulesXml}
 		const xml = await response.text();
 		const rootPrefix = getInternalPath("", user || undefined, bucket);
 		const rewrittenXml = rewriteListObjectsV2Response(xml, rootPrefix);
+
+		if (response.status === 200) {
+			redis.set(cacheKeyList, rewrittenXml, "EX", 3600).catch((e) => {
+				console.error("Failed to cache ListObjects response:", e);
+			});
+		}
 
 		const headers = new Headers({ "Content-Type": "application/xml" });
 		for (const [k, v] of corsHeaders.entries()) {
@@ -236,6 +260,32 @@ ${rulesXml}
 	}
 
 	try {
+		// Redis Cache Check for Object
+		const cacheKeyBody = `s3:body:${bucket.name}:${key}`;
+		const cacheKeyMeta = `s3:meta:${bucket.name}:${key}`;
+
+		if (!url.searchParams.has("uploadId") && !req.headers.has("range")) {
+			try {
+				const [cachedBody, cachedMeta] = await Promise.all([
+					redis.getBuffer(cacheKeyBody),
+					redis.get(cacheKeyMeta),
+				]);
+
+				if (cachedBody && cachedMeta) {
+					const headers = new Headers(JSON.parse(cachedMeta));
+					for (const [k, v] of corsHeaders.entries()) {
+						headers.set(k, v);
+					}
+					return new Response(cachedBody, {
+						status: 200,
+						headers,
+					});
+				}
+			} catch (e) {
+				console.error("Redis object cache error:", e);
+			}
+		}
+
 		const cleanUrl = stripAuthQueryParams(url);
 		const queryStr = cleanUrl.searchParams.toString();
 		const pathWithQuery = queryStr
@@ -305,6 +355,31 @@ ${rulesXml}
 
 		// Ensure header matches actual blob size
 		headers.set("Content-Length", bodyBlob.size.toString());
+
+		// Redis Cache Write
+		if (!url.searchParams.has("uploadId") && response.status === 200) {
+			const shouldCacheBody = bodyBlob.size < 10 * 1024 * 1024; // 10MB limit
+
+			try {
+				const headersObj: Record<string, string> = {};
+				headers.forEach((v, k) => (headersObj[k] = v));
+				
+				const promises: Promise<any>[] = [
+					redis.set(cacheKeyMeta, JSON.stringify(headersObj)),
+				];
+
+				if (shouldCacheBody) {
+					// Convert Blob to ArrayBuffer for caching
+					// Note: arrayBuffer() creates a copy, but for <10MB it's acceptable
+					const buffer = await bodyBlob.arrayBuffer();
+					promises.push(redis.set(cacheKeyBody, Buffer.from(buffer)));
+				}
+
+				await Promise.all(promises);
+			} catch (e) {
+				console.error("Failed to cache S3 object:", e);
+			}
+		}
 
 		return new Response(bodyBlob, {
 			status: response.status,
