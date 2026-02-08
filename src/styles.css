@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @font-face {
   font-family: "JetBrains Mono";
@@ -28,17 +30,19 @@
   font-style: normal;
 }
 
-@theme {
-  --font-sans: "Space Grotesk", "sans-serif";
-  --font-mono: "JetBrains Mono", "monospace";
+@layer base {
+  :root {
+    --font-sans: "Space Grotesk", "sans-serif";
+    --font-mono: "JetBrains Mono", "monospace";
 
-  --color-hc-red: #ec3750;
-  --color-hc-dark: #17171d;
-  --color-hc-darker: #131316;
-  --color-hc-blue: #338eda;
-  --color-sidebar-bg: #1c1c21;
-  --color-text-main: #e0e6ed;
-  --color-text-muted: #94a3b8;
+    --color-hc-red: #ec3750;
+    --color-hc-dark: #17171d;
+    --color-hc-darker: #131316;
+    --color-hc-blue: #338eda;
+    --color-sidebar-bg: #1c1c21;
+    --color-text-main: #e0e6ed;
+    --color-text-muted: #94a3b8;
+  }
 }
 
 /* Common Styles */
