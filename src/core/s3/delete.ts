@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import { buckets } from "../../db/schema";
+import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
 import { filterUpstreamHeaders, stripAuthQueryParams } from "./utils";
@@ -32,6 +33,32 @@ export async function handleDeleteRequest(
 			method: "DELETE",
 			headers: filterUpstreamHeaders(req.headers),
 		});
+
+		if (response.ok || response.status === 204 || response.status === 404) {
+			// Invalidate caches
+			try {
+				const keys = [
+					`s3:body:${bucket.name}:${key}`,
+					`s3:meta:${bucket.name}:${key}`,
+				];
+				
+				// Same eventual consistency pattern as PUT
+				const stream = redis.scanStream({
+					match: `s3:list:${bucket.name}:*`,
+					count: 100
+				});
+				
+				stream.on('data', (keys) => {
+					if (keys.length) {
+						redis.del(keys);
+					}
+				});
+
+				await redis.del(keys);
+			} catch (e) {
+				console.error("Cache invalidation error:", e);
+			}
+		}
 
 		return new Response(response.body, {
 			status: response.status,

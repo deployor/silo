@@ -55,9 +55,6 @@ Make S3 "fucking FAST" by aggressively caching data, metadata, and optimizing IO
 6.  [ ] **HEAD Cache:** Update `src/core/s3/index.ts` to use cached metadata for `HEAD` requests.
 7.  [ ] **Invalidation:** `src/core/s3/put.ts` & `src/core/s3/delete.ts` (Clear Object + List caches).
 
-### Phase 3: Metadata Speedups
-8.  [ ] **Auth Cache:** `src/middleware/auth.ts`.
-9.  [ ] **Rate Limit:** `src/middleware/rate-limit.ts`.
 
 ## Technical Details
 

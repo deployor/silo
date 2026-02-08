@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { config } from "../../config";
 import { db } from "../../db";
 import { buckets, type users } from "../../db/schema";
+import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
 import { getCorsHeaders, handleCorsPreflight } from "./cors";
@@ -170,6 +171,26 @@ export async function handleS3Request(
 			return new Response(null, { status: 200 });
 		}
 		try {
+			const corsHeaders = getCorsHeaders(req, bucket);
+
+			// Check Redis for cached metadata
+			const cacheKeyMeta = `s3:meta:${bucket.name}:${key}`;
+			try {
+				const cachedMeta = await redis.get(cacheKeyMeta);
+				if (cachedMeta) {
+					const headers = new Headers(JSON.parse(cachedMeta));
+					for (const [k, v] of corsHeaders.entries()) {
+						headers.set(k, v);
+					}
+					return new Response(null, {
+						status: 200,
+						headers,
+					});
+				}
+			} catch (e) {
+				console.error("Redis meta cache error:", e);
+			}
+
 			const cleanUrl = stripAuthQueryParams(url);
 			const queryStr = cleanUrl.searchParams.toString();
 			const pathWithQuery = queryStr
@@ -183,9 +204,17 @@ export async function handleS3Request(
 
 			const headers = new Headers(response.headers);
 			// Apply CORS for HEAD too
-			const corsHeaders = getCorsHeaders(req, bucket);
 			for (const [k, v] of corsHeaders.entries()) {
 				headers.set(k, v);
+			}
+
+			// Cache metadata on miss if success
+			if (response.status === 200) {
+				const headersObj: Record<string, string> = {};
+				headers.forEach((v, k) => (headersObj[k] = v));
+				redis.set(cacheKeyMeta, JSON.stringify(headersObj)).catch((e) => {
+					console.error("Failed to cache HEAD metadata:", e);
+				});
 			}
 
 			return new Response(null, {
