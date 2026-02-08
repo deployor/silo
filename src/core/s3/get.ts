@@ -334,13 +334,9 @@ ${rulesXml}
 		}
 
 		// Ensure Content-Length is present in the response if available
-		// Upstream S3 usually provides it, but sometimes it might be missing or in a different case
-		// Note: Bun/Node response headers are case-insensitive maps, but we want to ensure
-		// it is exposed properly if it exists.
 		const contentLength =
 			headers.get("content-length") || headers.get("Content-Length");
 		if (contentLength) {
-			// Force explicit Content-Length header
 			headers.set("Content-Length", contentLength);
 		}
 
@@ -348,40 +344,73 @@ ${rulesXml}
 		headers.delete("Transfer-Encoding");
 		headers.delete("transfer-encoding");
 
-		// To ensure Content-Length is preserved and correct, we read the response as a Blob.
-		// This avoids Bun/Node forcing chunked encoding for streams which strips Content-Length.
-		// Bun's Blob is file-backed for large files, so this is memory-safe but adds latency (TTFB).
-		const bodyBlob = await response.blob();
+		let responseBody: ReadableStream | Blob | null = response.body;
 
-		// Ensure header matches actual blob size
-		headers.set("Content-Length", bodyBlob.size.toString());
+		// Redis Cache Write (Side Effect)
+		if (
+			!url.searchParams.has("uploadId") &&
+			response.status === 200 &&
+			response.body
+		) {
+			const sizeHint = contentLength ? parseInt(contentLength) : 0;
+			const shouldCacheBody = sizeHint > 0 && sizeHint < 10 * 1024 * 1024; // 10MB limit
 
-		// Redis Cache Write
-		if (!url.searchParams.has("uploadId") && response.status === 200) {
-			const shouldCacheBody = bodyBlob.size < 10 * 1024 * 1024; // 10MB limit
+			// If likely cacheable, tee the stream
+			if (shouldCacheBody) {
+				const [stream1, stream2] = response.body.tee();
+				responseBody = stream1;
 
-			try {
+				// Background cache population
+				(async () => {
+					try {
+						const reader = stream2.getReader();
+						const chunks: Uint8Array[] = [];
+						let totalSize = 0;
+						const MAX_CACHE_SIZE = 10 * 1024 * 1024;
+
+						while (true) {
+							const { done, value } = await reader.read();
+							if (done) break;
+
+							totalSize += value.length;
+							if (totalSize > MAX_CACHE_SIZE) {
+								// Too big, abandon caching this object
+								reader.cancel();
+								return;
+							}
+							chunks.push(value);
+						}
+
+						// Combine chunks
+						const buffer = new Uint8Array(totalSize);
+						let offset = 0;
+						for (const chunk of chunks) {
+							buffer.set(chunk, offset);
+							offset += chunk.length;
+						}
+
+						const headersObj: Record<string, string> = {};
+						headers.forEach((v, k) => (headersObj[k] = v));
+
+						await Promise.all([
+							redis.set(cacheKeyMeta, JSON.stringify(headersObj)),
+							redis.set(cacheKeyBody, Buffer.from(buffer)),
+						]);
+					} catch (e) {
+						console.error("Failed to cache S3 object in background:", e);
+					}
+				})();
+			} else {
+				// Just cache metadata if too big for body
 				const headersObj: Record<string, string> = {};
 				headers.forEach((v, k) => (headersObj[k] = v));
-				
-				const promises: Promise<any>[] = [
-					redis.set(cacheKeyMeta, JSON.stringify(headersObj)),
-				];
-
-				if (shouldCacheBody) {
-					// Convert Blob to ArrayBuffer for caching
-					// Note: arrayBuffer() creates a copy, but for <10MB it's acceptable
-					const buffer = await bodyBlob.arrayBuffer();
-					promises.push(redis.set(cacheKeyBody, Buffer.from(buffer)));
-				}
-
-				await Promise.all(promises);
-			} catch (e) {
-				console.error("Failed to cache S3 object:", e);
+				redis.set(cacheKeyMeta, JSON.stringify(headersObj)).catch((e) => {
+					console.error("Failed to cache S3 metadata:", e);
+				});
 			}
 		}
 
-		return new Response(bodyBlob, {
+		return new Response(responseBody, {
 			status: response.status,
 			headers,
 		});
