@@ -4,6 +4,7 @@ import { db } from "../../db";
 import { buckets, type users } from "../../db/schema";
 import { AwsChunkedDecoder } from "../../lib/aws-chunked-decoder";
 import { redis } from "../../lib/redis";
+import { diskCache } from "../../lib/disk-cache";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
 import {
@@ -436,30 +437,28 @@ export async function handlePutRequest(
 					`s3:body:${bucket.name}:${key}`,
 					`s3:meta:${bucket.name}:${key}`,
 				];
-				
-				// Pattern match invalidation for list cache is expensive in Redis (KEYS/SCAN)
-				// For now, we accept eventual consistency or just clear common prefixes if we knew them.
-				// Better approach: Use a Redis "scan" stream or a dedicated "s3:list-keys:{bucket}" set to track known list keys.
-				// BUT, for simple "make it fast", we can just not invalidate lists and rely on short TTL (e.g. 5-10s) for lists,
-				// OR we can try to invalidate specific relevant list keys if we tracked them.
-				//
-				// Given the "FAST" requirement, aggressive caching implies we MUST invalidate to be correct.
-				// Strategy: Use Lua script or SCAN to find `s3:list:{bucket}:*` and delete them.
-				// Since we don't have that infrastructure yet, let's do a best-effort pattern delete
-				// using SCAN in background.
-				
-				const stream = redis.scanStream({
-					match: `s3:list:${bucket.name}:*`,
-					count: 100
-				});
-				
-				stream.on('data', (keys) => {
-					if (keys.length) {
-						redis.del(keys);
-					}
-				});
 
-				await redis.del(keys);
+				// Fire-and-forget background invalidation
+				(async () => {
+					try {
+						await redis.del(keys);
+				                    await diskCache.del(bucket.name, key);
+
+						// SCAN is slow, but acceptable in background for "eventual" list consistency
+						const stream = redis.scanStream({
+							match: `s3:list:${bucket.name}:*`,
+							count: 100,
+						});
+
+						stream.on("data", (keys) => {
+							if (keys.length) {
+								redis.del(keys);
+							}
+						});
+					} catch (e) {
+						console.error("Background cache invalidation error:", e);
+					}
+				})();
 			} catch (e) {
 				console.error("Cache invalidation error:", e);
 			}
