@@ -5,6 +5,7 @@ import { bucketKeys, buckets, users } from "../db/schema";
 import { verifyAwsV4Signature } from "../lib/auth-v4";
 import { context } from "../lib/context";
 import { S3Errors } from "../lib/s3-errors";
+import { redis } from "../lib/redis";
 
 const S3_DOMAIN = config.s3Domain;
 
@@ -203,30 +204,65 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 		return S3Errors.InvalidRequest("Invalid Service").toResponse();
 	}
 
-	const keyResult = await db
-		.select({
-			bucket: buckets,
-			user: users,
-			key: bucketKeys,
-		})
-		.from(bucketKeys)
-		.innerJoin(buckets, eq(bucketKeys.bucketId, buckets.id))
-		.innerJoin(users, eq(buckets.userId, users.id))
-		.where(eq(bucketKeys.accessKey, accessKeyId))
-		.limit(1);
+	let bucket: typeof buckets.$inferSelect;
+	let user: any;
+	let key: typeof bucketKeys.$inferSelect;
 
-	if (keyResult.length === 0) {
-		return S3Errors.InvalidAccessKeyId().toResponse();
+	const cacheKeyAuth = `auth:key:${accessKeyId}`;
+	let cachedAuth = null;
+	try {
+		const cachedStr = await redis.get(cacheKeyAuth);
+		if (cachedStr) {
+			cachedAuth = JSON.parse(cachedStr);
+		}
+	} catch (e) {
+		console.error("Redis auth cache error:", e);
 	}
 
-	const { bucket, user, key } = keyResult[0];
+	if (cachedAuth) {
+		bucket = cachedAuth.bucket;
+		user = cachedAuth.user;
+		key = cachedAuth.key;
+	} else {
+		const keyResult = await db
+			.select({
+				bucket: buckets,
+				user: users,
+				key: bucketKeys,
+			})
+			.from(bucketKeys)
+			.innerJoin(buckets, eq(bucketKeys.bucketId, buckets.id))
+			.innerJoin(users, eq(buckets.userId, users.id))
+			.where(eq(bucketKeys.accessKey, accessKeyId))
+			.limit(1);
 
-	const usageResult = await db
-		.select({ total: sql<number>`sum(${buckets.totalBytes})` })
-		.from(buckets)
-		.where(eq(buckets.userId, user.id));
+		if (keyResult.length === 0) {
+			return S3Errors.InvalidAccessKeyId().toResponse();
+		}
 
-	user.storageUsageBytes = Number(usageResult[0]?.total) || 0;
+		const res = keyResult[0];
+		bucket = res.bucket;
+		user = res.user;
+		key = res.key;
+
+		const usageResult = await db
+			.select({ total: sql<number>`sum(${buckets.totalBytes})` })
+			.from(buckets)
+			.where(eq(buckets.userId, user.id));
+
+		user.storageUsageBytes = Number(usageResult[0]?.total) || 0;
+
+		try {
+			await redis.set(
+				cacheKeyAuth,
+				JSON.stringify({ bucket, user, key }),
+				"EX",
+				60,
+			);
+		} catch (e) {
+			console.error("Failed to cache auth:", e);
+		}
+	}
 
 	if (user.isLocked) {
 		return S3Errors.AccessDenied("Account is temporarily locked.").toResponse();
