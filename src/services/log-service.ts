@@ -80,6 +80,14 @@ class LogService {
 			}, this.FLUSH_INTERVAL_MS);
 		}
 	}
+
+	public async shutdown() {
+		if (this.flushTimer) {
+			clearTimeout(this.flushTimer);
+			this.flushTimer = null;
+		}
+		await this.flush();
+	}
 }
 
 export const logService = new LogService();

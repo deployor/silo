@@ -11,6 +11,8 @@ import {
 	users,
 } from "../../db/schema";
 import { jsonResponse } from "../../lib/api-utils";
+import { getDiskCacheStats } from "../../lib/disk-cache";
+import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
@@ -67,6 +69,122 @@ async function serveAdminSettingsPage(req: Request) {
 	return new Response(html, {
 		headers: { "Content-Type": "text/html" },
 	});
+}
+
+async function serveAdminCachePage(req: Request) {
+	const user = await getCurrentUser(req);
+	const html = await render("admin-cache", {
+		title: "Cache - Admin",
+		user,
+		pageTitle: "ADMIN",
+	});
+	return new Response(html, {
+		headers: { "Content-Type": "text/html" },
+	});
+}
+
+function formatBytes(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+	if (bytes < 1024 * 1024 * 1024)
+		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+	return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+function formatUptime(seconds: number): string {
+	const d = Math.floor(seconds / 86400);
+	const h = Math.floor((seconds % 86400) / 3600);
+	const m = Math.floor((seconds % 3600) / 60);
+	if (d > 0) return `${d}d ${h}h ${m}m`;
+	if (h > 0) return `${h}h ${m}m`;
+	return `${m}m`;
+}
+
+function parseRedisInfo(info: string): Record<string, string> {
+	const result: Record<string, string> = {};
+	for (const line of info.split("\r\n")) {
+		const idx = line.indexOf(":");
+		if (idx > 0) {
+			result[line.slice(0, idx)] = line.slice(idx + 1);
+		}
+	}
+	return result;
+}
+
+async function getCacheStatsJson() {
+	// Get Redis INFO
+	const redisInfo = await redis.info();
+	const redisDbSize = await redis.dbsize();
+	const info = parseRedisInfo(redisInfo);
+
+	// Key breakdown by prefix using SCAN
+	const prefixes = ["s3:meta:", "s3:obj:", "auth:", "stats:", "rl:"];
+	const keyBreakdown: Array<{ name: string; count: number }> = [];
+	for (const prefix of prefixes) {
+		let cursor = "0";
+		let count = 0;
+		do {
+			const [nextCursor, keys] = await redis.scan(
+				cursor,
+				"MATCH",
+				`${prefix}*`,
+				"COUNT",
+				1000,
+			);
+			cursor = nextCursor;
+			count += keys.length;
+		} while (cursor !== "0");
+		keyBreakdown.push({ name: `${prefix}*`, count });
+	}
+
+	// Get disk cache stats
+	const diskStats = getDiskCacheStats();
+
+	// Redis hit/miss
+	const hits = Number.parseInt(info.keyspace_hits || "0", 10);
+	const misses = Number.parseInt(info.keyspace_misses || "0", 10);
+	const hitRate =
+		hits + misses > 0
+			? `${((hits / (hits + misses)) * 100).toFixed(1)}%`
+			: "N/A";
+
+	const uptimeSeconds = Number.parseInt(info.uptime_in_seconds || "0", 10);
+
+	const capacityPercent =
+		diskStats.maxTotalSizeBytes > 0
+			? (
+					(diskStats.totalSizeBytes / diskStats.maxTotalSizeBytes) *
+					100
+				).toFixed(1)
+			: "0";
+
+	// Get S3 circuit breaker state
+	const circuit = s3Client.getCircuitState();
+
+	return {
+		redis: {
+			keyCount: redisDbSize,
+			memoryUsed: info.used_memory_human || "-",
+			hitRate,
+			uptime: formatUptime(uptimeSeconds),
+			connectedClients: info.connected_clients || "-",
+			keyBreakdown,
+		},
+		disk: {
+			fileCount: diskStats.entryCount,
+			currentSize: formatBytes(diskStats.totalSizeBytes),
+			maxSize: formatBytes(diskStats.maxTotalSizeBytes),
+			capacityPercent: `${capacityPercent}%`,
+			capacityPercentNum: Number.parseFloat(capacityPercent),
+			admissionThreshold: diskStats.currentAdmissionThreshold,
+			topHotObjects: diskStats.topHotObjects,
+		},
+		system: {
+			circuitState: circuit.state,
+			circuitFailures: circuit.failures,
+			uptime: formatUptime(Math.floor(process.uptime())),
+		},
+	};
 }
 
 async function listUsers(url: URL, user: typeof users.$inferSelect) {
@@ -745,11 +863,30 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	if (path === "/admin/settings") {
 		return serveAdminSettingsPage(req);
 	}
+	if (path === "/admin/cache") {
+		return serveAdminCachePage(req);
+	}
 
 	// API Routes
 	if (path.startsWith("/api/admin/")) {
 		if (!user.isAdmin) {
 			return new Response("Forbidden", { status: 403 });
+		}
+
+		// Cache stats API
+		if (path === "/api/admin/cache-stats" && req.method === "GET") {
+			try {
+				const stats = await getCacheStatsJson();
+				return new Response(JSON.stringify(stats), {
+					headers: { "Content-Type": "application/json" },
+				});
+			} catch (e) {
+				console.error("Failed to get cache stats:", e);
+				return new Response(
+					JSON.stringify({ error: "Failed to get cache stats" }),
+					{ status: 500, headers: { "Content-Type": "application/json" } },
+				);
+			}
 		}
 
 		// Start impersonation (admin-only): switches current session into impersonation mode.

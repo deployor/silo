@@ -1,10 +1,17 @@
 import { AwsClient } from "aws4fetch";
 import { config } from "../config";
 
+const S3_TIMEOUT_MS = Number(process.env.S3_TIMEOUT_MS ?? "30000");
+
 export class HetznerS3Client {
 	private client: AwsClient;
 	private endpoint: string;
 	private bucket: string;
+
+	private consecutiveFailures = 0;
+	private circuitOpenUntil = 0;
+	private static readonly CIRCUIT_THRESHOLD = 5;
+	private static readonly CIRCUIT_RESET_MS = 30000;
 
 	constructor() {
 		const { accessKeyId, secretAccessKey, endpoint, bucket, region } =
@@ -31,6 +38,15 @@ export class HetznerS3Client {
 		init?: RequestInit,
 		retries = 3,
 	): Promise<Response> {
+		// Circuit breaker: fail fast if upstream is consistently failing
+		if (this.consecutiveFailures >= HetznerS3Client.CIRCUIT_THRESHOLD) {
+			if (Date.now() < this.circuitOpenUntil) {
+				throw new Error("S3 upstream circuit breaker open — failing fast");
+			}
+			// Half-open: allow one probe request through
+			this.consecutiveFailures = HetznerS3Client.CIRCUIT_THRESHOLD; // keep at threshold
+		}
+
 		const baseUrl = new URL(`https://${this.bucket}.${this.endpoint}`);
 
 		if (pathAndQuery.startsWith("?")) {
@@ -49,7 +65,7 @@ export class HetznerS3Client {
 		for (let i = 0; i < retries; i++) {
 			try {
 				const controller = new AbortController();
-				const timeoutId = setTimeout(() => controller.abort(), 30000);
+				const timeoutId = setTimeout(() => controller.abort(), S3_TIMEOUT_MS);
 
 				const headersObj: Record<string, string> = {};
 				if (init?.headers) {
@@ -79,9 +95,11 @@ export class HetznerS3Client {
 				}
 
 				if (res.status === 403 || res.status === 404) {
+					this.consecutiveFailures = 0;
 					return res;
 				}
 
+				this.consecutiveFailures = 0;
 				return res;
 			} catch (e: unknown) {
 				lastError = e;
@@ -91,7 +109,17 @@ export class HetznerS3Client {
 				}
 
 				if (i < retries - 1) {
-					await new Promise((r) => setTimeout(r, 2 ** i * 100));
+					const baseDelay = 2 ** i * 100;
+					const jitter = Math.floor(Math.random() * 100);
+					await new Promise((r) => setTimeout(r, baseDelay + jitter));
+				}
+
+				this.consecutiveFailures++;
+				if (this.consecutiveFailures >= HetznerS3Client.CIRCUIT_THRESHOLD) {
+					this.circuitOpenUntil = Date.now() + HetznerS3Client.CIRCUIT_RESET_MS;
+					console.error(
+						`S3 circuit breaker opened after ${this.consecutiveFailures} consecutive failures`,
+					);
 				}
 			}
 		}
@@ -119,6 +147,19 @@ export class HetznerS3Client {
 
 	getBucket(): string {
 		return this.bucket;
+	}
+
+	getCircuitState(): {
+		state: "closed" | "open" | "half-open";
+		failures: number;
+	} {
+		if (this.consecutiveFailures >= HetznerS3Client.CIRCUIT_THRESHOLD) {
+			if (Date.now() < this.circuitOpenUntil) {
+				return { state: "open", failures: this.consecutiveFailures };
+			}
+			return { state: "half-open", failures: this.consecutiveFailures };
+		}
+		return { state: "closed", failures: this.consecutiveFailures };
 	}
 }
 

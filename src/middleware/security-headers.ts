@@ -1,4 +1,7 @@
-export function securityHeaders(_req: Request, res: Response): Response {
+export function dashboardSecurityHeaders(
+	_req: Request,
+	res: Response,
+): Response {
 	const headers = new Headers(res.headers);
 
 	// HSTS - Force HTTPS
@@ -49,4 +52,23 @@ export function securityHeaders(_req: Request, res: Response): Response {
 		statusText: res.statusText,
 		headers,
 	});
+}
+
+export function s3SecurityHeaders(_req: Request, res: Response): Response {
+	const headers = new Headers(res.headers);
+	headers.set("X-Content-Type-Options", "nosniff");
+	return new Response(res.body, {
+		status: res.status,
+		statusText: res.statusText,
+		headers,
+	});
+}
+
+export function securityHeaders(
+	req: Request,
+	res: Response,
+	isS3: boolean,
+): Response {
+	if (isS3) return s3SecurityHeaders(req, res);
+	return dashboardSecurityHeaders(req, res);
 }
