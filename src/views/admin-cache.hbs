@@ -1,4 +1,4 @@
-<div x-data="cacheStats()" x-init="fetchStats()">
+<div x-data="cacheStats" x-init="fetchStats()">
   <!-- Admin Subnav -->
   <div class="flex gap-4 mb-6 border-b border-white/10 pb-4">
     <a href="/admin/users" id="tab-users" class="text-text-muted font-bold px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">Users</a>
@@ -44,19 +44,19 @@
         <div class="space-y-3">
           <div class="flex justify-between">
             <span class="text-white/60 text-sm">Keys</span>
-            <span class="text-white font-mono text-sm" x-text="stats?.redis?.keyCount || '0'"></span>
+            <span class="text-white font-mono text-sm" x-text="stats && stats.redis && stats.redis.keyCount ? stats.redis.keyCount : '0'"></span>
           </div>
           <div class="flex justify-between">
             <span class="text-white/60 text-sm">Memory</span>
-            <span class="text-white font-mono text-sm" x-text="stats?.redis?.memoryUsed || '-'"></span>
+            <span class="text-white font-mono text-sm" x-text="stats && stats.redis && stats.redis.memoryUsed ? stats.redis.memoryUsed : '-'"></span>
           </div>
           <div class="flex justify-between">
             <span class="text-white/60 text-sm">Hit Rate</span>
-            <span class="text-white font-mono text-sm" x-text="stats?.redis?.hitRate || '-'"></span>
+            <span class="text-white font-mono text-sm" x-text="stats && stats.redis && stats.redis.hitRate ? stats.redis.hitRate : '-'"></span>
           </div>
           <div class="flex justify-between">
             <span class="text-white/60 text-sm">Uptime</span>
-            <span class="text-white font-mono text-sm" x-text="stats?.redis?.uptime || '-'"></span>
+            <span class="text-white font-mono text-sm" x-text="stats && stats.redis && stats.redis.uptime ? stats.redis.uptime : '-'"></span>
           </div>
         </div>
       </div>
@@ -70,25 +70,25 @@
         <div class="space-y-3">
           <div class="flex justify-between">
             <span class="text-white/60 text-sm">Files</span>
-            <span class="text-white font-mono text-sm" x-text="stats?.disk?.fileCount || '0'"></span>
+            <span class="text-white font-mono text-sm" x-text="stats && stats.disk && stats.disk.fileCount ? stats.disk.fileCount : '0'"></span>
           </div>
           <div class="flex justify-between">
             <span class="text-white/60 text-sm">Size</span>
-            <span class="text-white font-mono text-sm" x-text="stats?.disk?.currentSize || '-'"></span>
+            <span class="text-white font-mono text-sm" x-text="stats && stats.disk && stats.disk.currentSize ? stats.disk.currentSize : '-'"></span>
           </div>
           <div class="flex justify-between">
             <span class="text-white/60 text-sm">Capacity</span>
-            <span class="text-white font-mono text-sm" x-text="stats?.disk?.capacityPercent || '-'"></span>
+            <span class="text-white font-mono text-sm" x-text="stats && stats.disk && stats.disk.capacityPercent ? stats.disk.capacityPercent : '-'"></span>
           </div>
           <div class="flex justify-between">
             <span class="text-white/60 text-sm">Threshold</span>
-            <span class="text-white font-mono text-sm" x-text="stats?.disk?.admissionThreshold || '-'"></span>
+            <span class="text-white font-mono text-sm" x-text="stats && stats.disk && stats.disk.admissionThreshold ? stats.disk.admissionThreshold : '-'"></span>
           </div>
         </div>
         <!-- Capacity bar -->
         <div class="mt-4">
           <div class="w-full bg-white/10 rounded-full h-2">
-            <div class="bg-hc-primary rounded-full h-2 transition-all duration-500" :style="'width: ' + (stats?.disk?.capacityPercentNum || 0) + '%'"></div>
+            <div class="bg-hc-primary rounded-full h-2 transition-all duration-500" :style="'width: ' + ((stats && stats.disk && stats.disk.capacityPercentNum) || 0) + '%'"></div>
           </div>
         </div>
       </div>
@@ -102,19 +102,19 @@
         <div class="space-y-3">
           <div class="flex justify-between">
             <span class="text-white/60 text-sm">S3 Circuit</span>
-            <span class="font-mono text-sm" :class="stats?.system?.circuitState === 'closed' ? 'text-green-400' : 'text-red-400'" x-text="stats?.system?.circuitState || '-'"></span>
+            <span class="font-mono text-sm" :class="stats && stats.system && stats.system.circuitState === 'closed' ? 'text-green-400' : 'text-red-400'" x-text="stats && stats.system && stats.system.circuitState ? stats.system.circuitState : '-'"></span>
           </div>
           <div class="flex justify-between">
             <span class="text-white/60 text-sm">S3 Failures</span>
-            <span class="text-white font-mono text-sm" x-text="stats?.system?.circuitFailures || '0'"></span>
+            <span class="text-white font-mono text-sm" x-text="stats && stats.system && stats.system.circuitFailures ? stats.system.circuitFailures : '0'"></span>
           </div>
           <div class="flex justify-between">
             <span class="text-white/60 text-sm">Uptime</span>
-            <span class="text-white font-mono text-sm" x-text="stats?.system?.uptime || '-'"></span>
+            <span class="text-white font-mono text-sm" x-text="stats && stats.system && stats.system.uptime ? stats.system.uptime : '-'"></span>
           </div>
           <div class="flex justify-between">
             <span class="text-white/60 text-sm">Connections</span>
-            <span class="text-white font-mono text-sm" x-text="stats?.redis?.connectedClients || '-'"></span>
+            <span class="text-white font-mono text-sm" x-text="stats && stats.redis && stats.redis.connectedClients ? stats.redis.connectedClients : '-'"></span>
           </div>
         </div>
       </div>
@@ -124,14 +124,14 @@
     <div class="bg-black/30 p-6 rounded-xl border border-white/10 mb-6">
       <h3 class="text-white font-semibold mb-4"><i class="ph ph-key mr-1"></i> Redis Key Breakdown</h3>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <template x-for="prefix in stats?.redis?.keyBreakdown || []" :key="prefix.name">
+        <template x-for="prefix in (stats && stats.redis && stats.redis.keyBreakdown ? stats.redis.keyBreakdown : [])" :key="prefix.name">
           <div class="bg-white/5 p-3 rounded-lg">
             <div class="text-white/60 text-xs font-mono" x-text="prefix.name"></div>
             <div class="text-white text-lg font-bold mt-1" x-text="prefix.count"></div>
           </div>
         </template>
       </div>
-      <div x-show="!stats?.redis?.keyBreakdown?.length" class="text-white/40 text-sm text-center py-4">No key data available</div>
+      <div x-show="!(stats && stats.redis && stats.redis.keyBreakdown && stats.redis.keyBreakdown.length)" class="text-white/40 text-sm text-center py-4">No key data available</div>
     </div>
 
     <!-- Top Cached Files -->
@@ -148,7 +148,7 @@
             </tr>
           </thead>
           <tbody>
-            <template x-for="obj in stats?.disk?.topHotObjects || []" :key="obj.bucket + '/' + obj.key">
+            <template x-for="obj in (stats && stats.disk && stats.disk.topHotObjects ? stats.disk.topHotObjects : [])" :key="obj.bucket + '/' + obj.key">
               <tr class="border-b border-white/5 text-white/80">
                 <td class="py-2 font-mono text-xs" x-text="obj.bucket"></td>
                 <td class="py-2 font-mono text-xs max-w-[300px] truncate" x-text="obj.key"></td>
@@ -158,7 +158,7 @@
                 <td class="py-2 font-mono text-xs" x-text="obj.sizeMB + ' MB'"></td>
               </tr>
             </template>
-            <tr x-show="!stats?.disk?.topHotObjects?.length">
+            <tr x-show="!(stats && stats.disk && stats.disk.topHotObjects && stats.disk.topHotObjects.length)">
               <td colspan="4" class="py-4 text-center text-white/40">No hot objects tracked yet</td>
             </tr>
           </tbody>
@@ -169,8 +169,8 @@
 </div>
 
 <script>
-function cacheStats() {
-  return {
+document.addEventListener('alpine:init', () => {
+  Alpine.data('cacheStats', () => ({
     stats: null,
     loading: false,
     error: null,
@@ -194,10 +194,10 @@ function cacheStats() {
       } finally {
         this.loading = false;
       }
-      // Auto-refresh every 10 seconds
+
       if (this.refreshTimer) clearTimeout(this.refreshTimer);
       this.refreshTimer = setTimeout(() => this.fetchStats(), 10000);
     }
-  };
-}
+  }));
+});
 </script>
