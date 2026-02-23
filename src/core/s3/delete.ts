@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "../../db";
 import { buckets } from "../../db/schema";
+import { diskCacheInvalidate } from "../../lib/disk-cache";
 import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
@@ -35,16 +36,16 @@ export async function handleDeleteRequest(
 		});
 
 		if (response.ok || response.status === 204 || response.status === 404) {
-			// Invalidate caches
+			// Invalidate all cache layers (Redis L1 + Disk L2)
 			// Fire-and-forget background invalidation
 			(async () => {
 				try {
-					const keys = [
+					const redisKeys = [
 						`s3:body:${bucket.name}:${key}`,
 						`s3:meta:${bucket.name}:${key}`,
 					];
 
-					await redis.del(keys);
+					await redis.del(redisKeys);
 
 					// Same eventual consistency pattern as PUT
 					const stream = redis.scanStream({
@@ -52,15 +53,18 @@ export async function handleDeleteRequest(
 						count: 100,
 					});
 
-					stream.on("data", (keys) => {
-						if (keys.length) {
-							redis.del(keys);
+					stream.on("data", (foundKeys: string[]) => {
+						if (foundKeys.length) {
+							redis.del(foundKeys);
 						}
 					});
 				} catch (e) {
 					console.error("Background cache invalidation error:", e);
 				}
 			})();
+
+			// Invalidate disk cache (non-blocking)
+			diskCacheInvalidate(bucket.name, key);
 		}
 
 		return new Response(response.body, {

@@ -3,6 +3,7 @@ import { XMLParser } from "fast-xml-parser";
 import { db } from "../../db";
 import { buckets, type users } from "../../db/schema";
 import { AwsChunkedDecoder } from "../../lib/aws-chunked-decoder";
+import { diskCacheInvalidate } from "../../lib/disk-cache";
 import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
@@ -430,9 +431,9 @@ export async function handlePutRequest(
 		);
 
 		if (response.ok) {
-			// Invalidate caches
+			// Invalidate all cache layers (Redis L1 + Disk L2)
 			try {
-				const keys = [
+				const redisKeys = [
 					`s3:body:${bucket.name}:${key}`,
 					`s3:meta:${bucket.name}:${key}`,
 				];
@@ -440,7 +441,7 @@ export async function handlePutRequest(
 				// Fire-and-forget background invalidation
 				(async () => {
 					try {
-						await redis.del(keys);
+						await redis.del(redisKeys);
 
 						// SCAN is slow, but acceptable in background for "eventual" list consistency
 						const stream = redis.scanStream({
@@ -448,15 +449,18 @@ export async function handlePutRequest(
 							count: 100,
 						});
 
-						stream.on("data", (keys) => {
-							if (keys.length) {
-								redis.del(keys);
+						stream.on("data", (foundKeys: string[]) => {
+							if (foundKeys.length) {
+								redis.del(foundKeys);
 							}
 						});
 					} catch (e) {
 						console.error("Background cache invalidation error:", e);
 					}
 				})();
+
+				// Invalidate disk cache (non-blocking)
+				diskCacheInvalidate(bucket.name, key);
 			} catch (e) {
 				console.error("Cache invalidation error:", e);
 			}

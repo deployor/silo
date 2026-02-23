@@ -26,3 +26,6 @@ Thumbs.db
 
 coverage
 src/assets/styles.css
+
+# Disk cache
+.s3-disk-cache/

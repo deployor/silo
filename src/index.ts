@@ -1,22 +1,27 @@
+import { sql } from "drizzle-orm";
 import { config } from "./config";
 import { handleS3Request } from "./core/s3";
+import { db } from "./db";
 import { handleSlackRequest } from "./integrations/slack";
 import { errorResponse } from "./lib/api-utils";
 import { context } from "./lib/context";
+import { getDiskCacheStats, stopPeriodicEviction } from "./lib/disk-cache";
+import { redis } from "./lib/redis";
 import { S3Errors } from "./lib/s3-errors";
 import { validateOrigin } from "./lib/security";
 import { render } from "./lib/view-engine";
 import { authenticate } from "./middleware/auth";
+import { compressResponse } from "./middleware/compression";
 import { rateLimit } from "./middleware/rate-limit";
 import { securityHeaders } from "./middleware/security-headers";
 import { logService } from "./services/log-service";
 import { statsService } from "./services/stats-service";
 import { handleAdminRequest } from "./web/admin";
+import { handleRevocationRequest } from "./web/api/revocation";
 import { handleDashboardRequest } from "./web/dashboard";
+import { handleGalleryRequest } from "./web/gallery";
 import { handleRedeemRequest } from "./web/redemptions";
 import { handleYswsRequest } from "./web/ysws";
-import { handleGalleryRequest } from "./web/gallery";
-import { handleRevocationRequest } from "./web/api/revocation";
 
 const S3_DOMAIN = config.s3Domain;
 
@@ -80,6 +85,7 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 			"/gallery",
 			"/redeem",
 			"/api/revocation",
+			"/health",
 		];
 
 		// Exact match for root
@@ -102,7 +108,7 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 	return false;
 }
 
-Bun.serve({
+const server = Bun.serve({
 	port: process.env.PORT || 3000,
 	maxRequestBodySize: 1024 * 1024 * 1024, // 1GB
 	async fetch(req) {
@@ -128,6 +134,57 @@ Bun.serve({
 				});
 
 				if (isDashboardRequest(req, url)) {
+					// Health check — no rate limiting, no auth
+					if (url.pathname === "/health") {
+						try {
+							const checks: Record<string, string> = {};
+							let healthy = true;
+
+							// Redis check
+							try {
+								await redis.ping();
+								checks.redis = "connected";
+							} catch {
+								checks.redis = "disconnected";
+								healthy = false;
+							}
+
+							// Postgres check
+							try {
+								await db.execute(sql`SELECT 1`);
+								checks.postgres = "connected";
+							} catch {
+								checks.postgres = "disconnected";
+								healthy = false;
+							}
+
+							// Disk cache stats
+							const diskStats = getDiskCacheStats();
+
+							const body = {
+								status: healthy ? "ok" : "degraded",
+								uptime: Math.floor(process.uptime()),
+								...checks,
+								diskCache: {
+									entries: diskStats.entryCount,
+									usedBytes: diskStats.totalSizeBytes,
+									budgetBytes: diskStats.maxTotalSizeBytes,
+								},
+								version: config.git?.shortSha || "unknown",
+							};
+
+							return new Response(JSON.stringify(body, null, 2), {
+								status: healthy ? 200 : 503,
+								headers: { "Content-Type": "application/json" },
+							});
+						} catch {
+							return new Response(JSON.stringify({ status: "error" }), {
+								status: 503,
+								headers: { "Content-Type": "application/json" },
+							});
+						}
+					}
+
 					// Rate Limiting
 					if (url.pathname.startsWith("/api/")) {
 						const limitRes = await apiLimiter(req);
@@ -246,6 +303,11 @@ Bun.serve({
 					}
 
 					if (!response) response = S3Errors.InternalError().toResponse();
+
+					// Compress compressible S3 GET responses (CDN-like behaviour)
+					if (req.method === "GET" && response.ok) {
+						response = await compressResponse(req, response);
+					}
 				}
 
 				// Post-request logging and stats
@@ -281,10 +343,58 @@ Bun.serve({
 					}
 				}
 
-				return securityHeaders(req, response);
+				const isS3 = !isDashboardRequest(req, url);
+				return securityHeaders(req, response, isS3);
 			},
 		);
 	},
 });
 
 console.log(`Silo S3 Gateway running on port ${process.env.PORT || 3000}`);
+
+let shuttingDown = false;
+
+async function gracefulShutdown(signal: string) {
+	if (shuttingDown) return;
+	shuttingDown = true;
+	console.log(`\n${signal} received — starting graceful shutdown...`);
+
+	// 1. Stop accepting new connections
+	server.stop();
+	console.log("Stopped accepting new connections");
+
+	// 2. Wait a beat for in-flight requests to complete
+	await new Promise((resolve) => setTimeout(resolve, 2000));
+
+	// 3. Flush pending work
+	try {
+		console.log("Flushing stats to database...");
+		await statsService.shutdown();
+	} catch (e) {
+		console.error("Stats flush error:", e);
+	}
+
+	try {
+		console.log("Flushing log queue...");
+		await logService.shutdown();
+	} catch (e) {
+		console.error("Log flush error:", e);
+	}
+
+	// 4. Stop background timers
+	stopPeriodicEviction();
+
+	// 5. Close connections
+	try {
+		await redis.quit();
+		console.log("Redis disconnected");
+	} catch (e) {
+		console.error("Redis disconnect error:", e);
+	}
+
+	console.log("Graceful shutdown complete");
+	process.exit(0);
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));

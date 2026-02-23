@@ -1,17 +1,55 @@
 import { config } from "../../config";
 import type { buckets, users } from "../../db/schema";
+import {
+	diskCacheGet,
+	diskCacheGetPath,
+	diskCachePut,
+	isDiskCacheEligible,
+	recordDemand,
+} from "../../lib/disk-cache";
+import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
 import {
 	rewriteListObjectsV2Response,
 	rewriteMultipartUploadResponse,
 } from "../../lib/xml-rewriter";
-import { redis } from "../../lib/redis";
 import {
 	filterUpstreamHeaders,
 	getInternalPath,
 	stripAuthQueryParams,
 } from "./utils";
+
+/**
+ * Parse an HTTP Range header and return the byte range.
+ * Supports formats: bytes=0-499, bytes=500-, bytes=-500
+ */
+function parseRangeHeader(
+	rangeHeader: string,
+	totalSize: number,
+): { start: number; end: number } | null {
+	const match = rangeHeader.match(/^bytes=(\d*)-(\d*)$/);
+	if (!match) return null;
+
+	let start = match[1] ? Number.parseInt(match[1], 10) : -1;
+	let end = match[2] ? Number.parseInt(match[2], 10) : -1;
+
+	if (start === -1 && end === -1) return null;
+
+	if (start === -1) {
+		// Suffix range: bytes=-500 means last 500 bytes
+		start = Math.max(0, totalSize - end);
+		end = totalSize - 1;
+	} else if (end === -1) {
+		// Open-ended: bytes=500- means from 500 to end
+		end = totalSize - 1;
+	}
+
+	if (start > end || start >= totalSize) return null;
+
+	end = Math.min(end, totalSize - 1);
+	return { start, end };
+}
 
 export async function handleGetRequest(
 	req: Request,
@@ -193,7 +231,8 @@ ${rulesXml}
 		const rewrittenXml = rewriteListObjectsV2Response(xml, rootPrefix);
 
 		if (response.status === 200) {
-			redis.set(cacheKeyList, rewrittenXml, "EX", 3600).catch((e) => {
+			redis.set(cacheKeyList, rewrittenXml, "EX", 21600).catch((e) => {
+				// 6 hours
 				console.error("Failed to cache ListObjects response:", e);
 			});
 		}
@@ -260,11 +299,52 @@ ${rulesXml}
 	}
 
 	try {
-		// Redis Cache Check for Object
+		// Redis Cache Check for Object (L1)
 		const cacheKeyBody = `s3:body:${bucket.name}:${key}`;
 		const cacheKeyMeta = `s3:meta:${bucket.name}:${key}`;
+		const rangeHeader = req.headers.get("range");
+		const isCacheable = !url.searchParams.has("uploadId");
+		const isSimpleGet = isCacheable && !rangeHeader;
 
-		if (!url.searchParams.has("uploadId") && !req.headers.has("range")) {
+		// Record demand for smart disk cache admission tracking
+		if (isCacheable && key !== "") {
+			recordDemand(bucket.name, key, 0); // size filled in later
+		}
+
+		// Conditional request check (ETag / 304 Not Modified)
+		if (isCacheable && key !== "") {
+			const ifNoneMatch = req.headers.get("if-none-match");
+			if (ifNoneMatch) {
+				try {
+					const cachedMeta = await redis.get(cacheKeyMeta);
+					if (cachedMeta) {
+						const meta = JSON.parse(cachedMeta);
+						const cachedEtag = meta.etag || meta.ETag || "";
+						// Normalize: strip weak validator prefix, compare
+						const normalize = (s: string) =>
+							s.replace(/^W\//, "").replace(/"/g, "");
+						if (
+							normalize(ifNoneMatch) === normalize(cachedEtag) ||
+							ifNoneMatch === "*"
+						) {
+							const headers304 = new Headers();
+							if (cachedEtag) headers304.set("ETag", cachedEtag);
+							if (meta["last-modified"])
+								headers304.set("Last-Modified", meta["last-modified"]);
+							for (const [k, v] of corsHeaders.entries()) {
+								headers304.set(k, v);
+							}
+							return new Response(null, { status: 304, headers: headers304 });
+						}
+					}
+				} catch (_e) {
+					// Ignore — fall through to normal flow
+				}
+			}
+		}
+
+		if (isCacheable) {
+			// --- L1: Redis cache check ---
 			try {
 				const [cachedBody, cachedMeta] = await Promise.all([
 					redis.getBuffer(cacheKeyBody),
@@ -276,13 +356,148 @@ ${rulesXml}
 					for (const [k, v] of corsHeaders.entries()) {
 						headers.set(k, v);
 					}
-					return new Response(cachedBody, {
+					// Add Cache-Control if not already set
+					if (!headers.has("cache-control")) {
+						if (!user) {
+							headers.set("Cache-Control", "public, max-age=3600");
+						} else {
+							headers.set("Cache-Control", "private, no-cache");
+						}
+					}
+					headers.set("Accept-Ranges", "bytes");
+
+					// Range request support for Redis L1 cache
+					if (rangeHeader) {
+						const totalSize = cachedBody.byteLength;
+						const range = parseRangeHeader(rangeHeader, totalSize);
+						if (range) {
+							const sliced = new Uint8Array(cachedBody).slice(
+								range.start,
+								range.end + 1,
+							);
+							headers.set("Content-Length", sliced.byteLength.toString());
+							headers.set(
+								"Content-Range",
+								`bytes ${range.start}-${range.end}/${totalSize}`,
+							);
+							return new Response(sliced, { status: 206, headers });
+						}
+						// Invalid range
+						return new Response(null, {
+							status: 416,
+							headers: {
+								"Content-Range": `bytes */${totalSize}`,
+							},
+						});
+					}
+
+					return new Response(new Uint8Array(cachedBody), {
 						status: 200,
 						headers,
 					});
 				}
 			} catch (e) {
 				console.error("Redis object cache error:", e);
+			}
+
+			// --- L2: Disk cache check (for larger objects) ---
+			try {
+				// For Range requests, use path-based access for efficient partial reads
+				if (rangeHeader) {
+					const diskPathHit = await diskCacheGetPath(bucket.name, key);
+					if (diskPathHit) {
+						const headers = new Headers(diskPathHit.meta.headers);
+						for (const [k, v] of corsHeaders.entries()) {
+							headers.set(k, v);
+						}
+						// Re-apply security headers for dangerous types
+						const ct = headers.get("content-type") || "";
+						if (
+							[
+								"text/html",
+								"application/xhtml+xml",
+								"image/svg+xml",
+								"text/xml",
+								"application/xml",
+								"text/javascript",
+							].some((t) => ct.includes(t))
+						) {
+							headers.set("Content-Disposition", "attachment");
+							headers.set("Content-Type", "application/octet-stream");
+						}
+						headers.set("X-Cache", "DISK-HIT");
+						headers.set("Accept-Ranges", "bytes");
+						if (!headers.has("cache-control")) {
+							if (!user) {
+								headers.set("Cache-Control", "public, max-age=3600");
+							} else {
+								headers.set("Cache-Control", "private, no-cache");
+							}
+						}
+
+						const totalSize = diskPathHit.meta.size;
+						const range = parseRangeHeader(rangeHeader, totalSize);
+						if (range) {
+							const file = Bun.file(diskPathHit.filePath);
+							const sliced = file.slice(range.start, range.end + 1);
+							headers.set(
+								"Content-Length",
+								(range.end - range.start + 1).toString(),
+							);
+							headers.set(
+								"Content-Range",
+								`bytes ${range.start}-${range.end}/${totalSize}`,
+							);
+							return new Response(sliced, { status: 206, headers });
+						}
+						// Invalid range
+						return new Response(null, {
+							status: 416,
+							headers: {
+								"Content-Range": `bytes */${totalSize}`,
+							},
+						});
+					}
+				} else {
+					const diskHit = await diskCacheGet(bucket.name, key);
+					if (diskHit) {
+						const headers = new Headers(diskHit.meta.headers);
+						for (const [k, v] of corsHeaders.entries()) {
+							headers.set(k, v);
+						}
+						// Re-apply security headers for dangerous types
+						const ct = headers.get("content-type") || "";
+						if (
+							[
+								"text/html",
+								"application/xhtml+xml",
+								"image/svg+xml",
+								"text/xml",
+								"application/xml",
+								"text/javascript",
+							].some((t) => ct.includes(t))
+						) {
+							headers.set("Content-Disposition", "attachment");
+							headers.set("Content-Type", "application/octet-stream");
+						}
+						headers.set("X-Cache", "DISK-HIT");
+						headers.set("Accept-Ranges", "bytes");
+						// Add Cache-Control if not already set
+						if (!headers.has("cache-control")) {
+							if (!user) {
+								headers.set("Cache-Control", "public, max-age=3600");
+							} else {
+								headers.set("Cache-Control", "private, no-cache");
+							}
+						}
+						return new Response(diskHit.stream, {
+							status: 200,
+							headers,
+						});
+					}
+				}
+			} catch (e) {
+				console.error("Disk cache read error:", e);
 			}
 		}
 
@@ -344,44 +559,61 @@ ${rulesXml}
 		headers.delete("Transfer-Encoding");
 		headers.delete("transfer-encoding");
 
+		// Add Cache-Control if not already set by upstream
+		if (!headers.has("cache-control")) {
+			if (!user) {
+				// Public bucket access — allow browser and CDN caching
+				headers.set("Cache-Control", "public, max-age=3600");
+			} else {
+				// Authenticated access — don't cache in shared caches
+				headers.set("Cache-Control", "private, no-cache");
+			}
+		}
+
+		// Advertise Range request support
+		headers.set("Accept-Ranges", "bytes");
+
 		let responseBody: ReadableStream | Blob | null = response.body;
 
-		// Redis Cache Write (Side Effect)
-		if (
-			!url.searchParams.has("uploadId") &&
-			response.status === 200 &&
-			response.body
-		) {
-			const sizeHint = contentLength ? parseInt(contentLength) : 0;
-			const shouldCacheBody = sizeHint > 0 && sizeHint < 10 * 1024 * 1024; // 10MB limit
+		// Cache population (background, non-blocking)
+		if (isSimpleGet && response.status === 200 && response.body) {
+			const sizeHint = contentLength ? parseInt(contentLength, 10) : 0;
+			const REDIS_CACHE_LIMIT = 10 * 1024 * 1024; // 10 MB
+			const shouldCacheRedis = sizeHint > 0 && sizeHint < REDIS_CACHE_LIMIT;
+			const shouldCacheDisk = sizeHint > 0 && isDiskCacheEligible(sizeHint);
 
-			// If likely cacheable, tee the stream
-			if (shouldCacheBody) {
+			// Update demand tracker with actual size
+			if (key !== "") {
+				recordDemand(bucket.name, key, sizeHint);
+			}
+
+			if (shouldCacheRedis || shouldCacheDisk) {
 				const [stream1, stream2] = response.body.tee();
 				responseBody = stream1;
 
-				// Background cache population
+				// Background cache population — fires and forgets
 				(async () => {
 					try {
 						const reader = stream2.getReader();
 						const chunks: Uint8Array[] = [];
 						let totalSize = 0;
-						const MAX_CACHE_SIZE = 10 * 1024 * 1024;
+						// Hard cap: don't buffer more than what we'd cache
+						const maxBuffer = shouldCacheDisk
+							? sizeHint + 1024
+							: REDIS_CACHE_LIMIT;
 
 						while (true) {
 							const { done, value } = await reader.read();
 							if (done) break;
 
 							totalSize += value.length;
-							if (totalSize > MAX_CACHE_SIZE) {
-								// Too big, abandon caching this object
+							if (totalSize > maxBuffer) {
 								reader.cancel();
 								return;
 							}
 							chunks.push(value);
 						}
 
-						// Combine chunks
 						const buffer = new Uint8Array(totalSize);
 						let offset = 0;
 						for (const chunk of chunks) {
@@ -390,23 +622,59 @@ ${rulesXml}
 						}
 
 						const headersObj: Record<string, string> = {};
-						headers.forEach((v, k) => (headersObj[k] = v));
+						for (const [k, v] of headers.entries()) {
+							headersObj[k] = v;
+						}
 
-						await Promise.all([
-							redis.set(cacheKeyMeta, JSON.stringify(headersObj)),
-							redis.set(cacheKeyBody, Buffer.from(buffer)),
-						]);
+						// L1: Redis (small objects, with TTL to prevent unbounded growth)
+						if (totalSize < REDIS_CACHE_LIMIT) {
+							const REDIS_BODY_TTL = 21600; // 6 hours
+							const REDIS_META_TTL = 43200; // 12 hours
+							await Promise.all([
+								redis.set(
+									cacheKeyMeta,
+									JSON.stringify(headersObj),
+									"EX",
+									REDIS_META_TTL,
+								),
+								redis.set(
+									cacheKeyBody,
+									Buffer.from(buffer),
+									"EX",
+									REDIS_BODY_TTL,
+								),
+							]);
+						}
+
+						// L2: Disk (larger objects, demand-gated)
+						if (isDiskCacheEligible(totalSize)) {
+							const cached = await diskCachePut(
+								bucket.name,
+								key,
+								buffer,
+								headersObj,
+							);
+							if (cached) {
+								console.log(
+									`[disk-cache] cached ${bucket.name}/${key} (${(totalSize / (1024 * 1024)).toFixed(1)} MB)`,
+								);
+							}
+						}
 					} catch (e) {
 						console.error("Failed to cache S3 object in background:", e);
 					}
 				})();
 			} else {
-				// Just cache metadata if too big for body
+				// Cache metadata only for objects that don't qualify for body caching
 				const headersObj: Record<string, string> = {};
-				headers.forEach((v, k) => (headersObj[k] = v));
-				redis.set(cacheKeyMeta, JSON.stringify(headersObj)).catch((e) => {
-					console.error("Failed to cache S3 metadata:", e);
-				});
+				for (const [k, v] of headers.entries()) {
+					headersObj[k] = v;
+				}
+				redis
+					.set(cacheKeyMeta, JSON.stringify(headersObj), "EX", 43200) // 12 hours
+					.catch((e) => {
+						console.error("Failed to cache S3 metadata:", e);
+					});
 			}
 		}
 

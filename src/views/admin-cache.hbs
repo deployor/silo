@@ -1,0 +1,203 @@
+<div x-data="cacheStats()" x-init="fetchStats()">
+  <!-- Admin Subnav -->
+  <div class="flex gap-4 mb-6 border-b border-white/10 pb-4">
+    <a href="/admin/users" id="tab-users" class="text-text-muted font-bold px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">Users</a>
+    <a href="/admin/ysws" id="tab-ysws" class="text-text-muted font-bold px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">YSWS</a>
+    <a href="/admin/redemptions" id="tab-redemptions" class="text-text-muted font-bold px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">Redemptions</a>
+    <a href="/admin/logs" id="tab-logs" class="text-text-muted font-bold px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">Logs</a>
+    <a href="/admin/settings" id="tab-settings" class="text-text-muted font-bold px-4 py-2 rounded-lg hover:bg-white/5 transition-colors">Settings</a>
+    <a href="/admin/cache" id="tab-cache" class="text-white font-bold px-4 py-2 rounded-lg bg-white/10 transition-colors">Cache</a>
+  </div>
+
+  <!-- Title bar with refresh -->
+  <div class="flex items-center justify-between mb-6">
+    <h2 class="text-2xl font-bold text-white"><i class="ph ph-database mr-2"></i>Cache Statistics</h2>
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-white/40" x-text="lastUpdated ? 'Updated ' + lastUpdated : ''"></span>
+      <button @click="fetchStats()" class="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors">
+        <i class="ph ph-arrows-clockwise mr-1"></i> Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading state -->
+  <div x-show="loading && !stats" class="text-center py-12">
+    <i class="ph ph-spinner ph-spin text-3xl text-white/40"></i>
+    <p class="text-white/40 mt-2">Loading cache stats...</p>
+  </div>
+
+  <!-- Error state -->
+  <div x-show="error" class="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-6">
+    <p class="text-red-400 text-sm"><i class="ph ph-warning mr-1"></i> <span x-text="error"></span></p>
+  </div>
+
+  <!-- Stats content -->
+  <div x-show="stats" x-cloak>
+    <!-- Overview Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <!-- Redis L1 Card -->
+      <div class="bg-black/30 p-6 rounded-xl border border-white/10">
+        <div class="flex items-center gap-2 mb-4">
+          <i class="ph ph-lightning text-hc-primary text-xl"></i>
+          <h3 class="text-white font-semibold">Redis L1 Cache</h3>
+        </div>
+        <div class="space-y-3">
+          <div class="flex justify-between">
+            <span class="text-white/60 text-sm">Keys</span>
+            <span class="text-white font-mono text-sm" x-text="stats?.redis?.keyCount || '0'"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-white/60 text-sm">Memory</span>
+            <span class="text-white font-mono text-sm" x-text="stats?.redis?.memoryUsed || '-'"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-white/60 text-sm">Hit Rate</span>
+            <span class="text-white font-mono text-sm" x-text="stats?.redis?.hitRate || '-'"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-white/60 text-sm">Uptime</span>
+            <span class="text-white font-mono text-sm" x-text="stats?.redis?.uptime || '-'"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Disk L2 Card -->
+      <div class="bg-black/30 p-6 rounded-xl border border-white/10">
+        <div class="flex items-center gap-2 mb-4">
+          <i class="ph ph-hard-drives text-hc-primary text-xl"></i>
+          <h3 class="text-white font-semibold">Disk L2 Cache</h3>
+        </div>
+        <div class="space-y-3">
+          <div class="flex justify-between">
+            <span class="text-white/60 text-sm">Files</span>
+            <span class="text-white font-mono text-sm" x-text="stats?.disk?.fileCount || '0'"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-white/60 text-sm">Size</span>
+            <span class="text-white font-mono text-sm" x-text="stats?.disk?.currentSize || '-'"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-white/60 text-sm">Capacity</span>
+            <span class="text-white font-mono text-sm" x-text="stats?.disk?.capacityPercent || '-'"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-white/60 text-sm">Threshold</span>
+            <span class="text-white font-mono text-sm" x-text="stats?.disk?.admissionThreshold || '-'"></span>
+          </div>
+        </div>
+        <!-- Capacity bar -->
+        <div class="mt-4">
+          <div class="w-full bg-white/10 rounded-full h-2">
+            <div class="bg-hc-primary rounded-full h-2 transition-all duration-500" :style="'width: ' + (stats?.disk?.capacityPercentNum || 0) + '%'"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Card -->
+      <div class="bg-black/30 p-6 rounded-xl border border-white/10">
+        <div class="flex items-center gap-2 mb-4">
+          <i class="ph ph-heartbeat text-hc-primary text-xl"></i>
+          <h3 class="text-white font-semibold">System</h3>
+        </div>
+        <div class="space-y-3">
+          <div class="flex justify-between">
+            <span class="text-white/60 text-sm">S3 Circuit</span>
+            <span class="font-mono text-sm" :class="stats?.system?.circuitState === 'closed' ? 'text-green-400' : 'text-red-400'" x-text="stats?.system?.circuitState || '-'"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-white/60 text-sm">S3 Failures</span>
+            <span class="text-white font-mono text-sm" x-text="stats?.system?.circuitFailures || '0'"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-white/60 text-sm">Uptime</span>
+            <span class="text-white font-mono text-sm" x-text="stats?.system?.uptime || '-'"></span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-white/60 text-sm">Connections</span>
+            <span class="text-white font-mono text-sm" x-text="stats?.redis?.connectedClients || '-'"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Redis Key Breakdown -->
+    <div class="bg-black/30 p-6 rounded-xl border border-white/10 mb-6">
+      <h3 class="text-white font-semibold mb-4"><i class="ph ph-key mr-1"></i> Redis Key Breakdown</h3>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <template x-for="prefix in stats?.redis?.keyBreakdown || []" :key="prefix.name">
+          <div class="bg-white/5 p-3 rounded-lg">
+            <div class="text-white/60 text-xs font-mono" x-text="prefix.name"></div>
+            <div class="text-white text-lg font-bold mt-1" x-text="prefix.count"></div>
+          </div>
+        </template>
+      </div>
+      <div x-show="!stats?.redis?.keyBreakdown?.length" class="text-white/40 text-sm text-center py-4">No key data available</div>
+    </div>
+
+    <!-- Top Cached Files -->
+    <div class="bg-black/30 p-6 rounded-xl border border-white/10">
+      <h3 class="text-white font-semibold mb-4"><i class="ph ph-fire mr-1"></i> Top Hot Objects (by hit count)</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-white/40 text-left border-b border-white/10">
+              <th class="pb-2 font-medium">Bucket</th>
+              <th class="pb-2 font-medium">Key</th>
+              <th class="pb-2 font-medium">Hits</th>
+              <th class="pb-2 font-medium">Size</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="obj in stats?.disk?.topHotObjects || []" :key="obj.bucket + '/' + obj.key">
+              <tr class="border-b border-white/5 text-white/80">
+                <td class="py-2 font-mono text-xs" x-text="obj.bucket"></td>
+                <td class="py-2 font-mono text-xs max-w-[300px] truncate" x-text="obj.key"></td>
+                <td class="py-2">
+                  <span class="px-2 py-0.5 bg-hc-primary/20 text-hc-primary rounded text-xs font-mono" x-text="obj.hits"></span>
+                </td>
+                <td class="py-2 font-mono text-xs" x-text="obj.sizeMB + ' MB'"></td>
+              </tr>
+            </template>
+            <tr x-show="!stats?.disk?.topHotObjects?.length">
+              <td colspan="4" class="py-4 text-center text-white/40">No hot objects tracked yet</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function cacheStats() {
+  return {
+    stats: null,
+    loading: false,
+    error: null,
+    lastUpdated: null,
+    refreshTimer: null,
+
+    async fetchStats() {
+      this.loading = true;
+      this.error = null;
+      try {
+        const res = await fetch('/api/admin/cache-stats');
+        if (res.ok) {
+          this.stats = await res.json();
+          this.lastUpdated = new Date().toLocaleTimeString();
+        } else {
+          this.error = 'Failed to fetch cache stats (HTTP ' + res.status + ')';
+        }
+      } catch (e) {
+        console.error('Failed to fetch cache stats:', e);
+        this.error = 'Failed to connect to server';
+      } finally {
+        this.loading = false;
+      }
+      // Auto-refresh every 10 seconds
+      if (this.refreshTimer) clearTimeout(this.refreshTimer);
+      this.refreshTimer = setTimeout(() => this.fetchStats(), 10000);
+    }
+  };
+}
+</script>

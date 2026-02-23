@@ -80,24 +80,22 @@
         {{/if}}
     {{else}}
         <!-- No Submissions yet (First time CTA) -->
-        <div class="bg-hc-dark rounded-3xl p-8 md:p-12 card-shadow relative overflow-hidden group mb-8 border border-white/10">
-            <div class="relative z-10 flex flex-col items-center text-center">
-                    <div class="mb-6 bg-white/5 p-4 rounded-full border border-white/10">
-                         <i class="ph-duotone ph-rocket-launch text-6xl text-hc-red"></i>
-                    </div>
-                    <h2 class="text-4xl md:text-5xl font-black text-white italic tracking-tight mb-4">
-                        Low on storage? <br class="hidden md:block"> <span class="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400">Ship something.</span>
+        <div id="low-storage-ysws-cta" class="bg-hc-dark rounded-3xl p-6 md:p-8 card-shadow relative overflow-hidden group mb-8 border border-white/10 hidden">
+            <div class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="text-center md:text-left">
+                    <h2 class="text-2xl md:text-3xl font-black text-white tracking-tight mb-2">
+                        Low on storage? <span class="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400">Ship something.</span>
                     </h2>
-                    <p class="text-text-muted text-xl max-w-2xl mb-8 leading-relaxed">
-                        Cargo operates on a simple rule: <span class="text-white font-bold">Shipping is the currency.</span><br>
-                        Submit a YSWS project to unlock permanent storage buckets for your next big idea.
+                    <p class="text-text-muted text-sm md:text-base max-w-2xl">
+                        Submit a YSWS project to unlock more permanent storage.
                     </p>
-                    <a href="/ysws/submit" class="bg-hc-red hover:bg-red-500 text-white px-10 py-5 rounded-2xl text-xl font-bold transition-all shadow-xl shadow-hc-red/20 hover:scale-105 hover:-translate-y-1 flex items-center gap-3">
-                        <i class="ph-bold ph-rocket-launch"></i>
-                        Ship Your First Project
-                    </a>
                 </div>
+                <a href="/ysws/submit" class="shrink-0 bg-hc-red hover:bg-red-500 text-white px-6 py-3 rounded-xl text-sm md:text-base font-bold transition-all shadow-lg shadow-hc-red/20 hover:scale-105 flex items-center gap-2">
+                    <i class="ph-bold ph-rocket-launch"></i>
+                    Ship a Project
+                </a>
             </div>
+        </div>
         </div>
     {{/if}}
 </div>
@@ -445,6 +443,7 @@
       // Update Storage Stats
       const storageUsage = Number(data.user.storageUsage) || 0;
       const storageLimit = Number(data.user.storageLimit) || 1073741824;
+      const storagePercent = storageLimit > 0 ? (storageUsage / storageLimit) * 100 : 0;
 
       document.getElementById("storage-usage").textContent = formatBytes(storageUsage);
       const storageLimitContainer = document.getElementById("storage-limit-container");
@@ -463,10 +462,17 @@
              document.getElementById("storage-limit").textContent = limitGB;
         }
 
-        const percent = Math.min((storageUsage / storageLimit) * 100, 100);
+        const percent = Math.min(storagePercent, 100);
         const bar = document.getElementById("storage-bar");
         bar.style.width = `${percent}%`;
         bar.className = "bg-hc-red h-2 rounded-full transition-all duration-500";
+      }
+
+      const lowStorageCta = document.getElementById("low-storage-ysws-cta");
+      if (lowStorageCta) {
+        const LOW_STORAGE_THRESHOLD_PERCENT = 80;
+        const isLowOnStorage = storagePercent >= LOW_STORAGE_THRESHOLD_PERCENT;
+        lowStorageCta.classList.toggle("hidden", data.user.isImmortal || !isLowOnStorage);
       }
 
       // Update Traffic Stats
