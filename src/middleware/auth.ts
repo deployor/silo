@@ -9,6 +9,7 @@ import { S3Errors } from "../lib/s3-errors";
 
 const S3_DOMAIN = config.s3Domain;
 const AUTH_CACHE_TTL_SECONDS = 300;
+const AUTH_USER_CACHE_TTL_SECONDS = 15;
 
 type CachedPublicAuth = {
 	bucket: typeof buckets.$inferSelect;
@@ -75,6 +76,17 @@ function getDate(req: Request) {
 }
 
 async function getFreshUserById(userId: string) {
+	const cacheKey = `auth:user:${userId}`;
+
+	try {
+		const cached = await redis.get(cacheKey);
+		if (cached) {
+			return JSON.parse(cached) as typeof users.$inferSelect;
+		}
+	} catch (e) {
+		console.error("Redis user cache error:", e);
+	}
+
 	const userRow = await db
 		.select()
 		.from(users)
@@ -82,14 +94,19 @@ async function getFreshUserById(userId: string) {
 		.limit(1);
 
 	if (userRow.length === 0) return null;
-
 	const user = userRow[0];
-	const usageResult = await db
-		.select({ total: sql<number>`sum(${buckets.totalBytes})` })
-		.from(buckets)
-		.where(eq(buckets.userId, user.id));
 
-	user.storageUsageBytes = Number(usageResult[0]?.total) || 0;
+	try {
+		await redis.set(
+			cacheKey,
+			JSON.stringify(user),
+			"EX",
+			AUTH_USER_CACHE_TTL_SECONDS,
+		);
+	} catch (e) {
+		console.error("Failed to cache user auth state:", e);
+	}
+
 	return user;
 }
 
