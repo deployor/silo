@@ -7,6 +7,7 @@ import {
 	isDiskCacheEligible,
 	recordDemand,
 } from "../../lib/disk-cache";
+import { consumeEgressQuota } from "../../lib/quota-cache";
 import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
@@ -147,16 +148,22 @@ ${rulesXml}
 				egressLimit = calculated > minLimit ? calculated : minLimit;
 			}
 		}
+	}
 
-		if (
-			egressLimit !== null &&
-			BigInt(user.egressBytes) > egressLimit &&
-			!user.isImmortal
-		) {
-			return S3Errors.QuotaExceeded(
-				"You have exceeded your egress quota.",
-			).toResponse();
-		}
+	async function reserveEgressQuota(bytesToSend: number) {
+		if (!user || user.isImmortal) return true;
+		if (!Number.isFinite(bytesToSend) || bytesToSend <= 0) return true;
+
+		return consumeEgressQuota(
+			{
+				id: user.id,
+				isImmortal: user.isImmortal,
+				storageLimitBytes: user.storageLimitBytes,
+				egressLimitBytes: user.egressLimitBytes,
+			},
+			Number(user.egressBytes) || 0,
+			bytesToSend,
+		);
 	}
 
 	if (key === "" && url.searchParams.has("location")) {
@@ -375,6 +382,12 @@ ${rulesXml}
 								range.start,
 								range.end + 1,
 							);
+							const allowed = await reserveEgressQuota(sliced.byteLength);
+							if (!allowed) {
+								return S3Errors.QuotaExceeded(
+									"You have exceeded your egress quota.",
+								).toResponse();
+							}
 							headers.set("Content-Length", sliced.byteLength.toString());
 							headers.set(
 								"Content-Range",
@@ -389,6 +402,13 @@ ${rulesXml}
 								"Content-Range": `bytes */${totalSize}`,
 							},
 						});
+					}
+
+					const allowed = await reserveEgressQuota(cachedBody.byteLength);
+					if (!allowed) {
+						return S3Errors.QuotaExceeded(
+							"You have exceeded your egress quota.",
+						).toResponse();
 					}
 
 					return new Response(new Uint8Array(cachedBody), {
@@ -440,10 +460,14 @@ ${rulesXml}
 						if (range) {
 							const file = Bun.file(diskPathHit.filePath);
 							const sliced = file.slice(range.start, range.end + 1);
-							headers.set(
-								"Content-Length",
-								(range.end - range.start + 1).toString(),
-							);
+							const bytesToSend = range.end - range.start + 1;
+							const allowed = await reserveEgressQuota(bytesToSend);
+							if (!allowed) {
+								return S3Errors.QuotaExceeded(
+									"You have exceeded your egress quota.",
+								).toResponse();
+							}
+							headers.set("Content-Length", bytesToSend.toString());
 							headers.set(
 								"Content-Range",
 								`bytes ${range.start}-${range.end}/${totalSize}`,
@@ -461,6 +485,13 @@ ${rulesXml}
 				} else {
 					const diskHit = await diskCacheGet(bucket.name, key);
 					if (diskHit) {
+						const allowed = await reserveEgressQuota(diskHit.meta.size);
+						if (!allowed) {
+							return S3Errors.QuotaExceeded(
+								"You have exceeded your egress quota.",
+							).toResponse();
+						}
+
 						const headers = new Headers(diskHit.meta.headers);
 						for (const [k, v] of corsHeaders.entries()) {
 							headers.set(k, v);
@@ -551,6 +582,16 @@ ${rulesXml}
 		// Ensure Content-Length is present in the response if available
 		const contentLength =
 			headers.get("content-length") || headers.get("Content-Length");
+		const contentLengthNum = contentLength
+			? Number.parseInt(contentLength, 10)
+			: 0;
+		const allowed = await reserveEgressQuota(contentLengthNum);
+		if (!allowed) {
+			return S3Errors.QuotaExceeded(
+				"You have exceeded your egress quota.",
+			).toResponse();
+		}
+
 		if (contentLength) {
 			headers.set("Content-Length", contentLength);
 		}
