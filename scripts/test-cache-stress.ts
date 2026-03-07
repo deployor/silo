@@ -46,6 +46,8 @@ type Cfg = {
 type Stats = {
   ok: number;
   fail: number;
+  timeouts: number;
+  rateLimited: number;
   p50: number;
   p95: number;
   min: number;
@@ -144,6 +146,8 @@ async function coldPrime(aws: AwsClient, c: Cfg, keys: string[]): Promise<Stats>
   const statuses = new Map<number, number>();
   let ok = 0;
   let fail = 0;
+  let timeouts = 0;
+  let rateLimited = 0;
   let bytes = 0;
   let idx = 0;
   let done = 0;
@@ -175,12 +179,14 @@ async function coldPrime(aws: AwsClient, c: Cfg, keys: string[]): Promise<Stats>
           bytes += buf.byteLength;
         } else {
           fail++;
+          if (res.status === 429) rateLimited++;
           await res.text().catch(() => "");
         }
-      } catch (_e) {
+      } catch (e) {
         const ms = performance.now() - t0;
         samples.push(ms);
         fail++;
+        if (String(e).includes("timeout")) timeouts++;
         statuses.set(0, (statuses.get(0) ?? 0) + 1);
       }
 
@@ -199,6 +205,8 @@ async function coldPrime(aws: AwsClient, c: Cfg, keys: string[]): Promise<Stats>
   return {
     ok,
     fail,
+    timeouts,
+    rateLimited,
     p50: percentile(samples, 0.5),
     p95: percentile(samples, 0.95),
     min: samples.length ? Math.min(...samples) : 0,
@@ -214,6 +222,8 @@ async function hotReadBlast(aws: AwsClient, c: Cfg, keys: string[]): Promise<Sta
   const statuses = new Map<number, number>();
   let ok = 0;
   let fail = 0;
+  let timeouts = 0;
+  let rateLimited = 0;
   let bytes = 0;
   let idx = 0;
   let done = 0;
@@ -264,12 +274,14 @@ async function hotReadBlast(aws: AwsClient, c: Cfg, keys: string[]): Promise<Sta
           bytes += buf.byteLength;
         } else {
           fail++;
+          if (res.status === 429) rateLimited++;
           if (workerId === 0) await res.text().catch(() => "");
         }
-      } catch (_e) {
+      } catch (e) {
         const ms = performance.now() - t0;
         samples.push(ms);
         fail++;
+        if (String(e).includes("timeout")) timeouts++;
         statuses.set(0, (statuses.get(0) ?? 0) + 1);
       }
 
@@ -294,6 +306,8 @@ async function hotReadBlast(aws: AwsClient, c: Cfg, keys: string[]): Promise<Sta
   return {
     ok,
     fail,
+    timeouts,
+    rateLimited,
     p50: percentile(samples, 0.5),
     p95: percentile(samples, 0.95),
     min: samples.length ? Math.min(...samples) : 0,
@@ -307,8 +321,13 @@ async function hotReadBlast(aws: AwsClient, c: Cfg, keys: string[]): Promise<Sta
 function printStats(name: string, s: Stats) {
   console.log(`\n=== ${name} ===`);
   console.log(`ok/fail: ${s.ok}/${s.fail}`);
+  console.log(`timeouts: ${s.timeouts}, 429s: ${s.rateLimited}`);
+  const total = s.ok + s.fail;
+  const successRate = total > 0 ? (s.ok / total) * 100 : 0;
+  console.log(`success rate: ${successRate.toFixed(2)}%`);
   console.log(`latency ms: min=${s.min.toFixed(1)} p50=${s.p50.toFixed(1)} p95=${s.p95.toFixed(1)} max=${s.max.toFixed(1)}`);
   console.log(`throughput: ${s.rps.toFixed(2)} req/s`);
+  console.log(`effective throughput (2xx): ${(s.rps * (successRate / 100)).toFixed(2)} req/s`);
   console.log(`bytes read: ${(s.bytes / (1024 * 1024)).toFixed(2)} MiB`);
   const statusList = [...s.statuses.entries()].sort((a, b) => a[0] - b[0]);
   console.log(`statuses: ${statusList.map(([code, count]) => `${code}:${count}`).join(", ") || "none"}`);
@@ -346,6 +365,11 @@ async function main() {
 
   const speedup = cold.p95 > 0 ? cold.p95 / Math.max(hot.p95, 0.0001) : 0;
   console.log(`\nEstimated hot-vs-cold p95 improvement: ${speedup.toFixed(2)}x`);
+  const hotSuccessRate = hot.ok + hot.fail > 0 ? (hot.ok / (hot.ok + hot.fail)) * 100 : 0;
+  console.log(`HOT success rate: ${hotSuccessRate.toFixed(2)}%`);
+  if (hot.rateLimited > 0) {
+    console.log(`HOT run saw heavy rate limiting (${hot.rateLimited}x 429). Compare runs by success rate + effective throughput.`);
+  }
 
   if (hot.fail > 0) process.exitCode = 2;
 }

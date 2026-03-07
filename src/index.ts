@@ -32,7 +32,7 @@ const authLimiter = rateLimit({ limit: 60, windowMs: 60000 }); // 60 req/min for
 // S3 should be more tolerant and independent from dashboard/API.
 // Defaults are intentionally high; override via env for different tiers.
 const s3Limiter = rateLimit({
-	limit: Number(process.env.S3_RATE_LIMIT_PER_MIN ?? "100000"),
+	limit: Number(process.env.S3_RATE_LIMIT_PER_MIN ?? "1000000"),
 	windowMs: 60000,
 });
 
