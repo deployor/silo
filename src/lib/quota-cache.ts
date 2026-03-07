@@ -1,5 +1,10 @@
 import { redis } from "./redis";
 
+// TEMP BENCH SWITCH:
+// Set to false to bypass Redis quota counters while load-testing performance.
+// Keep true in normal operation.
+const QUOTA_CACHE_ENABLED = false;
+
 type QuotaUser = {
 	id: string;
 	isImmortal: boolean;
@@ -64,6 +69,7 @@ export async function consumeStorageQuota(
 	currentStorageUsageBytes: number,
 	bytesToAdd: number,
 ): Promise<boolean> {
+	if (!QUOTA_CACHE_ENABLED) return true;
 	if (user.isImmortal) return true;
 	if (bytesToAdd <= 0) return true;
 
@@ -86,6 +92,7 @@ export async function releaseStorageQuota(
 	userId: string,
 	bytesToRelease: number,
 ): Promise<void> {
+	if (!QUOTA_CACHE_ENABLED) return;
 	if (!userId || bytesToRelease <= 0) return;
 
 	await redis.eval(
@@ -101,6 +108,7 @@ export async function consumeEgressQuota(
 	currentEgressBytes: number,
 	bytesToAdd: number,
 ): Promise<boolean> {
+	if (!QUOTA_CACHE_ENABLED) return true;
 	if (user.isImmortal) return true;
 	if (bytesToAdd <= 0) return true;
 
