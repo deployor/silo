@@ -3,7 +3,7 @@ import { redis } from "./redis";
 // TEMP BENCH SWITCH:
 // Set to false to bypass Redis quota counters while load-testing performance.
 // Keep true in normal operation.
-const QUOTA_CACHE_ENABLED = false;
+const QUOTA_CACHE_ENABLED = true;
 
 type QuotaUser = {
 	id: string;
@@ -15,38 +15,7 @@ type QuotaUser = {
 const STORAGE_KEY = (userId: string) => `quota:storage:${userId}`;
 const EGRESS_KEY = (userId: string) => `quota:egress:${userId}`;
 
-const CHECK_AND_INCREMENT_LUA = `
-local key = KEYS[1]
-local delta = tonumber(ARGV[1])
-local limit = tonumber(ARGV[2])
-local seed = tonumber(ARGV[3])
-
-local current = tonumber(redis.call('GET', key))
-if current == nil then
-  current = seed
-  redis.call('SET', key, current)
-end
-
-if (current + delta) > limit then
-  return {0, current}
-end
-
-local nextValue = redis.call('INCRBY', key, delta)
-return {1, nextValue}
-`;
-
-const DECREMENT_CLAMP_LUA = `
-local key = KEYS[1]
-local delta = tonumber(ARGV[1])
-local current = tonumber(redis.call('GET', key))
-if current == nil then
-  return 0
-end
-local nextValue = current - delta
-if nextValue < 0 then nextValue = 0 end
-redis.call('SET', key, nextValue)
-return nextValue
-`;
+const BUCKET_COUNTER_TTL_SECONDS = 3600;
 
 function computeEgressLimitBytes(user: QuotaUser): number | null {
 	if (user.isImmortal) return null;
@@ -77,13 +46,17 @@ export async function consumeStorageQuota(
 	if (!Number.isFinite(storageLimit) || storageLimit <= 0) return false;
 
 	const result = (await redis.eval(
-		CHECK_AND_INCREMENT_LUA,
+		"return redis.call('checkAndIncrQuota', KEYS[1], ARGV[1], ARGV[2], ARGV[3])",
 		1,
 		STORAGE_KEY(user.id),
 		String(Math.floor(bytesToAdd)),
 		String(Math.floor(storageLimit)),
 		String(Math.max(0, Math.floor(currentStorageUsageBytes))),
 	)) as [number, number];
+
+	if (Number(result?.[0]) === 1) {
+		void redis.expire(STORAGE_KEY(user.id), BUCKET_COUNTER_TTL_SECONDS);
+	}
 
 	return Number(result?.[0]) === 1;
 }
@@ -96,11 +69,12 @@ export async function releaseStorageQuota(
 	if (!userId || bytesToRelease <= 0) return;
 
 	await redis.eval(
-		DECREMENT_CLAMP_LUA,
+		"return redis.call('decrClampQuota', KEYS[1], ARGV[1])",
 		1,
 		STORAGE_KEY(userId),
 		String(Math.floor(bytesToRelease)),
 	);
+	void redis.expire(STORAGE_KEY(userId), BUCKET_COUNTER_TTL_SECONDS);
 }
 
 export async function consumeEgressQuota(
@@ -116,13 +90,17 @@ export async function consumeEgressQuota(
 	if (egressLimit === null) return true;
 
 	const result = (await redis.eval(
-		CHECK_AND_INCREMENT_LUA,
+		"return redis.call('checkAndIncrQuota', KEYS[1], ARGV[1], ARGV[2], ARGV[3])",
 		1,
 		EGRESS_KEY(user.id),
 		String(Math.floor(bytesToAdd)),
 		String(Math.floor(egressLimit)),
 		String(Math.max(0, Math.floor(currentEgressBytes))),
 	)) as [number, number];
+
+	if (Number(result?.[0]) === 1) {
+		void redis.expire(EGRESS_KEY(user.id), BUCKET_COUNTER_TTL_SECONDS);
+	}
 
 	return Number(result?.[0]) === 1;
 }
