@@ -4,6 +4,10 @@ import { db } from "../../db";
 import { buckets, type users } from "../../db/schema";
 import { AwsChunkedDecoder } from "../../lib/aws-chunked-decoder";
 import { diskCacheInvalidate } from "../../lib/disk-cache";
+import {
+	consumeStorageQuota,
+	releaseStorageQuota,
+} from "../../lib/quota-cache";
 import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
@@ -141,6 +145,8 @@ export async function handlePutRequest(
 	}
 
 	const copySource = req.headers.get("x-amz-copy-source");
+	let storageQuotaReserved = false;
+	let actualSize = 0;
 
 	if (copySource && user) {
 		const rewrittenSource = await rewriteCopySourceHeader(
@@ -163,7 +169,6 @@ export async function handlePutRequest(
 			: internalPath;
 
 		let requestBody: unknown = req.body;
-		let actualSize = 0;
 
 		if (!copySource) {
 			const body = req.body;
@@ -372,6 +377,26 @@ export async function handlePutRequest(
 			}
 		}
 
+		if (!copySource && actualSize > 0 && user && !user.isImmortal) {
+			storageQuotaReserved = await consumeStorageQuota(
+				{
+					id: user.id,
+					isImmortal: user.isImmortal,
+					storageLimitBytes: user.storageLimitBytes,
+					egressLimitBytes: user.egressLimitBytes,
+				},
+				Number(user.storageUsageBytes) || 0,
+				actualSize,
+			);
+
+			if (!storageQuotaReserved) {
+				return S3Errors.QuotaExceeded(
+					"You have exceeded your storage quota.",
+					key,
+				).toResponse();
+			}
+		}
+
 		// Debug logging for Content-Length
 		if (
 			upstreamHeaders.has("Content-Length") ||
@@ -429,6 +454,16 @@ export async function handlePutRequest(
 			} as unknown as RequestInit,
 			1,
 		);
+
+		if (
+			!response.ok &&
+			storageQuotaReserved &&
+			user &&
+			!copySource &&
+			actualSize > 0
+		) {
+			await releaseStorageQuota(user.id, actualSize);
+		}
 
 		if (response.ok) {
 			// Invalidate all cache layers (Redis L1 + Disk L2)
@@ -513,6 +548,10 @@ export async function handlePutRequest(
 			headers: resHeaders,
 		});
 	} catch (e: unknown) {
+		if (storageQuotaReserved && user && !copySource && actualSize > 0) {
+			await releaseStorageQuota(user.id, actualSize);
+		}
+
 		console.error("PUT Error:", e);
 		const error = e as Error;
 

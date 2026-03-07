@@ -14,8 +14,12 @@
  *   CACHE_OBJECT_SIZE=131072      # bytes (default 128 KiB)
  *   COLD_CONCURRENCY=40
  *   HOT_CONCURRENCY=250
- *   HOT_REQUESTS=20000
+ *   HOT_REQUESTS=8000
+ *   HOT_RANGE_BYTES=16384         # request only first N bytes per hot GET
+ *   MAX_HOT_SECONDS=180           # hard stop for hot phase
+ *   PROGRESS_EVERY=500            # print progress every N completed reqs
  *   TIMEOUT_MS=25000
+ *   HOT_TIMEOUT_MS=8000           # timeout per hot request (faster tail)
  */
 
 import { randomBytes } from "node:crypto";
@@ -32,7 +36,11 @@ type Cfg = {
   coldConcurrency: number;
   hotConcurrency: number;
   hotRequests: number;
+  hotRangeBytes: number;
+  maxHotSeconds: number;
+  progressEvery: number;
   timeoutMs: number;
+  hotTimeoutMs: number;
 };
 
 type Stats = {
@@ -72,8 +80,12 @@ function cfg(): Cfg {
     objectSize: num("CACHE_OBJECT_SIZE", 128 * 1024),
     coldConcurrency: num("COLD_CONCURRENCY", 40),
     hotConcurrency: num("HOT_CONCURRENCY", 250),
-    hotRequests: num("HOT_REQUESTS", 20000),
+    hotRequests: num("HOT_REQUESTS", 8000),
+    hotRangeBytes: num("HOT_RANGE_BYTES", 16 * 1024),
+    maxHotSeconds: num("MAX_HOT_SECONDS", 180),
+    progressEvery: num("PROGRESS_EVERY", 500),
     timeoutMs: num("TIMEOUT_MS", 25000),
+    hotTimeoutMs: num("HOT_TIMEOUT_MS", 8000),
   };
 }
 
@@ -134,29 +146,49 @@ async function coldPrime(aws: AwsClient, c: Cfg, keys: string[]): Promise<Stats>
   let fail = 0;
   let bytes = 0;
   let idx = 0;
+  let done = 0;
 
   const start = performance.now();
+  const presigned = await Promise.all(
+    keys.map(async (key) => {
+      const url = `${c.endpoint}/${c.bucket}/${keyPath(key)}`;
+      const signed = await aws.sign(url, { method: "GET", aws: { signQuery: true } });
+      return signed.url;
+    }),
+  );
 
   async function worker() {
     while (true) {
       const i = idx++;
       if (i >= keys.length) return;
-      const key = keys[i]!;
-      const url = `${c.endpoint}/${c.bucket}/${keyPath(key)}`;
-      const signed = await aws.sign(url, { method: "GET", aws: { signQuery: true } });
-      const t0 = performance.now();
-      const res = await fetchWithTimeout(signed.url, { method: "GET" }, c.timeoutMs);
-      const ms = performance.now() - t0;
-      samples.push(ms);
-      statuses.set(res.status, (statuses.get(res.status) ?? 0) + 1);
 
-      if (res.ok) {
-        ok++;
-        const buf = await res.arrayBuffer();
-        bytes += buf.byteLength;
-      } else {
+      const t0 = performance.now();
+      try {
+        const res = await fetchWithTimeout(presigned[i]!, { method: "GET" }, c.timeoutMs);
+        const ms = performance.now() - t0;
+        samples.push(ms);
+        statuses.set(res.status, (statuses.get(res.status) ?? 0) + 1);
+
+        if (res.ok) {
+          ok++;
+          const buf = await res.arrayBuffer();
+          bytes += buf.byteLength;
+        } else {
+          fail++;
+          await res.text().catch(() => "");
+        }
+      } catch (_e) {
+        const ms = performance.now() - t0;
+        samples.push(ms);
         fail++;
-        await res.text().catch(() => "");
+        statuses.set(0, (statuses.get(0) ?? 0) + 1);
+      }
+
+      done++;
+      if (done % c.progressEvery === 0 || done === keys.length) {
+        const elapsed = (performance.now() - start) / 1000;
+        const liveRps = done / Math.max(elapsed, 0.001);
+        console.log(`COLD progress: ${done}/${keys.length} (${((done / keys.length) * 100).toFixed(1)}%) @ ${liveRps.toFixed(1)} req/s`);
       }
     }
   }
@@ -184,11 +216,26 @@ async function hotReadBlast(aws: AwsClient, c: Cfg, keys: string[]): Promise<Sta
   let fail = 0;
   let bytes = 0;
   let idx = 0;
+  let done = 0;
 
   const start = performance.now();
+  const hardDeadline = start + c.maxHotSeconds * 1000;
+  const rangeHeader = `bytes=0-${Math.max(0, c.hotRangeBytes - 1)}`;
+
+  const presigned = await Promise.all(
+    keys.map(async (key) => {
+      const url = `${c.endpoint}/${c.bucket}/${keyPath(key)}`;
+      const signed = await aws.sign(url, { method: "GET", aws: { signQuery: true } });
+      return signed.url;
+    }),
+  );
+
+  let lastProgressAt = performance.now();
 
   async function worker(workerId: number) {
     while (true) {
+      if (performance.now() >= hardDeadline) return;
+
       const i = idx++;
       if (i >= c.hotRequests) return;
 
@@ -198,24 +245,45 @@ async function hotReadBlast(aws: AwsClient, c: Cfg, keys: string[]): Promise<Sta
       const keyIndex = r < 0.8
         ? Math.floor(Math.random() * hotBand)
         : hotBand + Math.floor(Math.random() * Math.max(1, keys.length - hotBand));
-      const key = keys[Math.min(keys.length - 1, keyIndex)]!;
-
-      const url = `${c.endpoint}/${c.bucket}/${keyPath(key)}`;
-      const signed = await aws.sign(url, { method: "GET", aws: { signQuery: true } });
+      const signedUrl = presigned[Math.min(keys.length - 1, keyIndex)]!;
 
       const t0 = performance.now();
-      const res = await fetchWithTimeout(signed.url, { method: "GET" }, c.timeoutMs);
-      const ms = performance.now() - t0;
-      samples.push(ms);
-      statuses.set(res.status, (statuses.get(res.status) ?? 0) + 1);
+      try {
+        const res = await fetchWithTimeout(
+          signedUrl,
+          { method: "GET", headers: { Range: rangeHeader } },
+          c.hotTimeoutMs,
+        );
+        const ms = performance.now() - t0;
+        samples.push(ms);
+        statuses.set(res.status, (statuses.get(res.status) ?? 0) + 1);
 
-      if (res.ok) {
-        ok++;
-        const buf = await res.arrayBuffer();
-        bytes += buf.byteLength;
-      } else {
+        if (res.ok) {
+          ok++;
+          const buf = await res.arrayBuffer();
+          bytes += buf.byteLength;
+        } else {
+          fail++;
+          if (workerId === 0) await res.text().catch(() => "");
+        }
+      } catch (_e) {
+        const ms = performance.now() - t0;
+        samples.push(ms);
         fail++;
-        if (workerId === 0) await res.text().catch(() => "");
+        statuses.set(0, (statuses.get(0) ?? 0) + 1);
+      }
+
+      done++;
+      const now = performance.now();
+      if (done % c.progressEvery === 0 || now - lastProgressAt > 5000) {
+        lastProgressAt = now;
+        const elapsed = (now - start) / 1000;
+        const liveRps = done / Math.max(elapsed, 0.001);
+        const remaining = Math.max(0, c.hotRequests - done);
+        const etaSec = liveRps > 0 ? remaining / liveRps : 0;
+        console.log(
+          `HOT progress: ${done}/${c.hotRequests} (${((done / c.hotRequests) * 100).toFixed(1)}%) @ ${liveRps.toFixed(1)} req/s, p95=${percentile(samples, 0.95).toFixed(1)}ms, eta=${etaSec.toFixed(0)}s`,
+        );
       }
     }
   }
@@ -263,6 +331,8 @@ async function main() {
   console.log(`bucket=${c.bucket}`);
   console.log(`objects=${c.objectCount}, objectSize=${c.objectSize} bytes`);
   console.log(`coldConcurrency=${c.coldConcurrency}, hotConcurrency=${c.hotConcurrency}, hotRequests=${c.hotRequests}`);
+  console.log(`hotRangeBytes=${c.hotRangeBytes}, maxHotSeconds=${c.maxHotSeconds}, progressEvery=${c.progressEvery}`);
+  console.log(`timeoutMs=${c.timeoutMs}, hotTimeoutMs=${c.hotTimeoutMs}`);
   console.log(`prefix=${prefix}`);
 
   const keys = await seedObjects(aws, c, prefix);

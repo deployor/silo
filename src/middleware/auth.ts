@@ -8,6 +8,18 @@ import { redis } from "../lib/redis";
 import { S3Errors } from "../lib/s3-errors";
 
 const S3_DOMAIN = config.s3Domain;
+const AUTH_CACHE_TTL_SECONDS = 300;
+
+type CachedPublicAuth = {
+	bucket: typeof buckets.$inferSelect;
+	userId: string | null;
+};
+
+type CachedKeyAuth = {
+	bucket: typeof buckets.$inferSelect;
+	key: typeof bucketKeys.$inferSelect;
+	userId: string;
+};
 
 function getBucketFromRequest(req: Request): string | null {
 	const url = new URL(req.url);
@@ -62,6 +74,131 @@ function getDate(req: Request) {
 	);
 }
 
+async function getFreshUserById(userId: string) {
+	const userRow = await db
+		.select()
+		.from(users)
+		.where(eq(users.id, userId))
+		.limit(1);
+
+	if (userRow.length === 0) return null;
+
+	const user = userRow[0];
+	const usageResult = await db
+		.select({ total: sql<number>`sum(${buckets.totalBytes})` })
+		.from(buckets)
+		.where(eq(buckets.userId, user.id));
+
+	user.storageUsageBytes = Number(usageResult[0]?.total) || 0;
+	return user;
+}
+
+async function getPublicAuthContext(
+	requestedBucket: string,
+): Promise<{
+	bucket: typeof buckets.$inferSelect;
+	userId: string | null;
+} | null> {
+	const cacheKeyPub = `auth:pub:${requestedBucket}`;
+
+	try {
+		const cachedStr = await redis.get(cacheKeyPub);
+		if (cachedStr) {
+			const cached = JSON.parse(cachedStr) as CachedPublicAuth;
+			if (cached?.bucket) {
+				return { bucket: cached.bucket, userId: cached.userId ?? null };
+			}
+		}
+	} catch (e) {
+		console.error("Redis pub cache error:", e);
+	}
+
+	const bucketResult = await db
+		.select({
+			bucket: buckets,
+			user: users,
+		})
+		.from(buckets)
+		.leftJoin(users, eq(buckets.userId, users.id))
+		.where(eq(buckets.name, requestedBucket))
+		.limit(1);
+
+	if (bucketResult.length === 0) {
+		return null;
+	}
+
+	const bucket = bucketResult[0].bucket;
+	const userId = bucketResult[0].user?.id ?? null;
+
+	try {
+		await redis.set(
+			cacheKeyPub,
+			JSON.stringify({ bucket, userId }),
+			"EX",
+			AUTH_CACHE_TTL_SECONDS,
+		);
+	} catch (e) {
+		console.error("Failed to cache public bucket:", e);
+	}
+
+	return { bucket, userId };
+}
+
+async function getSignedAuthContext(accessKeyId: string): Promise<{
+	bucket: typeof buckets.$inferSelect;
+	key: typeof bucketKeys.$inferSelect;
+	userId: string;
+} | null> {
+	const cacheKeyAuth = `auth:key:${accessKeyId}`;
+
+	try {
+		const cachedStr = await redis.get(cacheKeyAuth);
+		if (cachedStr) {
+			const cached = JSON.parse(cachedStr) as CachedKeyAuth;
+			if (cached?.bucket && cached?.key && cached?.userId) {
+				return cached;
+			}
+		}
+	} catch (e) {
+		console.error("Redis auth cache error:", e);
+	}
+
+	const keyResult = await db
+		.select({
+			bucket: buckets,
+			user: users,
+			key: bucketKeys,
+		})
+		.from(bucketKeys)
+		.innerJoin(buckets, eq(bucketKeys.bucketId, buckets.id))
+		.innerJoin(users, eq(buckets.userId, users.id))
+		.where(eq(bucketKeys.accessKey, accessKeyId))
+		.limit(1);
+
+	if (keyResult.length === 0) {
+		return null;
+	}
+
+	const resolved = {
+		bucket: keyResult[0].bucket,
+		key: keyResult[0].key,
+		userId: keyResult[0].user.id,
+	};
+
+	try {
+		await redis.set(
+			cacheKeyAuth,
+			JSON.stringify(resolved),
+			"EX",
+			AUTH_CACHE_TTL_SECONDS,
+		);
+	} catch (e) {
+		console.error("Failed to cache auth:", e);
+	}
+
+	return resolved;
+}
+
 export type AuthResult =
 	| {
 			user: typeof users.$inferSelect | null;
@@ -79,52 +216,16 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 			if (!requestedBucket) {
 				return new Response(null, { status: 400 });
 			}
-			const cacheKeyPub = `auth:pub:${requestedBucket}`;
-			let bucket: typeof buckets.$inferSelect;
-			let user: typeof users.$inferSelect | null;
 
-			let cachedPub = null;
-			try {
-				const cachedStr = await redis.get(cacheKeyPub);
-				if (cachedStr) {
-					cachedPub = JSON.parse(cachedStr);
-				}
-			} catch (e) {
-				console.error("Redis pub cache error:", e);
+			const authContext = await getPublicAuthContext(requestedBucket);
+			if (!authContext) {
+				return new Response(null, { status: 404 });
 			}
 
-			if (cachedPub) {
-				bucket = cachedPub.bucket;
-				user = cachedPub.user;
-			} else {
-				const bucketResult = await db
-					.select({
-						bucket: buckets,
-						user: users,
-					})
-					.from(buckets)
-					.leftJoin(users, eq(buckets.userId, users.id))
-					.where(eq(buckets.name, requestedBucket))
-					.limit(1);
-
-				if (bucketResult.length === 0) {
-					return new Response(null, { status: 404 });
-				}
-
-				bucket = bucketResult[0].bucket;
-				user = bucketResult[0].user;
-
-				try {
-					await redis.set(
-						cacheKeyPub,
-						JSON.stringify({ bucket, user }),
-						"EX",
-						300,
-					);
-				} catch (e) {
-					console.error("Failed to cache public bucket:", e);
-				}
-			}
+			const bucket = authContext.bucket;
+			const user = authContext.userId
+				? await getFreshUserById(authContext.userId)
+				: null;
 
 			if (!user && !bucket.isSystem) {
 				return new Response(null, { status: 404 });
@@ -148,52 +249,15 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 			return S3Errors.AccessDenied().toResponse();
 		}
 
-		const cacheKeyPub = `auth:pub:${requestedBucket}`;
-		let bucket: typeof buckets.$inferSelect;
-		let user: typeof users.$inferSelect | null;
-
-		let cachedPub = null;
-		try {
-			const cachedStr = await redis.get(cacheKeyPub);
-			if (cachedStr) {
-				cachedPub = JSON.parse(cachedStr);
-			}
-		} catch (e) {
-			console.error("Redis pub cache error:", e);
+		const authContext = await getPublicAuthContext(requestedBucket);
+		if (!authContext) {
+			return S3Errors.AccessDenied().toResponse();
 		}
 
-		if (cachedPub) {
-			bucket = cachedPub.bucket;
-			user = cachedPub.user;
-		} else {
-			const bucketResult = await db
-				.select({
-					bucket: buckets,
-					user: users,
-				})
-				.from(buckets)
-				.leftJoin(users, eq(buckets.userId, users.id))
-				.where(eq(buckets.name, requestedBucket))
-				.limit(1);
-
-			if (bucketResult.length === 0) {
-				return S3Errors.AccessDenied().toResponse();
-			}
-
-			bucket = bucketResult[0].bucket;
-			user = bucketResult[0].user;
-
-			try {
-				await redis.set(
-					cacheKeyPub,
-					JSON.stringify({ bucket, user }),
-					"EX",
-					300,
-				);
-			} catch (e) {
-				console.error("Failed to cache public bucket:", e);
-			}
-		}
+		const bucket = authContext.bucket;
+		let user: typeof users.$inferSelect | null = authContext.userId
+			? await getFreshUserById(authContext.userId)
+			: null;
 
 		if (!user) {
 			if (bucket.isSystem) {
@@ -218,12 +282,12 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 			return S3Errors.AccessDenied().toResponse();
 		}
 
-		const usageResult = await db
-			.select({ total: sql<number>`sum(${buckets.totalBytes})` })
-			.from(buckets)
-			.where(eq(buckets.userId, user.id));
-
-		user.storageUsageBytes = Number(usageResult[0]?.total) || 0;
+		// Always refresh dynamic user fields for quota checks (storage/egress/lock/immortal).
+		const freshUser = await getFreshUserById(user.id);
+		if (!freshUser) {
+			return S3Errors.AccessDenied().toResponse();
+		}
+		user = freshUser;
 
 		if (user.isLocked) {
 			return S3Errors.AccessDenied(
@@ -266,65 +330,24 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 		return S3Errors.InvalidRequest("Invalid Service").toResponse();
 	}
 
-	let bucket: typeof buckets.$inferSelect;
-	let user: any;
-	let key: typeof bucketKeys.$inferSelect;
-
-	const cacheKeyAuth = `auth:key:${accessKeyId}`;
-	let cachedAuth = null;
-	try {
-		const cachedStr = await redis.get(cacheKeyAuth);
-		if (cachedStr) {
-			cachedAuth = JSON.parse(cachedStr);
-		}
-	} catch (e) {
-		console.error("Redis auth cache error:", e);
+	const authContext = await getSignedAuthContext(accessKeyId);
+	if (!authContext) {
+		return S3Errors.InvalidAccessKeyId().toResponse();
 	}
 
-	if (cachedAuth) {
-		bucket = cachedAuth.bucket;
-		user = cachedAuth.user;
-		key = cachedAuth.key;
-	} else {
-		const keyResult = await db
-			.select({
-				bucket: buckets,
-				user: users,
-				key: bucketKeys,
-			})
-			.from(bucketKeys)
-			.innerJoin(buckets, eq(bucketKeys.bucketId, buckets.id))
-			.innerJoin(users, eq(buckets.userId, users.id))
-			.where(eq(bucketKeys.accessKey, accessKeyId))
-			.limit(1);
-
-		if (keyResult.length === 0) {
-			return S3Errors.InvalidAccessKeyId().toResponse();
-		}
-
-		const res = keyResult[0];
-		bucket = res.bucket;
-		user = res.user;
-		key = res.key;
-
-		const usageResult = await db
-			.select({ total: sql<number>`sum(${buckets.totalBytes})` })
-			.from(buckets)
-			.where(eq(buckets.userId, user.id));
-
-		user.storageUsageBytes = Number(usageResult[0]?.total) || 0;
-
-		try {
-			await redis.set(
-				cacheKeyAuth,
-				JSON.stringify({ bucket, user, key }),
-				"EX",
-				300,
-			);
-		} catch (e) {
-			console.error("Failed to cache auth:", e);
-		}
+	const bucket = authContext.bucket;
+	const key = authContext.key;
+	let user = await getFreshUserById(authContext.userId);
+	if (!user) {
+		return S3Errors.InvalidAccessKeyId().toResponse();
 	}
+
+	// Always refresh dynamic user fields for quota checks (storage/egress/lock/immortal).
+	const freshUser = await getFreshUserById(user.id);
+	if (!freshUser) {
+		return S3Errors.AccessDenied().toResponse();
+	}
+	user = freshUser;
 
 	if (user.isLocked) {
 		return S3Errors.AccessDenied("Account is temporarily locked.").toResponse();
