@@ -43,6 +43,7 @@ type ConfirmDialogState = {
 	message: string;
 	confirmLabel: string;
 	confirmClassName?: string;
+	publicRiskWarning?: boolean;
 	onConfirm: () => Promise<void>;
 };
 
@@ -135,6 +136,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				: `Only authenticated access will be allowed for ${bucketName}.`,
 			confirmLabel: isPublic ? "Make Public" : "Make Private",
 			confirmClassName: "bg-hc-blue hover:bg-blue-600",
+			publicRiskWarning: isPublic,
 			onConfirm: async () => {
 				await fetchText(`/api/dashboard/buckets/${bucketName}`, {
 					method: "PATCH",
@@ -478,7 +480,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										</div>
 									</td>
 									<td className="px-6 py-4">
-										<label className="inline-flex items-center cursor-pointer">
+										<label
+											className={`inline-flex items-center ${bucket.isPaused || bucket.isCdn ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+										>
 											<input
 												type="checkbox"
 												className="sr-only peer"
@@ -488,7 +492,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													togglePublic(bucket.name, e.target.checked)
 												}
 											/>
-											<div className="relative w-9 h-5 bg-white/10 rounded-full peer-checked:bg-hc-blue" />
+											<div className="relative w-10 h-6 bg-white/10 rounded-full transition-colors peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-blue/60 peer-checked:bg-hc-blue/80 after:content-[''] after:absolute after:top-1 after:left-1 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-4" />
 											<span className="ms-2 text-xs font-medium text-text-muted">
 												{bucket.isPublic ? "Public" : "Private"}
 											</span>
@@ -625,26 +629,37 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!corsBucket}
 				onClose={() => setCorsBucket(null)}
 				title="CORS Configuration"
-				className="max-w-2xl p-8"
+				className="max-w-3xl p-8"
 			>
 				{corsBucket ? (
 					<>
-						<p className="text-text-muted text-sm -mt-3 mb-4 font-mono">
+						<p className="text-text-muted text-sm -mt-3 mb-6 font-mono">
 							{corsBucket.name}
 						</p>
-						<p className="text-text-muted text-sm mb-4">
-							Configure CORS as a JSON array of rules.
-						</p>
-						<textarea
-							value={corsEditor}
-							onChange={(e) => {
-								setCorsEditor(e.target.value);
-								setCorsError(null);
-							}}
-							className="w-full h-64 bg-black/30 border border-white/10 rounded-xl p-4 text-white font-mono text-sm focus:outline-none focus:border-hc-blue focus:ring-1 focus:ring-hc-blue resize-none"
-						/>
+
+						<div className="bg-black/30 rounded-xl border border-white/10 p-4 mb-4">
+							<p className="text-text-muted text-sm mb-2 flex items-start gap-2">
+								<i className="ph ph-info text-hc-blue text-base mt-0.5" />
+								<span>
+									Configure CORS as a JSON array of rules. Invalid JSON or
+									missing fields will be rejected.
+								</span>
+							</p>
+							<textarea
+								value={corsEditor}
+								onChange={(e) => {
+									setCorsEditor(e.target.value);
+									setCorsError(null);
+								}}
+								className="w-full h-64 bg-black/40 border border-white/10 rounded-xl p-4 text-white font-mono text-sm focus:outline-none focus:border-hc-blue focus:ring-1 focus:ring-hc-blue resize-none"
+							/>
+						</div>
+
 						{corsError ? (
-							<p className="text-xs text-red-400 mt-2">{corsError}</p>
+							<p className="text-xs text-red-400 mb-2 flex items-center gap-2">
+								<i className="ph ph-warning-circle" />
+								<span>{corsError}</span>
+							</p>
 						) : null}
 						<div className="flex justify-between items-center mt-6">
 							<button
@@ -684,6 +699,30 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				{confirmDialog ? (
 					<>
 						<p className="text-text-muted text-sm">{confirmDialog.message}</p>
+						{confirmDialog.publicRiskWarning ? (
+							<div className="mt-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+								<div className="flex items-start gap-3">
+									<div className="shrink-0 text-yellow-300 mt-0.5">
+										<i className="ph ph-warning-diamond text-xl" />
+									</div>
+									<div>
+										<h4 className="text-yellow-200 font-bold text-sm mb-1">
+											Public bucket risk warning
+										</h4>
+										<ul className="text-yellow-100/90 text-xs space-y-1 list-disc list-inside">
+											<li>Anyone can access files in this bucket.</li>
+											<li>
+												Public access can lead to abuse and heavy traffic.
+											</li>
+											<li>
+												Abuse can consume your quota and impact your account
+												limits.
+											</li>
+										</ul>
+									</div>
+								</div>
+							</div>
+						) : null}
 						<div className="mt-6 flex justify-end gap-3">
 							<button
 								type="button"
