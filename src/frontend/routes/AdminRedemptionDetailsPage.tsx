@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AdminSubnav } from "../components/AdminSubnav";
 import { AppShell } from "../components/AppShell";
+import { PhIcon } from "../components/ui/PhIcon";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 import { formatBytes, formatDate } from "../shared/utils/format";
 
@@ -58,7 +59,7 @@ export function AdminRedemptionDetailsPage({
 							href="/admin/redemptions"
 							className="text-text-muted hover:text-white transition-colors"
 						>
-							<i className="ph ph-arrow-left text-2xl" />
+							<PhIcon className="ph ph-arrow-left text-2xl" />
 						</a>
 						<div>
 							<h1 className="text-2xl font-bold text-white">
@@ -198,7 +199,7 @@ export function AdminRedemptionDetailsPage({
 								onClick={() => setOpen(false)}
 								className="text-text-muted hover:text-white transition-colors"
 							>
-								<i className="ph ph-x text-2xl" />
+								<PhIcon className="ph ph-x text-2xl" />
 							</button>
 						</div>
 						<form

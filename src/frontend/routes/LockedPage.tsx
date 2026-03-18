@@ -1,4 +1,5 @@
 import { AppShell } from "../components/AppShell";
+import { PhIcon } from "../components/ui/PhIcon";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 
 export function LockedPage({ bootstrap }: { bootstrap: AppBootstrap }) {
@@ -20,7 +21,7 @@ export function LockedPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			<div className="flex-1 flex items-center justify-center p-6">
 				<div className="max-w-md w-full bg-black/30 rounded-2xl border border-white/10 p-6 text-center">
 					<div className="w-16 h-16 bg-hc-red/20 rounded-full flex items-center justify-center mx-auto mb-4">
-						<i className="ph ph-lock-key text-3xl text-hc-red" />
+						<PhIcon className="ph ph-lock-key text-3xl text-hc-red" />
 					</div>
 
 					<h1 className="text-2xl font-bold text-white mb-2">

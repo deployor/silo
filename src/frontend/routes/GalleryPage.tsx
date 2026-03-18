@@ -1,4 +1,5 @@
 import { AppShell } from "../components/AppShell";
+import { PhIcon } from "../components/ui/PhIcon";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 import { formatDate } from "../shared/utils/format";
 
@@ -38,7 +39,7 @@ export function GalleryPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							href="/ysws/submit"
 							className="bg-hc-red hover:bg-red-600 text-white font-bold py-2 px-5 rounded-lg transition-colors inline-flex items-center gap-2"
 						>
-							<i className="ph-bold ph-plus" /> Submit Project
+							<PhIcon className="ph-bold ph-plus" /> Submit Project
 						</a>
 						<a
 							href="/"
@@ -71,11 +72,11 @@ export function GalleryPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										/>
 									) : (
 										<div className="w-full h-full flex items-center justify-center text-white/10">
-											<i className="ph ph-image text-4xl" />
+											<PhIcon className="ph ph-image text-4xl" />
 										</div>
 									)}
 									<div className="absolute top-3 right-3 bg-black/80 backdrop-blur-sm border border-white/10 rounded px-2 py-1 text-xs font-mono text-white flex items-center gap-1.5 shadow-sm">
-										<i className="ph-fill ph-check-circle text-hc-green" />{" "}
+										<PhIcon className="ph-fill ph-check-circle text-hc-green" />{" "}
 										{item.hoursSpent || 0}h
 									</div>
 								</a>
@@ -97,7 +98,7 @@ export function GalleryPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												className="text-white/40 hover:text-white transition-colors shrink-0"
 												title="View Code"
 											>
-												<i className="ph-fill ph-github-logo text-xl" />
+												<PhIcon className="ph-fill ph-github-logo text-xl" />
 											</a>
 										) : null}
 									</div>
@@ -105,7 +106,7 @@ export function GalleryPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										{item.shortDescription}
 									</p>
 									<div className="flex items-center gap-2 text-xs text-white/30 font-mono border-t border-white/5 pt-3 mt-auto">
-										<i className="ph ph-calendar-blank" />
+										<PhIcon className="ph ph-calendar-blank" />
 										<span>Shipped {formatDate(item.reviewedAt)}</span>
 									</div>
 								</div>
@@ -115,7 +116,7 @@ export function GalleryPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				) : (
 					<div className="text-center py-24 bg-white/5 border border-white/10 rounded-xl border-dashed">
 						<div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
-							<i className="ph ph-images text-3xl text-white/40" />
+							<PhIcon className="ph ph-images text-3xl text-white/40" />
 						</div>
 						<h3 className="text-xl font-bold text-white mb-2">
 							Gallery is Empty

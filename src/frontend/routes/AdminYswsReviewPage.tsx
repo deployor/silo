@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AdminSubnav } from "../components/AdminSubnav";
 import { AppShell } from "../components/AppShell";
+import { PhIcon } from "../components/ui/PhIcon";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 import { formatDate } from "../shared/utils/format";
 
@@ -54,7 +55,7 @@ export function AdminYswsReviewPage({
 						href="/admin/ysws"
 						className="text-text-muted hover:text-white transition-colors flex items-center gap-2"
 					>
-						<i className="ph ph-arrow-left" />
+						<PhIcon className="ph ph-arrow-left" />
 						Back to List
 					</a>
 					<div className="h-4 w-px bg-white/10" />
@@ -83,7 +84,7 @@ export function AdminYswsReviewPage({
 									className="flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg p-3 transition-colors text-sm font-medium"
 								>
 									View Code (Repo)
-									<i className="ph ph-arrow-up-right opacity-50" />
+									<PhIcon className="ph ph-arrow-up-right opacity-50" />
 								</a>
 								<a
 									href={submission.demoUrl}
@@ -92,7 +93,7 @@ export function AdminYswsReviewPage({
 									className="flex items-center justify-center gap-2 bg-hc-red/10 hover:bg-hc-red/20 border border-hc-red/30 text-hc-red rounded-lg p-3 transition-colors text-sm font-medium"
 								>
 									View Live Demo
-									<i className="ph ph-arrow-up-right opacity-50" />
+									<PhIcon className="ph ph-arrow-up-right opacity-50" />
 								</a>
 							</div>
 
@@ -112,7 +113,7 @@ export function AdminYswsReviewPage({
 										) : (
 											<div className="absolute inset-0 flex items-center justify-center text-white/10 bg-black/50 backdrop-blur-md z-50 border border-white/5 rounded-lg">
 												<div className="text-center p-4">
-													<i className="ph ph-image-broken text-6xl mx-auto mb-2" />
+													<PhIcon className="ph ph-image-broken text-6xl mx-auto mb-2" />
 													<p className="text-xs font-mono uppercase tracking-widest opacity-50">
 														Error Loading Image
 													</p>
@@ -143,7 +144,7 @@ export function AdminYswsReviewPage({
 									</div>
 								) : (
 									<div className="bg-green-500/10 border border-green-500/20 text-green-400 p-4 rounded-lg flex items-center gap-2">
-										<i className="ph ph-check text-lg" />
+										<PhIcon className="ph ph-check text-lg" />
 										<span>No AI used. 100% Human Made.</span>
 									</div>
 								)}

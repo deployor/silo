@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { PhIcon } from "../components/ui/PhIcon";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 
 export function AdminRedemptionGeneratedPage({
@@ -48,7 +49,7 @@ export function AdminRedemptionGeneratedPage({
 						href={`/admin/redemptions/${p.program?.id || ""}`}
 						className="text-text-muted hover:text-white transition-colors"
 					>
-						<i className="ph ph-arrow-left text-2xl" />
+						<PhIcon className="ph ph-arrow-left text-2xl" />
 					</a>
 					<div>
 						<h1 className="text-2xl font-bold text-white">

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AdminSubnav } from "../components/AdminSubnav";
 import { AppShell } from "../components/AppShell";
 import { Modal } from "../components/ui/Modal";
+import { PhIcon } from "../components/ui/PhIcon";
 import { fetchJson } from "../shared/api/http";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 import { formatBytes } from "../shared/utils/format";
@@ -178,7 +179,7 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								onClick={() => setShowFilters((v) => !v)}
 								className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2"
 							>
-								<i className="ph ph-funnel" /> Filters
+								<PhIcon className="ph ph-funnel" /> Filters
 							</button>
 						</div>
 

@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { Modal } from "../components/ui/Modal";
+import { PhIcon } from "../components/ui/PhIcon";
 import { fetchJson, fetchText } from "../shared/api/http";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 import { formatBytes } from "../shared/utils/format";
@@ -256,7 +257,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										onClick={() => loadFiles(folder.prefix, null, true)}
 									>
 										<td className="px-6 py-4 text-hc-blue">
-											<i className="ph-fill ph-folder text-xl" />
+											<PhIcon className="ph-fill ph-folder text-xl" />
 										</td>
 										<td className="px-6 py-4 font-medium text-white font-mono">
 											{folder.name}
@@ -273,7 +274,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										className="hover:bg-white/5 transition-colors group"
 									>
 										<td className="px-6 py-4 text-text-muted">
-											<i className="ph ph-file text-xl" />
+											<PhIcon className="ph ph-file text-xl" />
 										</td>
 										<td className="px-6 py-4 font-medium text-white font-mono break-all">
 											{file.name}
@@ -374,7 +375,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</pre>
 						) : (
 							<div className="text-center flex flex-col items-center justify-center h-64">
-								<i className="ph ph-file-x text-6xl text-text-muted mx-auto mb-4" />
+								<PhIcon className="ph ph-file-x text-6xl text-text-muted mx-auto mb-4" />
 								<p className="text-text-muted">
 									Preview not available for this file type.
 								</p>
@@ -425,7 +426,9 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						onClick={confirmDelete}
 						className="bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
 					>
-						{deleting ? <i className="ph ph-spinner animate-spin" /> : null}
+						{deleting ? (
+							<PhIcon className="ph ph-spinner animate-spin" />
+						) : null}
 						{deleting ? "Deleting..." : "Delete"}
 					</button>
 				</div>

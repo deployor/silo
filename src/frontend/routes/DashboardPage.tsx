@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	MdAccessTimeFilled,
+	MdArrowForward,
 	MdCode,
 	MdDeleteForever,
 	MdDeleteOutline,
@@ -8,9 +9,8 @@ import {
 	MdInfoOutline,
 	MdKey,
 	MdOutlineRocketLaunch,
-	MdWarningAmber,
 	MdWarning,
-	MdArrowForward,
+	MdWarningAmber,
 } from "react-icons/md";
 import { AppShell } from "../components/AppShell";
 import { Modal } from "../components/ui/Modal";
@@ -328,9 +328,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			<div className="mb-10">
 				{p.latestSubmission?.status === "pending" ? (
 					<div className="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow">
-					<div className="inline-flex items-center gap-2 bg-yellow-500/10 text-yellow-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 border border-yellow-500/20">
-							<MdAccessTimeFilled className="animate-pulse" /> Under
-							Review
+						<div className="inline-flex items-center gap-2 bg-yellow-500/10 text-yellow-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 border border-yellow-500/20">
+							<MdAccessTimeFilled className="animate-pulse" /> Under Review
 						</div>
 						<h2 className="text-3xl font-black text-white italic tracking-tight mb-2">
 							“{p.latestSubmission.projectName}” is in the pipeline.
@@ -494,8 +493,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												onClick={() => setActiveBucket(bucket)}
 												className={`${buttonBase} ${buttonNeutral} text-xs px-3 py-1.5 rounded-lg`}
 											>
-												<MdKey className="text-sm mr-1" />{" "}
-												{bucket.keys.length} Keys
+												<MdKey className="text-sm mr-1" /> {bucket.keys.length}{" "}
+												Keys
 											</button>
 										)}
 									</td>
@@ -766,9 +765,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						{confirmDialog.publicRiskWarning ? (
 							<div className="mt-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
 								<div className="flex items-start gap-3">
-								<div className="shrink-0 text-yellow-300 mt-0.5">
-									<MdWarningAmber className="text-xl" />
-								</div>
+									<div className="shrink-0 text-yellow-300 mt-0.5">
+										<MdWarningAmber className="text-xl" />
+									</div>
 									<div>
 										<h4 className="text-yellow-200 font-bold text-sm mb-1">
 											Public bucket risk warning

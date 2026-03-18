@@ -1,4 +1,5 @@
 import type React from "react";
+import { PhIcon } from "./PhIcon";
 
 type ModalProps = {
 	open: boolean;
@@ -41,7 +42,7 @@ export function Modal({
 								onClick={onClose}
 								className="text-text-muted hover:text-white transition-colors rounded-lg p-1 hover:bg-white/5"
 							>
-								<i className="ph ph-x text-2xl" />
+								<PhIcon className="ph ph-x text-2xl" />
 							</button>
 						) : null}
 					</div>
