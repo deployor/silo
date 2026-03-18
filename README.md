@@ -27,6 +27,14 @@ For full documentation on how to use Silo, including SDK examples, configuration
 - **Public & Private Buckets**: Host static assets publicly or keep backups private.
 - **CORS Support**: Configurable Cross-Origin Resource Sharing for web applications.
 
+## Development
+
+- Start local development (backend + React asset watcher): `bun dev`
+- Build production assets: `bun run build`
+- Start production server: `bun run start`
+
+The frontend is rendered via React and bundled with Vite into [`src/assets/react/app.js`](src/assets/react/app.js) and [`src/assets/react/app.css`](src/assets/react/app.css).
+
 ---
 
 <div align="center">

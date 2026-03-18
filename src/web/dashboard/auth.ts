@@ -41,7 +41,9 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 		const storedState = cookies.silo_oauth_state;
 
 		if (!state || !storedState || state !== storedState) {
-			return new Response("Invalid or missing state parameter", { status: 400 });
+			return new Response("Invalid or missing state parameter", {
+				status: 400,
+			});
 		}
 
 		try {

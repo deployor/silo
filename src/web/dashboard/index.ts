@@ -93,6 +93,20 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		});
 	}
 
+	if (path === "/dashboard" || path === "/dashboard/") {
+		const user = await getCurrentUser(req);
+		if (!user) {
+			return new Response(null, {
+				status: 302,
+				headers: {
+					Location: `/auth/login?next=${encodeURIComponent(path)}`,
+				},
+			});
+		}
+
+		return Response.redirect("/");
+	}
+
 	const user = await getCurrentUser(req);
 	if (!user) {
 		const settings = await getAppSettings();

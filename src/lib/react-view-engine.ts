@@ -1,0 +1,93 @@
+import { config } from "../config";
+
+type RenderOptions = {
+	layout?: string | boolean;
+};
+
+type ViewData = Record<string, unknown> & {
+	title?: string;
+	bodyClass?: string;
+};
+
+const REACT_PAGES = new Set([
+	"landing",
+	"dashboard",
+	"files",
+	"docs",
+	"cdn",
+	"offboarding",
+	"admin-users",
+	"admin-logs",
+	"admin-cache",
+	"admin-settings",
+	"admin-redemptions",
+	"admin-redemption-details",
+	"admin-redemption-generated",
+	"admin-ysws",
+	"admin-ysws-review",
+	"ysws-list",
+	"ysws-submit",
+	"gallery",
+	"redeem",
+	"slack-success",
+	"wip",
+	"onboarding",
+	"locked",
+	"aged-out",
+]);
+
+function escapeForInlineJson(value: string): string {
+	return value.replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
+}
+
+export function isReactPage(templateName: string): boolean {
+	return REACT_PAGES.has(templateName);
+}
+
+export function renderReactDocument(
+	templateName: string,
+	viewData: ViewData = {},
+	options: RenderOptions = { layout: "main" },
+): string {
+	const title = viewData.title || "Silo";
+	const bootstrap = {
+		page: templateName,
+		title,
+		layout: options.layout,
+		props: viewData,
+		config: {
+			env: config.env,
+			git: config.git,
+		},
+	};
+
+	const bootstrapJson = escapeForInlineJson(JSON.stringify(bootstrap));
+
+	return `<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${title} - Free S3 Storage for Hack Club</title>
+    <meta name="description" content="Free S3-compatible object storage for Hack Club members. Ship your projects, earn more storage. Built on Cloudflare R2 for high performance." />
+    <meta name="keywords" content="free s3 storage, hack club, object storage, s3 gateway, cloudflare r2, developer tools, free tier" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://silo.hackclub.com/" />
+    <meta property="og:title" content="Silo - Free S3 Storage for Hack Club" />
+    <meta property="og:description" content="Free S3-compatible object storage for Hack Club members. Ship your projects, earn more storage." />
+    <meta property="og:image" content="https://assets.hackclub.com/icon-rounded.png" />
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://silo.hackclub.com/" />
+    <meta property="twitter:title" content="Silo - Free S3 Storage for Hack Club" />
+    <meta property="twitter:description" content="Free S3-compatible object storage for Hack Club members. Ship your projects, earn more storage." />
+    <meta property="twitter:image" content="https://assets.hackclub.com/icon-rounded.png" />
+    <link rel="stylesheet" href="/assets/react/app.css" />
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  </head>
+  <body class="min-h-screen selection:bg-hc-red selection:text-white font-sans ${viewData.bodyClass || ""}">
+    <div id="root"></div>
+    <script>window.__SILO_APP__ = ${bootstrapJson};</script>
+    <script type="module" src="/assets/react/app.js"></script>
+  </body>
+</html>`;
+}

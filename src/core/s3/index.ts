@@ -211,7 +211,9 @@ export async function handleS3Request(
 			// Cache metadata on miss if success
 			if (response.status === 200) {
 				const headersObj: Record<string, string> = {};
-				headers.forEach((v, k) => (headersObj[k] = v));
+				headers.forEach((v, k) => {
+					headersObj[k] = v;
+				});
 				redis.set(cacheKeyMeta, JSON.stringify(headersObj)).catch((e) => {
 					console.error("Failed to cache HEAD metadata:", e);
 				});

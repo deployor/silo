@@ -48,6 +48,38 @@ const s3Limiter = rateLimit({
  */
 function isDashboardRequest(req: Request, url: URL): boolean {
 	const host = req.headers.get("host") || "";
+	const accept = req.headers.get("accept") || "";
+	const hasAuthHeader = req.headers.has("authorization");
+	const hasAmzParams =
+		url.searchParams.has("X-Amz-Algorithm") ||
+		url.searchParams.has("x-amz-algorithm");
+	const isBrowserNavigation =
+		req.method === "GET" && accept.includes("text/html");
+
+	const path = url.pathname;
+	const dashboardPaths = [
+		"/",
+		"/auth/",
+		"/api/dashboard/",
+		"/dashboard",
+		"/dashboard/",
+		"/docs",
+		"/api/slack/",
+		"/assets/",
+		"/admin",
+		"/api/admin",
+		"/cdn",
+		"/api/cdn/",
+		"/onboarding",
+		"/api/onboarding/",
+		"/ysws",
+		"/api/ysws",
+		"/gallery",
+		"/redeem",
+		"/api/revocation",
+		"/health",
+		"/slack-success",
+	];
 
 	// 1. Explicit dashboard subdomain
 	if (host.startsWith("dashboard.")) {
@@ -59,35 +91,6 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 		host === S3_DOMAIN ||
 		(S3_DOMAIN === "localhost:3000" && host.startsWith("localhost"))
 	) {
-		const path = url.pathname;
-		const hasAuthHeader = req.headers.has("authorization");
-		const hasAmzParams =
-			url.searchParams.has("X-Amz-Algorithm") ||
-			url.searchParams.has("x-amz-algorithm");
-
-		// Known dashboard paths
-		const dashboardPaths = [
-			"/",
-			"/auth/",
-			"/api/dashboard/",
-			"/dashboard/",
-			"/docs",
-			"/api/slack/",
-			"/assets/",
-			"/admin",
-			"/api/admin",
-			"/cdn",
-			"/api/cdn/",
-			"/onboarding",
-			"/api/onboarding/",
-			"/ysws",
-			"/api/ysws",
-			"/gallery",
-			"/redeem",
-			"/api/revocation",
-			"/health",
-		];
-
 		// Exact match for root
 		if (path === "/") return true;
 
@@ -103,6 +106,15 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 
 		// Default to S3 for unknown paths (public bucket access)
 		return false;
+	}
+
+	// 3. Local/dev fallback: treat normal browser navigation to known dashboard
+	// routes as dashboard even when host doesn't match configured S3 domain.
+	if (!hasAuthHeader && !hasAmzParams && isBrowserNavigation) {
+		if (path === "/") return true;
+		if (dashboardPaths.some((p) => p !== "/" && path.startsWith(p))) {
+			return true;
+		}
 	}
 
 	return false;

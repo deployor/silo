@@ -1,4 +1,3 @@
-
 export class AwsChunkedDecoder extends TransformStream<Uint8Array, Uint8Array> {
 	private leftover: Uint8Array | null = null;
 	private phase: "size" | "data" | "crlf" = "size";
@@ -11,7 +10,7 @@ export class AwsChunkedDecoder extends TransformStream<Uint8Array, Uint8Array> {
 			transform: (chunk, controller) => {
 				this.processChunk(chunk, controller);
 			},
-			flush: (controller) => {
+			flush: (_controller) => {
 				if (this.leftover && this.leftover.length > 0) {
 					console.warn(
 						"[AwsChunkedDecoder] Stream ended with incomplete data",
@@ -76,7 +75,7 @@ export class AwsChunkedDecoder extends TransformStream<Uint8Array, Uint8Array> {
 				const sizeStr = semiColon === -1 ? line : line.slice(0, semiColon);
 				const size = parseInt(sizeStr, 16);
 
-				if (isNaN(size)) {
+				if (Number.isNaN(size)) {
 					throw new Error(`Invalid chunk size: ${sizeStr}`);
 				}
 
@@ -104,7 +103,7 @@ export class AwsChunkedDecoder extends TransformStream<Uint8Array, Uint8Array> {
 					controller.enqueue(currentChunk.subarray(cursor));
 					this.chunkSize -= available;
 					// No leftover, we consumed everything
-					return; 
+					return;
 				}
 			} else if (this.phase === "crlf") {
 				const available = len - cursor;

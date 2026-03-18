@@ -199,8 +199,12 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 					isImmortal: user.isImmortal,
 				},
 				limits: {
-					maxBucketsPerUser: user.isImmortal ? -1 : settings.defaultMaxBucketsPerUser,
-					maxKeysPerBucket: user.isImmortal ? -1 : settings.defaultMaxKeysPerBucket,
+					maxBucketsPerUser: user.isImmortal
+						? -1
+						: settings.defaultMaxBucketsPerUser,
+					maxKeysPerBucket: user.isImmortal
+						? -1
+						: settings.defaultMaxKeysPerBucket,
 					defaultStorageLimitBytes: settings.defaultStorageLimitBytes,
 					egressMultiplier: settings.egressMultiplier,
 					minEgressBytes: settings.minEgressBytes,
