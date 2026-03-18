@@ -1,4 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+	MdAccessTimeFilled,
+	MdCode,
+	MdDeleteForever,
+	MdDeleteOutline,
+	MdFolderOpen,
+	MdInfoOutline,
+	MdKey,
+	MdOutlineRocketLaunch,
+	MdWarningAmber,
+	MdWarning,
+	MdArrowForward,
+} from "react-icons/md";
 import { AppShell } from "../components/AppShell";
 import { Modal } from "../components/ui/Modal";
 import { fetchJson, fetchText } from "../shared/api/http";
@@ -79,9 +92,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const buttonSubtle =
 		"bg-transparent hover:bg-white/5 border-transparent text-text-muted hover:text-white px-4 py-2.5";
 	const iconActionBase =
-		"relative inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors";
+		"peer relative inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors";
 	const iconActionTooltip =
-		"pointer-events-none absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-md border border-white/15 bg-black/90 px-2 py-1 text-[10px] font-medium text-white opacity-0 translate-y-1 transition-all group-hover:opacity-100 group-hover:translate-y-0";
+		"pointer-events-none absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-md border border-white/15 bg-black/90 px-2 py-1 text-[10px] font-medium text-white opacity-0 translate-y-1 transition-all peer-hover:opacity-100 peer-hover:translate-y-0 peer-focus-visible:opacity-100 peer-focus-visible:translate-y-0";
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -307,7 +320,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						href="/dashboard/offboarding"
 						className="shrink-0 bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow whitespace-nowrap"
 					>
-						Start Migration <i className="ph ph-arrow-right" />
+						Start Migration <MdArrowForward className="inline text-base" />
 					</a>
 				</div>
 			) : null}
@@ -315,8 +328,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			<div className="mb-10">
 				{p.latestSubmission?.status === "pending" ? (
 					<div className="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow">
-						<div className="inline-flex items-center gap-2 bg-yellow-500/10 text-yellow-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 border border-yellow-500/20">
-							<i className="ph-fill ph-clock-countdown animate-pulse" /> Under
+					<div className="inline-flex items-center gap-2 bg-yellow-500/10 text-yellow-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 border border-yellow-500/20">
+							<MdAccessTimeFilled className="animate-pulse" /> Under
 							Review
 						</div>
 						<h2 className="text-3xl font-black text-white italic tracking-tight mb-2">
@@ -345,7 +358,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							href="/ysws/submit"
 							className="bg-hc-red hover:bg-red-500 text-white px-8 py-4 rounded-xl text-lg font-bold transition-all shadow-lg shadow-hc-red/20 inline-flex items-center gap-3"
 						>
-							<i className="ph-bold ph-rocket-launch" /> Ship a Project
+							<MdOutlineRocketLaunch /> Ship a Project
 						</a>
 					</div>
 				)}
@@ -481,7 +494,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												onClick={() => setActiveBucket(bucket)}
 												className={`${buttonBase} ${buttonNeutral} text-xs px-3 py-1.5 rounded-lg`}
 											>
-												<i className="ph ph-key text-sm mr-1" />{" "}
+												<MdKey className="text-sm mr-1" />{" "}
 												{bucket.keys.length} Keys
 											</button>
 										)}
@@ -529,7 +542,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												title="Configure CORS"
 												className={`${iconActionBase} group text-text-muted hover:text-white hover:bg-white/10`}
 											>
-												<i className="ph ph-code text-base" />
+												<MdCode className="text-base" />
 												<span className={iconActionTooltip}>
 													Configure CORS rules
 												</span>
@@ -541,7 +554,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											title="Open bucket files"
 											className={`${iconActionBase} group text-hc-blue hover:text-blue-300 hover:bg-hc-blue/10`}
 										>
-											<i className="ph ph-folder-open text-base" />
+											<MdFolderOpen className="text-base" />
 											<span className={iconActionTooltip}>
 												View bucket files
 											</span>
@@ -554,7 +567,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												title="Empty bucket"
 												className={`${iconActionBase} group text-yellow-300 hover:text-yellow-200 hover:bg-yellow-500/10`}
 											>
-												<i className="ph ph-trash text-base" />
+												<MdDeleteOutline className="text-base" />
 												<span className={iconActionTooltip}>
 													Delete all files in bucket
 												</span>
@@ -567,7 +580,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												title="Empty bucket"
 												className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10`}
 											>
-												<i className="ph ph-trash text-base" />
+												<MdDeleteOutline className="text-base" />
 												<span className={iconActionTooltip}>
 													Delete all files in bucket
 												</span>
@@ -581,7 +594,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												title="Delete bucket"
 												className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10`}
 											>
-												<i className="ph ph-trash-simple text-base" />
+												<MdDeleteForever className="text-base" />
 												<span className={iconActionTooltip}>
 													Delete bucket and all files
 												</span>
@@ -632,7 +645,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														title="Delete key"
 														className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10 ml-auto`}
 													>
-														<i className="ph ph-trash-simple text-base" />
+														<MdDeleteForever className="text-base" />
 														<span className={iconActionTooltip}>
 															Delete this access key
 														</span>
@@ -689,7 +702,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div className="bg-black/30 rounded-xl border border-white/10 overflow-hidden mb-6">
 							<div className="px-4 py-3 border-b border-white/10 bg-white/[0.02]">
 								<p className="text-text-muted text-sm flex items-start gap-2">
-									<i className="ph ph-info text-hc-blue text-base mt-0.5" />
+									<MdInfoOutline className="text-hc-blue text-base mt-0.5" />
 									<span>
 										Configure CORS as a JSON array of rules. Invalid JSON or
 										missing fields will be rejected.
@@ -708,7 +721,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 						{corsError ? (
 							<p className="text-xs text-red-400 mb-2 flex items-center gap-2">
-								<i className="ph ph-warning-circle" />
+								<MdWarning className="text-sm" />
 								<span>{corsError}</span>
 							</p>
 						) : null}
@@ -753,9 +766,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						{confirmDialog.publicRiskWarning ? (
 							<div className="mt-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
 								<div className="flex items-start gap-3">
-									<div className="shrink-0 text-yellow-300 mt-0.5">
-										<i className="ph ph-warning-diamond text-xl" />
-									</div>
+								<div className="shrink-0 text-yellow-300 mt-0.5">
+									<MdWarningAmber className="text-xl" />
+								</div>
 									<div>
 										<h4 className="text-yellow-200 font-bold text-sm mb-1">
 											Public bucket risk warning
