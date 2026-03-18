@@ -78,6 +78,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		"bg-white/5 hover:bg-white/10 border-white/10 text-white px-4 py-2.5";
 	const buttonSubtle =
 		"bg-transparent hover:bg-white/5 border-transparent text-text-muted hover:text-white px-4 py-2.5";
+	const tableActionBase =
+		"text-xs font-bold uppercase tracking-wider transition-colors";
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -499,7 +501,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											onClick={() =>
 												togglePublic(bucket.name, !bucket.isPublic)
 											}
-											className={`inline-flex items-center gap-2 rounded-lg border px-2 py-1 transition-colors ${bucket.isPaused || bucket.isCdn ? "opacity-50 cursor-not-allowed border-white/10" : "border-white/20 hover:border-white/35 hover:bg-white/5"}`}
+											className={`inline-flex items-center gap-2 px-1 py-1 transition-colors ${bucket.isPaused || bucket.isCdn ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}
 										>
 											<span
 												className={`relative h-6 w-11 rounded-full border transition-colors ${bucket.isPublic ? "bg-hc-blue/80 border-hc-blue" : "bg-white/10 border-white/20"}`}
@@ -521,14 +523,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<button
 												type="button"
 												onClick={() => openCorsModal(bucket)}
-												className={`${buttonBase} ${buttonNeutral} text-xs px-3 py-1.5 rounded-lg`}
+												className={`${tableActionBase} text-text-muted hover:text-white`}
 											>
 												CORS
 											</button>
 										) : null}
 										<a
 											href={`/dashboard/buckets/${bucket.name}`}
-											className={`${buttonBase} bg-hc-blue/10 hover:bg-hc-blue/20 border-hc-blue/30 text-hc-blue text-xs px-3 py-1.5 rounded-lg`}
+											className={`${tableActionBase} text-hc-blue hover:text-blue-300`}
 										>
 											Files
 										</a>
@@ -536,7 +538,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<button
 												type="button"
 												onClick={() => deleteBucket(bucket.name, true)}
-												className={`${buttonBase} bg-yellow-500/10 hover:bg-yellow-500/20 border-yellow-500/30 text-yellow-300 text-xs px-3 py-1.5 rounded-lg`}
+												className={`${tableActionBase} text-yellow-300 hover:text-yellow-200`}
 											>
 												Empty
 											</button>
@@ -544,7 +546,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<button
 												type="button"
 												onClick={() => deleteBucket(bucket.name, true)}
-												className={`${buttonBase} bg-hc-red/10 hover:bg-hc-red/20 border-hc-red/30 text-hc-red text-xs px-3 py-1.5 rounded-lg`}
+												className={`${tableActionBase} text-hc-red hover:text-red-400`}
 											>
 												Empty
 											</button>
@@ -553,7 +555,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<button
 												type="button"
 												onClick={() => deleteBucket(bucket.name, false)}
-												className={`${buttonBase} bg-hc-red/10 hover:bg-hc-red/20 border-hc-red/30 text-hc-red text-xs px-3 py-1.5 rounded-lg`}
+												className={`${tableActionBase} text-hc-red hover:text-red-400`}
 											>
 												Delete
 											</button>
@@ -599,7 +601,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													<button
 														type="button"
 														onClick={() => deleteKey(activeBucket.name, k.id)}
-														className={`${buttonBase} bg-hc-red/10 hover:bg-hc-red/20 border-hc-red/30 text-hc-red text-xs px-3 py-1.5 rounded-lg`}
+														className={`${tableActionBase} text-hc-red hover:text-red-400`}
 													>
 														Delete
 													</button>
