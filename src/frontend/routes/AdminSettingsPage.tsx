@@ -190,6 +190,9 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<h4 className="text-white font-bold mb-1">
 								Default Storage Quota
 							</h4>
+							<p className="text-xs text-text-muted mb-4">
+								Used when a user does not have an explicit per-user quota.
+							</p>
 							<div className="flex gap-2 items-center mt-3">
 								<input
 									type="number"
@@ -215,45 +218,84 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									))}
 								</select>
 							</div>
+							<p className="text-[11px] text-text-muted mt-2">
+								Stored as bytes.
+							</p>
 						</div>
 
 						<div className="bg-black/30 p-6 rounded-xl border border-white/10">
 							<h4 className="text-white font-bold mb-1">
-								Default Egress Formula
+								Default Egress Limit (formula)
 							</h4>
+							<p className="text-xs text-text-muted mb-4">
+								When a user has no explicit egress limit, we compute:{" "}
+								<span className="font-mono">
+									max(minEgress, storage × multiplier)
+								</span>
+								.
+							</p>
 							<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-								<input
-									type="number"
-									value={egressMultiplier}
-									onChange={(e) => setEgressMultiplier(Number(e.target.value))}
-									className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono"
-								/>
-								<div className="flex gap-2 items-center">
+								<div>
+									<div className="text-xs text-text-muted mb-1 font-bold uppercase tracking-wider">
+										Multiplier
+									</div>
 									<input
 										type="number"
-										min={0}
-										step="0.01"
-										value={minEgressAmount}
-										onChange={(e) => setMinEgressAmount(Number(e.target.value))}
+										value={egressMultiplier}
+										onChange={(e) =>
+											setEgressMultiplier(Number(e.target.value))
+										}
 										className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono"
 									/>
-									<select
-										value={minEgressUnit}
-										onChange={(e) => setMinEgressUnit(Number(e.target.value))}
-										className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white cursor-pointer font-mono"
-									>
-										{UNITS.map((u) => (
-											<option key={u.value} value={u.value}>
-												{u.label}
-											</option>
-										))}
-									</select>
+								</div>
+								<div className="flex gap-2 items-center">
+									<div className="w-full">
+										<div className="text-xs text-text-muted mb-1 font-bold uppercase tracking-wider">
+											Minimum Egress
+										</div>
+										<div className="flex gap-2 items-center">
+											<input
+												type="number"
+												min={0}
+												step="0.01"
+												value={minEgressAmount}
+												onChange={(e) =>
+													setMinEgressAmount(Number(e.target.value))
+												}
+												className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono"
+											/>
+											<select
+												value={minEgressUnit}
+												onChange={(e) =>
+													setMinEgressUnit(Number(e.target.value))
+												}
+												className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white cursor-pointer font-mono"
+											>
+												{UNITS.map((u) => (
+													<option key={u.value} value={u.value}>
+														{u.label}
+													</option>
+												))}
+											</select>
+										</div>
+									</div>
 								</div>
 							</div>
+							<p className="text-[11px] text-text-muted mt-3">
+								Example: if storage is <span className="font-mono">1GB</span>,
+								multiplier is <span className="font-mono">3</span>, and minimum
+								is <span className="font-mono">10GB</span>, default egress
+								becomes <span className="font-mono">10GB</span>.
+							</p>
 						</div>
 
 						<div className="bg-black/30 p-6 rounded-xl border border-white/10">
-							<h4 className="text-white font-bold mb-1">Limits</h4>
+							<h4 className="text-white font-bold mb-1">
+								Max Buckets per User
+							</h4>
+							<p className="text-xs text-text-muted mb-4">
+								Enforced when creating buckets (Dashboard + Slack + API).
+							</p>
 							<div className="grid grid-cols-2 gap-3 mt-3">
 								<input
 									type="number"
@@ -261,6 +303,9 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									onChange={(e) => setMaxBuckets(Number(e.target.value))}
 									className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono"
 								/>
+								<div className="col-span-2 -mt-1 text-xs text-text-muted font-bold uppercase tracking-wider">
+									Max Keys per Bucket
+								</div>
 								<input
 									type="number"
 									value={maxKeys}
@@ -268,10 +313,16 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono"
 								/>
 							</div>
+							<p className="text-xs text-text-muted mt-4">
+								Max keys is enforced when generating access keys.
+							</p>
 						</div>
 
 						<div className="bg-black/30 p-6 rounded-xl border border-white/10">
 							<h4 className="text-white font-bold mb-1">YSWS + CDN</h4>
+							<p className="text-xs text-text-muted mb-4">
+								Storage reward per shipped hour and CDN notification behavior.
+							</p>
 							<div className="flex gap-2 items-center mt-3 mb-3">
 								<input
 									type="number"
@@ -300,9 +351,13 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									onChange={(e) => setCdnForceSlackUpload(e.target.checked)}
 								/>
 								<span className="text-white text-sm">
-									Force Slack upload notification
+									Force Slack Upload Notification
 								</span>
 							</label>
+							<p className="text-[11px] text-text-muted mt-2">
+								If enabled, all CDN uploads are posted to the configured Slack
+								channel.
+							</p>
 						</div>
 
 						<div className="bg-black/30 p-6 rounded-xl border border-white/10 md:col-span-2">
@@ -325,6 +380,15 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								>
 									+ Add Tier
 								</button>
+							</div>
+							<p className="text-xs text-text-muted mb-4">
+								Configure automatic bonuses for high-hour projects.
+							</p>
+							<div className="grid grid-cols-12 gap-3 mb-2 text-xs text-text-muted uppercase font-bold tracking-wider">
+								<div className="col-span-4">Hours &gt;</div>
+								<div className="col-span-3">Bonus %</div>
+								<div className="col-span-2 text-center">Enabled</div>
+								<div className="col-span-3" />
 							</div>
 							<div className="space-y-2">
 								{tiers.map((tier) => (
