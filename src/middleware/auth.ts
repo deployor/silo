@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { config } from "../config";
 import { db } from "../db";
 import { bucketKeys, buckets, users } from "../db/schema";
@@ -110,9 +110,7 @@ async function getFreshUserById(userId: string) {
 	return user;
 }
 
-async function getPublicAuthContext(
-	requestedBucket: string,
-): Promise<{
+async function getPublicAuthContext(requestedBucket: string): Promise<{
 	bucket: typeof buckets.$inferSelect;
 	userId: string | null;
 } | null> {

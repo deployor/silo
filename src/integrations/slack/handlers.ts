@@ -202,7 +202,10 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			.select()
 			.from(buckets)
 			.where(eq(buckets.userId, user.id));
-		if (!user.isImmortal && userBuckets.length >= settings.defaultMaxBucketsPerUser) {
+		if (
+			!user.isImmortal &&
+			userBuckets.length >= settings.defaultMaxBucketsPerUser
+		) {
 			return {
 				response_action: "errors",
 				errors: {
@@ -284,10 +287,16 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 				.where(eq(bucketKeys.bucketId, bucketId));
 			await openModal(
 				payload.trigger_id,
-				manageKeysModal(bucket[0], keys, {
-					defaultMaxKeysPerBucket: (await getAppSettings())
-						.defaultMaxKeysPerBucket,
-				}, undefined, user.isImmortal),
+				manageKeysModal(
+					bucket[0],
+					keys,
+					{
+						defaultMaxKeysPerBucket: (await getAppSettings())
+							.defaultMaxKeysPerBucket,
+					},
+					undefined,
+					user.isImmortal,
+				),
 			);
 		}
 	}
@@ -408,10 +417,16 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 				},
 				body: JSON.stringify({
 					view_id: payload.view.id,
-					view: manageKeysModal(bucket[0], keys, {
-						defaultMaxKeysPerBucket: (await getAppSettings())
-							.defaultMaxKeysPerBucket,
-					}, undefined, user.isImmortal),
+					view: manageKeysModal(
+						bucket[0],
+						keys,
+						{
+							defaultMaxKeysPerBucket: (await getAppSettings())
+								.defaultMaxKeysPerBucket,
+						},
+						undefined,
+						user.isImmortal,
+					),
 				}),
 			});
 		}

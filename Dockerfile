@@ -20,7 +20,7 @@ COPY --from=install /temp/dev/node_modules node_modules
 COPY . .
 # Generate git info file
 RUN echo "{\"sha\": \"$(git rev-parse HEAD)\", \"date\": \"$(git show -s --format=%cI HEAD)\", \"message\": \"$(git show -s --format=%s HEAD | tr -d '"' | tr -d '\n')\", \"buildDate\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"}" > src/git-info.json
-RUN bun run build:css
+RUN bun run build
 
 FROM base AS release
 COPY --from=install /temp/prod/node_modules node_modules

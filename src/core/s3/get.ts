@@ -133,23 +133,6 @@ ${rulesXml}
 		);
 	}
 
-	let egressLimit: bigint | null = null;
-	if (user && !user.isImmortal) {
-		if (user.egressLimitBytes !== null) {
-			const manualLimit = BigInt(user.egressLimitBytes);
-			if (manualLimit !== -1n) {
-				egressLimit = manualLimit;
-			}
-		} else {
-			if (user.storageLimitBytes !== null) {
-				const storageLimit = BigInt(user.storageLimitBytes);
-				const calculated = storageLimit * 3n;
-				const minLimit = 10n * 1024n * 1024n * 1024n; // 10GB
-				egressLimit = calculated > minLimit ? calculated : minLimit;
-			}
-		}
-	}
-
 	async function reserveEgressQuota(bytesToSend: number) {
 		if (!user || user.isImmortal) return true;
 		if (!Number.isFinite(bytesToSend) || bytesToSend <= 0) return true;

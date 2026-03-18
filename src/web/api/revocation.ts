@@ -32,7 +32,7 @@ export async function handleRevocationRequest(req: Request): Promise<Response> {
 	let body: { accessKey?: string };
 	try {
 		body = await req.json();
-	} catch (e) {
+	} catch (_e) {
 		return errorResponse("Invalid JSON body", 400);
 	}
 

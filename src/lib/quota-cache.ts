@@ -44,14 +44,16 @@ export async function consumeStorageQuota(
 	if (!Number.isFinite(storageLimit) || storageLimit <= 0) return false;
 
 	try {
-		const result = (await (redis as unknown as {
-			checkAndIncrQuota: (
-				key: string,
-				delta: string,
-				limit: string,
-				seed: string,
-			) => Promise<[number, number]>;
-		}).checkAndIncrQuota(
+		const result = (await (
+			redis as unknown as {
+				checkAndIncrQuota: (
+					key: string,
+					delta: string,
+					limit: string,
+					seed: string,
+				) => Promise<[number, number]>;
+			}
+		).checkAndIncrQuota(
 			STORAGE_KEY(user.id),
 			String(Math.floor(bytesToAdd)),
 			String(Math.floor(storageLimit)),
@@ -73,9 +75,11 @@ export async function releaseStorageQuota(
 	if (!userId || bytesToRelease <= 0) return;
 
 	try {
-		await (redis as unknown as {
-			decrClampQuota: (key: string, delta: string) => Promise<number>;
-		}).decrClampQuota(STORAGE_KEY(userId), String(Math.floor(bytesToRelease)));
+		await (
+			redis as unknown as {
+				decrClampQuota: (key: string, delta: string) => Promise<number>;
+			}
+		).decrClampQuota(STORAGE_KEY(userId), String(Math.floor(bytesToRelease)));
 	} catch (error) {
 		console.error("[quota] storage release failed", error);
 	}
@@ -94,14 +98,16 @@ export async function consumeEgressQuota(
 	if (egressLimit === null) return true;
 
 	try {
-		const result = (await (redis as unknown as {
-			checkAndIncrQuota: (
-				key: string,
-				delta: string,
-				limit: string,
-				seed: string,
-			) => Promise<[number, number]>;
-		}).checkAndIncrQuota(
+		const result = (await (
+			redis as unknown as {
+				checkAndIncrQuota: (
+					key: string,
+					delta: string,
+					limit: string,
+					seed: string,
+				) => Promise<[number, number]>;
+			}
+		).checkAndIncrQuota(
 			EGRESS_KEY(user.id),
 			String(Math.floor(bytesToAdd)),
 			String(Math.floor(egressLimit)),

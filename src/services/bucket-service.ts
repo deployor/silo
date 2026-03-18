@@ -69,7 +69,7 @@ export async function createBucket(
 		.select()
 		.from(buckets)
 		.where(eq(buckets.userId, userId));
-	
+
 	if (!user.isImmortal && userBuckets.length >= maxBuckets) {
 		throw new Error(`Bucket limit reached (${maxBuckets})`);
 	}

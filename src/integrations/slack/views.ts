@@ -69,8 +69,8 @@ export const homeView = (
 			Divider(),
 			Section({ text: "*:ms-increasing-graph: Usage Overview*" }),
 			Section().fields(
-				`*Storage Used*\n${formatBytes(user.storageUsageBytes)} / ${user.isImmortal ? '∞' : formatBytes(user.storageLimitBytes ?? 0)} ${user.isImmortal ? '' : `(${usagePercent.toFixed(1)}%)`}`,
-				`*Active Buckets*\n${buckets.length} / ${user.isImmortal ? '∞' : settings.defaultMaxBucketsPerUser}`,
+				`*Storage Used*\n${formatBytes(user.storageUsageBytes)} / ${user.isImmortal ? "∞" : formatBytes(user.storageLimitBytes ?? 0)} ${user.isImmortal ? "" : `(${usagePercent.toFixed(1)}%)`}`,
+				`*Active Buckets*\n${buckets.length} / ${user.isImmortal ? "∞" : settings.defaultMaxBucketsPerUser}`,
 			),
 			Section().fields(
 				`*Total Requests*\n${user.totalRequests.toLocaleString()}`,
@@ -193,7 +193,8 @@ export const manageKeysModal = (
 	newKey?: { accessKey: string; secretKey: string },
 	isImmortal = false,
 ) => {
-	const isAtLimit = !isImmortal && keys.length >= settings.defaultMaxKeysPerBucket;
+	const isAtLimit =
+		!isImmortal && keys.length >= settings.defaultMaxKeysPerBucket;
 
 	return Modal({
 		title: `Keys: ${bucket.name}`,
@@ -206,9 +207,7 @@ export const manageKeysModal = (
 				text: "Here are the keys :ms-wrench:",
 			}).accessory(
 				Button({
-					text: isAtLimit
-						? "Key Limit Reached"
-						: "Make New Key :blobby-lock:",
+					text: isAtLimit ? "Key Limit Reached" : "Make New Key :blobby-lock:",
 					actionId: "generate_key",
 					value: bucket.id,
 				}).primary(),
@@ -217,8 +216,8 @@ export const manageKeysModal = (
 				isImmortal
 					? `Keys: ${keys.length} / ∞`
 					: isAtLimit
-					? `Keys: ${keys.length} / ${settings.defaultMaxKeysPerBucket} (limit reached… delete one to create another)`
-					: `Keys: ${keys.length} / ${settings.defaultMaxKeysPerBucket}`,
+						? `Keys: ${keys.length} / ${settings.defaultMaxKeysPerBucket} (limit reached… delete one to create another)`
+						: `Keys: ${keys.length} / ${settings.defaultMaxKeysPerBucket}`,
 			),
 			Divider(),
 			newKey
