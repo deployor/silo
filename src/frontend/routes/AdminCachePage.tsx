@@ -2,6 +2,7 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminSubnav } from "../components/AdminSubnav";
 import { AppShell } from "../components/AppShell";
+import { PhIcon } from "../components/ui/PhIcon";
 import { fetchJson } from "../shared/api/http";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 
@@ -77,7 +78,7 @@ export function AdminCachePage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 			<div className="flex items-center justify-between mb-6">
 				<h2 className="text-2xl font-bold text-white">
-					<i className="ph ph-database mr-2" />
+					<PhIcon className="ph ph-database mr-2" />
 					Cache Statistics
 				</h2>
 				<div className="flex items-center gap-3">
@@ -89,7 +90,7 @@ export function AdminCachePage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						onClick={load}
 						className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg text-sm font-bold transition-colors"
 					>
-						<i className="ph ph-arrows-clockwise mr-1" /> Refresh
+						<PhIcon className="ph ph-arrows-clockwise mr-1" /> Refresh
 					</button>
 				</div>
 			</div>
@@ -152,7 +153,7 @@ export function AdminCachePage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 					<div className="bg-black/30 p-6 rounded-xl border border-white/10 mb-6">
 						<h3 className="text-white font-semibold mb-4">
-							<i className="ph ph-key mr-1" /> Redis Key Breakdown
+							<PhIcon className="ph ph-key mr-1" /> Redis Key Breakdown
 						</h3>
 						<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 							{(stats.redis?.keyBreakdown || []).map((prefix) => (
@@ -170,7 +171,7 @@ export function AdminCachePage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 					<div className="bg-black/30 p-6 rounded-xl border border-white/10">
 						<h3 className="text-white font-semibold mb-4">
-							<i className="ph ph-fire mr-1" /> Top Hot Objects
+							<PhIcon className="ph ph-fire mr-1" /> Top Hot Objects
 						</h3>
 						<div className="overflow-x-auto">
 							<table className="w-full text-sm">

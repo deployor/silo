@@ -1,6 +1,7 @@
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { PhIcon } from "../components/ui/PhIcon";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 
 type Section = {
@@ -335,7 +336,7 @@ const s3 = new S3Client({ endpoint: "https://silo.deployor.dev", region: "auto" 
 							onClick={() => setMobileOpen(false)}
 							className="text-text-muted hover:text-white"
 						>
-							<i className="ph ph-x text-2xl" />
+							<PhIcon className="ph ph-x text-2xl" />
 						</button>
 					</div>
 
@@ -370,7 +371,7 @@ const s3 = new S3Client({ endpoint: "https://silo.deployor.dev", region: "auto" 
 							onClick={() => setMobileOpen(true)}
 							className="flex items-center gap-2 text-sm font-bold text-text-muted hover:text-white transition-colors"
 						>
-							<i className="ph ph-list text-xl" /> Table of Contents
+							<PhIcon className="ph ph-list text-xl" /> Table of Contents
 						</button>
 					</div>
 					<div className="p-6 md:p-12 pt-0 md:pt-12">

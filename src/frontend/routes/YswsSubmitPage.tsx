@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { PhIcon } from "../components/ui/PhIcon";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 import { formatBytes } from "../shared/utils/format";
 
@@ -137,7 +138,7 @@ export function YswsSubmitPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						href="/ysws"
 						className="text-sm text-text-muted hover:text-white transition-colors flex items-center gap-2"
 					>
-						<i className="ph ph-arrow-left text-lg" />
+						<PhIcon className="ph ph-arrow-left text-lg" />
 						Back to Dashboard
 					</a>
 				</div>

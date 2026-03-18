@@ -1,6 +1,7 @@
 import type React from "react";
 import { useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { PhIcon } from "../components/ui/PhIcon";
 import type { AppBootstrap } from "../shared/types/app";
 
 export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
@@ -32,7 +33,7 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								className="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20"
 							>
 								<span>Next: Your Storage</span>
-								<i className="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform" />
+								<PhIcon className="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform" />
 							</button>
 						}
 					/>
@@ -59,7 +60,8 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								onClick={() => setStep(3)}
 								className="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 shadow-lg shadow-hc-red/20"
 							>
-								Next: Privacy & Logs <i className="ph-bold ph-arrow-right" />
+								Next: Privacy & Logs{" "}
+								<PhIcon className="ph-bold ph-arrow-right" />
 							</button>
 						}
 					/>
@@ -85,7 +87,7 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								onClick={() => setStep(4)}
 								className="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 shadow-lg shadow-hc-red/20"
 							>
-								Next: How it Works <i className="ph-bold ph-arrow-right" />
+								Next: How it Works <PhIcon className="ph-bold ph-arrow-right" />
 							</button>
 						}
 					/>
@@ -111,7 +113,7 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									type="submit"
 									className="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 shadow-lg shadow-hc-red/20"
 								>
-									Get Started <i className="ph-bold ph-rocket-launch" />
+									Get Started <PhIcon className="ph-bold ph-rocket-launch" />
 								</button>
 							</form>
 						}

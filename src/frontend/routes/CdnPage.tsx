@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { PhIcon } from "../components/ui/PhIcon";
 import { useClipboard } from "../hooks/useClipboard";
 import { fetchJson } from "../shared/api/http";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
@@ -159,7 +160,7 @@ export function CdnPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div className="flex flex-col items-center gap-4 mb-6">
 							<div className="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-4 py-2 rounded-lg text-sm inline-block max-w-xl">
 								<div className="flex items-center gap-2">
-									<i className="ph ph-info text-lg" />
+									<PhIcon className="ph ph-info text-lg" />
 									<span>
 										Files uploaded here can be automatically posted to the{" "}
 										<span className="font-bold text-white">#cdn</span> channel
@@ -186,7 +187,7 @@ export function CdnPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					) : (
 						<div className="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-4 py-2 rounded-lg text-sm mb-6 inline-block max-w-xl">
 							<div className="flex items-center gap-2">
-								<i className="ph ph-info text-lg" />
+								<PhIcon className="ph ph-info text-lg" />
 								<span>
 									Files uploaded here will be automatically posted to the{" "}
 									<span className="font-bold text-white">#cdn</span> channel on
@@ -242,7 +243,7 @@ export function CdnPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					{!uploading ? (
 						<div className="text-center pointer-events-none">
 							<div className="inline-flex mb-6 text-hc-red">
-								<i className="ph ph-cloud-arrow-up text-5xl" />
+								<PhIcon className="ph ph-cloud-arrow-up text-5xl" />
 							</div>
 							<h3 className="text-xl md:text-2xl font-bold text-white mb-2">
 								Drop files here
@@ -263,7 +264,7 @@ export function CdnPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								/>
 							</div>
 							<p className="text-white font-mono text-base md:text-lg flex items-center gap-2 text-center">
-								<i className="ph ph-spinner animate-spin text-xl text-hc-red" />
+								<PhIcon className="ph ph-spinner animate-spin text-xl text-hc-red" />
 								<span>
 									Uploading{" "}
 									<span className="font-bold text-hc-red">{fileCount}</span>{" "}
@@ -298,7 +299,7 @@ export function CdnPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									>
 										<div className="flex items-center gap-4 overflow-hidden">
 											<div className="bg-emerald-500/10 p-3 rounded-xl text-emerald-400 shrink-0 border border-emerald-500/20">
-												<i className="ph ph-check text-2xl" />
+												<PhIcon className="ph ph-check text-2xl" />
 											</div>
 											<div className="min-w-0">
 												<p className="text-white font-bold truncate text-base">
@@ -338,7 +339,7 @@ export function CdnPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												className="text-text-muted hover:text-white p-2 rounded-lg"
 												title="Open"
 											>
-												<i className="ph ph-arrow-square-out text-xl" />
+												<PhIcon className="ph ph-arrow-square-out text-xl" />
 											</a>
 										</div>
 									</div>
@@ -348,7 +349,7 @@ export function CdnPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										className="bg-hc-dark border border-white/10 rounded-2xl p-5 flex items-center gap-4 card-shadow"
 									>
 										<div className="bg-red-500/10 p-3 rounded-xl text-red-400 shrink-0 border border-red-500/20">
-											<i className="ph ph-warning-circle text-2xl" />
+											<PhIcon className="ph ph-warning-circle text-2xl" />
 										</div>
 										<div className="min-w-0">
 											<p className="text-white font-bold truncate text-base">

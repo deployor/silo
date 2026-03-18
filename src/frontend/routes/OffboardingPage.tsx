@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { PhIcon } from "../components/ui/PhIcon";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 
 type PlanRow = {
@@ -167,7 +168,7 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				{step === 1 ? (
 					<div className="w-full max-w-4xl mx-auto text-center">
 						<div className="mb-8 flex justify-center">
-							<i className="ph-duotone ph-hand-waving text-8xl text-hc-red transform scale-x-[-1]" />
+							<PhIcon className="ph-duotone ph-hand-waving text-8xl text-hc-red transform scale-x-[-1]" />
 						</div>
 						{p.user?.dataExported ? (
 							<>
@@ -201,7 +202,7 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
 							<div className="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow flex flex-col items-center text-center">
 								<div className="h-20 w-20 bg-white/10 rounded-full flex items-center justify-center mb-6 text-4xl text-white">
-									<i className="ph-duotone ph-file-zip text-5xl" />
+									<PhIcon className="ph-duotone ph-file-zip text-5xl" />
 								</div>
 								<h3 className="text-2xl font-bold text-white mb-2">
 									Download ZIP
@@ -211,7 +212,7 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</p>
 								{p.showSuccess ? (
 									<div className="bg-green-500/20 text-green-400 p-4 rounded-xl font-bold w-full">
-										<i className="ph-bold ph-check-circle mr-2" /> Archive
+										<PhIcon className="ph-bold ph-check-circle mr-2" /> Archive
 										Created
 									</div>
 								) : (
@@ -243,7 +244,7 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</div>
 								) : null}
 								<div className="h-20 w-20 bg-blue-500/10 rounded-full flex items-center justify-center mb-6 text-4xl text-blue-400">
-									<i className="ph-duotone ph-rocket-launch" />
+									<PhIcon className="ph-duotone ph-rocket-launch" />
 								</div>
 								<h3 className="text-2xl font-bold text-white mb-2">
 									Migration Assistant
@@ -304,7 +305,7 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								className="group bg-hc-dark hover:bg-white/5 border border-white/10 hover:border-white/50 rounded-2xl p-6 transition-all flex items-center gap-6 col-span-1 md:col-span-2"
 							>
 								<div className="h-16 w-16 shrink-0 rounded-xl bg-white/10 flex items-center justify-center p-3 text-3xl text-white">
-									<i className="ph-bold ph-globe" />
+									<PhIcon className="ph-bold ph-globe" />
 								</div>
 								<div className="flex-1">
 									<h4 className="text-white font-bold text-xl mb-1">

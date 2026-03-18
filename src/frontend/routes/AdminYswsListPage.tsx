@@ -1,5 +1,6 @@
 import { AdminSubnav } from "../components/AdminSubnav";
 import { AppShell } from "../components/AppShell";
+import { PhIcon } from "../components/ui/PhIcon";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 import { formatDate } from "../shared/utils/format";
 
@@ -99,7 +100,7 @@ export function AdminYswsListPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												className="text-hc-red hover:text-white transition-colors font-medium flex items-center justify-end gap-1"
 											>
 												Review
-												<i className="ph ph-arrow-right" />
+												<PhIcon className="ph ph-arrow-right" />
 											</a>
 										</td>
 									</tr>

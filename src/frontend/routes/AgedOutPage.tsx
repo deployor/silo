@@ -1,3 +1,4 @@
+import { PhIcon } from "../components/ui/PhIcon";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 
 export function AgedOutPage({ bootstrap }: { bootstrap: AppBootstrap }) {
@@ -43,7 +44,7 @@ export function AgedOutPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					href="https://hackclub.com"
 					className="text-white font-bold hover:text-text-muted transition-colors"
 				>
-					Return to Hack Club <i className="ph ph-arrow-right" />
+					Return to Hack Club <PhIcon className="ph ph-arrow-right" />
 				</a>
 
 				<div className="mt-12 pt-8 border-t border-white/10 text-xs text-text-muted font-mono opacity-40">

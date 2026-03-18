@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AdminSubnav } from "../components/AdminSubnav";
 import { AppShell } from "../components/AppShell";
+import { PhIcon } from "../components/ui/PhIcon";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 import { formatBytes } from "../shared/utils/format";
 
@@ -126,7 +127,7 @@ export function AdminRedemptionsPage({
 								onClick={() => setOpen(false)}
 								className="text-text-muted hover:text-white transition-colors"
 							>
-								<i className="ph ph-x text-2xl" />
+								<PhIcon className="ph ph-x text-2xl" />
 							</button>
 						</div>
 						<form method="POST" action="/admin/redemptions/create">
