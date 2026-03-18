@@ -56,7 +56,6 @@ export function renderReactDocument(
     <meta property="twitter:description" content="Free S3-compatible object storage for Hack Club members. Ship your projects, earn more storage." />
     <meta property="twitter:image" content="https://assets.hackclub.com/icon-rounded.png" />
     <link rel="stylesheet" href="/assets/react/app.css" />
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
   </head>
   <body class="min-h-screen selection:bg-hc-red selection:text-white font-sans ${viewData.bodyClass || ""}">
     <div id="root"></div>

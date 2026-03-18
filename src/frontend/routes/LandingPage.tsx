@@ -42,6 +42,9 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					<h1 className="text-6xl md:text-9xl font-bold mb-2 italic tracking-tighter text-white select-none">
 						SILO
 					</h1>
+					<h2 className="sr-only">
+						Free S3 Compatible Object Storage for YSWS
+					</h2>
 					<p className="text-2xl md:text-3xl text-gray-400 mb-12 max-w-2xl mx-auto font-light">
 						The YSWS object storage thing.
 						<br />
@@ -132,8 +135,12 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											max={100}
 											value={hours}
 											onChange={(e) => setHours(Number(e.target.value))}
-											className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-hc-red"
+											className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-hc-red hover:accent-red-400 transition-all"
 										/>
+										<div className="flex justify-between mt-2 text-xs text-text-muted font-mono">
+											<span>1h</span>
+											<span>100h</span>
+										</div>
 									</div>
 									<div className="hidden md:block w-px h-24 bg-white/10" />
 									<div className="flex-1 w-full text-center md:text-left">
@@ -148,6 +155,9 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												GB
 											</span>
 										</div>
+										<p className="text-xs text-text-muted mt-2">
+											Permanent storage added to your account
+										</p>
 										{tier > 0 ? (
 											<p className="text-xs text-hc-green font-bold mt-2">
 												+{tier}% Bonus Applied!
@@ -156,6 +166,9 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</div>
 								</div>
 							</div>
+							<p className="mt-8 text-lg text-text-muted max-w-xl mx-auto">
+								Ship your project to earn storage quota.
+							</p>
 						</div>
 					) : null}
 				</div>
