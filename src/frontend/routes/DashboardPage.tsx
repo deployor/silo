@@ -78,8 +78,10 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		"bg-white/5 hover:bg-white/10 border-white/10 text-white px-4 py-2.5";
 	const buttonSubtle =
 		"bg-transparent hover:bg-white/5 border-transparent text-text-muted hover:text-white px-4 py-2.5";
-	const tableActionBase =
-		"text-xs font-bold uppercase tracking-wider transition-colors";
+	const iconActionBase =
+		"relative inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors";
+	const iconActionTooltip =
+		"pointer-events-none absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-md border border-white/15 bg-black/90 px-2 py-1 text-[10px] font-medium text-white opacity-0 translate-y-1 transition-all group-hover:opacity-100 group-hover:translate-y-0";
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -518,46 +520,71 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<td className="px-6 py-4 text-text-muted text-xs font-mono">
 										{new Date(bucket.createdAt).toLocaleDateString()}
 									</td>
-									<td className="px-6 py-4 text-right flex justify-end items-center gap-2">
+									<td className="px-6 py-4 text-right flex justify-end items-center gap-1.5">
 										{!bucket.isCdn ? (
 											<button
 												type="button"
 												onClick={() => openCorsModal(bucket)}
-												className={`${tableActionBase} text-text-muted hover:text-white`}
+												aria-label="Configure CORS"
+												title="Configure CORS"
+												className={`${iconActionBase} group text-text-muted hover:text-white hover:bg-white/10`}
 											>
-												CORS
+												<i className="ph ph-code text-base" />
+												<span className={iconActionTooltip}>
+													Configure CORS rules
+												</span>
 											</button>
 										) : null}
 										<a
 											href={`/dashboard/buckets/${bucket.name}`}
-											className={`${tableActionBase} text-hc-blue hover:text-blue-300`}
+											aria-label="Open bucket files"
+											title="Open bucket files"
+											className={`${iconActionBase} group text-hc-blue hover:text-blue-300 hover:bg-hc-blue/10`}
 										>
-											Files
+											<i className="ph ph-folder-open text-base" />
+											<span className={iconActionTooltip}>
+												View bucket files
+											</span>
 										</a>
 										{!bucket.isCdn ? (
 											<button
 												type="button"
 												onClick={() => deleteBucket(bucket.name, true)}
-												className={`${tableActionBase} text-yellow-300 hover:text-yellow-200`}
+												aria-label="Empty bucket"
+												title="Empty bucket"
+												className={`${iconActionBase} group text-yellow-300 hover:text-yellow-200 hover:bg-yellow-500/10`}
 											>
-												Empty
+												<i className="ph ph-trash text-base" />
+												<span className={iconActionTooltip}>
+													Delete all files in bucket
+												</span>
 											</button>
 										) : (
 											<button
 												type="button"
 												onClick={() => deleteBucket(bucket.name, true)}
-												className={`${tableActionBase} text-hc-red hover:text-red-400`}
+												aria-label="Empty bucket"
+												title="Empty bucket"
+												className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10`}
 											>
-												Empty
+												<i className="ph ph-trash text-base" />
+												<span className={iconActionTooltip}>
+													Delete all files in bucket
+												</span>
 											</button>
 										)}
 										{!bucket.isCdn ? (
 											<button
 												type="button"
 												onClick={() => deleteBucket(bucket.name, false)}
-												className={`${tableActionBase} text-hc-red hover:text-red-400`}
+												aria-label="Delete bucket"
+												title="Delete bucket"
+												className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10`}
 											>
-												Delete
+												<i className="ph ph-trash-simple text-base" />
+												<span className={iconActionTooltip}>
+													Delete bucket and all files
+												</span>
 											</button>
 										) : null}
 									</td>
@@ -601,9 +628,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													<button
 														type="button"
 														onClick={() => deleteKey(activeBucket.name, k.id)}
-														className={`${tableActionBase} text-hc-red hover:text-red-400`}
+														aria-label="Delete key"
+														title="Delete key"
+														className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10 ml-auto`}
 													>
-														Delete
+														<i className="ph ph-trash-simple text-base" />
+														<span className={iconActionTooltip}>
+															Delete this access key
+														</span>
 													</button>
 												</td>
 											</tr>
