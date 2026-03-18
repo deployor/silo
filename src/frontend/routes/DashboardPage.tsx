@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { Modal } from "../components/ui/Modal";
 import { fetchJson, fetchText } from "../shared/api/http";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 import { formatBytes } from "../shared/utils/format";
@@ -37,6 +38,14 @@ type DashboardStats = {
 	buckets: DashboardBucket[];
 };
 
+type ConfirmDialogState = {
+	title: string;
+	message: string;
+	confirmLabel: string;
+	confirmClassName?: string;
+	onConfirm: () => Promise<void>;
+};
+
 export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const p = bootstrap.props as {
 		user?: FrontendUser | null;
@@ -50,6 +59,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [activeBucket, setActiveBucket] = useState<DashboardBucket | null>(
 		null,
 	);
+	const [corsBucket, setCorsBucket] = useState<DashboardBucket | null>(null);
+	const [corsEditor, setCorsEditor] = useState("[]");
+	const [corsError, setCorsError] = useState<string | null>(null);
+	const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(
+		null,
+	);
+	const [confirmLoading, setConfirmLoading] = useState(false);
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -112,42 +128,40 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	};
 
 	const togglePublic = async (bucketName: string, isPublic: boolean) => {
-		if (
-			!window.confirm(`Make ${bucketName} ${isPublic ? "public" : "private"}?`)
-		)
-			return;
-		try {
-			await fetchText(`/api/dashboard/buckets/${bucketName}`, {
-				method: "PATCH",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ isPublic }),
-			});
-			await load();
-		} catch (e) {
-			window.alert(
-				e instanceof Error ? e.message : "Failed to update visibility",
-			);
-		}
+		setConfirmDialog({
+			title: `Make bucket ${isPublic ? "public" : "private"}`,
+			message: isPublic
+				? `Anyone with the file URL will be able to access files in ${bucketName}.`
+				: `Only authenticated access will be allowed for ${bucketName}.`,
+			confirmLabel: isPublic ? "Make Public" : "Make Private",
+			confirmClassName: "bg-hc-blue hover:bg-blue-600",
+			onConfirm: async () => {
+				await fetchText(`/api/dashboard/buckets/${bucketName}`, {
+					method: "PATCH",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ isPublic }),
+				});
+				await load();
+			},
+		});
 	};
 
 	const deleteBucket = async (bucketName: string, emptyOnly: boolean) => {
-		if (
-			!window.confirm(
-				emptyOnly ? `Empty ${bucketName}?` : `Delete ${bucketName}?`,
-			)
-		)
-			return;
-		try {
-			await fetchText(
-				`/api/dashboard/buckets/${bucketName}${emptyOnly ? "?empty=true" : ""}`,
-				{
-					method: "DELETE",
-				},
-			);
-			await load();
-		} catch (e) {
-			window.alert(e instanceof Error ? e.message : "Bucket action failed");
-		}
+		setConfirmDialog({
+			title: emptyOnly ? "Empty bucket" : "Delete bucket",
+			message: emptyOnly
+				? `This will permanently remove all files in ${bucketName}.`
+				: `This will permanently delete ${bucketName} and all of its files.`,
+			confirmLabel: emptyOnly ? "Empty Bucket" : "Delete Bucket",
+			confirmClassName: "bg-hc-red hover:bg-red-600",
+			onConfirm: async () => {
+				await fetchText(
+					`/api/dashboard/buckets/${bucketName}${emptyOnly ? "?empty=true" : ""}`,
+					{ method: "DELETE" },
+				);
+				await load();
+			},
+		});
 	};
 
 	const generateKey = async (bucketName: string) => {
@@ -167,43 +181,91 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	};
 
 	const deleteKey = async (bucketName: string, keyId: string) => {
-		if (!window.confirm("Delete this key?")) return;
+		setConfirmDialog({
+			title: "Delete access key",
+			message:
+				"Any applications using this key will immediately lose access to this bucket.",
+			confirmLabel: "Delete Key",
+			confirmClassName: "bg-hc-red hover:bg-red-600",
+			onConfirm: async () => {
+				await fetchText(`/api/dashboard/buckets/${bucketName}/keys/${keyId}`, {
+					method: "DELETE",
+				});
+				await load();
+			},
+		});
+	};
+
+	const openCorsModal = (bucket: DashboardBucket) => {
+		setCorsBucket(bucket);
+		setCorsError(null);
+		if (!bucket.corsConfig) {
+			setCorsEditor("[]");
+			return;
+		}
+
 		try {
-			await fetchText(`/api/dashboard/buckets/${bucketName}/keys/${keyId}`, {
-				method: "DELETE",
-			});
-			await load();
-		} catch (e) {
-			window.alert(e instanceof Error ? e.message : "Failed to delete key");
+			const parsed = JSON.parse(bucket.corsConfig);
+			setCorsEditor(JSON.stringify(parsed.CORSRules || parsed, null, 2));
+		} catch {
+			setCorsEditor(bucket.corsConfig);
 		}
 	};
 
-	const setCors = async (bucket: DashboardBucket) => {
-		const current = bucket.corsConfig || "[]";
-		const raw = window.prompt("Paste CORS rules array JSON", current);
-		if (raw === null) return;
+	const saveCors = async () => {
+		if (!corsBucket) return;
 		try {
-			const rules = JSON.parse(raw);
-			await fetchText(`/api/dashboard/buckets/${bucket.name}/cors`, {
+			const rules = JSON.parse(corsEditor);
+			if (!Array.isArray(rules)) {
+				setCorsError("Configuration must be a JSON array of CORS rules.");
+				return;
+			}
+			for (const rule of rules) {
+				if (!rule?.AllowedOrigins || !rule?.AllowedMethods) {
+					setCorsError(
+						"Each rule must include AllowedOrigins and AllowedMethods.",
+					);
+					return;
+				}
+			}
+
+			setCorsError(null);
+			await fetchText(`/api/dashboard/buckets/${corsBucket.name}/cors`, {
 				method: "PUT",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ rules }),
 			});
 			await load();
+			setCorsBucket(null);
 		} catch (e) {
-			window.alert(e instanceof Error ? e.message : "Invalid CORS config");
+			setCorsError(e instanceof Error ? e.message : "Invalid CORS config");
 		}
 	};
 
-	const resetCors = async (bucket: DashboardBucket) => {
-		if (!window.confirm(`Reset CORS for ${bucket.name}?`)) return;
+	const resetCors = async () => {
+		if (!corsBucket) return;
 		try {
-			await fetchText(`/api/dashboard/buckets/${bucket.name}/cors`, {
+			await fetchText(`/api/dashboard/buckets/${corsBucket.name}/cors`, {
 				method: "DELETE",
 			});
 			await load();
+			setCorsEditor("[]");
+			setCorsError(null);
 		} catch (e) {
-			window.alert(e instanceof Error ? e.message : "Failed to reset CORS");
+			setCorsError(e instanceof Error ? e.message : "Failed to reset CORS");
+		}
+	};
+
+	const runConfirmDialog = async () => {
+		if (!confirmDialog) return;
+		setConfirmLoading(true);
+		try {
+			await confirmDialog.onConfirm();
+			setConfirmDialog(null);
+		} catch (e) {
+			window.alert(e instanceof Error ? e.message : "Action failed");
+		} finally {
+			setConfirmLoading(false);
 		}
 	};
 
@@ -251,10 +313,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				) : (
 					<div className="bg-hc-dark rounded-3xl card-shadow border border-white/10 p-8">
 						<h2 className="text-3xl md:text-4xl font-black text-white italic tracking-tight mb-3">
-							Ship projects.{" "}
-							<span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400">
-								Get paid in storage.
-							</span>
+							Ship projects. <span className="text-hc-red">Get paid in storage.</span>
 						</h2>
 						<p className="text-text-muted text-lg max-w-xl mb-6">
 							Built something cool? Submit it to YSWS. Every shipped project
@@ -441,7 +500,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										{!bucket.isCdn ? (
 											<button
 												type="button"
-												onClick={() => setCors(bucket)}
+												onClick={() => openCorsModal(bucket)}
 												className="bg-white/5 hover:bg-white/10 text-text-muted hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold"
 											>
 												CORS
@@ -479,15 +538,6 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												Delete
 											</button>
 										) : null}
-										{!bucket.isCdn ? (
-											<button
-												type="button"
-												onClick={() => resetCors(bucket)}
-												className="text-text-muted hover:text-white text-xs font-bold uppercase tracking-wider"
-											>
-												Reset CORS
-											</button>
-										) : null}
 									</td>
 								</tr>
 							))}
@@ -496,25 +546,17 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				</div>
 			</div>
 
-			{activeBucket ? (
-				<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-					<div className="bg-hc-dark rounded-3xl border border-white/10 p-8 w-full max-w-3xl card-shadow">
-						<div className="flex justify-between items-center mb-6">
-							<div>
-								<h3 className="text-2xl font-bold text-white">Manage Keys</h3>
-								<p className="text-text-muted text-sm mt-1 font-mono">
-									{activeBucket.name}
-								</p>
-							</div>
-							<button
-								type="button"
-								onClick={() => setActiveBucket(null)}
-								className="text-text-muted hover:text-white"
-							>
-								<i className="ph ph-x text-2xl" />
-							</button>
-						</div>
-
+			<Modal
+				open={!!activeBucket}
+				onClose={() => setActiveBucket(null)}
+				title="Manage Keys"
+				className="max-w-3xl p-8"
+			>
+				{activeBucket ? (
+					<>
+						<p className="text-text-muted text-sm -mt-3 mb-6 font-mono">
+							{activeBucket.name}
+						</p>
 						<div className="bg-black/30 rounded-xl border border-white/10 overflow-hidden mb-6 max-h-[55vh] overflow-y-auto">
 							<table className="w-full text-left text-sm">
 								<thead className="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider sticky top-0">
@@ -574,9 +616,94 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								+ Generate New Key
 							</button>
 						</div>
-					</div>
-				</div>
-			) : null}
+					</>
+				) : null}
+			</Modal>
+
+			<Modal
+				open={!!corsBucket}
+				onClose={() => setCorsBucket(null)}
+				title="CORS Configuration"
+				className="max-w-2xl p-8"
+			>
+				{corsBucket ? (
+					<>
+						<p className="text-text-muted text-sm -mt-3 mb-4 font-mono">
+							{corsBucket.name}
+						</p>
+						<p className="text-text-muted text-sm mb-4">
+							Configure CORS as a JSON array of rules.
+						</p>
+						<textarea
+							value={corsEditor}
+							onChange={(e) => {
+								setCorsEditor(e.target.value);
+								setCorsError(null);
+							}}
+							className="w-full h-64 bg-black/30 border border-white/10 rounded-xl p-4 text-white font-mono text-sm focus:outline-none focus:border-hc-blue focus:ring-1 focus:ring-hc-blue resize-none"
+						/>
+						{corsError ? (
+							<p className="text-xs text-red-400 mt-2">{corsError}</p>
+						) : null}
+						<div className="flex justify-between items-center mt-6">
+							<button
+								type="button"
+								onClick={resetCors}
+								className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+							>
+								Reset CORS
+							</button>
+							<div className="flex items-center gap-3">
+								<button
+									type="button"
+									onClick={() => setCorsBucket(null)}
+									className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+								>
+									Cancel
+								</button>
+								<button
+									type="button"
+									onClick={saveCors}
+									className="bg-hc-blue hover:bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all"
+								>
+									Save Configuration
+								</button>
+							</div>
+						</div>
+					</>
+				) : null}
+			</Modal>
+
+			<Modal
+				open={!!confirmDialog}
+				onClose={confirmLoading ? undefined : () => setConfirmDialog(null)}
+				title={confirmDialog?.title}
+				className="max-w-md p-8"
+			>
+				{confirmDialog ? (
+					<>
+						<p className="text-text-muted text-sm">{confirmDialog.message}</p>
+						<div className="mt-6 flex justify-end gap-3">
+							<button
+								type="button"
+								disabled={confirmLoading}
+								onClick={() => setConfirmDialog(null)}
+								className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors disabled:opacity-50"
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								disabled={confirmLoading}
+								onClick={runConfirmDialog}
+								className={`${confirmDialog.confirmClassName || "bg-hc-red hover:bg-red-600"} text-white px-6 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-50`}
+							>
+								{confirmLoading ? "Working..." : confirmDialog.confirmLabel}
+							</button>
+						</div>
+					</>
+				) : null}
+			</Modal>
 		</AppShell>
 	);
 }
