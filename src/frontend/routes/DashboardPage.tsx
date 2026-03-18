@@ -313,7 +313,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				) : (
 					<div className="bg-hc-dark rounded-3xl card-shadow border border-white/10 p-8">
 						<h2 className="text-3xl md:text-4xl font-black text-white italic tracking-tight mb-3">
-							Ship projects. <span className="text-hc-red">Get paid in storage.</span>
+							Ship projects.{" "}
+							<span className="text-hc-red">Get paid in storage.</span>
 						</h2>
 						<p className="text-text-muted text-lg max-w-xl mb-6">
 							Built something cool? Submit it to YSWS. Every shipped project
