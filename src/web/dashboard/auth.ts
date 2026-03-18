@@ -4,7 +4,12 @@ import { config } from "../../config";
 import { db } from "../../db";
 import { sessions, users } from "../../db/schema";
 import { parseCookies } from "../../lib/api-utils";
+import { htmlResponse } from "../../lib/http/html";
 import { render } from "../../lib/view-engine";
+
+function secureFlag(): string {
+	return config.isProduction ? "; Secure" : "";
+}
 
 export async function handleAuthRequest(req: Request): Promise<Response> {
 	const url = new URL(req.url);
@@ -24,7 +29,7 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 		headers.set("Location", authUrl);
 		headers.set(
 			"Set-Cookie",
-			`silo_oauth_state=${state}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=300`,
+			`silo_oauth_state=${state}; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Max-Age=300`,
 		);
 
 		return new Response(null, { status: 302, headers });
@@ -41,9 +46,7 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 		const storedState = cookies.silo_oauth_state;
 
 		if (!state || !storedState || state !== storedState) {
-			return new Response("Invalid or missing state parameter", {
-				status: 400,
-			});
+			return htmlResponse("Invalid or missing state parameter", 400);
 		}
 
 		try {
@@ -140,11 +143,11 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 			const headers = new Headers();
 			headers.append(
 				"Set-Cookie",
-				`silo_session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Secure; Expires=${expiresAt.toUTCString()}`,
+				`silo_session=${sessionId}; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Expires=${expiresAt.toUTCString()}`,
 			);
 			headers.append(
 				"Set-Cookie",
-				"silo_oauth_state=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0",
+				`silo_oauth_state=; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Max-Age=0`,
 			);
 
 			if (source === "slack") {
@@ -205,7 +208,7 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 
 				headers.append(
 					"Set-Cookie",
-					"silo_impersonating=; Path=/; SameSite=Lax; Secure; Max-Age=0",
+					`silo_impersonating=; Path=/; SameSite=Lax${secureFlag()}; Max-Age=0`,
 				);
 				headers.set("Location", "/admin");
 				return new Response(null, { status: 302, headers });
@@ -216,11 +219,11 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 
 		headers.append(
 			"Set-Cookie",
-			`silo_session=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0`,
+			`silo_session=; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Max-Age=0`,
 		);
 		headers.append(
 			"Set-Cookie",
-			"silo_impersonating=; Path=/; SameSite=Lax; Secure; Max-Age=0",
+			`silo_impersonating=; Path=/; SameSite=Lax${secureFlag()}; Max-Age=0`,
 		);
 		headers.set("Location", "/");
 		return new Response(null, { status: 302, headers });
@@ -256,11 +259,11 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 			const headers = new Headers();
 			headers.append(
 				"Set-Cookie",
-				`silo_wip_bypass=${bypassValue}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=31536000`,
+				`silo_wip_bypass=${bypassValue}; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Max-Age=31536000`,
 			);
 			headers.append(
 				"Set-Cookie",
-				`silo_wip_attempt=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0`,
+				`silo_wip_attempt=; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Max-Age=0`,
 			);
 			headers.set("Location", "/auth/login");
 			return new Response(null, { status: 302, headers });
@@ -269,7 +272,7 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 		const headers = new Headers();
 		headers.set(
 			"Set-Cookie",
-			`silo_wip_attempt=${now}; Path=/; HttpOnly; SameSite=Lax; Secure`,
+			`silo_wip_attempt=${now}; Path=/; HttpOnly; SameSite=Lax${secureFlag()}`,
 		);
 
 		const html = await render("wip", {

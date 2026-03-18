@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { z } from "zod";
+import { config } from "../../config";
 import { deleteBucketContents, getInternalPath } from "../../core/s3/utils";
 import { db } from "../../db";
 import {
@@ -22,6 +23,10 @@ import {
 } from "../../services/settings-service";
 import { handleAdminRedemptionsRequest } from "../redemptions";
 import { handleAdminYswsRequest } from "./ysws";
+
+function secureFlag(): string {
+	return config.isProduction ? "; Secure" : "";
+}
 
 type AdminUpdateUserQuotaBody = {
 	storageLimitBytes?: unknown;
@@ -959,7 +964,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				// Non-HttpOnly flag used only for UI label changes.
 				headers.append(
 					"Set-Cookie",
-					"silo_impersonating=true; Path=/; SameSite=Lax; Secure; Max-Age=1800",
+					`silo_impersonating=true; Path=/; SameSite=Lax${secureFlag()}; Max-Age=1800`,
 				);
 
 				return new Response(
@@ -1040,7 +1045,7 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				const headers = new Headers({ "Content-Type": "application/json" });
 				headers.append(
 					"Set-Cookie",
-					"silo_impersonating=; Path=/; SameSite=Lax; Secure; Max-Age=0",
+					`silo_impersonating=; Path=/; SameSite=Lax${secureFlag()}; Max-Age=0`,
 				);
 
 				return new Response(JSON.stringify({ ok: true }), { headers });

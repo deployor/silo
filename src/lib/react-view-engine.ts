@@ -1,4 +1,5 @@
 import { config } from "../config";
+import { isReactPageId } from "./react-pages";
 
 type RenderOptions = {
 	layout?: string | boolean;
@@ -9,39 +10,12 @@ type ViewData = Record<string, unknown> & {
 	bodyClass?: string;
 };
 
-const REACT_PAGES = new Set([
-	"landing",
-	"dashboard",
-	"files",
-	"docs",
-	"cdn",
-	"offboarding",
-	"admin-users",
-	"admin-logs",
-	"admin-cache",
-	"admin-settings",
-	"admin-redemptions",
-	"admin-redemption-details",
-	"admin-redemption-generated",
-	"admin-ysws",
-	"admin-ysws-review",
-	"ysws-list",
-	"ysws-submit",
-	"gallery",
-	"redeem",
-	"slack-success",
-	"wip",
-	"onboarding",
-	"locked",
-	"aged-out",
-]);
-
 function escapeForInlineJson(value: string): string {
 	return value.replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
 }
 
 export function isReactPage(templateName: string): boolean {
-	return REACT_PAGES.has(templateName);
+	return isReactPageId(templateName);
 }
 
 export function renderReactDocument(
