@@ -23,23 +23,23 @@ export function Modal({
 				<button
 					type="button"
 					aria-label="Close modal"
-					className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+					className="absolute inset-0 bg-black/80"
 					onClick={onClose}
 				/>
 			) : (
-				<div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+				<div className="absolute inset-0 bg-black/80" />
 			)}
 			<div
-				className={`bg-hc-dark rounded-3xl border border-white/10 w-full max-h-[90vh] overflow-y-auto card-shadow ${className ?? "max-w-3xl p-8"}`}
+				className={`relative z-10 bg-hc-dark rounded-3xl border border-white/10 w-full max-h-[90vh] overflow-y-auto card-shadow ${className ?? "max-w-3xl p-8"}`}
 			>
 				{title ? (
-					<div className="flex justify-between items-center mb-6">
+					<div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
 						<h3 className="text-2xl font-bold text-white">{title}</h3>
 						{onClose ? (
 							<button
 								type="button"
 								onClick={onClose}
-								className="text-text-muted hover:text-white transition-colors"
+								className="text-text-muted hover:text-white transition-colors rounded-lg p-1 hover:bg-white/5"
 							>
 								<i className="ph ph-x text-2xl" />
 							</button>
