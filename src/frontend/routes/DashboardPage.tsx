@@ -68,6 +68,17 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	);
 	const [confirmLoading, setConfirmLoading] = useState(false);
 
+	const buttonBase =
+		"inline-flex items-center justify-center gap-2 rounded-xl border text-sm font-bold transition-colors";
+	const buttonPrimaryBlue =
+		"bg-hc-blue hover:bg-blue-600 border-hc-blue text-white px-6 py-3";
+	const buttonPrimaryRed =
+		"bg-hc-red hover:bg-red-600 border-hc-red text-white px-6 py-3";
+	const buttonNeutral =
+		"bg-white/5 hover:bg-white/10 border-white/10 text-white px-4 py-2.5";
+	const buttonSubtle =
+		"bg-transparent hover:bg-white/5 border-transparent text-text-muted hover:text-white px-4 py-2.5";
+
 	const load = useCallback(async () => {
 		setLoading(true);
 		setError(null);
@@ -417,7 +428,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					<button
 						type="button"
 						onClick={handleCreateBucket}
-						className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-6 py-3 rounded-xl text-sm font-bold transition-all"
+						className={`${buttonBase} ${buttonNeutral} px-6 py-3`}
 					>
 						+ New Bucket
 					</button>
@@ -464,7 +475,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<button
 												type="button"
 												onClick={() => setActiveBucket(bucket)}
-												className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-1.5 rounded-lg text-xs font-bold"
+												className={`${buttonBase} ${buttonNeutral} text-xs px-3 py-1.5 rounded-lg`}
 											>
 												<i className="ph ph-key text-sm mr-1" />{" "}
 												{bucket.keys.length} Keys
@@ -480,23 +491,27 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										</div>
 									</td>
 									<td className="px-6 py-4">
-										<label
-											className={`inline-flex items-center ${bucket.isPaused || bucket.isCdn ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+										<button
+											type="button"
+											role="switch"
+											aria-checked={bucket.isPublic}
+											disabled={!!bucket.isPaused || !!bucket.isCdn}
+											onClick={() =>
+												togglePublic(bucket.name, !bucket.isPublic)
+											}
+											className={`inline-flex items-center gap-2 rounded-lg border px-2 py-1 transition-colors ${bucket.isPaused || bucket.isCdn ? "opacity-50 cursor-not-allowed border-white/10" : "border-white/20 hover:border-white/35 hover:bg-white/5"}`}
 										>
-											<input
-												type="checkbox"
-												className="sr-only peer"
-												checked={!!bucket.isPublic}
-												disabled={!!bucket.isPaused || !!bucket.isCdn}
-												onChange={(e) =>
-													togglePublic(bucket.name, e.target.checked)
-												}
-											/>
-											<div className="relative w-10 h-6 bg-white/10 rounded-full transition-colors peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-blue/60 peer-checked:bg-hc-blue/80 after:content-[''] after:absolute after:top-1 after:left-1 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition-transform peer-checked:after:translate-x-4" />
-											<span className="ms-2 text-xs font-medium text-text-muted">
+											<span
+												className={`relative h-6 w-11 rounded-full border transition-colors ${bucket.isPublic ? "bg-hc-blue/80 border-hc-blue" : "bg-white/10 border-white/20"}`}
+											>
+												<span
+													className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform ${bucket.isPublic ? "translate-x-5" : "translate-x-0"}`}
+												/>
+											</span>
+											<span className="text-xs font-semibold text-text-muted min-w-12 text-left">
 												{bucket.isPublic ? "Public" : "Private"}
 											</span>
-										</label>
+										</button>
 									</td>
 									<td className="px-6 py-4 text-text-muted text-xs font-mono">
 										{new Date(bucket.createdAt).toLocaleDateString()}
@@ -506,14 +521,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<button
 												type="button"
 												onClick={() => openCorsModal(bucket)}
-												className="bg-white/5 hover:bg-white/10 text-text-muted hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold"
+												className={`${buttonBase} ${buttonNeutral} text-xs px-3 py-1.5 rounded-lg`}
 											>
 												CORS
 											</button>
 										) : null}
 										<a
 											href={`/dashboard/buckets/${bucket.name}`}
-											className="bg-hc-blue/10 hover:bg-hc-blue/20 text-hc-blue px-3 py-1.5 rounded-lg text-xs font-bold"
+											className={`${buttonBase} bg-hc-blue/10 hover:bg-hc-blue/20 border-hc-blue/30 text-hc-blue text-xs px-3 py-1.5 rounded-lg`}
 										>
 											Files
 										</a>
@@ -521,7 +536,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<button
 												type="button"
 												onClick={() => deleteBucket(bucket.name, true)}
-												className="text-yellow-400 hover:text-yellow-300 text-xs font-bold uppercase tracking-wider"
+												className={`${buttonBase} bg-yellow-500/10 hover:bg-yellow-500/20 border-yellow-500/30 text-yellow-300 text-xs px-3 py-1.5 rounded-lg`}
 											>
 												Empty
 											</button>
@@ -529,7 +544,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<button
 												type="button"
 												onClick={() => deleteBucket(bucket.name, true)}
-												className="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider"
+												className={`${buttonBase} bg-hc-red/10 hover:bg-hc-red/20 border-hc-red/30 text-hc-red text-xs px-3 py-1.5 rounded-lg`}
 											>
 												Empty
 											</button>
@@ -538,7 +553,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<button
 												type="button"
 												onClick={() => deleteBucket(bucket.name, false)}
-												className="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider"
+												className={`${buttonBase} bg-hc-red/10 hover:bg-hc-red/20 border-hc-red/30 text-hc-red text-xs px-3 py-1.5 rounded-lg`}
 											>
 												Delete
 											</button>
@@ -584,7 +599,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													<button
 														type="button"
 														onClick={() => deleteKey(activeBucket.name, k.id)}
-														className="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider"
+														className={`${buttonBase} bg-hc-red/10 hover:bg-hc-red/20 border-hc-red/30 text-hc-red text-xs px-3 py-1.5 rounded-lg`}
 													>
 														Delete
 													</button>
@@ -616,7 +631,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<button
 								type="button"
 								onClick={() => generateKey(activeBucket.name)}
-								className="bg-hc-blue hover:bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all"
+								className={`${buttonBase} ${buttonPrimaryBlue}`}
 							>
 								+ Generate New Key
 							</button>
@@ -637,21 +652,23 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							{corsBucket.name}
 						</p>
 
-						<div className="bg-black/30 rounded-xl border border-white/10 p-4 mb-4">
-							<p className="text-text-muted text-sm mb-2 flex items-start gap-2">
-								<i className="ph ph-info text-hc-blue text-base mt-0.5" />
-								<span>
-									Configure CORS as a JSON array of rules. Invalid JSON or
-									missing fields will be rejected.
-								</span>
-							</p>
+						<div className="bg-black/30 rounded-xl border border-white/10 overflow-hidden mb-6">
+							<div className="px-4 py-3 border-b border-white/10 bg-white/[0.02]">
+								<p className="text-text-muted text-sm flex items-start gap-2">
+									<i className="ph ph-info text-hc-blue text-base mt-0.5" />
+									<span>
+										Configure CORS as a JSON array of rules. Invalid JSON or
+										missing fields will be rejected.
+									</span>
+								</p>
+							</div>
 							<textarea
 								value={corsEditor}
 								onChange={(e) => {
 									setCorsEditor(e.target.value);
 									setCorsError(null);
 								}}
-								className="w-full h-64 bg-black/40 border border-white/10 rounded-xl p-4 text-white font-mono text-sm focus:outline-none focus:border-hc-blue focus:ring-1 focus:ring-hc-blue resize-none"
+								className="w-full h-64 bg-black/40 p-4 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-hc-blue/40 resize-none"
 							/>
 						</div>
 
@@ -665,7 +682,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<button
 								type="button"
 								onClick={resetCors}
-								className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+								className={`${buttonBase} bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300 px-4 py-2.5`}
 							>
 								Reset CORS
 							</button>
@@ -673,14 +690,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<button
 									type="button"
 									onClick={() => setCorsBucket(null)}
-									className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+									className={`${buttonBase} ${buttonSubtle}`}
 								>
 									Cancel
 								</button>
 								<button
 									type="button"
 									onClick={saveCors}
-									className="bg-hc-blue hover:bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all"
+									className={`${buttonBase} ${buttonPrimaryBlue}`}
 								>
 									Save Configuration
 								</button>
@@ -728,7 +745,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								type="button"
 								disabled={confirmLoading}
 								onClick={() => setConfirmDialog(null)}
-								className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors disabled:opacity-50"
+								className={`${buttonBase} ${buttonSubtle} disabled:opacity-50`}
 							>
 								Cancel
 							</button>
@@ -736,7 +753,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								type="button"
 								disabled={confirmLoading}
 								onClick={runConfirmDialog}
-								className={`${confirmDialog.confirmClassName || "bg-hc-red hover:bg-red-600"} text-white px-6 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-50`}
+								className={`${buttonBase} ${confirmDialog.confirmClassName || buttonPrimaryRed} disabled:opacity-50`}
 							>
 								{confirmLoading ? "Working..." : confirmDialog.confirmLabel}
 							</button>
