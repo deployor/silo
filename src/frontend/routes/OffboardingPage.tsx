@@ -315,13 +315,7 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</div>
 							</button>
 						</div>
-						<button
-							type="button"
-							onClick={() => setStep(1)}
-							className="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors"
-						>
-							Back
-						</button>
+						{/* back button is rendered by shared footer controls below */}
 					</div>
 				) : null}
 
