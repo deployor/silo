@@ -827,12 +827,12 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!confirmDialog}
 				onClose={confirmLoading ? undefined : () => setConfirmDialog(null)}
 				title={confirmDialog?.title}
-				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "!border-2 !border-red-500 bg-[#1a0a0b] ring-2 ring-red-500/80" : ""}`}
+				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "!border-2 !border-red-500 bg-[#1a0a0b] ring-2 ring-red-500/80 !overflow-visible" : ""}`}
 			>
 				{confirmDialog ? (
 					<>
 						{confirmDialog.publicRiskWarning ? (
-							<div className="pointer-events-none absolute inset-0 rounded-3xl border-2 border-red-400 animate-[pulse_0.9s_ease-in-out_infinite] shadow-[0_0_34px_rgba(239,68,68,0.98)]" />
+							<div className="pointer-events-none absolute -inset-2 rounded-[2rem] border-2 border-red-400/95 animate-[pulse_0.8s_linear_infinite] shadow-[0_0_20px_rgba(255,60,60,0.95),0_0_44px_rgba(255,40,40,0.9),0_0_70px_rgba(255,20,20,0.85)]" />
 						) : null}
 						<p
 							className={
