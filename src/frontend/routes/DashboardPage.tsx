@@ -326,7 +326,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			) : null}
 
 			<div className="mb-10">
-				{p.latestSubmission?.status === "pending" ? (
+				{stats?.user.isImmortal ? null : p.latestSubmission?.status ===
+					"pending" ? (
 					<div className="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow">
 						<div className="inline-flex items-center gap-2 bg-yellow-500/10 text-yellow-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 border border-yellow-500/20">
 							<MdAccessTimeFilled className="animate-pulse" /> Under Review

@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MdDeleteForever, MdOpenInNew } from "react-icons/md";
 import { AdminSubnav } from "../components/AdminSubnav";
 import { AppShell } from "../components/AppShell";
@@ -277,19 +277,45 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	>("default");
 	const [egressAmount, setEgressAmount] = useState(0);
 	const [egressUnit, setEgressUnit] = useState(1024 ** 3);
+	const loadingRef = useRef(false);
+	const searchRef = useRef(search);
+	const adminsOnlyRef = useRef(adminsOnly);
+	const offsetRef = useRef(offset);
 
 	const limit = 50;
 
+	useEffect(() => {
+		searchRef.current = search;
+	}, [search]);
+
+	useEffect(() => {
+		adminsOnlyRef.current = adminsOnly;
+	}, [adminsOnly]);
+
+	useEffect(() => {
+		offsetRef.current = offset;
+	}, [offset]);
+
 	const loadUsers = useCallback(
-		async (reset = true) => {
-			if (loading) return;
+		async (
+			reset = true,
+			overrides?: {
+				offset?: number;
+				search?: string;
+				adminsOnly?: boolean;
+			},
+		) => {
+			if (loadingRef.current) return;
+			loadingRef.current = true;
 			setLoading(true);
-			const nextOffset = reset ? 0 : offset;
+			const nextOffset = reset ? 0 : (overrides?.offset ?? offsetRef.current);
+			const nextSearch = overrides?.search ?? searchRef.current;
+			const nextAdminsOnly = overrides?.adminsOnly ?? adminsOnlyRef.current;
 			const q = new URLSearchParams({
 				limit: String(limit),
 				offset: String(nextOffset),
-				search,
-				adminsOnly: String(adminsOnly),
+				search: nextSearch,
+				adminsOnly: String(nextAdminsOnly),
 			});
 			try {
 				const data = await fetchJson<UsersResponse>(
@@ -298,18 +324,23 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				setTotal(data.total || 0);
 				if (reset) {
 					setUsers(data.users || []);
-					setOffset((data.users || []).length);
+					const next = (data.users || []).length;
+					setOffset(next);
+					offsetRef.current = next;
 				} else {
 					setUsers((prev) => [...prev, ...(data.users || [])]);
-					setOffset(nextOffset + (data.users || []).length);
+					const next = nextOffset + (data.users || []).length;
+					setOffset(next);
+					offsetRef.current = next;
 				}
 			} catch (e) {
 				window.alert(e instanceof Error ? e.message : "Failed to load users");
 			} finally {
+				loadingRef.current = false;
 				setLoading(false);
 			}
 		},
-		[adminsOnly, loading, offset, search],
+		[],
 	);
 
 	useEffect(() => {
@@ -581,7 +612,11 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<input
 								type="checkbox"
 								checked={adminsOnly}
-								onChange={(e) => setAdminsOnly(e.target.checked)}
+								onChange={(e) => {
+									const checked = e.target.checked;
+									setAdminsOnly(checked);
+									void loadUsers(true, { adminsOnly: checked });
+								}}
 								className="sr-only peer"
 							/>
 							<div className="relative w-9 h-5 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-red rounded-full peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border after:border-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-hc-red" />
@@ -710,7 +745,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					{!loading && offset < total ? (
 						<button
 							type="button"
-							onClick={() => loadUsers(false)}
+							onClick={() => loadUsers(false, { offset })}
 							className="text-text-muted hover:text-white text-sm font-bold"
 						>
 							Load More
