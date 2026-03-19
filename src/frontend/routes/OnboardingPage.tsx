@@ -54,14 +54,59 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								icon="ph-rocket-launch text-blue-500"
 								title="Ship Projects."
 								subtitle="Get Paid in Storage."
-								content={`Every YSWS project you ship unlocks more permanent cloud storage. Earn ${p.yswsQuotaPerHourHuman || "quota"} for every hour.`}
+								content={
+									<>
+										Every YSWS project you ship unlocks more permanent cloud
+										storage.
+										<br />
+										<span className="text-white font-bold">
+											Shipping is the currency.
+										</span>{" "}
+										Storage is the reward.
+									</>
+								}
+								extra={
+									<div className="bg-white/5 rounded-xl p-6 mb-12 max-w-2xl mx-auto border border-white/10 flex flex-col gap-4 text-left">
+										<div className="flex items-start gap-4">
+											<div className="bg-green-500/20 p-2 rounded-lg">
+												<PhIcon className="ph-bold ph-check text-green-500 text-xl" />
+											</div>
+											<div>
+												<h3 className="text-white font-bold text-lg">
+													You ship a project
+												</h3>
+												<p className="text-text-muted">
+													Submit your YSWS project through Cargo.
+												</p>
+											</div>
+										</div>
+										<div className="flex items-start gap-4">
+											<div className="bg-blue-500/20 p-2 rounded-lg">
+												<PhIcon className="ph-bold ph-hard-drives text-blue-500 text-xl" />
+											</div>
+											<div>
+												<h3 className="text-white font-bold text-lg">
+													We expand your quota
+												</h3>
+												<p className="text-text-muted">
+													Earn{" "}
+													<span className="text-white font-bold">
+														{p.yswsQuotaPerHourHuman || "quota"}
+													</span>{" "}
+													of storage for every hour.
+												</p>
+											</div>
+										</div>
+									</div>
+								}
 								left={
 									<button
 										type="button"
 										onClick={() => setStep(1)}
-										className="text-text-muted hover:text-white px-6 py-3 font-bold text-lg"
+										className="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group"
 									>
-										Back
+										<PhIcon className="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform" />
+										<span>Back</span>
 									</button>
 								}
 								right={
@@ -70,8 +115,8 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										onClick={() => setStep(3)}
 										className="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 shadow-lg shadow-hc-red/20"
 									>
-										Next: Privacy & Logs{" "}
-										<PhIcon className="ph-bold ph-arrow-right" />
+										<span>Next: Privacy & Logs</span>
+										<PhIcon className="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform" />
 									</button>
 								}
 							/>
@@ -81,14 +126,27 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<Panel
 								icon="ph-shield-check text-yellow-500"
 								title="We Log Requests"
-								content="To keep Cargo safe and fast, we log request metadata (user agent, path, status, timing). We do NOT log file contents."
+								content={
+									<>
+										To keep Cargo safe and fast, we log all requests (User
+										Agent, Path etc).
+										<br />
+										<br />
+										<span className="text-white font-bold">
+											We do NOT log your file contents.
+										</span>{" "}
+										Your data remains yours. We only track metadata to prevent
+										abuse.
+									</>
+								}
 								left={
 									<button
 										type="button"
 										onClick={() => setStep(2)}
-										className="text-text-muted hover:text-white px-6 py-3 font-bold text-lg"
+										className="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group"
 									>
-										Back
+										<PhIcon className="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform" />
+										<span>Back</span>
 									</button>
 								}
 								right={
@@ -97,8 +155,8 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										onClick={() => setStep(4)}
 										className="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 shadow-lg shadow-hc-red/20"
 									>
-										Next: How it Works{" "}
-										<PhIcon className="ph-bold ph-arrow-right" />
+										<span>Next: How it Works</span>
+										<PhIcon className="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform" />
 									</button>
 								}
 							/>
@@ -108,14 +166,25 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<Panel
 								icon="ph-cloud-check text-green-500"
 								title="It's Just S3"
-								content="Use standard S3 tools and SDKs. Behind the scenes, Cargo handles routing, auth and quotas so your experience feels like a normal bucket workflow."
+								content={
+									<>
+										You can use almost all standard S3 functions. We store
+										everyone&apos;s data in one massive bucket, but to you, it
+										feels like your own private bucket.
+										<br />
+										<br />
+										There is a middleman, but you&apos;ll never notice. Just
+										create buckets and ship!
+									</>
+								}
 								left={
 									<button
 										type="button"
 										onClick={() => setStep(3)}
-										className="text-text-muted hover:text-white px-6 py-3 font-bold text-lg"
+										className="text-text-muted hover:text-white px-6 py-3 font-bold text-lg transition-colors flex items-center gap-2 group"
 									>
-										Back
+										<PhIcon className="ph-bold ph-arrow-left group-hover:-translate-x-1 transition-transform" />
+										<span>Back</span>
 									</button>
 								}
 								right={
@@ -124,8 +193,8 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											type="submit"
 											className="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 shadow-lg shadow-hc-red/20"
 										>
-											Get Started{" "}
-											<PhIcon className="ph-bold ph-rocket-launch" />
+											<span>Get Started</span>
+											<PhIcon className="ph-bold ph-rocket-launch group-hover:translate-x-1 transition-transform" />
 										</button>
 									</form>
 								}
@@ -143,33 +212,40 @@ function Panel({
 	title,
 	subtitle,
 	content,
+	extra,
 	left,
 	right,
 }: {
 	icon: string;
 	title: string;
-	subtitle?: string;
-	content: string;
+	subtitle?: React.ReactNode;
+	content: React.ReactNode;
+	extra?: React.ReactNode;
 	left?: React.ReactNode;
 	right?: React.ReactNode;
 }) {
+	const isCenteredOnlyRight = !left && !!right;
+
 	return (
 		<div className="text-center max-w-3xl mx-auto w-full">
 			<div className="mb-8 flex justify-center">
-				<i className={`ph-duotone ${icon} text-8xl`} />
+				<PhIcon className={`ph-duotone ${icon} text-8xl`} />
 			</div>
-			<h1 className="text-6xl md:text-8xl font-black text-white mb-4 tracking-tighter italic">
+			<h1 className="text-6xl md:text-8xl font-black text-white mb-8 tracking-tighter italic">
 				{title}
 			</h1>
 			{subtitle ? (
-				<p className="text-4xl md:text-6xl text-white/50 font-black tracking-tighter mb-6 italic">
+				<p className="block text-4xl md:text-6xl mt-2 text-white/50 font-black tracking-tighter mb-6 italic">
 					{subtitle}
 				</p>
 			) : null}
 			<p className="text-text-muted text-2xl max-w-3xl mx-auto font-medium mb-12 leading-relaxed">
 				{content}
 			</p>
-			<div className="flex items-center justify-between w-full max-w-md mx-auto">
+			{extra}
+			<div
+				className={`flex items-center w-full max-w-md mx-auto ${isCenteredOnlyRight ? "justify-center gap-6" : "justify-between"}`}
+			>
 				<div>{left}</div>
 				<div>{right}</div>
 			</div>
