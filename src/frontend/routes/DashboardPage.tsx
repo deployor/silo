@@ -827,14 +827,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!confirmDialog}
 				onClose={confirmLoading ? undefined : () => setConfirmDialog(null)}
 				title={confirmDialog?.title}
-				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "border-2 border-red-500 bg-[#22080b] shadow-[0_0_0_1px_rgba(239,68,68,0.35)]" : ""}`}
+				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "!border-2 !border-red-500 bg-[#1a0a0b] ring-2 ring-red-500/70" : ""}`}
 			>
 				{confirmDialog ? (
 					<>
 						<p
 							className={
 								confirmDialog.publicRiskWarning
-									? "text-red-200 text-sm"
+									? "text-white text-sm"
 									: "text-text-muted text-sm"
 							}
 						>
@@ -842,7 +842,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</p>
 						{confirmDialog.publicRiskWarning ? (
 							<div className="mt-4">
-								<div className="flex items-center gap-2 text-red-300 font-black uppercase tracking-wider text-xs mb-4">
+								<div className="flex items-center gap-2 text-white font-black uppercase tracking-wider text-xs mb-4">
 									<MdWarningAmber className="text-base text-red-400" />
 									Public bucket warning
 								</div>
@@ -852,7 +852,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<div className="mt-0.5 text-red-400">
 											<MdPublic className="text-lg" />
 										</div>
-										<p className="text-red-200 text-sm">
+										<p className="text-white text-sm">
 											People on the internet can access your files if they have
 											the URL.
 										</p>
@@ -862,7 +862,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<div className="mt-0.5 text-red-400">
 											<MdVisibility className="text-lg" />
 										</div>
-										<p className="text-red-200 text-sm">
+										<p className="text-white text-sm">
 											Public files can be indexed, mirrored, and shared broadly.
 										</p>
 									</div>
@@ -871,15 +871,15 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<div className="mt-0.5 text-red-400">
 											<MdGroups className="text-lg" />
 										</div>
-										<p className="text-red-200 text-sm">
+										<p className="text-white text-sm">
 											Unexpected traffic from others can burn your quota faster.
 										</p>
 									</div>
 								</div>
 
-								<div className="mt-4 text-xs text-red-300 font-bold">
+								<div className="mt-4 text-xs text-white font-bold">
 									You can confirm in{" "}
-									<span className="text-white">{confirmDelayRemaining}s</span>
+									<span className="text-red-400">{confirmDelayRemaining}s</span>
 								</div>
 							</div>
 						) : null}
