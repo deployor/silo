@@ -873,9 +873,18 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<div className="mt-1 transition-all duration-300 text-white space-y-5">
 								<div className="flex items-center justify-center gap-3 pb-1">
 									{[
-										{ icon: <MdWarningAmber className="text-2xl" />, label: "Use case" },
-										{ icon: <MdPublic className="text-2xl" />, label: "Exposure" },
-										{ icon: <MdGroups className="text-2xl" />, label: "Abuse risk" },
+										{
+											icon: <MdWarningAmber className="text-2xl" />,
+											label: "Use case",
+										},
+										{
+											icon: <MdPublic className="text-2xl" />,
+											label: "Exposure",
+										},
+										{
+											icon: <MdGroups className="text-2xl" />,
+											label: "Abuse risk",
+										},
 									].map((step, idx) => {
 										const active = publicWarningStep === idx;
 										const complete = publicWarningStep > idx;
@@ -895,10 +904,10 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<div className="space-y-4">
 											<div>
 												<p className="text-xs uppercase tracking-[0.18em] text-hc-red font-black">
-													Public is ONLY for static assets
+													This applies to the ENTIRE bucket
 												</p>
 												<h4 className="text-2xl font-black text-white leading-tight mt-1">
-													Good: images, CSS, docs, public files.
+													Every file in this bucket must be safe to expose.
 												</h4>
 											</div>
 											<div className="grid sm:grid-cols-2 gap-3 text-sm">
@@ -907,7 +916,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														OK TO MAKE PUBLIC
 													</p>
 													<p className="text-white/90 mt-1">
-														Blog images, app icons, CSS/JS bundles, docs screenshots.
+														Blog images, app icons, CSS/JS bundles, docs
+														screenshots.
 													</p>
 												</div>
 												<div className="rounded-xl border border-red-400/25 bg-red-500/[0.06] p-3">
@@ -915,7 +925,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														DO NOT MAKE PUBLIC
 													</p>
 													<p className="text-white/90 mt-1">
-														User uploads, private docs, backups, secret/config files.
+														If this bucket contains even one sensitive file,
+														keep the entire bucket private.
 													</p>
 												</div>
 											</div>
@@ -937,15 +948,21 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<div className="grid sm:grid-cols-3 gap-2.5 text-xs sm:text-sm">
 												<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
 													<p className="font-black text-white">People</p>
-													<p className="text-white/75 mt-1">Anyone with a link.</p>
+													<p className="text-white/75 mt-1">
+														Anyone with a link.
+													</p>
 												</div>
 												<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
 													<p className="font-black text-white">Crawlers</p>
-													<p className="text-white/75 mt-1">Search engines and scanners.</p>
+													<p className="text-white/75 mt-1">
+														Search engines and scanners.
+													</p>
 												</div>
 												<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
 													<p className="font-black text-white">AI scrapers</p>
-													<p className="text-white/75 mt-1">Dataset and model collectors.</p>
+													<p className="text-white/75 mt-1">
+														Dataset and model collectors.
+													</p>
 												</div>
 											</div>
 										</div>
@@ -965,15 +982,20 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											</div>
 											<div className="grid sm:grid-cols-2 gap-3 text-sm">
 												<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
-													<p className="font-black text-hc-red">What can happen</p>
+													<p className="font-black text-hc-red">
+														What can happen
+													</p>
 													<p className="text-white/85 mt-1">
 														Bot traffic burns egress + request quota quickly.
 													</p>
 												</div>
 												<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
-													<p className="font-black text-hc-red">Possible outcome</p>
+													<p className="font-black text-hc-red">
+														Possible outcome
+													</p>
 													<p className="text-white/85 mt-1">
-														We may suspend abusive public traffic to protect the platform.
+														We may suspend abusive public traffic to protect the
+														platform.
 													</p>
 												</div>
 											</div>
@@ -981,11 +1003,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												<input
 													type="checkbox"
 													checked={dontShowPublicWarningAgain}
-													onChange={(e) => setDontShowPublicWarningAgain(e.target.checked)}
+													onChange={(e) =>
+														setDontShowPublicWarningAgain(e.target.checked)
+													}
 													className="mt-1 h-4 w-4 rounded border-white/30 bg-black/20 text-hc-red focus:ring-hc-red/40"
 												/>
 												<span className="text-sm text-white/90 leading-relaxed">
-													Don&apos;t show this 3-step warning again on this device.
+													Don&apos;t show this 3-step warning again on this
+													device.
 												</span>
 											</label>
 										</div>
