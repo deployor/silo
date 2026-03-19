@@ -827,7 +827,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!confirmDialog}
 				onClose={confirmLoading ? undefined : () => setConfirmDialog(null)}
 				title={confirmDialog?.title}
-				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "!border-2 !border-red-500 bg-[#1a0a0b] ring-2 ring-red-500/70" : ""}`}
+				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "!border-2 !border-red-500 bg-[#1a0a0b] ring-2 ring-red-500/70 animate-pulse" : ""}`}
 			>
 				{confirmDialog ? (
 					<>
@@ -843,7 +843,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						{confirmDialog.publicRiskWarning ? (
 							<div className="mt-4">
 								<div className="flex items-center gap-2 text-white font-black uppercase tracking-wider text-xs mb-4">
-									<MdWarningAmber className="text-base text-red-400" />
+									<MdWarningAmber className="text-base text-red-400 animate-pulse" />
 									Public bucket warning
 								</div>
 
