@@ -6,9 +6,12 @@ import {
 	MdDeleteForever,
 	MdDeleteOutline,
 	MdFolderOpen,
+	MdGroups,
 	MdInfoOutline,
 	MdKey,
 	MdOutlineRocketLaunch,
+	MdPublic,
+	MdVisibility,
 	MdWarning,
 	MdWarningAmber,
 } from "react-icons/md";
@@ -58,6 +61,7 @@ type ConfirmDialogState = {
 	confirmClassName?: string;
 	pendingKey?: string;
 	publicRiskWarning?: boolean;
+	confirmDelaySeconds?: number;
 	onConfirm: () => Promise<void>;
 };
 
@@ -81,6 +85,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		null,
 	);
 	const [confirmLoading, setConfirmLoading] = useState(false);
+	const [confirmDelayRemaining, setConfirmDelayRemaining] = useState(0);
 	const [pendingActionKey, setPendingActionKey] = useState<string | null>(null);
 
 	const buttonBase =
@@ -120,6 +125,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		const den = stats.user.storageLimit || 1;
 		return Math.min(100, (stats.user.storageUsage / den) * 100);
 	}, [stats]);
+
+	const sortedBuckets = useMemo(() => {
+		if (!stats?.buckets) return [];
+		return [...stats.buckets].sort((a, b) =>
+			a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+		);
+	}, [stats?.buckets]);
 
 	const egressLimitBytes = useMemo(() => {
 		if (!stats) return 0;
@@ -165,9 +177,12 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				? `Anyone with the file URL will be able to access files in ${bucketName}.`
 				: `Only authenticated access will be allowed for ${bucketName}.`,
 			confirmLabel: isPublic ? "Make Public" : "Make Private",
-			confirmClassName: "bg-hc-blue hover:bg-blue-600",
+			confirmClassName: isPublic
+				? "bg-hc-red hover:bg-red-600"
+				: "bg-hc-blue hover:bg-blue-600",
 			pendingKey: `visibility:${bucketName}`,
 			publicRiskWarning: isPublic,
+			confirmDelaySeconds: isPublic ? 5 : 0,
 			onConfirm: async () => {
 				await fetchText(`/api/dashboard/buckets/${bucketName}`, {
 					method: "PATCH",
@@ -178,6 +193,31 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			},
 		});
 	};
+
+	useEffect(() => {
+		if (!confirmDialog?.publicRiskWarning) {
+			setConfirmDelayRemaining(0);
+			return;
+		}
+
+		const initial = confirmDialog.confirmDelaySeconds ?? 0;
+		setConfirmDelayRemaining(initial);
+		if (initial <= 0) return;
+
+		const timer = window.setInterval(() => {
+			setConfirmDelayRemaining((prev) => {
+				if (prev <= 1) {
+					window.clearInterval(timer);
+					return 0;
+				}
+				return prev - 1;
+			});
+		}, 1000);
+
+		return () => {
+			window.clearInterval(timer);
+		};
+	}, [confirmDialog]);
 
 	const deleteBucket = async (bucketName: string, emptyOnly: boolean) => {
 		setConfirmDialog({
@@ -293,6 +333,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 	const runConfirmDialog = async () => {
 		if (!confirmDialog) return;
+		if (confirmDelayRemaining > 0) return;
 		setConfirmLoading(true);
 		setPendingActionKey(confirmDialog.pendingKey ?? null);
 		try {
@@ -474,7 +515,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</tr>
 						</thead>
 						<tbody className="divide-y divide-white/5">
-							{(stats?.buckets || []).map((bucket) =>
+							{sortedBuckets.map((bucket) =>
 								(() => {
 									const visibilityBusy =
 										pendingActionKey === `visibility:${bucket.name}`;
@@ -792,26 +833,45 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					<>
 						<p className="text-text-muted text-sm">{confirmDialog.message}</p>
 						{confirmDialog.publicRiskWarning ? (
-							<div className="mt-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
-								<div className="flex items-start gap-3">
-									<div className="shrink-0 text-yellow-300 mt-0.5">
-										<MdWarningAmber className="text-xl" />
+							<div className="mt-4 rounded-2xl border border-red-500/40 bg-gradient-to-b from-red-500/15 to-red-900/20 p-5">
+								<div className="flex items-center gap-2 text-red-200 font-black uppercase tracking-wider text-xs mb-4">
+									<MdWarningAmber className="text-base" />
+									Public bucket warning
+								</div>
+
+								<div className="space-y-3">
+									<div className="flex items-start gap-3 rounded-xl border border-red-500/25 bg-red-500/10 p-3">
+										<div className="mt-0.5 text-red-300">
+											<MdPublic className="text-lg" />
+										</div>
+										<p className="text-red-100 text-sm">
+											People on the internet can access your files if they have
+											the URL.
+										</p>
 									</div>
-									<div>
-										<h4 className="text-yellow-200 font-bold text-sm mb-1">
-											Public bucket risk warning
-										</h4>
-										<ul className="text-yellow-100/90 text-xs space-y-1 list-disc list-inside">
-											<li>Anyone can access files in this bucket.</li>
-											<li>
-												Public access can lead to abuse and heavy traffic.
-											</li>
-											<li>
-												Abuse can consume your quota and impact your account
-												limits.
-											</li>
-										</ul>
+
+									<div className="flex items-start gap-3 rounded-xl border border-red-500/25 bg-red-500/10 p-3">
+										<div className="mt-0.5 text-red-300">
+											<MdVisibility className="text-lg" />
+										</div>
+										<p className="text-red-100 text-sm">
+											Public files can be indexed, mirrored, and shared broadly.
+										</p>
 									</div>
+
+									<div className="flex items-start gap-3 rounded-xl border border-red-500/25 bg-red-500/10 p-3">
+										<div className="mt-0.5 text-red-300">
+											<MdGroups className="text-lg" />
+										</div>
+										<p className="text-red-100 text-sm">
+											Unexpected traffic from others can burn your quota faster.
+										</p>
+									</div>
+								</div>
+
+								<div className="mt-4 rounded-lg border border-red-400/35 bg-red-500/10 px-3 py-2 text-xs text-red-200 font-bold">
+									You can confirm in{" "}
+									<span className="text-white">{confirmDelayRemaining}s</span>
 								</div>
 							</div>
 						) : null}
@@ -826,11 +886,15 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</button>
 							<button
 								type="button"
-								disabled={confirmLoading}
+								disabled={confirmLoading || confirmDelayRemaining > 0}
 								onClick={runConfirmDialog}
 								className={`${buttonBase} ${confirmDialog.confirmClassName || buttonPrimaryRed} disabled:opacity-50`}
 							>
-								{confirmLoading ? "Working..." : confirmDialog.confirmLabel}
+								{confirmLoading
+									? "Working..."
+									: confirmDelayRemaining > 0
+										? `${confirmDialog.confirmLabel} (${confirmDelayRemaining}s)`
+										: confirmDialog.confirmLabel}
 							</button>
 						</div>
 					</>

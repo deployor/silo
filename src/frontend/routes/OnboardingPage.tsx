@@ -173,7 +173,7 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										feels like your own private bucket.
 										<br />
 										<br />
-										There is a middleman, but you&apos;ll never notice. Just
+										There is a proxy, but you&apos;ll never notice. Just
 										create buckets and ship!
 									</>
 								}
