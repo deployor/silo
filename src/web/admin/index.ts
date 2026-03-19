@@ -583,6 +583,7 @@ async function runAdminSpeedtest(req: Request) {
 			hotSuccessRate: number;
 			hotRateLimited: number;
 			hotTimeouts: number;
+			internalHitRatePercent: number;
 		};
 		iterationsDetail: SpeedtestIterationRow[];
 	};
@@ -949,6 +950,12 @@ async function runAdminSpeedtest(req: Request) {
 			coldOk + coldFail > 0 ? (coldOk / (coldOk + coldFail)) * 100 : 0;
 		const hotSuccessRate =
 			hotOk + hotFail > 0 ? (hotOk / (hotOk + hotFail)) * 100 : 0;
+		const redisHitsDelta = after.redisHits - before.redisHits;
+		const redisMissesDelta = after.redisMisses - before.redisMisses;
+		const internalHitRatePercent =
+			redisHitsDelta + redisMissesDelta > 0
+				? (redisHitsDelta / (redisHitsDelta + redisMissesDelta)) * 100
+				: 0;
 
 		return {
 			id: "cache-heavy",
@@ -980,8 +987,8 @@ async function runAdminSpeedtest(req: Request) {
 				warmMissCount,
 			},
 			cacheDiagnostics: {
-				redisHitsDelta: after.redisHits - before.redisHits,
-				redisMissesDelta: after.redisMisses - before.redisMisses,
+				redisHitsDelta,
+				redisMissesDelta,
 				diskEntriesDelta: after.diskEntryCount - before.diskEntryCount,
 				diskSizeDeltaBytes: after.diskSizeBytes - before.diskSizeBytes,
 				demandEntriesDelta:
@@ -995,6 +1002,7 @@ async function runAdminSpeedtest(req: Request) {
 				hotSuccessRate,
 				hotRateLimited,
 				hotTimeouts,
+				internalHitRatePercent,
 			},
 			iterationsDetail,
 		};

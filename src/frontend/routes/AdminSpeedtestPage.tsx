@@ -61,6 +61,7 @@ type SpeedtestSuite = {
 		hotSuccessRate: number;
 		hotRateLimited: number;
 		hotTimeouts: number;
+		internalHitRatePercent: number;
 	};
 	iterationsDetail: Array<{
 		index: number;
@@ -718,66 +719,82 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										</div>
 
 										{stat.suite.cacheDiagnostics ? (
-											<div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-												<StatCard
-													label="Redis Hits Δ"
-													value={stat.suite.cacheDiagnostics.redisHitsDelta.toLocaleString()}
-												/>
-												<StatCard
-													label="Redis Misses Δ"
-													value={stat.suite.cacheDiagnostics.redisMissesDelta.toLocaleString()}
-												/>
-												<StatCard
-													label="Disk Entries Δ"
-													value={stat.suite.cacheDiagnostics.diskEntriesDelta.toLocaleString()}
-												/>
-												<StatCard
-													label="Disk Size Δ"
-													value={formatBytes(
-														stat.suite.cacheDiagnostics.diskSizeDeltaBytes,
-													)}
-												/>
-												<StatCard
-													label="Demand Entries Δ"
-													value={stat.suite.cacheDiagnostics.demandEntriesDelta.toLocaleString()}
-												/>
-												<StatCard
-													label="Stress GET Avg"
-													value={`${stat.suite.cacheDiagnostics.stressGetAvgMs.toFixed(1)} ms`}
-												/>
-												<StatCard
-													label="Stress GET P50"
-													value={`${stat.suite.cacheDiagnostics.stressGetP50Ms.toFixed(1)} ms`}
-												/>
-												<StatCard
-													label="Stress GET P95"
-													value={`${stat.suite.cacheDiagnostics.stressGetP95Ms.toFixed(1)} ms`}
-												/>
-												<StatCard
-													label="Cold Req/s"
-													value={stat.suite.cacheDiagnostics.coldRps.toFixed(1)}
-												/>
-												<StatCard
-													label="Hot Req/s"
-													value={stat.suite.cacheDiagnostics.hotRps.toFixed(1)}
-												/>
-												<StatCard
-													label="Cold Success"
-													value={`${stat.suite.cacheDiagnostics.coldSuccessRate.toFixed(1)}%`}
-												/>
-												<StatCard
-													label="Hot Success"
-													value={`${stat.suite.cacheDiagnostics.hotSuccessRate.toFixed(1)}%`}
-												/>
-												<StatCard
-													label="Hot 429s"
-													value={stat.suite.cacheDiagnostics.hotRateLimited.toLocaleString()}
-												/>
-												<StatCard
-													label="Hot Timeouts"
-													value={stat.suite.cacheDiagnostics.hotTimeouts.toLocaleString()}
-												/>
-											</div>
+											<>
+												<div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+													<StatCard
+														label="Redis Hits Δ"
+														value={stat.suite.cacheDiagnostics.redisHitsDelta.toLocaleString()}
+													/>
+													<StatCard
+														label="Redis Misses Δ"
+														value={stat.suite.cacheDiagnostics.redisMissesDelta.toLocaleString()}
+													/>
+													<StatCard
+														label="Disk Entries Δ"
+														value={stat.suite.cacheDiagnostics.diskEntriesDelta.toLocaleString()}
+													/>
+													<StatCard
+														label="Disk Size Δ"
+														value={formatBytes(
+															stat.suite.cacheDiagnostics.diskSizeDeltaBytes,
+														)}
+													/>
+													<StatCard
+														label="Demand Entries Δ"
+														value={stat.suite.cacheDiagnostics.demandEntriesDelta.toLocaleString()}
+													/>
+													<StatCard
+														label="Stress GET Avg"
+														value={`${stat.suite.cacheDiagnostics.stressGetAvgMs.toFixed(1)} ms`}
+													/>
+													<StatCard
+														label="Stress GET P50"
+														value={`${stat.suite.cacheDiagnostics.stressGetP50Ms.toFixed(1)} ms`}
+													/>
+													<StatCard
+														label="Stress GET P95"
+														value={`${stat.suite.cacheDiagnostics.stressGetP95Ms.toFixed(1)} ms`}
+													/>
+													<StatCard
+														label="Cold Req/s"
+														value={stat.suite.cacheDiagnostics.coldRps.toFixed(
+															1,
+														)}
+													/>
+													<StatCard
+														label="Hot Req/s"
+														value={stat.suite.cacheDiagnostics.hotRps.toFixed(
+															1,
+														)}
+													/>
+													<StatCard
+														label="Cold Success"
+														value={`${stat.suite.cacheDiagnostics.coldSuccessRate.toFixed(1)}%`}
+													/>
+													<StatCard
+														label="Hot Success"
+														value={`${stat.suite.cacheDiagnostics.hotSuccessRate.toFixed(1)}%`}
+													/>
+													<StatCard
+														label="Hot 429s"
+														value={stat.suite.cacheDiagnostics.hotRateLimited.toLocaleString()}
+													/>
+													<StatCard
+														label="Hot Timeouts"
+														value={stat.suite.cacheDiagnostics.hotTimeouts.toLocaleString()}
+													/>
+													<StatCard
+														label="Internal Cache Hit Signal"
+														value={`${stat.suite.cacheDiagnostics.internalHitRatePercent.toFixed(1)}%`}
+													/>
+												</div>
+												<div className="text-[11px] text-text-muted">
+													Note: <span className="font-mono">X-Cache</span> is
+													edge/CDN cache and may stay MISS for signed/private
+													requests. Internal Redis/disk behavior is reflected by
+													Redis/Disk deltas and Internal Cache Hit Signal.
+												</div>
+											</>
 										) : null}
 
 										<div className="grid grid-cols-1 md:grid-cols-4 gap-3">
