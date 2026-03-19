@@ -307,7 +307,7 @@ export function YswsSubmitPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 								<label
 									htmlFor="file-input"
-									className={`border-2 border-dashed rounded-xl p-8 transition-colors group relative ${dragActive ? "border-white/40 bg-white/5" : "border-white/20 hover:border-white/40"}`}
+									className={`block w-full min-h-44 border-2 border-dashed rounded-xl p-8 transition-colors group relative overflow-hidden cursor-pointer ${dragActive ? "border-white/40 bg-white/5" : "border-white/20 hover:border-white/40"}`}
 									onDragEnter={(e) => {
 										e.preventDefault();
 										setDragActive(true);
@@ -345,11 +345,11 @@ export function YswsSubmitPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									/>
 
 									{preview ? (
-										<div className="flex items-center justify-center gap-4">
+										<div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full">
 											<img
 												src={preview}
 												alt="Preview"
-												className="max-h-48 rounded-lg shadow-lg"
+												className="max-h-48 w-full max-w-full object-contain rounded-lg shadow-lg"
 											/>
 											<button
 												type="button"
