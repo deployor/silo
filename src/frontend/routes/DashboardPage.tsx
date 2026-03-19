@@ -86,6 +86,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	);
 	const [confirmLoading, setConfirmLoading] = useState(false);
 	const [confirmDelayRemaining, setConfirmDelayRemaining] = useState(0);
+	const [publicWarningStep, setPublicWarningStep] = useState(0);
+	const [dontShowPublicWarningAgain, setDontShowPublicWarningAgain] =
+		useState(false);
 	const [pendingActionKey, setPendingActionKey] = useState<string | null>(null);
 
 	const buttonBase =
@@ -171,6 +174,11 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	};
 
 	const togglePublic = async (bucketName: string, isPublic: boolean) => {
+		const skipPublicWarning =
+			typeof window !== "undefined" &&
+			window.localStorage.getItem("silo.publicWarning.skip") === "1";
+		const showPublicWarningWizard = isPublic && !skipPublicWarning;
+
 		setConfirmDialog({
 			title: `Make bucket ${isPublic ? "public" : "private"}`,
 			message: isPublic
@@ -181,8 +189,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				? "bg-hc-red hover:bg-red-600 border-hc-red text-white"
 				: "bg-hc-blue hover:bg-blue-600 border-hc-blue text-white",
 			pendingKey: `visibility:${bucketName}`,
-			publicRiskWarning: isPublic,
-			confirmDelaySeconds: isPublic ? 15 : 0,
+			publicRiskWarning: showPublicWarningWizard,
+			confirmDelaySeconds: isPublic ? 5 : 0,
 			onConfirm: async () => {
 				await fetchText(`/api/dashboard/buckets/${bucketName}`, {
 					method: "PATCH",
@@ -195,8 +203,16 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	};
 
 	useEffect(() => {
-		if (!confirmDialog?.publicRiskWarning) {
+		if (!confirmDialog) {
+			setPublicWarningStep(0);
+			setDontShowPublicWarningAgain(false);
 			setConfirmDelayRemaining(0);
+			return;
+		}
+
+		if (confirmDialog.publicRiskWarning) {
+			setPublicWarningStep(0);
+			setDontShowPublicWarningAgain(false);
 			return;
 		}
 
@@ -218,6 +234,28 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			window.clearInterval(timer);
 		};
 	}, [confirmDialog]);
+
+	useEffect(() => {
+		if (!confirmDialog?.publicRiskWarning) return;
+		if (publicWarningStep < 0 || publicWarningStep > 2) return;
+
+		const initial = 5;
+		setConfirmDelayRemaining(initial);
+
+		const timer = window.setInterval(() => {
+			setConfirmDelayRemaining((prev) => {
+				if (prev <= 1) {
+					window.clearInterval(timer);
+					return 0;
+				}
+				return prev - 1;
+			});
+		}, 1000);
+
+		return () => {
+			window.clearInterval(timer);
+		};
+	}, [confirmDialog?.publicRiskWarning, publicWarningStep]);
 
 	const deleteBucket = async (bucketName: string, emptyOnly: boolean) => {
 		setConfirmDialog({
@@ -827,65 +865,107 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!confirmDialog}
 				onClose={confirmLoading ? undefined : () => setConfirmDialog(null)}
 				title={confirmDialog?.title}
-				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "!border-2 !border-red-500 bg-[#1a0a0b] ring-2 ring-red-500/80 !overflow-visible" : ""}`}
+				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "!border !border-red-800 bg-[#1a0a0b]" : ""}`}
 			>
 				{confirmDialog ? (
 					<>
 						{confirmDialog.publicRiskWarning ? (
-							<div className="pointer-events-none absolute -inset-2 rounded-[2rem] border-2 border-red-400/95 animate-[pulse_0.8s_linear_infinite] shadow-[0_0_20px_rgba(255,60,60,0.95),0_0_44px_rgba(255,40,40,0.9),0_0_70px_rgba(255,20,20,0.85)]" />
-						) : null}
-						<p
-							className={
-								confirmDialog.publicRiskWarning
-									? "text-white text-sm"
-									: "text-text-muted text-sm"
-							}
-						>
-							{confirmDialog.message}
-						</p>
-						{confirmDialog.publicRiskWarning ? (
-							<div className="mt-4">
-								<div className="flex items-center gap-2 text-white font-black uppercase tracking-wider text-xs mb-4">
-									<MdWarningAmber className="text-base text-red-400" />
-									Public bucket warning
-								</div>
-
-								<div className="space-y-3">
-									<div className="flex items-start gap-3 border-l-4 border-red-600 pl-3 py-1">
-										<div className="mt-0.5 text-red-400">
-											<MdPublic className="text-lg" />
+							<div className="mt-1 transition-all duration-300 text-white">
+								{publicWarningStep === 0 ? (
+									<div className="space-y-4">
+										<div className="flex items-center gap-2 text-xs uppercase tracking-wider text-red-300 font-bold">
+											<MdWarningAmber className="text-red-400" />
+											Use public buckets only for static assets
 										</div>
-										<p className="text-white text-sm">
-											People on the internet can access your files if they have
-											the URL.
+										<p className="text-sm text-white/95 leading-relaxed">
+											Use this for things like{" "}
+											<span className="font-bold text-red-300">
+												blog images
+											</span>
+											, <span className="font-bold text-red-300">CSS</span>, and
+											other files that are already meant to be public.
+										</p>
+										<ul className="text-sm space-y-2 list-disc list-inside text-white/90">
+											<li>
+												<span className="font-bold text-red-300">
+													DO NOT USE
+												</span>{" "}
+												for user-upload web apps.
+											</li>
+											<li>
+												<span className="font-bold text-red-300">
+													DO NOT USE
+												</span>{" "}
+												for private/sensitive files.
+											</li>
+											<li>
+												<span className="font-bold text-red-300">
+													DO NOT USE
+												</span>{" "}
+												as a backend storage shortcut.
+											</li>
+										</ul>
+									</div>
+								) : null}
+
+								{publicWarningStep === 1 ? (
+									<div className="space-y-4">
+										<div className="flex items-center gap-2 text-xs uppercase tracking-wider text-red-300 font-bold">
+											<MdPublic className="text-red-400" />
+											Public means ANYONE
+										</div>
+										<p className="text-sm text-white/95 leading-relaxed">
+											If you make this public,{" "}
+											<span className="font-bold text-red-300">ANYONE</span> can
+											access it — including bots, crawlers, and AI scrapers.
+										</p>
+										<p className="text-sm text-white/90 leading-relaxed">
+											We{" "}
+											<span className="font-bold text-red-300">
+												cannot protect
+											</span>{" "}
+											public content for you. You are fully responsible for what
+											you expose.
 										</p>
 									</div>
+								) : null}
 
-									<div className="flex items-start gap-3 border-l-4 border-red-600 pl-3 py-1">
-										<div className="mt-0.5 text-red-400">
-											<MdVisibility className="text-lg" />
+								{publicWarningStep === 2 ? (
+									<div className="space-y-4">
+										<div className="flex items-center gap-2 text-xs uppercase tracking-wider text-red-300 font-bold">
+											<MdGroups className="text-red-400" />
+											Quota and abuse risk
 										</div>
-										<p className="text-white text-sm">
-											Public files can be indexed, mirrored, and shared broadly.
+										<p className="text-sm text-white/95 leading-relaxed">
+											Your quota can be burned quickly by spam or high traffic.
+											If a public bucket causes absurd load, we may need to
+											disable it.
 										</p>
+										<label className="flex items-start gap-3 mt-2">
+											<input
+												type="checkbox"
+												checked={dontShowPublicWarningAgain}
+												onChange={(e) =>
+													setDontShowPublicWarningAgain(e.target.checked)
+												}
+												className="mt-1 rounded border-red-500/50 bg-black/20 text-hc-red focus:ring-hc-red/40"
+											/>
+											<span className="text-xs text-white/80">
+												Don&apos;t show this warning flow again on this device.
+											</span>
+										</label>
 									</div>
+								) : null}
 
-									<div className="flex items-start gap-3 border-l-4 border-red-600 pl-3 py-1">
-										<div className="mt-0.5 text-red-400">
-											<MdGroups className="text-lg" />
-										</div>
-										<p className="text-white text-sm">
-											Unexpected traffic from others can burn your quota faster.
-										</p>
-									</div>
-								</div>
-
-								<div className="mt-4 text-xs text-white font-bold">
-									You can confirm in{" "}
+								<div className="mt-4 text-xs text-white/75 font-bold">
+									Continue in{" "}
 									<span className="text-red-400">{confirmDelayRemaining}s</span>
 								</div>
 							</div>
-						) : null}
+						) : (
+							<p className="text-text-muted text-sm">{confirmDialog.message}</p>
+						)}
+
 						<div className="mt-6 flex justify-end gap-3">
 							<button
 								type="button"
@@ -895,18 +975,74 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							>
 								Cancel
 							</button>
-							<button
-								type="button"
-								disabled={confirmLoading || confirmDelayRemaining > 0}
-								onClick={runConfirmDialog}
-								className={`${buttonBase} px-6 py-3 ${confirmDialog.confirmClassName || buttonPrimaryRed} disabled:opacity-50`}
-							>
-								{confirmLoading
-									? "Working..."
-									: confirmDelayRemaining > 0
-										? `${confirmDialog.confirmLabel} (${confirmDelayRemaining}s)`
-										: confirmDialog.confirmLabel}
-							</button>
+
+							{confirmDialog.publicRiskWarning ? (
+								<>
+									{publicWarningStep > 0 ? (
+										<button
+											type="button"
+											onClick={() =>
+												setPublicWarningStep((s) => Math.max(0, s - 1))
+											}
+											className={`${buttonBase} ${buttonSubtle}`}
+										>
+											Back
+										</button>
+									) : null}
+
+									{publicWarningStep < 2 ? (
+										<button
+											type="button"
+											disabled={confirmDelayRemaining > 0}
+											onClick={() =>
+												setPublicWarningStep((s) => Math.min(2, s + 1))
+											}
+											className={`${buttonBase} ${buttonPrimaryRed} disabled:opacity-50`}
+										>
+											{confirmDelayRemaining > 0
+												? `Next (${confirmDelayRemaining}s)`
+												: "Next"}
+										</button>
+									) : (
+										<button
+											type="button"
+											disabled={confirmLoading || confirmDelayRemaining > 0}
+											onClick={() => {
+												if (
+													dontShowPublicWarningAgain &&
+													typeof window !== "undefined"
+												) {
+													window.localStorage.setItem(
+														"silo.publicWarning.skip",
+														"1",
+													);
+												}
+												runConfirmDialog();
+											}}
+											className={`${buttonBase} px-6 py-3 ${confirmDialog.confirmClassName || buttonPrimaryRed} disabled:opacity-50`}
+										>
+											{confirmLoading
+												? "Working..."
+												: confirmDelayRemaining > 0
+													? `${confirmDialog.confirmLabel} (${confirmDelayRemaining}s)`
+													: confirmDialog.confirmLabel}
+										</button>
+									)}
+								</>
+							) : (
+								<button
+									type="button"
+									disabled={confirmLoading || confirmDelayRemaining > 0}
+									onClick={runConfirmDialog}
+									className={`${buttonBase} px-6 py-3 ${confirmDialog.confirmClassName || buttonPrimaryRed} disabled:opacity-50`}
+								>
+									{confirmLoading
+										? "Working..."
+										: confirmDelayRemaining > 0
+											? `${confirmDialog.confirmLabel} (${confirmDelayRemaining}s)`
+											: confirmDialog.confirmLabel}
+								</button>
+							)}
 						</div>
 					</>
 				) : null}
