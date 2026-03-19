@@ -452,10 +452,13 @@ async function runAdminSpeedtest(req: Request) {
 		runSingle: z.boolean().default(true),
 		runManySmall: z.boolean().default(true),
 		runConcurrent: z.boolean().default(false),
+		runCacheHeavy: z.boolean().default(false),
 		smallFileKb: z.number().int().min(16).max(4096).default(256),
 		smallFileCount: z.number().int().min(1).max(200).default(16),
 		concurrency: z.number().int().min(1).max(20).default(4),
 		warmPasses: z.number().int().min(1).max(3).default(1),
+		cacheStressLoops: z.number().int().min(5).max(500).default(80),
+		cacheObjectCount: z.number().int().min(1).max(20).default(4),
 	});
 
 	const body = await req.json().catch(() => null);
@@ -476,10 +479,13 @@ async function runAdminSpeedtest(req: Request) {
 		runSingle,
 		runManySmall,
 		runConcurrent,
+		runCacheHeavy,
 		smallFileKb,
 		smallFileCount,
 		concurrency,
 		warmPasses,
+		cacheStressLoops,
+		cacheObjectCount,
 	} = parsed.data;
 
 	const bucket = await db
@@ -521,7 +527,7 @@ async function runAdminSpeedtest(req: Request) {
 	const runId = crypto.randomUUID().slice(0, 8);
 	const baseUrl = `https://${config.s3Domain}`;
 
-	type SuiteId = "single" | "many-small" | "concurrent";
+	type SuiteId = "single" | "many-small" | "concurrent" | "cache-heavy";
 	type SpeedtestIterationRow = {
 		index: number;
 		key: string;
@@ -560,6 +566,16 @@ async function runAdminSpeedtest(req: Request) {
 			warmHitCount: number;
 			warmMissCount: number;
 		};
+		cacheDiagnostics?: {
+			redisHitsDelta: number;
+			redisMissesDelta: number;
+			diskEntriesDelta: number;
+			diskSizeDeltaBytes: number;
+			demandEntriesDelta: number;
+			stressGetAvgMs: number;
+			stressGetP50Ms: number;
+			stressGetP95Ms: number;
+		};
 		iterationsDetail: SpeedtestIterationRow[];
 	};
 
@@ -594,6 +610,25 @@ async function runAdminSpeedtest(req: Request) {
 					] || 0
 				: 0;
 		return { avgMs, p95Ms };
+	}
+
+	function percentile(values: number[], p: number): number {
+		if (values.length === 0) return 0;
+		const sorted = [...values].sort((a, b) => a - b);
+		const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * p));
+		return sorted[idx] ?? 0;
+	}
+
+	async function getCacheSnapshot() {
+		const info = parseRedisInfo(await redis.info());
+		const diskStats = getDiskCacheStats();
+		return {
+			redisHits: Number.parseInt(info.keyspace_hits || "0", 10),
+			redisMisses: Number.parseInt(info.keyspace_misses || "0", 10),
+			diskEntryCount: diskStats.entryCount,
+			diskSizeBytes: diskStats.totalSizeBytes,
+			demandTrackerEntries: diskStats.demandTrackerEntries,
+		};
 	}
 
 	async function probeLatency(url: string, sampleCount = 5): Promise<number[]> {
@@ -763,16 +798,155 @@ async function runAdminSpeedtest(req: Request) {
 		};
 	}
 
+	async function runCacheHeavySuite(): Promise<SpeedtestSuite> {
+		const fileSizeBytes = Math.max(
+			1024 * 1024,
+			Math.floor(payloadSizeBytes / 4),
+		);
+		const fileCount = cacheObjectCount;
+		const payload = randomBytes(fileSizeBytes);
+		const effectiveConcurrency = Math.max(1, Math.min(concurrency, fileCount));
+		const prefix = `admin-speedtest/${runId}/cache-heavy`;
+		const objects = Array.from({ length: fileCount }, (_v, fileIndex) => {
+			const key = `${prefix}/obj-${fileIndex}.bin`;
+			return { key, url: `${baseUrl}/${bucketName}/${key}` };
+		});
+
+		const putStart = performance.now();
+		await runPool(objects, effectiveConcurrency, async (objectItem) => {
+			const putRes = await client.fetch(objectItem.url, {
+				method: "PUT",
+				body: payload,
+				headers: {
+					"content-type": "application/octet-stream",
+					"x-amz-content-sha256": "UNSIGNED-PAYLOAD",
+				},
+			});
+			if (!putRes.ok) {
+				const message = await putRes.text();
+				throw new Error(
+					`Cache-heavy seed upload failed (${putRes.status}) for ${objectItem.key}: ${message}`,
+				);
+			}
+		});
+		const uploadMs = performance.now() - putStart;
+
+		const coldStart = performance.now();
+		await runPool(objects, effectiveConcurrency, async (objectItem) => {
+			const res = await client.fetch(objectItem.url, { method: "GET" });
+			const body = await res.arrayBuffer();
+			if (!res.ok || body.byteLength !== fileSizeBytes) {
+				throw new Error(
+					`Cache-heavy cold read failed for ${objectItem.key} (status=${res.status}, size=${body.byteLength})`,
+				);
+			}
+		});
+		const downloadColdMs = performance.now() - coldStart;
+
+		const before = await getCacheSnapshot();
+
+		const warmLatencies: number[] = [];
+		const iterationsDetail: SpeedtestIterationRow[] = [];
+		let downloadWarmMsTotal = 0;
+		let warmHitCount = 0;
+		let warmMissCount = 0;
+
+		for (let i = 0; i < cacheStressLoops; i++) {
+			let warmHeader: string | null = null;
+			const started = performance.now();
+			await runPool(objects, effectiveConcurrency, async (objectItem) => {
+				const reqStart = performance.now();
+				const res = await client.fetch(objectItem.url, { method: "GET" });
+				const body = await res.arrayBuffer();
+				warmLatencies.push(performance.now() - reqStart);
+				if (!res.ok || body.byteLength !== fileSizeBytes) {
+					throw new Error(
+						`Cache-heavy warm read failed for ${objectItem.key} (status=${res.status}, size=${body.byteLength})`,
+					);
+				}
+				const cacheHeader = res.headers.get("x-cache");
+				if (warmHeader === null && cacheHeader) warmHeader = cacheHeader;
+				if (cacheHeader?.toLowerCase().includes("hit")) warmHitCount++;
+				else warmMissCount++;
+			});
+			const loopMs = performance.now() - started;
+			downloadWarmMsTotal += loopMs;
+
+			iterationsDetail.push({
+				index: i,
+				key: `${prefix}/* (${fileCount} files)`,
+				uploadMs: 0,
+				downloadColdMs: 0,
+				downloadWarmMs: loopMs,
+				warmCacheHeader: warmHeader,
+				sizeBytes: fileCount * fileSizeBytes,
+			});
+		}
+
+		const after = await getCacheSnapshot();
+
+		await runPool(objects, effectiveConcurrency, async (objectItem) => {
+			await client.fetch(objectItem.url, { method: "DELETE" });
+		});
+
+		const latencyStats = calcLatencyStats(warmLatencies);
+
+		return {
+			id: "cache-heavy",
+			label: "Cache Hammer (Redis + Disk)",
+			config: {
+				iterations: cacheStressLoops,
+				fileSizeBytes,
+				fileCount,
+				concurrency: effectiveConcurrency,
+				warmPasses: 1,
+			},
+			totals: {
+				uploadMs,
+				downloadColdMs,
+				downloadWarmMs: downloadWarmMsTotal,
+				putRequests: fileCount,
+				getRequests: fileCount * (1 + cacheStressLoops),
+				deleteRequests: fileCount,
+				bytesUp: fileCount * fileSizeBytes,
+				bytesDown: fileCount * fileSizeBytes * (1 + cacheStressLoops),
+			},
+			latency: {
+				headSamplesMs: warmLatencies.slice(0, 20),
+				avgMs: latencyStats.avgMs,
+				p95Ms: latencyStats.p95Ms,
+			},
+			cache: {
+				warmHitCount,
+				warmMissCount,
+			},
+			cacheDiagnostics: {
+				redisHitsDelta: after.redisHits - before.redisHits,
+				redisMissesDelta: after.redisMisses - before.redisMisses,
+				diskEntriesDelta: after.diskEntryCount - before.diskEntryCount,
+				diskSizeDeltaBytes: after.diskSizeBytes - before.diskSizeBytes,
+				demandEntriesDelta:
+					after.demandTrackerEntries - before.demandTrackerEntries,
+				stressGetAvgMs: latencyStats.avgMs,
+				stressGetP50Ms: percentile(warmLatencies, 0.5),
+				stressGetP95Ms: percentile(warmLatencies, 0.95),
+			},
+			iterationsDetail,
+		};
+	}
+
 	const suitesToRun = {
 		runSingle,
 		runManySmall,
 		runConcurrent,
+		runCacheHeavy,
 	};
 
 	if (
 		!suitesToRun.runSingle &&
 		!suitesToRun.runManySmall &&
-		!suitesToRun.runConcurrent
+		!suitesToRun.runConcurrent &&
+		!suitesToRun.runCacheHeavy
 	) {
 		suitesToRun.runSingle = true;
 	}
@@ -826,6 +1000,10 @@ async function runAdminSpeedtest(req: Request) {
 					warmPasses,
 				}),
 			);
+		}
+
+		if (suitesToRun.runCacheHeavy) {
+			suiteResults.push(await runCacheHeavySuite());
 		}
 	} catch (error) {
 		const message =
