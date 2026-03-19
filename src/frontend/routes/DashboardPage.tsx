@@ -902,9 +902,6 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								{publicWarningStep === 0 ? (
 									<div className="rounded-2xl border border-red-600/50 bg-red-950/20 p-5 md:p-6">
 										<div className="grid md:grid-cols-[120px_1fr] gap-5 items-start">
-											<div className="flex items-center justify-center rounded-2xl border border-red-500/40 bg-red-600/15 p-4">
-												<MdVisibility className="text-[72px] text-red-300" />
-											</div>
 											<div className="space-y-4">
 												<div>
 													<p className="text-xs uppercase tracking-[0.18em] text-red-300 font-black">
@@ -942,9 +939,6 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								{publicWarningStep === 1 ? (
 									<div className="rounded-2xl border border-red-600/50 bg-red-950/20 p-5 md:p-6">
 										<div className="grid md:grid-cols-[120px_1fr] gap-5 items-start">
-											<div className="flex items-center justify-center rounded-2xl border border-red-500/40 bg-red-600/15 p-4">
-												<MdPublic className="text-[72px] text-red-300" />
-											</div>
 											<div className="space-y-4">
 												<div>
 													<p className="text-xs uppercase tracking-[0.18em] text-red-300 font-black">
@@ -982,9 +976,6 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								{publicWarningStep === 2 ? (
 									<div className="rounded-2xl border border-red-600/50 bg-red-950/20 p-5 md:p-6">
 										<div className="grid md:grid-cols-[120px_1fr] gap-5 items-start">
-											<div className="flex items-center justify-center rounded-2xl border border-red-500/40 bg-red-600/15 p-4">
-												<MdGroups className="text-[72px] text-red-300" />
-											</div>
 											<div className="space-y-4">
 												<div>
 													<p className="text-xs uppercase tracking-[0.18em] text-red-300 font-black">
