@@ -1,3 +1,4 @@
+import { AdminBucketsPage } from "../routes/AdminBucketsPage";
 import { AdminCachePage } from "../routes/AdminCachePage";
 import { AdminLogsPage } from "../routes/AdminLogsPage";
 import { AdminRedemptionDetailsPage } from "../routes/AdminRedemptionDetailsPage";
@@ -45,6 +46,8 @@ export function App({ bootstrap }: Props) {
 			return <OffboardingPage bootstrap={bootstrap} />;
 		case "admin-users":
 			return <AdminUsersPage bootstrap={bootstrap} />;
+		case "admin-buckets":
+			return <AdminBucketsPage bootstrap={bootstrap} />;
 		case "admin-logs":
 			return <AdminLogsPage bootstrap={bootstrap} />;
 		case "admin-cache":

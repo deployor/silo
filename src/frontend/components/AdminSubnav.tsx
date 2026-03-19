@@ -1,7 +1,14 @@
 export function AdminSubnav({
 	active,
 }: {
-	active: "users" | "ysws" | "redemptions" | "logs" | "settings" | "cache";
+	active:
+		| "users"
+		| "buckets"
+		| "ysws"
+		| "redemptions"
+		| "logs"
+		| "settings"
+		| "cache";
 }) {
 	const item = (href: string, key: typeof active, label: string) => (
 		<a
@@ -19,6 +26,7 @@ export function AdminSubnav({
 	return (
 		<div className="flex gap-4 mb-6 border-b border-white/10 pb-4">
 			{item("/admin/users", "users", "Users")}
+			{item("/admin/buckets", "buckets", "Buckets")}
 			{item("/admin/ysws", "ysws", "YSWS")}
 			{item("/admin/redemptions", "redemptions", "Redemptions")}
 			{item("/admin/logs", "logs", "Logs")}
