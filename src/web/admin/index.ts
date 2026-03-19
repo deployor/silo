@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+import { AwsClient } from "aws4fetch";
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { z } from "zod";
@@ -56,6 +58,18 @@ async function serveAdminBucketsPage(req: Request) {
 	const user = await getCurrentUser(req);
 	const html = await render("admin-buckets", {
 		title: "Admin Buckets",
+		user,
+		pageTitle: "ADMIN",
+	});
+	return new Response(html, {
+		headers: { "Content-Type": "text/html" },
+	});
+}
+
+async function serveAdminSpeedtestPage(req: Request) {
+	const user = await getCurrentUser(req);
+	const html = await render("admin-speedtest", {
+		title: "Admin Speed Test",
 		user,
 		pageTitle: "ADMIN",
 	});
@@ -428,6 +442,198 @@ async function listAdminBuckets(url: URL) {
 		}),
 		{ headers: { "Content-Type": "application/json" } },
 	);
+}
+
+async function runAdminSpeedtest(req: Request) {
+	const schema = z.object({
+		bucketName: z.string().regex(/^[a-z0-9-]+$/),
+		sizeMb: z.number().int().min(1).max(64).default(8),
+		iterations: z.number().int().min(1).max(10).default(3),
+	});
+
+	const body = await req.json().catch(() => null);
+	const parsed = schema.safeParse(body);
+	if (!parsed.success) {
+		return new Response(
+			parsed.error.issues[0]?.message ?? "Invalid request body",
+			{
+				status: 400,
+			},
+		);
+	}
+
+	const { bucketName, sizeMb, iterations } = parsed.data;
+
+	const bucket = await db
+		.select({ id: buckets.id, name: buckets.name, isPaused: buckets.isPaused })
+		.from(buckets)
+		.where(eq(buckets.name, bucketName))
+		.limit(1);
+
+	if (bucket.length === 0) {
+		return new Response("Bucket not found", { status: 404 });
+	}
+	if (bucket[0].isPaused) {
+		return new Response("Bucket is paused", { status: 400 });
+	}
+
+	const key = await db
+		.select({
+			accessKey: bucketKeys.accessKey,
+			secretKey: bucketKeys.secretKey,
+		})
+		.from(bucketKeys)
+		.where(eq(bucketKeys.bucketId, bucket[0].id))
+		.limit(1);
+
+	if (key.length === 0) {
+		return new Response("Bucket has no API key to run speed test", {
+			status: 400,
+		});
+	}
+
+	const client = new AwsClient({
+		accessKeyId: key[0].accessKey,
+		secretAccessKey: key[0].secretKey,
+		service: "s3",
+		region: config.s3.region || "auto",
+	});
+
+	const payloadSizeBytes = sizeMb * 1024 * 1024;
+	const payload = randomBytes(payloadSizeBytes);
+	const runId = crypto.randomUUID().slice(0, 8);
+	const baseUrl = `https://${config.s3Domain}`;
+
+	const iterationsDetail: Array<{
+		index: number;
+		key: string;
+		uploadMs: number;
+		downloadColdMs: number;
+		downloadWarmMs: number;
+		warmCacheHeader: string | null;
+	}> = [];
+
+	let uploadMsTotal = 0;
+	let downloadColdMsTotal = 0;
+	let downloadWarmMsTotal = 0;
+	let warmHitCount = 0;
+	let warmMissCount = 0;
+
+	for (let i = 0; i < iterations; i++) {
+		const objectKey = `admin-speedtest/${runId}/iter-${i}.bin`;
+		const objectUrl = `${baseUrl}/${bucketName}/${objectKey}`;
+
+		const putStart = performance.now();
+		const putRes = await client.fetch(objectUrl, {
+			method: "PUT",
+			body: payload,
+			headers: {
+				"content-type": "application/octet-stream",
+				"x-amz-content-sha256": "UNSIGNED-PAYLOAD",
+			},
+		});
+		const uploadMs = performance.now() - putStart;
+		if (!putRes.ok) {
+			const message = await putRes.text();
+			return new Response(`Upload failed (${putRes.status}): ${message}`, {
+				status: 500,
+			});
+		}
+
+		const coldStart = performance.now();
+		const coldRes = await client.fetch(objectUrl, { method: "GET" });
+		const coldBody = await coldRes.arrayBuffer();
+		const downloadColdMs = performance.now() - coldStart;
+		if (!coldRes.ok || coldBody.byteLength !== payloadSizeBytes) {
+			return new Response("Cold download failed or size mismatch", {
+				status: 500,
+			});
+		}
+
+		const warmStart = performance.now();
+		const warmRes = await client.fetch(objectUrl, { method: "GET" });
+		const warmBody = await warmRes.arrayBuffer();
+		const downloadWarmMs = performance.now() - warmStart;
+		if (!warmRes.ok || warmBody.byteLength !== payloadSizeBytes) {
+			return new Response("Warm download failed or size mismatch", {
+				status: 500,
+			});
+		}
+
+		const cacheHeader = warmRes.headers.get("x-cache");
+		if (cacheHeader && cacheHeader.toLowerCase().includes("hit")) {
+			warmHitCount++;
+		} else {
+			warmMissCount++;
+		}
+
+		uploadMsTotal += uploadMs;
+		downloadColdMsTotal += downloadColdMs;
+		downloadWarmMsTotal += downloadWarmMs;
+
+		iterationsDetail.push({
+			index: i,
+			key: objectKey,
+			uploadMs,
+			downloadColdMs,
+			downloadWarmMs,
+			warmCacheHeader: cacheHeader,
+		});
+
+		await client.fetch(objectUrl, { method: "DELETE" });
+	}
+
+	const latencyKey = iterationsDetail[0]?.key;
+	const headSamplesMs: number[] = [];
+	if (latencyKey) {
+		const latencyUrl = `${baseUrl}/${bucketName}/${latencyKey}`;
+		for (let i = 0; i < 5; i++) {
+			const start = performance.now();
+			const headRes = await client.fetch(latencyUrl, { method: "HEAD" });
+			const elapsedMs = performance.now() - start;
+			if (headRes.ok) headSamplesMs.push(elapsedMs);
+		}
+	}
+
+	const sorted = [...headSamplesMs].sort((a, b) => a - b);
+	const avgMs =
+		headSamplesMs.length > 0
+			? headSamplesMs.reduce((acc, n) => acc + n, 0) / headSamplesMs.length
+			: 0;
+	const p95Ms =
+		sorted.length > 0
+			? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] ||
+				0
+			: 0;
+
+	return jsonResponse({
+		ok: true,
+		result: {
+			bucketName,
+			sizeBytes: payloadSizeBytes,
+			iterations,
+			totals: {
+				uploadMs: uploadMsTotal,
+				downloadColdMs: downloadColdMsTotal,
+				downloadWarmMs: downloadWarmMsTotal,
+				putRequests: iterations,
+				getRequests: iterations * 2,
+				deleteRequests: iterations,
+				bytesUp: payloadSizeBytes * iterations,
+				bytesDown: payloadSizeBytes * iterations * 2,
+			},
+			latency: {
+				headSamplesMs,
+				avgMs,
+				p95Ms,
+			},
+			cache: {
+				warmHitCount,
+				warmMissCount,
+			},
+			iterationsDetail,
+		},
+	});
 }
 
 async function updateUserQuota(userId: string, req: Request) {
@@ -1008,6 +1214,9 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	if (path === "/admin/buckets") {
 		return serveAdminBucketsPage(req);
 	}
+	if (path === "/admin/speedtest") {
+		return serveAdminSpeedtestPage(req);
+	}
 	if (path === "/admin/logs") {
 		return serveAdminLogsPage(req);
 	}
@@ -1216,6 +1425,10 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 
 		if (path === "/api/admin/buckets" && req.method === "GET") {
 			return listAdminBuckets(url);
+		}
+
+		if (path === "/api/admin/speedtest/run" && req.method === "POST") {
+			return runAdminSpeedtest(req);
 		}
 
 		// Global Settings API
