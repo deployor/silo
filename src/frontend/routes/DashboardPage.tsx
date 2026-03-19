@@ -989,12 +989,10 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													</p>
 												</div>
 												<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
-													<p className="font-black text-hc-red">
-														Possible outcome
-													</p>
+													<p className="font-black text-hc-red">What this means</p>
 													<p className="text-white/85 mt-1">
-														We may suspend abusive public traffic to protect the
-														platform.
+														Public traffic can burn your quota very quickly, even if this
+														bucket only has a few files.
 													</p>
 												</div>
 											</div>
