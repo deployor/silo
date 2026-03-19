@@ -865,31 +865,35 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!confirmDialog}
 				onClose={confirmLoading ? undefined : () => setConfirmDialog(null)}
 				title={confirmDialog?.title}
-				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "!max-w-2xl !border !border-red-700 bg-[#16090a]" : ""}`}
+				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "!max-w-2xl bg-[#16090a]" : ""}`}
 			>
 				{confirmDialog ? (
 					<>
 						{confirmDialog.publicRiskWarning ? (
 							<div className="mt-1 transition-all duration-300 text-white space-y-5">
-								<div className="grid grid-cols-3 gap-2">
+								<div className="flex items-center justify-center gap-3 pb-1">
 									{[
-										{ icon: <MdWarningAmber className="text-2xl" />, label: "Use case" },
-										{ icon: <MdPublic className="text-2xl" />, label: "Exposure" },
-										{ icon: <MdGroups className="text-2xl" />, label: "Abuse risk" },
+										{
+											icon: <MdWarningAmber className="text-2xl" />,
+											label: "Use case",
+										},
+										{
+											icon: <MdPublic className="text-2xl" />,
+											label: "Exposure",
+										},
+										{
+											icon: <MdGroups className="text-2xl" />,
+											label: "Abuse risk",
+										},
 									].map((step, idx) => {
 										const active = publicWarningStep === idx;
 										const complete = publicWarningStep > idx;
 										return (
 											<div
 												key={step.label}
-												className={`rounded-xl border px-3 py-3 text-center transition-colors ${active ? "border-red-400 bg-red-500/20" : complete ? "border-red-500/40 bg-red-500/10" : "border-white/10 bg-white/[0.02]"}`}
+												className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${active ? "border-red-400 bg-red-500/25 text-red-200" : complete ? "border-red-500/40 bg-red-500/15 text-red-200" : "border-white/20 bg-white/[0.03] text-white/60"}`}
 											>
-												<div className={`mx-auto mb-1 inline-flex h-10 w-10 items-center justify-center rounded-full ${active ? "bg-red-500/30 text-red-200" : "bg-white/10 text-white/70"}`}>
-													{step.icon}
-												</div>
-												<div className="text-[11px] uppercase tracking-wider font-black text-white/90">
-													{idx + 1}. {step.label}
-												</div>
+												{step.icon}
 											</div>
 										);
 									})}
@@ -900,7 +904,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<div className="grid md:grid-cols-[120px_1fr] gap-5 items-start">
 											<div className="flex items-center justify-center rounded-2xl border border-red-500/40 bg-red-600/15 p-4">
 												<MdVisibility className="text-[72px] text-red-300" />
-										</div>
+											</div>
 											<div className="space-y-4">
 												<div>
 													<p className="text-xs uppercase tracking-[0.18em] text-red-300 font-black">
@@ -916,7 +920,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 															✅ OK TO MAKE PUBLIC
 														</p>
 														<p className="text-white/90 mt-1">
-															Blog images, app icons, CSS/JS bundles, docs screenshots.
+															Blog images, app icons, CSS/JS bundles, docs
+															screenshots.
 														</p>
 													</div>
 													<div className="rounded-xl border border-red-400/35 bg-red-500/10 p-3">
@@ -924,7 +929,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 															⛔ DO NOT MAKE PUBLIC
 														</p>
 														<p className="text-white/90 mt-1">
-															User uploads, private docs, backups, secret/config files.
+															User uploads, private docs, backups, secret/config
+															files.
 														</p>
 													</div>
 												</div>
@@ -938,7 +944,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<div className="grid md:grid-cols-[120px_1fr] gap-5 items-start">
 											<div className="flex items-center justify-center rounded-2xl border border-red-500/40 bg-red-600/15 p-4">
 												<MdPublic className="text-[72px] text-red-300" />
-										</div>
+											</div>
 											<div className="space-y-4">
 												<div>
 													<p className="text-xs uppercase tracking-[0.18em] text-red-300 font-black">
@@ -951,20 +957,23 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												<div className="grid sm:grid-cols-3 gap-2.5 text-xs sm:text-sm">
 													<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
 														<p className="font-black text-white">People</p>
-														<p className="text-white/75 mt-1">Anyone with a link.</p>
+														<p className="text-white/75 mt-1">
+															Anyone with a link.
+														</p>
 													</div>
 													<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
 														<p className="font-black text-white">Crawlers</p>
-														<p className="text-white/75 mt-1">Search engines and scanners.</p>
+														<p className="text-white/75 mt-1">
+															Search engines and scanners.
+														</p>
 													</div>
 													<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
 														<p className="font-black text-white">AI scrapers</p>
-														<p className="text-white/75 mt-1">Dataset and model collectors.</p>
+														<p className="text-white/75 mt-1">
+															Dataset and model collectors.
+														</p>
 													</div>
 												</div>
-												<p className="text-sm text-red-200 font-semibold">
-													We can&apos;t hide or retract already-public links for you.
-												</p>
 											</div>
 										</div>
 									</div>
@@ -975,7 +984,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<div className="grid md:grid-cols-[120px_1fr] gap-5 items-start">
 											<div className="flex items-center justify-center rounded-2xl border border-red-500/40 bg-red-600/15 p-4">
 												<MdGroups className="text-[72px] text-red-300" />
-										</div>
+											</div>
 											<div className="space-y-4">
 												<div>
 													<p className="text-xs uppercase tracking-[0.18em] text-red-300 font-black">
@@ -987,15 +996,20 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												</div>
 												<div className="grid sm:grid-cols-2 gap-3 text-sm">
 													<div className="rounded-xl border border-red-400/35 bg-red-500/10 p-3">
-														<p className="font-black text-red-300">What can happen</p>
+														<p className="font-black text-red-300">
+															What can happen
+														</p>
 														<p className="text-white/85 mt-1">
 															Bot traffic burns egress + request quota quickly.
 														</p>
 													</div>
 													<div className="rounded-xl border border-red-400/35 bg-red-500/10 p-3">
-														<p className="font-black text-red-300">Possible outcome</p>
+														<p className="font-black text-red-300">
+															Possible outcome
+														</p>
 														<p className="text-white/85 mt-1">
-															We may suspend abusive public traffic to protect the platform.
+															We may suspend abusive public traffic to protect
+															the platform.
 														</p>
 													</div>
 												</div>
@@ -1006,25 +1020,17 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														onChange={(e) =>
 															setDontShowPublicWarningAgain(e.target.checked)
 														}
-													className="mt-1 h-4 w-4 rounded border-red-500/50 bg-black/20 text-hc-red focus:ring-hc-red/40"
+														className="mt-1 h-4 w-4 rounded border-red-500/50 bg-black/20 text-hc-red focus:ring-hc-red/40"
 													/>
 													<span className="text-sm text-white/90 leading-relaxed">
-														Don&apos;t show this 3-step warning again on this device.
+														Don&apos;t show this 3-step warning again on this
+														device.
 													</span>
 												</label>
 											</div>
 										</div>
 									</div>
 								) : null}
-
-								<div className="flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2">
-									<p className="text-xs md:text-sm font-bold text-red-100">
-										Read timer: <span className="text-red-300">{confirmDelayRemaining}s</span>
-									</p>
-									<p className="text-[11px] md:text-xs uppercase tracking-wider text-red-200/90 font-black">
-										Step {publicWarningStep + 1} of 3
-									</p>
-								</div>
 							</div>
 						) : (
 							<p className="text-text-muted text-sm">{confirmDialog.message}</p>
