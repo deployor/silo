@@ -827,20 +827,28 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!confirmDialog}
 				onClose={confirmLoading ? undefined : () => setConfirmDialog(null)}
 				title={confirmDialog?.title}
-				className="max-w-md p-8"
+				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "border border-red-500/45 bg-gradient-to-b from-red-500/10 via-hc-dark to-hc-dark" : ""}`}
 			>
 				{confirmDialog ? (
 					<>
-						<p className="text-text-muted text-sm">{confirmDialog.message}</p>
+						<p
+							className={
+								confirmDialog.publicRiskWarning
+									? "text-red-100 text-sm"
+									: "text-text-muted text-sm"
+							}
+						>
+							{confirmDialog.message}
+						</p>
 						{confirmDialog.publicRiskWarning ? (
-							<div className="mt-4 rounded-2xl border border-red-500/35 bg-black/20 p-5">
-								<div className="flex items-center gap-2 text-red-200 font-black uppercase tracking-wider text-xs mb-3">
+							<div className="mt-4">
+								<div className="flex items-center gap-2 text-red-200 font-black uppercase tracking-wider text-xs mb-4">
 									<MdWarningAmber className="text-base" />
 									Public bucket warning
 								</div>
 
-								<div className="space-y-2">
-									<div className="flex items-start gap-3 rounded-lg border border-red-500/25 bg-red-500/5 px-3 py-2.5">
+								<div className="space-y-3">
+									<div className="flex items-start gap-3 border-l-2 border-red-400/70 pl-3 py-1">
 										<div className="mt-0.5 text-red-300">
 											<MdPublic className="text-lg" />
 										</div>
@@ -850,7 +858,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										</p>
 									</div>
 
-									<div className="flex items-start gap-3 rounded-lg border border-red-500/25 bg-red-500/5 px-3 py-2.5">
+									<div className="flex items-start gap-3 border-l-2 border-red-400/70 pl-3 py-1">
 										<div className="mt-0.5 text-red-300">
 											<MdVisibility className="text-lg" />
 										</div>
@@ -859,7 +867,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										</p>
 									</div>
 
-									<div className="flex items-start gap-3 rounded-lg border border-red-500/25 bg-red-500/5 px-3 py-2.5">
+									<div className="flex items-start gap-3 border-l-2 border-red-400/70 pl-3 py-1">
 										<div className="mt-0.5 text-red-300">
 											<MdGroups className="text-lg" />
 										</div>
@@ -869,7 +877,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</div>
 								</div>
 
-								<div className="mt-3 rounded-lg border border-red-400/35 bg-red-500/10 px-3 py-2 text-xs text-red-200 font-bold">
+								<div className="mt-4 text-xs text-red-200 font-bold">
 									You can confirm in{" "}
 									<span className="text-white">{confirmDelayRemaining}s</span>
 								</div>
