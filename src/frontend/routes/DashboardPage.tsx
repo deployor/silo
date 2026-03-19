@@ -832,7 +832,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				{confirmDialog ? (
 					<>
 						{confirmDialog.publicRiskWarning ? (
-							<div className="pointer-events-none absolute inset-0 rounded-3xl border-2 border-red-400 animate-[pulse_0.45s_ease-in-out_infinite] shadow-[0_0_28px_rgba(239,68,68,0.95),inset_0_0_14px_rgba(239,68,68,0.55)]" />
+							<div className="pointer-events-none absolute inset-0 rounded-3xl border-2 border-red-400 animate-[pulse_0.9s_ease-in-out_infinite] shadow-[0_0_34px_rgba(239,68,68,0.98)]" />
 						) : null}
 						<p
 							className={
