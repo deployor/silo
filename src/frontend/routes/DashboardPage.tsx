@@ -56,6 +56,7 @@ type ConfirmDialogState = {
 	message: string;
 	confirmLabel: string;
 	confirmClassName?: string;
+	pendingKey?: string;
 	publicRiskWarning?: boolean;
 	onConfirm: () => Promise<void>;
 };
@@ -80,6 +81,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		null,
 	);
 	const [confirmLoading, setConfirmLoading] = useState(false);
+	const [pendingActionKey, setPendingActionKey] = useState<string | null>(null);
 
 	const buttonBase =
 		"inline-flex items-center justify-center gap-2 rounded-xl border text-sm font-bold transition-colors";
@@ -164,6 +166,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				: `Only authenticated access will be allowed for ${bucketName}.`,
 			confirmLabel: isPublic ? "Make Public" : "Make Private",
 			confirmClassName: "bg-hc-blue hover:bg-blue-600",
+			pendingKey: `visibility:${bucketName}`,
 			publicRiskWarning: isPublic,
 			onConfirm: async () => {
 				await fetchText(`/api/dashboard/buckets/${bucketName}`, {
@@ -184,6 +187,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				: `This will permanently delete ${bucketName} and all of its files.`,
 			confirmLabel: emptyOnly ? "Empty Bucket" : "Delete Bucket",
 			confirmClassName: "bg-hc-red hover:bg-red-600",
+			pendingKey: `bucket:${bucketName}`,
 			onConfirm: async () => {
 				await fetchText(
 					`/api/dashboard/buckets/${bucketName}${emptyOnly ? "?empty=true" : ""}`,
@@ -217,6 +221,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				"Any applications using this key will immediately lose access to this bucket.",
 			confirmLabel: "Delete Key",
 			confirmClassName: "bg-hc-red hover:bg-red-600",
+			pendingKey: `key:${bucketName}:${keyId}`,
 			onConfirm: async () => {
 				await fetchText(`/api/dashboard/buckets/${bucketName}/keys/${keyId}`, {
 					method: "DELETE",
@@ -289,6 +294,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const runConfirmDialog = async () => {
 		if (!confirmDialog) return;
 		setConfirmLoading(true);
+		setPendingActionKey(confirmDialog.pendingKey ?? null);
 		try {
 			await confirmDialog.onConfirm();
 			setConfirmDialog(null);
@@ -296,6 +302,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			window.alert(e instanceof Error ? e.message : "Action failed");
 		} finally {
 			setConfirmLoading(false);
+			setPendingActionKey(null);
 		}
 	};
 
@@ -467,142 +474,163 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</tr>
 						</thead>
 						<tbody className="divide-y divide-white/5">
-							{(stats?.buckets || []).map((bucket) => (
-								<tr
-									key={bucket.name}
-									className="hover:bg-white/5 transition-colors group"
-								>
-									<td className="px-6 py-4 font-medium text-white font-mono">
-										{bucket.name}
-										{bucket.isPaused ? (
-											<span className="ml-2 bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-500/30">
-												PAUSED
-											</span>
-										) : null}
-										{bucket.isCdn ? (
-											<span className="ml-2 bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-blue-500/30">
-												CDN
-											</span>
-										) : null}
-									</td>
-									<td className="px-6 py-4">
-										{bucket.isCdn ? (
-											<span className="text-text-muted italic">Managed</span>
-										) : (
-											<button
-												type="button"
-												onClick={() => setActiveBucket(bucket)}
-												className={`${buttonBase} ${buttonNeutral} text-xs px-3 py-1.5 rounded-lg`}
-											>
-												<MdKey className="text-sm mr-1" /> {bucket.keys.length}{" "}
-												Keys
-											</button>
-										)}
-									</td>
-									<td className="px-6 py-4 text-text-main">
-										<div className="text-xs font-mono">
-											<div>{formatBytes(bucket.totalBytes)}</div>
-											<div className="text-text-muted">
-												{bucket.totalRequests.toLocaleString()} reqs
-											</div>
-										</div>
-									</td>
-									<td className="px-6 py-4">
-										<button
-											type="button"
-											role="switch"
-											aria-checked={bucket.isPublic}
-											disabled={!!bucket.isPaused || !!bucket.isCdn}
-											onClick={() =>
-												togglePublic(bucket.name, !bucket.isPublic)
-											}
-											className={`inline-flex items-center gap-2 px-1 py-1 transition-colors ${bucket.isPaused || bucket.isCdn ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}
+							{(stats?.buckets || []).map((bucket) =>
+								(() => {
+									const visibilityBusy =
+										pendingActionKey === `visibility:${bucket.name}`;
+									const bucketBusy =
+										pendingActionKey === `bucket:${bucket.name}`;
+									return (
+										<tr
+											key={bucket.name}
+											className="hover:bg-white/5 transition-colors group"
 										>
-											<span
-												className={`relative h-6 w-11 rounded-full border transition-colors ${bucket.isPublic ? "bg-hc-blue/80 border-hc-blue" : "bg-white/10 border-white/20"}`}
-											>
-												<span
-													className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform ${bucket.isPublic ? "translate-x-5" : "translate-x-0"}`}
-												/>
-											</span>
-											<span className="text-xs font-semibold text-text-muted min-w-12 text-left">
-												{bucket.isPublic ? "Public" : "Private"}
-											</span>
-										</button>
-									</td>
-									<td className="px-6 py-4 text-text-muted text-xs font-mono">
-										{new Date(bucket.createdAt).toLocaleDateString()}
-									</td>
-									<td className="px-6 py-4 text-right flex justify-end items-center gap-1.5">
-										{!bucket.isCdn ? (
-											<button
-												type="button"
-												onClick={() => openCorsModal(bucket)}
-												aria-label="Configure CORS"
-												title="Configure CORS"
-												className={`${iconActionBase} group text-text-muted hover:text-white hover:bg-white/10`}
-											>
-												<MdCode className="text-base" />
-												<span className={iconActionTooltip}>
-													Configure CORS rules
-												</span>
-											</button>
-										) : null}
-										<a
-											href={`/dashboard/buckets/${bucket.name}`}
-											aria-label="Open bucket files"
-											title="Open bucket files"
-											className={`${iconActionBase} group text-hc-blue hover:text-blue-300 hover:bg-hc-blue/10`}
-										>
-											<MdFolderOpen className="text-base" />
-											<span className={iconActionTooltip}>
-												View bucket files
-											</span>
-										</a>
-										{!bucket.isCdn ? (
-											<button
-												type="button"
-												onClick={() => deleteBucket(bucket.name, true)}
-												aria-label="Empty bucket"
-												title="Empty bucket"
-												className={`${iconActionBase} group text-yellow-300 hover:text-yellow-200 hover:bg-yellow-500/10`}
-											>
-												<MdDeleteOutline className="text-base" />
-												<span className={iconActionTooltip}>
-													Delete all files in bucket
-												</span>
-											</button>
-										) : (
-											<button
-												type="button"
-												onClick={() => deleteBucket(bucket.name, true)}
-												aria-label="Empty bucket"
-												title="Empty bucket"
-												className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10`}
-											>
-												<MdDeleteOutline className="text-base" />
-												<span className={iconActionTooltip}>
-													Delete all files in bucket
-												</span>
-											</button>
-										)}
-										{!bucket.isCdn ? (
-											<button
-												type="button"
-												onClick={() => deleteBucket(bucket.name, false)}
-												aria-label="Delete bucket"
-												title="Delete bucket"
-												className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10`}
-											>
-												<MdDeleteForever className="text-base" />
-												<span className={iconActionTooltip}>
-													Delete bucket and all files
-												</span>
-											</button>
-										) : null}
-									</td>
-								</tr>
-							))}
+											<td className="px-6 py-4 font-medium text-white font-mono">
+												{bucket.name}
+												{bucket.isPaused ? (
+													<span className="ml-2 bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-500/30">
+														PAUSED
+													</span>
+												) : null}
+												{bucket.isCdn ? (
+													<span className="ml-2 bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-blue-500/30">
+														CDN
+													</span>
+												) : null}
+											</td>
+											<td className="px-6 py-4">
+												{bucket.isCdn ? (
+													<span className="text-text-muted italic">
+														Managed
+													</span>
+												) : (
+													<button
+														type="button"
+														onClick={() => setActiveBucket(bucket)}
+														className={`${buttonBase} ${buttonNeutral} text-xs px-3 py-1.5 rounded-lg`}
+													>
+														<MdKey className="text-sm mr-1" />{" "}
+														{bucket.keys.length} Keys
+													</button>
+												)}
+											</td>
+											<td className="px-6 py-4 text-text-main">
+												<div className="text-xs font-mono">
+													<div>{formatBytes(bucket.totalBytes)}</div>
+													<div className="text-text-muted">
+														{bucket.totalRequests.toLocaleString()} reqs
+													</div>
+												</div>
+											</td>
+											<td className="px-6 py-4">
+												<button
+													type="button"
+													role="switch"
+													aria-checked={bucket.isPublic}
+													disabled={
+														!!bucket.isPaused ||
+														!!bucket.isCdn ||
+														visibilityBusy
+													}
+													onClick={() =>
+														togglePublic(bucket.name, !bucket.isPublic)
+													}
+													className={`inline-flex items-center gap-2 px-1 py-1 transition-colors ${bucket.isPaused || bucket.isCdn || visibilityBusy ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}
+												>
+													<span
+														className={`relative h-6 w-11 rounded-full border transition-colors ${bucket.isPublic ? "bg-hc-blue/80 border-hc-blue" : "bg-white/10 border-white/20"}`}
+													>
+														<span
+															className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform ${bucket.isPublic ? "translate-x-5" : "translate-x-0"}`}
+														/>
+													</span>
+													<span className="text-xs font-semibold text-text-muted min-w-12 text-left">
+														{visibilityBusy
+															? "Updating..."
+															: bucket.isPublic
+																? "Public"
+																: "Private"}
+													</span>
+												</button>
+											</td>
+											<td className="px-6 py-4 text-text-muted text-xs font-mono">
+												{new Date(bucket.createdAt).toLocaleDateString()}
+											</td>
+											<td className="px-6 py-4 text-right flex justify-end items-center gap-1.5">
+												{!bucket.isCdn ? (
+													<button
+														type="button"
+														onClick={() => openCorsModal(bucket)}
+														aria-label="Configure CORS"
+														title="Configure CORS"
+														className={`${iconActionBase} group text-text-muted hover:text-white hover:bg-white/10`}
+													>
+														<MdCode className="text-base" />
+														<span className={iconActionTooltip}>
+															Configure CORS rules
+														</span>
+													</button>
+												) : null}
+												<a
+													href={`/dashboard/buckets/${bucket.name}`}
+													aria-label="Open bucket files"
+													title="Open bucket files"
+													className={`${iconActionBase} group text-hc-blue hover:text-blue-300 hover:bg-hc-blue/10`}
+												>
+													<MdFolderOpen className="text-base" />
+													<span className={iconActionTooltip}>
+														View bucket files
+													</span>
+												</a>
+												{!bucket.isCdn ? (
+													<button
+														type="button"
+														onClick={() => deleteBucket(bucket.name, true)}
+														disabled={bucketBusy}
+														aria-label="Empty bucket"
+														title="Empty bucket"
+														className={`${iconActionBase} group text-yellow-300 hover:text-yellow-200 hover:bg-yellow-500/10`}
+													>
+														<MdDeleteOutline className="text-base" />
+														<span className={iconActionTooltip}>
+															Delete all files in bucket
+														</span>
+													</button>
+												) : (
+													<button
+														type="button"
+														onClick={() => deleteBucket(bucket.name, true)}
+														disabled={bucketBusy}
+														aria-label="Empty bucket"
+														title="Empty bucket"
+														className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10`}
+													>
+														<MdDeleteOutline className="text-base" />
+														<span className={iconActionTooltip}>
+															Delete all files in bucket
+														</span>
+													</button>
+												)}
+												{!bucket.isCdn ? (
+													<button
+														type="button"
+														onClick={() => deleteBucket(bucket.name, false)}
+														disabled={bucketBusy}
+														aria-label="Delete bucket"
+														title="Delete bucket"
+														className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10`}
+													>
+														<MdDeleteForever className="text-base" />
+														<span className={iconActionTooltip}>
+															Delete bucket and all files
+														</span>
+													</button>
+												) : null}
+											</td>
+										</tr>
+									);
+								})(),
+							)}
 						</tbody>
 					</table>
 				</div>

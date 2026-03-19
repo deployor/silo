@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useState } from "react";
 import { AppShell } from "../components/AppShell";
@@ -21,104 +22,117 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			config={bootstrap.config}
 		>
 			<div className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-4xl mx-auto">
-				{step === 1 && (
-					<Panel
-						icon="ph-hand-waving text-hc-red"
-						title="Welcome to Cargo!"
-						content="Cargo is an S3 Gateway and the new Hack Club CDN."
-						right={
-							<button
-								type="button"
-								onClick={() => setStep(2)}
-								className="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20"
-							>
-								<span>Next: Your Storage</span>
-								<PhIcon className="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform" />
-							</button>
-						}
-					/>
-				)}
+				<AnimatePresence mode="wait">
+					<motion.div
+						key={`onboarding-step-${step}`}
+						initial={{ opacity: 0, y: 24, scale: 0.985 }}
+						animate={{ opacity: 1, y: 0, scale: 1 }}
+						exit={{ opacity: 0, y: -20, scale: 0.985 }}
+						transition={{ duration: 0.28, ease: "easeOut" }}
+						className="w-full"
+					>
+						{step === 1 && (
+							<Panel
+								icon="ph-hand-waving text-hc-red"
+								title="Welcome to Cargo!"
+								content="Cargo is an S3 Gateway and the new Hack Club CDN."
+								right={
+									<button
+										type="button"
+										onClick={() => setStep(2)}
+										className="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center gap-3 shadow-lg shadow-hc-red/20"
+									>
+										<span>Next: Your Storage</span>
+										<PhIcon className="ph-bold ph-arrow-right group-hover:translate-x-1 transition-transform" />
+									</button>
+								}
+							/>
+						)}
 
-				{step === 2 && (
-					<Panel
-						icon="ph-rocket-launch text-blue-500"
-						title="Ship Projects."
-						subtitle="Get Paid in Storage."
-						content={`Every YSWS project you ship unlocks more permanent cloud storage. Earn ${p.yswsQuotaPerHourHuman || "quota"} for every hour.`}
-						left={
-							<button
-								type="button"
-								onClick={() => setStep(1)}
-								className="text-text-muted hover:text-white px-6 py-3 font-bold text-lg"
-							>
-								Back
-							</button>
-						}
-						right={
-							<button
-								type="button"
-								onClick={() => setStep(3)}
-								className="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 shadow-lg shadow-hc-red/20"
-							>
-								Next: Privacy & Logs{" "}
-								<PhIcon className="ph-bold ph-arrow-right" />
-							</button>
-						}
-					/>
-				)}
+						{step === 2 && (
+							<Panel
+								icon="ph-rocket-launch text-blue-500"
+								title="Ship Projects."
+								subtitle="Get Paid in Storage."
+								content={`Every YSWS project you ship unlocks more permanent cloud storage. Earn ${p.yswsQuotaPerHourHuman || "quota"} for every hour.`}
+								left={
+									<button
+										type="button"
+										onClick={() => setStep(1)}
+										className="text-text-muted hover:text-white px-6 py-3 font-bold text-lg"
+									>
+										Back
+									</button>
+								}
+								right={
+									<button
+										type="button"
+										onClick={() => setStep(3)}
+										className="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 shadow-lg shadow-hc-red/20"
+									>
+										Next: Privacy & Logs{" "}
+										<PhIcon className="ph-bold ph-arrow-right" />
+									</button>
+								}
+							/>
+						)}
 
-				{step === 3 && (
-					<Panel
-						icon="ph-shield-check text-yellow-500"
-						title="We Log Requests"
-						content="To keep Cargo safe and fast, we log request metadata (user agent, path, status, timing). We do NOT log file contents."
-						left={
-							<button
-								type="button"
-								onClick={() => setStep(2)}
-								className="text-text-muted hover:text-white px-6 py-3 font-bold text-lg"
-							>
-								Back
-							</button>
-						}
-						right={
-							<button
-								type="button"
-								onClick={() => setStep(4)}
-								className="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 shadow-lg shadow-hc-red/20"
-							>
-								Next: How it Works <PhIcon className="ph-bold ph-arrow-right" />
-							</button>
-						}
-					/>
-				)}
+						{step === 3 && (
+							<Panel
+								icon="ph-shield-check text-yellow-500"
+								title="We Log Requests"
+								content="To keep Cargo safe and fast, we log request metadata (user agent, path, status, timing). We do NOT log file contents."
+								left={
+									<button
+										type="button"
+										onClick={() => setStep(2)}
+										className="text-text-muted hover:text-white px-6 py-3 font-bold text-lg"
+									>
+										Back
+									</button>
+								}
+								right={
+									<button
+										type="button"
+										onClick={() => setStep(4)}
+										className="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 shadow-lg shadow-hc-red/20"
+									>
+										Next: How it Works{" "}
+										<PhIcon className="ph-bold ph-arrow-right" />
+									</button>
+								}
+							/>
+						)}
 
-				{step === 4 && (
-					<Panel
-						icon="ph-cloud-check text-green-500"
-						title="It's Just S3"
-						content="Use standard S3 tools and SDKs. Behind the scenes, Cargo handles routing, auth and quotas so your experience feels like a normal bucket workflow."
-						left={
-							<button
-								type="button"
-								onClick={() => setStep(3)}
-								className="text-text-muted hover:text-white px-6 py-3 font-bold text-lg"
-							>
-								Back
-							</button>
-						}
-						right={
-							<form action="/api/onboarding/complete" method="POST">
-								<button
-									type="submit"
-									className="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 shadow-lg shadow-hc-red/20"
-								>
-									Get Started <PhIcon className="ph-bold ph-rocket-launch" />
-								</button>
-							</form>
-						}
-					/>
-				)}
+						{step === 4 && (
+							<Panel
+								icon="ph-cloud-check text-green-500"
+								title="It's Just S3"
+								content="Use standard S3 tools and SDKs. Behind the scenes, Cargo handles routing, auth and quotas so your experience feels like a normal bucket workflow."
+								left={
+									<button
+										type="button"
+										onClick={() => setStep(3)}
+										className="text-text-muted hover:text-white px-6 py-3 font-bold text-lg"
+									>
+										Back
+									</button>
+								}
+								right={
+									<form action="/api/onboarding/complete" method="POST">
+										<button
+											type="submit"
+											className="group bg-hc-red text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 shadow-lg shadow-hc-red/20"
+										>
+											Get Started{" "}
+											<PhIcon className="ph-bold ph-rocket-launch" />
+										</button>
+									</form>
+								}
+							/>
+						)}
+					</motion.div>
+				</AnimatePresence>
 			</div>
 		</AppShell>
 	);
