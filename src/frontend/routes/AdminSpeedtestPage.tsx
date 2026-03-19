@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminSubnav } from "../components/AdminSubnav";
 import { AppShell } from "../components/AppShell";
 import { fetchJson } from "../shared/api/http";
@@ -62,6 +62,7 @@ type SpeedtestRunResult = {
 	startedAt: string;
 	completedAt: string;
 	durationMs: number;
+	serverBenchmarkMs: number;
 	suites: SpeedtestSuite[];
 	summary: {
 		totalBytesUp: number;
@@ -97,6 +98,16 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [elapsed, setElapsed] = useState(0);
 	const [result, setResult] = useState<SpeedtestRunResult | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [serverPing, setServerPing] = useState<{
+		avgMs: number;
+		p95Ms: number;
+		samplesMs: number[];
+	} | null>(null);
+	const [clientApiTiming, setClientApiTiming] = useState<{
+		roundTripMs: number;
+		serverBenchmarkMs: number;
+		estimatedOverheadMs: number;
+	} | null>(null);
 
 	useEffect(() => {
 		void (async () => {
@@ -121,6 +132,37 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		return () => window.clearInterval(timer);
 	}, [running, startedAt]);
 
+	const measureServerPing = useCallback(async () => {
+		try {
+			const samples: number[] = [];
+			for (let i = 0; i < 5; i++) {
+				const started = performance.now();
+				const res = await fetch("/api/admin/speedtest/ping", {
+					method: "GET",
+				});
+				if (!res.ok) {
+					throw new Error(await res.text());
+				}
+				samples.push(performance.now() - started);
+			}
+			const sorted = [...samples].sort((a, b) => a - b);
+			const avgMs =
+				samples.reduce((acc, value) => acc + value, 0) / samples.length;
+			const p95Ms =
+				sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] ||
+				0;
+			setServerPing({ avgMs, p95Ms, samplesMs: samples });
+		} catch (e) {
+			setError(
+				e instanceof Error ? e.message : "Failed to measure server ping",
+			);
+		}
+	}, []);
+
+	useEffect(() => {
+		void measureServerPing();
+	}, [measureServerPing]);
+
 	const runSpeedtest = async () => {
 		if (!bucketName) return;
 		if (!runSingle && !runManySmall && !runConcurrent) {
@@ -133,7 +175,9 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		setElapsed(0);
 		setError(null);
 		setResult(null);
+		setClientApiTiming(null);
 		try {
+			const requestStarted = performance.now();
 			const res = await fetch("/api/admin/speedtest/run", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -153,8 +197,19 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			if (!res.ok) {
 				throw new Error(await res.text());
 			}
+			const requestRoundTripMs = performance.now() - requestStarted;
 			const payload = (await res.json()) as SpeedtestRunResponse;
 			setResult(payload.result);
+			setClientApiTiming({
+				roundTripMs: requestRoundTripMs,
+				serverBenchmarkMs:
+					payload.result.serverBenchmarkMs || payload.result.durationMs,
+				estimatedOverheadMs: Math.max(
+					0,
+					requestRoundTripMs -
+						(payload.result.serverBenchmarkMs || payload.result.durationMs),
+				),
+			});
 		} catch (e) {
 			setError(e instanceof Error ? e.message : "Speed test failed");
 		} finally {
@@ -269,7 +324,7 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				</div>
 
 				<div className="p-6 space-y-6">
-					<div className="flex flex-wrap gap-2">
+					<div className="flex flex-wrap gap-2 items-center">
 						<button
 							type="button"
 							onClick={() => applyPreset("quick")}
@@ -291,6 +346,19 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						>
 							Heavy
 						</button>
+						<button
+							type="button"
+							onClick={() => void measureServerPing()}
+							className="px-3 py-1.5 text-xs rounded-lg border border-hc-red/40 text-hc-red hover:border-hc-red hover:text-red-300"
+						>
+							Measure Server RTT
+						</button>
+						{serverPing ? (
+							<div className="text-xs text-text-muted font-mono">
+								Server RTT avg {serverPing.avgMs.toFixed(1)} ms · p95{" "}
+								{serverPing.p95Ms.toFixed(1)} ms
+							</div>
+						) : null}
 					</div>
 
 					<div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -478,6 +546,33 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<StatCard
 									label="Total Requests"
 									value={result.summary.totalRequests.toLocaleString()}
+								/>
+							</div>
+
+							<div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+								<StatCard
+									label="Server Benchmark"
+									value={`${result.serverBenchmarkMs.toFixed(1)} ms`}
+								/>
+								<StatCard
+									label="API Round Trip"
+									value={
+										clientApiTiming
+											? `${clientApiTiming.roundTripMs.toFixed(1)} ms`
+											: "-"
+									}
+								/>
+								<StatCard
+									label="Estimated Client↔Server Overhead"
+									value={
+										clientApiTiming
+											? `${clientApiTiming.estimatedOverheadMs.toFixed(1)} ms`
+											: "-"
+									}
+								/>
+								<StatCard
+									label="Server RTT (Ping Avg)"
+									value={serverPing ? `${serverPing.avgMs.toFixed(1)} ms` : "-"}
 								/>
 							</div>
 
