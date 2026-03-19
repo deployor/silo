@@ -873,25 +873,16 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<div className="mt-1 transition-all duration-300 text-white space-y-5">
 								<div className="flex items-center justify-center gap-3 pb-1">
 									{[
-										{
-											icon: <MdWarningAmber className="text-2xl" />,
-											label: "Use case",
-										},
-										{
-											icon: <MdPublic className="text-2xl" />,
-											label: "Exposure",
-										},
-										{
-											icon: <MdGroups className="text-2xl" />,
-											label: "Abuse risk",
-										},
+										{ icon: <MdWarningAmber className="text-2xl" />, label: "Use case" },
+										{ icon: <MdPublic className="text-2xl" />, label: "Exposure" },
+										{ icon: <MdGroups className="text-2xl" />, label: "Abuse risk" },
 									].map((step, idx) => {
 										const active = publicWarningStep === idx;
 										const complete = publicWarningStep > idx;
 										return (
 											<div
 												key={step.label}
-												className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${active ? "border-red-400 bg-red-500/25 text-red-200" : complete ? "border-red-500/40 bg-red-500/15 text-red-200" : "border-white/20 bg-white/[0.03] text-white/60"}`}
+												className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${active ? "border-hc-red bg-hc-red/20 text-red-200" : complete ? "border-hc-red/40 bg-hc-red/10 text-red-200" : "border-white/20 bg-white/[0.03] text-white/60"}`}
 											>
 												{step.icon}
 											</div>
@@ -900,36 +891,32 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</div>
 
 								{publicWarningStep === 0 ? (
-									<div className="rounded-2xl border border-red-600/50 bg-red-950/20 p-5 md:p-6">
-										<div className="grid md:grid-cols-[120px_1fr] gap-5 items-start">
-											<div className="space-y-4">
-												<div>
-													<p className="text-xs uppercase tracking-[0.18em] text-red-300 font-black">
-														Public is ONLY for static assets
-													</p>
-													<h4 className="text-2xl font-black text-white leading-tight mt-1">
-														Good: images, CSS, docs, public files.
-													</h4>
-												</div>
-												<div className="grid sm:grid-cols-2 gap-3 text-sm">
-													<div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3">
+									<div className="rounded-2xl border border-white/15 bg-white/[0.02] p-5 md:p-6">
+										<div className="space-y-4">
+											<div>
+												<p className="text-xs uppercase tracking-[0.18em] text-hc-red font-black">
+													Public is ONLY for static assets
+												</p>
+												<h4 className="text-2xl font-black text-white leading-tight mt-1">
+													Good: images, CSS, docs, public files.
+												</h4>
+											</div>
+											<div className="grid sm:grid-cols-2 gap-3 text-sm">
+												<div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3">
 													<p className="font-black text-emerald-300 uppercase text-[11px] tracking-wider">
 														OK TO MAKE PUBLIC
 													</p>
-<p className="text-white/90 mt-1">
-															Blog images, app icons, CSS/JS bundles, docs
-															screenshots.
-														</p>
-													</div>
-													<div className="rounded-xl border border-red-400/35 bg-red-500/10 p-3">
+													<p className="text-white/90 mt-1">
+														Blog images, app icons, CSS/JS bundles, docs screenshots.
+													</p>
+												</div>
+												<div className="rounded-xl border border-red-400/25 bg-red-500/[0.06] p-3">
 													<p className="font-black text-red-300 uppercase text-[11px] tracking-wider">
 														DO NOT MAKE PUBLIC
 													</p>
-<p className="text-white/90 mt-1">
-															User uploads, private docs, backups, secret/config
-															files.
-														</p>
-													</div>
+													<p className="text-white/90 mt-1">
+														User uploads, private docs, backups, secret/config files.
+													</p>
 												</div>
 											</div>
 										</div>
@@ -937,36 +924,28 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								) : null}
 
 								{publicWarningStep === 1 ? (
-									<div className="rounded-2xl border border-red-600/50 bg-red-950/20 p-5 md:p-6">
-										<div className="grid md:grid-cols-[120px_1fr] gap-5 items-start">
-											<div className="space-y-4">
-												<div>
-													<p className="text-xs uppercase tracking-[0.18em] text-red-300 font-black">
-														Public means global access
-													</p>
-													<h4 className="text-2xl font-black text-white leading-tight mt-1">
-														Anyone can fetch these URLs.
-													</h4>
+									<div className="rounded-2xl border border-white/15 bg-white/[0.02] p-5 md:p-6">
+										<div className="space-y-4">
+											<div>
+												<p className="text-xs uppercase tracking-[0.18em] text-hc-red font-black">
+													Public means global access
+												</p>
+												<h4 className="text-2xl font-black text-white leading-tight mt-1">
+													Anyone can fetch these URLs.
+												</h4>
+											</div>
+											<div className="grid sm:grid-cols-3 gap-2.5 text-xs sm:text-sm">
+												<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
+													<p className="font-black text-white">People</p>
+													<p className="text-white/75 mt-1">Anyone with a link.</p>
 												</div>
-												<div className="grid sm:grid-cols-3 gap-2.5 text-xs sm:text-sm">
-													<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
-														<p className="font-black text-white">People</p>
-														<p className="text-white/75 mt-1">
-															Anyone with a link.
-														</p>
-													</div>
-													<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
-														<p className="font-black text-white">Crawlers</p>
-														<p className="text-white/75 mt-1">
-															Search engines and scanners.
-														</p>
-													</div>
-													<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
-														<p className="font-black text-white">AI scrapers</p>
-														<p className="text-white/75 mt-1">
-															Dataset and model collectors.
-														</p>
-													</div>
+												<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
+													<p className="font-black text-white">Crawlers</p>
+													<p className="text-white/75 mt-1">Search engines and scanners.</p>
+												</div>
+												<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
+													<p className="font-black text-white">AI scrapers</p>
+													<p className="text-white/75 mt-1">Dataset and model collectors.</p>
 												</div>
 											</div>
 										</div>
@@ -974,51 +953,41 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								) : null}
 
 								{publicWarningStep === 2 ? (
-									<div className="rounded-2xl border border-red-600/50 bg-red-950/20 p-5 md:p-6">
-										<div className="grid md:grid-cols-[120px_1fr] gap-5 items-start">
-											<div className="space-y-4">
-												<div>
-													<p className="text-xs uppercase tracking-[0.18em] text-red-300 font-black">
-														Quota burn + abuse happens fast
-													</p>
-													<h4 className="text-2xl font-black text-white leading-tight mt-1">
-														Traffic spikes can shut this down.
-													</h4>
-												</div>
-												<div className="grid sm:grid-cols-2 gap-3 text-sm">
-													<div className="rounded-xl border border-red-400/35 bg-red-500/10 p-3">
-														<p className="font-black text-red-300">
-															What can happen
-														</p>
-														<p className="text-white/85 mt-1">
-															Bot traffic burns egress + request quota quickly.
-														</p>
-													</div>
-													<div className="rounded-xl border border-red-400/35 bg-red-500/10 p-3">
-														<p className="font-black text-red-300">
-															Possible outcome
-														</p>
-														<p className="text-white/85 mt-1">
-															We may suspend abusive public traffic to protect
-															the platform.
-														</p>
-													</div>
-												</div>
-												<label className="flex items-start gap-3 rounded-xl border border-white/15 bg-black/20 p-3 mt-1">
-													<input
-														type="checkbox"
-														checked={dontShowPublicWarningAgain}
-														onChange={(e) =>
-															setDontShowPublicWarningAgain(e.target.checked)
-														}
-														className="mt-1 h-4 w-4 rounded border-red-500/50 bg-black/20 text-hc-red focus:ring-hc-red/40"
-													/>
-													<span className="text-sm text-white/90 leading-relaxed">
-														Don&apos;t show this 3-step warning again on this
-														device.
-													</span>
-												</label>
+									<div className="rounded-2xl border border-white/15 bg-white/[0.02] p-5 md:p-6">
+										<div className="space-y-4">
+											<div>
+												<p className="text-xs uppercase tracking-[0.18em] text-hc-red font-black">
+													Quota burn + abuse happens fast
+												</p>
+												<h4 className="text-2xl font-black text-white leading-tight mt-1">
+													Traffic spikes can shut this down.
+												</h4>
 											</div>
+											<div className="grid sm:grid-cols-2 gap-3 text-sm">
+												<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
+													<p className="font-black text-hc-red">What can happen</p>
+													<p className="text-white/85 mt-1">
+														Bot traffic burns egress + request quota quickly.
+													</p>
+												</div>
+												<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
+													<p className="font-black text-hc-red">Possible outcome</p>
+													<p className="text-white/85 mt-1">
+														We may suspend abusive public traffic to protect the platform.
+													</p>
+												</div>
+											</div>
+											<label className="flex items-start gap-3 rounded-xl border border-white/15 bg-black/20 p-3 mt-1">
+												<input
+													type="checkbox"
+													checked={dontShowPublicWarningAgain}
+													onChange={(e) => setDontShowPublicWarningAgain(e.target.checked)}
+													className="mt-1 h-4 w-4 rounded border-white/30 bg-black/20 text-hc-red focus:ring-hc-red/40"
+												/>
+												<span className="text-sm text-white/90 leading-relaxed">
+													Don&apos;t show this 3-step warning again on this device.
+												</span>
+											</label>
 										</div>
 									</div>
 								) : null}
