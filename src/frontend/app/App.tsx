@@ -5,6 +5,7 @@ import { AdminRedemptionDetailsPage } from "../routes/AdminRedemptionDetailsPage
 import { AdminRedemptionGeneratedPage } from "../routes/AdminRedemptionGeneratedPage";
 import { AdminRedemptionsPage } from "../routes/AdminRedemptionsPage";
 import { AdminSettingsPage } from "../routes/AdminSettingsPage";
+import { AdminSpeedtestPage } from "../routes/AdminSpeedtestPage";
 import { AdminUsersPage } from "../routes/AdminUsersPage";
 import { AdminYswsListPage } from "../routes/AdminYswsListPage";
 import { AdminYswsReviewPage } from "../routes/AdminYswsReviewPage";
@@ -48,6 +49,8 @@ export function App({ bootstrap }: Props) {
 			return <AdminUsersPage bootstrap={bootstrap} />;
 		case "admin-buckets":
 			return <AdminBucketsPage bootstrap={bootstrap} />;
+		case "admin-speedtest":
+			return <AdminSpeedtestPage bootstrap={bootstrap} />;
 		case "admin-logs":
 			return <AdminLogsPage bootstrap={bootstrap} />;
 		case "admin-cache":

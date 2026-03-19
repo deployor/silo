@@ -7,6 +7,7 @@ export const REACT_PAGE_IDS = [
 	"offboarding",
 	"admin-users",
 	"admin-buckets",
+	"admin-speedtest",
 	"admin-logs",
 	"admin-cache",
 	"admin-settings",
