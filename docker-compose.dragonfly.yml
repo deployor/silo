@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  dragonflydb:
+    image: 'docker.dragonflydb.io/dragonflydb/dragonfly'
+    ulimits:
+      memlock: -1
+    command:
+      - --requirepass=${DFLY_requirepass}
+      - --maxmemory=8gb
+      - --cache_mode=true
+    ports:
+      - "6370:6379"
+    volumes:
+      - dragonflydata:/data
+    environment:
+      - DFLY_requirepass
+    networks:
+      - dokploy-network
+volumes:
+  dragonflydata:
+networks:
+  dokploy-network:
+    external: true
