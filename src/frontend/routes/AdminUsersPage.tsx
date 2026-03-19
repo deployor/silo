@@ -288,7 +288,9 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const searchRef = useRef(search);
 	const adminsOnlyRef = useRef(adminsOnly);
 	const offsetRef = useRef(offset);
-	const [userActionLoading, setUserActionLoading] = useState<string | null>(null);
+	const [userActionLoading, setUserActionLoading] = useState<string | null>(
+		null,
+	);
 	const [bucketActionLoading, setBucketActionLoading] = useState<string | null>(
 		null,
 	);
@@ -451,7 +453,8 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			});
 			const updated = await loadUsers(true, { force: true });
 			if (updated) {
-				const refreshed = updated.users.find((u) => u.id === selected.id) || null;
+				const refreshed =
+					updated.users.find((u) => u.id === selected.id) || null;
 				setSelected(refreshed);
 				if (refreshed) {
 					const buckets = await fetchJson<BucketRow[]>(
@@ -609,9 +612,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const toggleBucketPause = async (isPaused: boolean) => {
 		if (!selectedBucketDetails) return;
 		setBucketActionLoading("pause");
-		setSelectedBucketDetails((prev) =>
-			prev ? { ...prev, isPaused } : prev,
-		);
+		setSelectedBucketDetails((prev) => (prev ? { ...prev, isPaused } : prev));
 		const pauseReason = isPaused
 			? window.prompt("Enter reason for pausing bucket (optional):")
 			: null;
@@ -950,9 +951,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										disabled={isQuotaLoading}
 										className="bg-hc-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold w-full"
 									>
-										{isQuotaLoading
-											? "Updating..."
-											: "Update Egress Limit"}
+										{isQuotaLoading ? "Updating..." : "Update Egress Limit"}
 									</button>
 								</div>
 								<p className="text-xs text-text-muted mt-2">
