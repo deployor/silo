@@ -21,6 +21,19 @@ import {
 	stripAuthQueryParams,
 } from "./utils";
 
+// Tracks in-flight cache population for object keys so subsequent requests can
+// briefly wait and then hit Redis/Disk instead of immediately re-fetching S3.
+const inFlightCachePopulation = new Map<string, Promise<void>>();
+
+async function maybeWaitForCachePopulation(cacheId: string, timeoutMs = 350) {
+	const pending = inFlightCachePopulation.get(cacheId);
+	if (!pending) return;
+	await Promise.race([
+		pending.catch(() => undefined),
+		new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+	]);
+}
+
 /**
  * Parse an HTTP Range header and return the byte range.
  * Supports formats: bytes=0-499, bytes=500-, bytes=-500
@@ -292,6 +305,7 @@ ${rulesXml}
 		// Redis Cache Check for Object (L1)
 		const cacheKeyBody = `s3:body:${bucket.name}:${key}`;
 		const cacheKeyMeta = `s3:meta:${bucket.name}:${key}`;
+		const cachePopulationId = `${bucket.name}\0${key}`;
 		const rangeHeader = req.headers.get("range");
 		const isCacheable = !url.searchParams.has("uploadId");
 		const isSimpleGet = isCacheable && !rangeHeader;
@@ -513,6 +527,75 @@ ${rulesXml}
 			} catch (e) {
 				console.error("Disk cache read error:", e);
 			}
+
+			// If a prior request is currently populating cache for this object,
+			// wait briefly and re-check caches before going to S3 again.
+			if (isSimpleGet && key !== "") {
+				await maybeWaitForCachePopulation(cachePopulationId);
+
+				try {
+					const [cachedBodyAfterWait, cachedMetaAfterWait] = await Promise.all([
+						redis.getBuffer(cacheKeyBody),
+						redis.get(cacheKeyMeta),
+					]);
+
+					if (cachedBodyAfterWait && cachedMetaAfterWait) {
+						const headers = new Headers(JSON.parse(cachedMetaAfterWait));
+						for (const [k, v] of corsHeaders.entries()) {
+							headers.set(k, v);
+						}
+						if (!headers.has("cache-control")) {
+							if (!user) headers.set("Cache-Control", "public, max-age=3600");
+							else headers.set("Cache-Control", "private, no-cache");
+						}
+						headers.set("Accept-Ranges", "bytes");
+
+						const allowed = await reserveEgressQuota(
+							cachedBodyAfterWait.byteLength,
+						);
+						if (!allowed) {
+							return S3Errors.QuotaExceeded(
+								"You have exceeded your egress quota.",
+							).toResponse();
+						}
+
+						return new Response(new Uint8Array(cachedBodyAfterWait), {
+							status: 200,
+							headers,
+						});
+					}
+
+					const diskHitAfterWait = await diskCacheGet(bucket.name, key);
+					if (diskHitAfterWait) {
+						const allowed = await reserveEgressQuota(
+							diskHitAfterWait.meta.size,
+						);
+						if (!allowed) {
+							return S3Errors.QuotaExceeded(
+								"You have exceeded your egress quota.",
+							).toResponse();
+						}
+
+						const headers = new Headers(diskHitAfterWait.meta.headers);
+						for (const [k, v] of corsHeaders.entries()) {
+							headers.set(k, v);
+						}
+						headers.set("X-Cache", "DISK-HIT");
+						headers.set("Accept-Ranges", "bytes");
+						if (!headers.has("cache-control")) {
+							if (!user) headers.set("Cache-Control", "public, max-age=3600");
+							else headers.set("Cache-Control", "private, no-cache");
+						}
+
+						return new Response(diskHitAfterWait.stream, {
+							status: 200,
+							headers,
+						});
+					}
+				} catch (e) {
+					console.error("Post-wait cache read error:", e);
+				}
+			}
 		}
 
 		const cleanUrl = stripAuthQueryParams(url);
@@ -616,7 +699,7 @@ ${rulesXml}
 				responseBody = stream1;
 
 				// Background cache population — fires and forgets
-				(async () => {
+				const cacheWritePromise = (async () => {
 					try {
 						const reader = stream2.getReader();
 						const chunks: Uint8Array[] = [];
@@ -688,6 +771,18 @@ ${rulesXml}
 						console.error("Failed to cache S3 object in background:", e);
 					}
 				})();
+
+				if (key !== "") {
+					inFlightCachePopulation.set(cachePopulationId, cacheWritePromise);
+					cacheWritePromise.finally(() => {
+						if (
+							inFlightCachePopulation.get(cachePopulationId) ===
+							cacheWritePromise
+						) {
+							inFlightCachePopulation.delete(cachePopulationId);
+						}
+					});
+				}
 			} else {
 				// Cache metadata only for objects that don't qualify for body caching
 				const headersObj: Record<string, string> = {};
