@@ -178,8 +178,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				: `Only authenticated access will be allowed for ${bucketName}.`,
 			confirmLabel: isPublic ? "Make Public" : "Make Private",
 			confirmClassName: isPublic
-				? "bg-hc-red hover:bg-red-600"
-				: "bg-hc-blue hover:bg-blue-600",
+				? "bg-hc-red hover:bg-red-600 border-hc-red text-white"
+				: "bg-hc-blue hover:bg-blue-600 border-hc-blue text-white",
 			pendingKey: `visibility:${bucketName}`,
 			publicRiskWarning: isPublic,
 			confirmDelaySeconds: isPublic ? 5 : 0,
@@ -833,14 +833,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					<>
 						<p className="text-text-muted text-sm">{confirmDialog.message}</p>
 						{confirmDialog.publicRiskWarning ? (
-							<div className="mt-4 rounded-2xl border border-red-500/40 bg-gradient-to-b from-red-500/15 to-red-900/20 p-5">
-								<div className="flex items-center gap-2 text-red-200 font-black uppercase tracking-wider text-xs mb-4">
+							<div className="mt-4 rounded-2xl border border-red-500/35 bg-black/20 p-5">
+								<div className="flex items-center gap-2 text-red-200 font-black uppercase tracking-wider text-xs mb-3">
 									<MdWarningAmber className="text-base" />
 									Public bucket warning
 								</div>
 
-								<div className="space-y-3">
-									<div className="flex items-start gap-3 rounded-xl border border-red-500/25 bg-red-500/10 p-3">
+								<div className="space-y-2">
+									<div className="flex items-start gap-3 rounded-lg border border-red-500/25 bg-red-500/5 px-3 py-2.5">
 										<div className="mt-0.5 text-red-300">
 											<MdPublic className="text-lg" />
 										</div>
@@ -850,7 +850,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										</p>
 									</div>
 
-									<div className="flex items-start gap-3 rounded-xl border border-red-500/25 bg-red-500/10 p-3">
+									<div className="flex items-start gap-3 rounded-lg border border-red-500/25 bg-red-500/5 px-3 py-2.5">
 										<div className="mt-0.5 text-red-300">
 											<MdVisibility className="text-lg" />
 										</div>
@@ -859,7 +859,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										</p>
 									</div>
 
-									<div className="flex items-start gap-3 rounded-xl border border-red-500/25 bg-red-500/10 p-3">
+									<div className="flex items-start gap-3 rounded-lg border border-red-500/25 bg-red-500/5 px-3 py-2.5">
 										<div className="mt-0.5 text-red-300">
 											<MdGroups className="text-lg" />
 										</div>
@@ -869,7 +869,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</div>
 								</div>
 
-								<div className="mt-4 rounded-lg border border-red-400/35 bg-red-500/10 px-3 py-2 text-xs text-red-200 font-bold">
+								<div className="mt-3 rounded-lg border border-red-400/35 bg-red-500/10 px-3 py-2 text-xs text-red-200 font-bold">
 									You can confirm in{" "}
 									<span className="text-white">{confirmDelayRemaining}s</span>
 								</div>
@@ -888,7 +888,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								type="button"
 								disabled={confirmLoading || confirmDelayRemaining > 0}
 								onClick={runConfirmDialog}
-								className={`${buttonBase} ${confirmDialog.confirmClassName || buttonPrimaryRed} disabled:opacity-50`}
+								className={`${buttonBase} px-6 py-3 ${confirmDialog.confirmClassName || buttonPrimaryRed} disabled:opacity-50`}
 							>
 								{confirmLoading
 									? "Working..."
