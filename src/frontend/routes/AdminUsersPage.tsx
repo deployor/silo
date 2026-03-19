@@ -278,6 +278,8 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [egressAmount, setEgressAmount] = useState(0);
 	const [egressUnit, setEgressUnit] = useState(1024 ** 3);
 	const loadingRef = useRef(false);
+	const lastRequestKeyRef = useRef("");
+	const lastRequestAtRef = useRef(0);
 	const searchRef = useRef(search);
 	const adminsOnlyRef = useRef(adminsOnly);
 	const offsetRef = useRef(offset);
@@ -303,6 +305,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				offset?: number;
 				search?: string;
 				adminsOnly?: boolean;
+				force?: boolean;
 			},
 		) => {
 			if (loadingRef.current) return;
@@ -317,6 +320,21 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				search: nextSearch,
 				adminsOnly: String(nextAdminsOnly),
 			});
+			const requestKey = q.toString();
+			const now = Date.now();
+			const shouldDedupe =
+				!overrides?.force &&
+				requestKey === lastRequestKeyRef.current &&
+				now - lastRequestAtRef.current < 1200;
+
+			if (shouldDedupe) {
+				loadingRef.current = false;
+				setLoading(false);
+				return;
+			}
+
+			lastRequestKeyRef.current = requestKey;
+			lastRequestAtRef.current = now;
 			try {
 				const data = await fetchJson<UsersResponse>(
 					`/api/admin/users?${q.toString()}`,
