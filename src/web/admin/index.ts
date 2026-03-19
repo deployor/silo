@@ -857,6 +857,7 @@ async function runAdminSpeedtest(req: Request) {
 			startedAt: new Date(startedAt).toISOString(),
 			completedAt: new Date().toISOString(),
 			durationMs: performance.now() - perfStart,
+			serverBenchmarkMs: performance.now() - perfStart,
 			suites: suiteResults,
 			summary,
 		},
@@ -1656,6 +1657,10 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 
 		if (path === "/api/admin/speedtest/run" && req.method === "POST") {
 			return runAdminSpeedtest(req);
+		}
+
+		if (path === "/api/admin/speedtest/ping" && req.method === "GET") {
+			return jsonResponse({ ok: true, serverTime: Date.now() });
 		}
 
 		// Global Settings API
