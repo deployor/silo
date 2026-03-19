@@ -648,17 +648,26 @@ async function runAdminSpeedtest(req: Request) {
 		const ac = new AbortController();
 		const timer = setTimeout(() => ac.abort("timeout"), timeoutMs);
 		try {
-			return await client.fetch(url, { ...init, signal: ac.signal });
+			return await fetch(url, { ...init, signal: ac.signal });
 		} finally {
 			clearTimeout(timer);
 		}
 	}
 
+	async function presignQueryUrl(url: string, method: "GET" | "HEAD") {
+		const signed = await client.sign(url, {
+			method,
+			aws: { signQuery: true },
+		});
+		return signed.url;
+	}
+
 	async function probeLatency(url: string, sampleCount = 5): Promise<number[]> {
 		const samples: number[] = [];
 		for (let i = 0; i < sampleCount; i++) {
+			const signedUrl = await presignQueryUrl(url, "HEAD");
 			const started = performance.now();
-			const headRes = await client.fetch(url, { method: "HEAD" });
+			const headRes = await fetch(signedUrl, { method: "HEAD" });
 			const elapsedMs = performance.now() - started;
 			if (headRes.ok) samples.push(elapsedMs);
 		}
@@ -704,6 +713,9 @@ async function runAdminSpeedtest(req: Request) {
 					url: `${baseUrl}/${bucketName}/${key}`,
 				};
 			});
+			const presignedGetUrls = await Promise.all(
+				objects.map((objectItem) => presignQueryUrl(objectItem.url, "GET")),
+			);
 
 			const putStart = performance.now();
 			await runPool(objects, effectiveConcurrency, async (objectItem) => {
@@ -726,7 +738,10 @@ async function runAdminSpeedtest(req: Request) {
 
 			const coldStart = performance.now();
 			await runPool(objects, effectiveConcurrency, async (objectItem) => {
-				const coldRes = await client.fetch(objectItem.url, { method: "GET" });
+				const objectIndex = objects.findIndex((o) => o.key === objectItem.key);
+				const coldRes = await fetch(presignedGetUrls[objectIndex], {
+					method: "GET",
+				});
 				const coldBody = await coldRes.arrayBuffer();
 				if (!coldRes.ok || coldBody.byteLength !== fileSizeBytes) {
 					throw new Error(
@@ -740,7 +755,12 @@ async function runAdminSpeedtest(req: Request) {
 			const warmStart = performance.now();
 			for (let pass = 0; pass < warmPasses; pass++) {
 				await runPool(objects, effectiveConcurrency, async (objectItem) => {
-					const warmRes = await client.fetch(objectItem.url, { method: "GET" });
+					const objectIndex = objects.findIndex(
+						(o) => o.key === objectItem.key,
+					);
+					const warmRes = await fetch(presignedGetUrls[objectIndex], {
+						method: "GET",
+					});
 					const warmBody = await warmRes.arrayBuffer();
 					if (!warmRes.ok || warmBody.byteLength !== fileSizeBytes) {
 						throw new Error(
@@ -853,6 +873,9 @@ async function runAdminSpeedtest(req: Request) {
 			}
 		});
 		const uploadMs = performance.now() - putStart;
+		const presignedGetUrls = await Promise.all(
+			objects.map((objectItem) => presignQueryUrl(objectItem.url, "GET")),
+		);
 
 		const coldSamples: number[] = [];
 		let coldOk = 0;
@@ -861,8 +884,9 @@ async function runAdminSpeedtest(req: Request) {
 		await runPool(objects, effectiveConcurrency, async (objectItem) => {
 			const started = performance.now();
 			try {
+				const objectIndex = objects.findIndex((o) => o.key === objectItem.key);
 				const res = await fetchWithTimeout(
-					objectItem.url,
+					presignedGetUrls[objectIndex],
 					{ method: "GET" },
 					cacheTimeoutMs,
 				);
@@ -898,9 +922,12 @@ async function runAdminSpeedtest(req: Request) {
 			await runPool(objects, effectiveConcurrency, async (objectItem) => {
 				const reqStart = performance.now();
 				try {
+					const objectIndex = objects.findIndex(
+						(o) => o.key === objectItem.key,
+					);
 					const res = await fetchWithTimeout(
-						objectItem.url,
-						{ method: "GET", headers: { Range: "bytes=0-16383" } },
+						presignedGetUrls[objectIndex],
+						{ method: "GET" },
 						cacheTimeoutMs,
 					);
 					const body = await res.arrayBuffer();
