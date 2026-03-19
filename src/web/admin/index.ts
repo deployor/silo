@@ -52,6 +52,18 @@ async function serveAdminUsersPage(req: Request) {
 	});
 }
 
+async function serveAdminBucketsPage(req: Request) {
+	const user = await getCurrentUser(req);
+	const html = await render("admin-buckets", {
+		title: "Admin Buckets",
+		user,
+		pageTitle: "ADMIN",
+	});
+	return new Response(html, {
+		headers: { "Content-Type": "text/html" },
+	});
+}
+
 async function serveAdminLogsPage(req: Request) {
 	const user = await getCurrentUser(req);
 	const html = await render("admin-logs", {
@@ -285,6 +297,137 @@ async function getUserBuckets(userId: string) {
 	return new Response(JSON.stringify(userBuckets), {
 		headers: { "Content-Type": "application/json" },
 	});
+}
+
+async function listAdminBuckets(url: URL) {
+	const limit = Number.parseInt(url.searchParams.get("limit") || "50", 10);
+	const offset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
+	const search = url.searchParams.get("search")?.trim();
+	const pausedOnly = url.searchParams.get("pausedOnly") === "true";
+	const sortBy = url.searchParams.get("sortBy") || "totalRequests";
+	const sortOrder =
+		url.searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
+
+	const filters = [];
+	if (search) {
+		filters.push(
+			or(
+				ilike(buckets.name, `%${search}%`),
+				ilike(users.email, `%${search}%`),
+				ilike(users.id, `%${search}%`),
+			),
+		);
+	}
+	if (pausedOnly) {
+		filters.push(eq(buckets.isPaused, true));
+	}
+
+	const conditions = filters.length > 0 ? and(...filters) : undefined;
+
+	const orderFn = sortOrder === "asc" ? asc : desc;
+	const orderBy = (() => {
+		switch (sortBy) {
+			case "name":
+				return orderFn(buckets.name);
+			case "totalBytes":
+				return orderFn(buckets.totalBytes);
+			case "egressBytes":
+				return orderFn(
+					sql<number>`COALESCE(sum(${requestLogs.egressBytes}), 0)`.mapWith(
+						Number,
+					),
+				);
+			case "getRequests":
+				return orderFn(
+					sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'GET' then 1 else 0 end), 0)`.mapWith(
+						Number,
+					),
+				);
+			case "putRequests":
+				return orderFn(
+					sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'PUT' then 1 else 0 end), 0)`.mapWith(
+						Number,
+					),
+				);
+			case "updatedAt":
+				return orderFn(buckets.updatedAt);
+			default:
+				return orderFn(buckets.totalRequests);
+		}
+	})();
+
+	const query = db
+		.select({
+			id: buckets.id,
+			name: buckets.name,
+			userId: buckets.userId,
+			ownerEmail: users.email,
+			ownerSlackId: users.slackId,
+			isPaused: buckets.isPaused,
+			pauseReason: buckets.pauseReason,
+			isCdn: buckets.isCdn,
+			totalBytes: buckets.totalBytes,
+			totalRequests: buckets.totalRequests,
+			getRequests:
+				sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'GET' then 1 else 0 end), 0)`.mapWith(
+					Number,
+				),
+			putRequests:
+				sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'PUT' then 1 else 0 end), 0)`.mapWith(
+					Number,
+				),
+			deleteRequests:
+				sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'DELETE' then 1 else 0 end), 0)`.mapWith(
+					Number,
+				),
+			headRequests:
+				sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'HEAD' then 1 else 0 end), 0)`.mapWith(
+					Number,
+				),
+			egressBytes:
+				sql<number>`COALESCE(sum(${requestLogs.egressBytes}), 0)`.mapWith(
+					Number,
+				),
+			ingressBytes:
+				sql<number>`COALESCE(sum(${requestLogs.ingressBytes}), 0)`.mapWith(
+					Number,
+				),
+			updatedAt: buckets.updatedAt,
+			createdAt: buckets.createdAt,
+		})
+		.from(buckets)
+		.leftJoin(users, eq(buckets.userId, users.id))
+		.leftJoin(requestLogs, eq(requestLogs.bucketName, buckets.name))
+		.groupBy(buckets.id, users.id)
+		.orderBy(orderBy)
+		.limit(limit)
+		.offset(offset);
+
+	if (conditions) {
+		query.where(conditions);
+	}
+
+	const rows = await query;
+
+	const countQuery = db
+		.select({ count: sql<number>`count(*)` })
+		.from(buckets)
+		.leftJoin(users, eq(buckets.userId, users.id));
+	if (conditions) {
+		countQuery.where(conditions);
+	}
+	const countRes = await countQuery;
+	const total = Number(countRes[0]?.count || 0);
+
+	return new Response(
+		JSON.stringify({
+			buckets: rows,
+			total,
+			limit,
+			offset,
+		}),
+		{ headers: { "Content-Type": "application/json" } },
+	);
 }
 
 async function updateUserQuota(userId: string, req: Request) {
@@ -862,6 +1005,9 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	if (path === "/admin/users") {
 		return serveAdminUsersPage(req);
 	}
+	if (path === "/admin/buckets") {
+		return serveAdminBucketsPage(req);
+	}
 	if (path === "/admin/logs") {
 		return serveAdminLogsPage(req);
 	}
@@ -1066,6 +1212,10 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		);
 		if (userBucketsMatch && req.method === "GET") {
 			return getUserBuckets(userBucketsMatch[1]);
+		}
+
+		if (path === "/api/admin/buckets" && req.method === "GET") {
+			return listAdminBuckets(url);
 		}
 
 		// Global Settings API

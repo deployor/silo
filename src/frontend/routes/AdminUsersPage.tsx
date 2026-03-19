@@ -263,7 +263,12 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		pageTitle?: string;
 	};
 
-	const [search, setSearch] = useState("");
+	const initialSearch =
+		typeof window !== "undefined"
+			? new URLSearchParams(window.location.search).get("search") || ""
+			: "";
+
+	const [search, setSearch] = useState(initialSearch);
 	const [adminsOnly, setAdminsOnly] = useState(false);
 	const [users, setUsers] = useState<UserRow[]>([]);
 	const [offset, setOffset] = useState(0);
