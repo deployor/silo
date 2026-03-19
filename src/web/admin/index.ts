@@ -448,7 +448,14 @@ async function runAdminSpeedtest(req: Request) {
 	const schema = z.object({
 		bucketName: z.string().regex(/^[a-z0-9-]+$/),
 		sizeMb: z.number().int().min(1).max(64).default(8),
-		iterations: z.number().int().min(1).max(10).default(3),
+		iterations: z.number().int().min(1).max(20).default(3),
+		runSingle: z.boolean().default(true),
+		runManySmall: z.boolean().default(true),
+		runConcurrent: z.boolean().default(false),
+		smallFileKb: z.number().int().min(16).max(4096).default(256),
+		smallFileCount: z.number().int().min(1).max(200).default(16),
+		concurrency: z.number().int().min(1).max(20).default(4),
+		warmPasses: z.number().int().min(1).max(3).default(1),
 	});
 
 	const body = await req.json().catch(() => null);
@@ -462,7 +469,18 @@ async function runAdminSpeedtest(req: Request) {
 		);
 	}
 
-	const { bucketName, sizeMb, iterations } = parsed.data;
+	const {
+		bucketName,
+		sizeMb,
+		iterations,
+		runSingle,
+		runManySmall,
+		runConcurrent,
+		smallFileKb,
+		smallFileCount,
+		concurrency,
+		warmPasses,
+	} = parsed.data;
 
 	const bucket = await db
 		.select({ id: buckets.id, name: buckets.name, isPaused: buckets.isPaused })
@@ -500,138 +518,347 @@ async function runAdminSpeedtest(req: Request) {
 	});
 
 	const payloadSizeBytes = sizeMb * 1024 * 1024;
-	const payload = randomBytes(payloadSizeBytes);
 	const runId = crypto.randomUUID().slice(0, 8);
 	const baseUrl = `https://${config.s3Domain}`;
 
-	const iterationsDetail: Array<{
+	type SuiteId = "single" | "many-small" | "concurrent";
+	type SpeedtestIterationRow = {
 		index: number;
 		key: string;
 		uploadMs: number;
 		downloadColdMs: number;
 		downloadWarmMs: number;
 		warmCacheHeader: string | null;
-	}> = [];
+		sizeBytes: number;
+	};
+	type SpeedtestSuite = {
+		id: SuiteId;
+		label: string;
+		config: {
+			iterations: number;
+			fileSizeBytes: number;
+			fileCount: number;
+			concurrency: number;
+			warmPasses: number;
+		};
+		totals: {
+			uploadMs: number;
+			downloadColdMs: number;
+			downloadWarmMs: number;
+			putRequests: number;
+			getRequests: number;
+			deleteRequests: number;
+			bytesUp: number;
+			bytesDown: number;
+		};
+		latency: {
+			headSamplesMs: number[];
+			avgMs: number;
+			p95Ms: number;
+		};
+		cache: {
+			warmHitCount: number;
+			warmMissCount: number;
+		};
+		iterationsDetail: SpeedtestIterationRow[];
+	};
 
-	let uploadMsTotal = 0;
-	let downloadColdMsTotal = 0;
-	let downloadWarmMsTotal = 0;
-	let warmHitCount = 0;
-	let warmMissCount = 0;
-
-	for (let i = 0; i < iterations; i++) {
-		const objectKey = `admin-speedtest/${runId}/iter-${i}.bin`;
-		const objectUrl = `${baseUrl}/${bucketName}/${objectKey}`;
-
-		const putStart = performance.now();
-		const putRes = await client.fetch(objectUrl, {
-			method: "PUT",
-			body: payload,
-			headers: {
-				"content-type": "application/octet-stream",
-				"x-amz-content-sha256": "UNSIGNED-PAYLOAD",
-			},
-		});
-		const uploadMs = performance.now() - putStart;
-		if (!putRes.ok) {
-			const message = await putRes.text();
-			return new Response(`Upload failed (${putRes.status}): ${message}`, {
-				status: 500,
-			});
-		}
-
-		const coldStart = performance.now();
-		const coldRes = await client.fetch(objectUrl, { method: "GET" });
-		const coldBody = await coldRes.arrayBuffer();
-		const downloadColdMs = performance.now() - coldStart;
-		if (!coldRes.ok || coldBody.byteLength !== payloadSizeBytes) {
-			return new Response("Cold download failed or size mismatch", {
-				status: 500,
-			});
-		}
-
-		const warmStart = performance.now();
-		const warmRes = await client.fetch(objectUrl, { method: "GET" });
-		const warmBody = await warmRes.arrayBuffer();
-		const downloadWarmMs = performance.now() - warmStart;
-		if (!warmRes.ok || warmBody.byteLength !== payloadSizeBytes) {
-			return new Response("Warm download failed or size mismatch", {
-				status: 500,
-			});
-		}
-
-		const cacheHeader = warmRes.headers.get("x-cache");
-		if (cacheHeader?.toLowerCase().includes("hit")) {
-			warmHitCount++;
-		} else {
-			warmMissCount++;
-		}
-
-		uploadMsTotal += uploadMs;
-		downloadColdMsTotal += downloadColdMs;
-		downloadWarmMsTotal += downloadWarmMs;
-
-		iterationsDetail.push({
-			index: i,
-			key: objectKey,
-			uploadMs,
-			downloadColdMs,
-			downloadWarmMs,
-			warmCacheHeader: cacheHeader,
-		});
-
-		await client.fetch(objectUrl, { method: "DELETE" });
+	async function runPool<T>(
+		items: T[],
+		limit: number,
+		worker: (item: T) => Promise<void>,
+	) {
+		let cursor = 0;
+		const workerCount = Math.max(1, Math.min(limit, items.length));
+		await Promise.all(
+			Array.from({ length: workerCount }, async () => {
+				while (cursor < items.length) {
+					const idx = cursor;
+					cursor++;
+					await worker(items[idx]);
+				}
+			}),
+		);
 	}
 
-	const latencyKey = iterationsDetail[0]?.key;
-	const headSamplesMs: number[] = [];
-	if (latencyKey) {
-		const latencyUrl = `${baseUrl}/${bucketName}/${latencyKey}`;
-		for (let i = 0; i < 5; i++) {
-			const start = performance.now();
-			const headRes = await client.fetch(latencyUrl, { method: "HEAD" });
-			const elapsedMs = performance.now() - start;
-			if (headRes.ok) headSamplesMs.push(elapsedMs);
-		}
+	function calcLatencyStats(headSamplesMs: number[]) {
+		const sorted = [...headSamplesMs].sort((a, b) => a - b);
+		const avgMs =
+			headSamplesMs.length > 0
+				? headSamplesMs.reduce((acc, n) => acc + n, 0) / headSamplesMs.length
+				: 0;
+		const p95Ms =
+			sorted.length > 0
+				? sorted[
+						Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))
+					] || 0
+				: 0;
+		return { avgMs, p95Ms };
 	}
 
-	const sorted = [...headSamplesMs].sort((a, b) => a - b);
-	const avgMs =
-		headSamplesMs.length > 0
-			? headSamplesMs.reduce((acc, n) => acc + n, 0) / headSamplesMs.length
-			: 0;
-	const p95Ms =
-		sorted.length > 0
-			? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] ||
-				0
-			: 0;
+	async function probeLatency(url: string, sampleCount = 5): Promise<number[]> {
+		const samples: number[] = [];
+		for (let i = 0; i < sampleCount; i++) {
+			const started = performance.now();
+			const headRes = await client.fetch(url, { method: "HEAD" });
+			const elapsedMs = performance.now() - started;
+			if (headRes.ok) samples.push(elapsedMs);
+		}
+		return samples;
+	}
 
-	return jsonResponse({
-		ok: true,
-		result: {
-			bucketName,
-			sizeBytes: payloadSizeBytes,
+	async function runSuite(params: {
+		id: SuiteId;
+		label: string;
+		fileSizeBytes: number;
+		fileCount: number;
+		concurrency: number;
+		iterations: number;
+		warmPasses: number;
+	}): Promise<SpeedtestSuite> {
+		const {
+			id,
+			label,
+			fileSizeBytes,
+			fileCount,
+			concurrency,
 			iterations,
+			warmPasses,
+		} = params;
+
+		const payload = randomBytes(fileSizeBytes);
+		const effectiveConcurrency = Math.max(1, Math.min(concurrency, fileCount));
+		const iterationsDetail: SpeedtestIterationRow[] = [];
+
+		let uploadMsTotal = 0;
+		let downloadColdMsTotal = 0;
+		let downloadWarmMsTotal = 0;
+		let warmHitCount = 0;
+		let warmMissCount = 0;
+		let latencySamples: number[] = [];
+
+		for (let i = 0; i < iterations; i++) {
+			const prefix = `admin-speedtest/${runId}/${id}/iter-${i}`;
+			const objects = Array.from({ length: fileCount }, (_v, fileIndex) => {
+				const key = `${prefix}/f-${fileIndex}.bin`;
+				return {
+					key,
+					url: `${baseUrl}/${bucketName}/${key}`,
+				};
+			});
+
+			const putStart = performance.now();
+			await runPool(objects, effectiveConcurrency, async (objectItem) => {
+				const putRes = await client.fetch(objectItem.url, {
+					method: "PUT",
+					body: payload,
+					headers: {
+						"content-type": "application/octet-stream",
+						"x-amz-content-sha256": "UNSIGNED-PAYLOAD",
+					},
+				});
+				if (!putRes.ok) {
+					const message = await putRes.text();
+					throw new Error(
+						`Upload failed (${putRes.status}) for ${objectItem.key}: ${message}`,
+					);
+				}
+			});
+			const uploadMs = performance.now() - putStart;
+
+			const coldStart = performance.now();
+			await runPool(objects, effectiveConcurrency, async (objectItem) => {
+				const coldRes = await client.fetch(objectItem.url, { method: "GET" });
+				const coldBody = await coldRes.arrayBuffer();
+				if (!coldRes.ok || coldBody.byteLength !== fileSizeBytes) {
+					throw new Error(
+						`Cold download failed for ${objectItem.key} (status=${coldRes.status}, size=${coldBody.byteLength})`,
+					);
+				}
+			});
+			const downloadColdMs = performance.now() - coldStart;
+
+			let warmCacheHeader: string | null = null;
+			const warmStart = performance.now();
+			for (let pass = 0; pass < warmPasses; pass++) {
+				await runPool(objects, effectiveConcurrency, async (objectItem) => {
+					const warmRes = await client.fetch(objectItem.url, { method: "GET" });
+					const warmBody = await warmRes.arrayBuffer();
+					if (!warmRes.ok || warmBody.byteLength !== fileSizeBytes) {
+						throw new Error(
+							`Warm download failed for ${objectItem.key} (status=${warmRes.status}, size=${warmBody.byteLength})`,
+						);
+					}
+					const cacheHeader = warmRes.headers.get("x-cache");
+					if (warmCacheHeader === null && cacheHeader) {
+						warmCacheHeader = cacheHeader;
+					}
+					if (cacheHeader?.toLowerCase().includes("hit")) {
+						warmHitCount++;
+					} else {
+						warmMissCount++;
+					}
+				});
+			}
+			const downloadWarmMs = performance.now() - warmStart;
+
+			if (latencySamples.length === 0 && objects[0]) {
+				latencySamples = await probeLatency(objects[0].url, 5);
+			}
+
+			await runPool(objects, effectiveConcurrency, async (objectItem) => {
+				await client.fetch(objectItem.url, { method: "DELETE" });
+			});
+
+			uploadMsTotal += uploadMs;
+			downloadColdMsTotal += downloadColdMs;
+			downloadWarmMsTotal += downloadWarmMs;
+
+			iterationsDetail.push({
+				index: i,
+				key:
+					objects.length === 1
+						? objects[0].key
+						: `${prefix}/* (${objects.length} files)`,
+				uploadMs,
+				downloadColdMs,
+				downloadWarmMs,
+				warmCacheHeader,
+				sizeBytes: fileSizeBytes * objects.length,
+			});
+		}
+
+		const latencyStats = calcLatencyStats(latencySamples);
+
+		return {
+			id,
+			label,
+			config: {
+				iterations,
+				fileSizeBytes,
+				fileCount,
+				concurrency: effectiveConcurrency,
+				warmPasses,
+			},
 			totals: {
 				uploadMs: uploadMsTotal,
 				downloadColdMs: downloadColdMsTotal,
 				downloadWarmMs: downloadWarmMsTotal,
-				putRequests: iterations,
-				getRequests: iterations * 2,
-				deleteRequests: iterations,
-				bytesUp: payloadSizeBytes * iterations,
-				bytesDown: payloadSizeBytes * iterations * 2,
+				putRequests: iterations * fileCount,
+				getRequests: iterations * fileCount * (1 + warmPasses),
+				deleteRequests: iterations * fileCount,
+				bytesUp: iterations * fileCount * fileSizeBytes,
+				bytesDown: iterations * fileCount * fileSizeBytes * (1 + warmPasses),
 			},
 			latency: {
-				headSamplesMs,
-				avgMs,
-				p95Ms,
+				headSamplesMs: latencySamples,
+				avgMs: latencyStats.avgMs,
+				p95Ms: latencyStats.p95Ms,
 			},
 			cache: {
 				warmHitCount,
 				warmMissCount,
 			},
 			iterationsDetail,
+		};
+	}
+
+	const suitesToRun = {
+		runSingle,
+		runManySmall,
+		runConcurrent,
+	};
+
+	if (
+		!suitesToRun.runSingle &&
+		!suitesToRun.runManySmall &&
+		!suitesToRun.runConcurrent
+	) {
+		suitesToRun.runSingle = true;
+	}
+
+	const startedAt = Date.now();
+	const perfStart = performance.now();
+	const suiteResults: SpeedtestSuite[] = [];
+
+	try {
+		if (suitesToRun.runSingle) {
+			suiteResults.push(
+				await runSuite({
+					id: "single",
+					label: "Single File Throughput",
+					fileSizeBytes: payloadSizeBytes,
+					fileCount: 1,
+					concurrency: 1,
+					iterations,
+					warmPasses,
+				}),
+			);
+		}
+
+		if (suitesToRun.runManySmall) {
+			suiteResults.push(
+				await runSuite({
+					id: "many-small",
+					label: "Many Small Files",
+					fileSizeBytes: smallFileKb * 1024,
+					fileCount: smallFileCount,
+					concurrency: Math.min(concurrency, smallFileCount),
+					iterations,
+					warmPasses,
+				}),
+			);
+		}
+
+		if (suitesToRun.runConcurrent) {
+			const concurrentFileSizeBytes = Math.max(
+				64 * 1024,
+				Math.floor(payloadSizeBytes / Math.max(1, concurrency)),
+			);
+			suiteResults.push(
+				await runSuite({
+					id: "concurrent",
+					label: "Concurrent Burst",
+					fileSizeBytes: concurrentFileSizeBytes,
+					fileCount: Math.max(concurrency, Math.min(24, concurrency * 2)),
+					concurrency,
+					iterations,
+					warmPasses,
+				}),
+			);
+		}
+	} catch (error) {
+		const message =
+			error instanceof Error ? error.message : "Speed test failed";
+		return new Response(message, { status: 500 });
+	}
+
+	const summary = suiteResults.reduce(
+		(acc, suite) => {
+			acc.totalBytesUp += suite.totals.bytesUp;
+			acc.totalBytesDown += suite.totals.bytesDown;
+			acc.totalRequests +=
+				suite.totals.putRequests +
+				suite.totals.getRequests +
+				suite.totals.deleteRequests;
+			return acc;
+		},
+		{
+			totalBytesUp: 0,
+			totalBytesDown: 0,
+			totalRequests: 0,
+		},
+	);
+
+	return jsonResponse({
+		ok: true,
+		result: {
+			bucketName,
+			startedAt: new Date(startedAt).toISOString(),
+			completedAt: new Date().toISOString(),
+			durationMs: performance.now() - perfStart,
+			suites: suiteResults,
+			summary,
 		},
 	});
 }
