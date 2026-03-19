@@ -55,6 +55,12 @@ type SpeedtestSuite = {
 		stressGetAvgMs: number;
 		stressGetP50Ms: number;
 		stressGetP95Ms: number;
+		coldRps: number;
+		hotRps: number;
+		coldSuccessRate: number;
+		hotSuccessRate: number;
+		hotRateLimited: number;
+		hotTimeouts: number;
 	};
 	iterationsDetail: Array<{
 		index: number;
@@ -106,6 +112,7 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [warmPasses, setWarmPasses] = useState(1);
 	const [cacheStressLoops, setCacheStressLoops] = useState(80);
 	const [cacheObjectCount, setCacheObjectCount] = useState(4);
+	const [cacheTimeoutMs, setCacheTimeoutMs] = useState(8000);
 	const [running, setRunning] = useState(false);
 	const [startedAt, setStartedAt] = useState<number | null>(null);
 	const [elapsed, setElapsed] = useState(0);
@@ -208,6 +215,7 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					warmPasses,
 					cacheStressLoops,
 					cacheObjectCount,
+					cacheTimeoutMs,
 				}),
 			});
 			if (!res.ok) {
@@ -285,6 +293,7 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			setWarmPasses(1);
 			setCacheStressLoops(20);
 			setCacheObjectCount(2);
+			setCacheTimeoutMs(6000);
 			return;
 		}
 
@@ -301,6 +310,7 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			setWarmPasses(1);
 			setCacheStressLoops(80);
 			setCacheObjectCount(4);
+			setCacheTimeoutMs(8000);
 			return;
 		}
 
@@ -316,6 +326,7 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		setWarmPasses(2);
 		setCacheStressLoops(200);
 		setCacheObjectCount(8);
+		setCacheTimeoutMs(12000);
 	};
 
 	return (
@@ -546,6 +557,25 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</div>
 						<div>
 							<label
+								htmlFor="speedtest-cache-timeout"
+								className="block text-xs uppercase font-bold text-text-muted mb-1"
+							>
+								Cache Timeout (ms)
+							</label>
+							<input
+								id="speedtest-cache-timeout"
+								type="number"
+								min={1000}
+								max={60000}
+								value={cacheTimeoutMs}
+								onChange={(e) =>
+									setCacheTimeoutMs(Number(e.target.value) || 1000)
+								}
+								className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-white text-sm"
+							/>
+						</div>
+						<div>
+							<label
 								htmlFor="speedtest-cache-objects"
 								className="block text-xs uppercase font-bold text-text-muted mb-1"
 							>
@@ -722,6 +752,30 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												<StatCard
 													label="Stress GET P95"
 													value={`${stat.suite.cacheDiagnostics.stressGetP95Ms.toFixed(1)} ms`}
+												/>
+												<StatCard
+													label="Cold Req/s"
+													value={stat.suite.cacheDiagnostics.coldRps.toFixed(1)}
+												/>
+												<StatCard
+													label="Hot Req/s"
+													value={stat.suite.cacheDiagnostics.hotRps.toFixed(1)}
+												/>
+												<StatCard
+													label="Cold Success"
+													value={`${stat.suite.cacheDiagnostics.coldSuccessRate.toFixed(1)}%`}
+												/>
+												<StatCard
+													label="Hot Success"
+													value={`${stat.suite.cacheDiagnostics.hotSuccessRate.toFixed(1)}%`}
+												/>
+												<StatCard
+													label="Hot 429s"
+													value={stat.suite.cacheDiagnostics.hotRateLimited.toLocaleString()}
+												/>
+												<StatCard
+													label="Hot Timeouts"
+													value={stat.suite.cacheDiagnostics.hotTimeouts.toLocaleString()}
 												/>
 											</div>
 										) : null}
