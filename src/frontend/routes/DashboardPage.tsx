@@ -913,10 +913,10 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												</div>
 												<div className="grid sm:grid-cols-2 gap-3 text-sm">
 													<div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3">
-														<p className="font-black text-emerald-300 uppercase text-[11px] tracking-wider">
-															✅ OK TO MAKE PUBLIC
-														</p>
-														<p className="text-white/90 mt-1">
+													<p className="font-black text-emerald-300 uppercase text-[11px] tracking-wider">
+														OK TO MAKE PUBLIC
+													</p>
+<p className="text-white/90 mt-1">
 															Blog images, app icons, CSS/JS bundles, docs
 															screenshots.
 														</p>
