@@ -865,101 +865,165 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!confirmDialog}
 				onClose={confirmLoading ? undefined : () => setConfirmDialog(null)}
 				title={confirmDialog?.title}
-				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "!border !border-red-800 bg-[#1a0a0b]" : ""}`}
+				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "!max-w-2xl !border !border-red-700 bg-[#16090a]" : ""}`}
 			>
 				{confirmDialog ? (
 					<>
 						{confirmDialog.publicRiskWarning ? (
-							<div className="mt-1 transition-all duration-300 text-white">
+							<div className="mt-1 transition-all duration-300 text-white space-y-5">
+								<div className="grid grid-cols-3 gap-2">
+									{[
+										{ icon: <MdWarningAmber className="text-2xl" />, label: "Use case" },
+										{ icon: <MdPublic className="text-2xl" />, label: "Exposure" },
+										{ icon: <MdGroups className="text-2xl" />, label: "Abuse risk" },
+									].map((step, idx) => {
+										const active = publicWarningStep === idx;
+										const complete = publicWarningStep > idx;
+										return (
+											<div
+												key={step.label}
+												className={`rounded-xl border px-3 py-3 text-center transition-colors ${active ? "border-red-400 bg-red-500/20" : complete ? "border-red-500/40 bg-red-500/10" : "border-white/10 bg-white/[0.02]"}`}
+											>
+												<div className={`mx-auto mb-1 inline-flex h-10 w-10 items-center justify-center rounded-full ${active ? "bg-red-500/30 text-red-200" : "bg-white/10 text-white/70"}`}>
+													{step.icon}
+												</div>
+												<div className="text-[11px] uppercase tracking-wider font-black text-white/90">
+													{idx + 1}. {step.label}
+												</div>
+											</div>
+										);
+									})}
+								</div>
+
 								{publicWarningStep === 0 ? (
-									<div className="space-y-4">
-										<div className="flex items-center gap-2 text-xs uppercase tracking-wider text-red-300 font-bold">
-											<MdWarningAmber className="text-red-400" />
-											Use public buckets only for static assets
+									<div className="rounded-2xl border border-red-600/50 bg-red-950/20 p-5 md:p-6">
+										<div className="grid md:grid-cols-[120px_1fr] gap-5 items-start">
+											<div className="flex items-center justify-center rounded-2xl border border-red-500/40 bg-red-600/15 p-4">
+												<MdVisibility className="text-[72px] text-red-300" />
 										</div>
-										<p className="text-sm text-white/95 leading-relaxed">
-											Use this for things like{" "}
-											<span className="font-bold text-red-300">
-												blog images
-											</span>
-											, <span className="font-bold text-red-300">CSS</span>, and
-											other files that are already meant to be public.
-										</p>
-										<ul className="text-sm space-y-2 list-disc list-inside text-white/90">
-											<li>
-												<span className="font-bold text-red-300">
-													DO NOT USE
-												</span>{" "}
-												for user-upload web apps.
-											</li>
-											<li>
-												<span className="font-bold text-red-300">
-													DO NOT USE
-												</span>{" "}
-												for private/sensitive files.
-											</li>
-											<li>
-												<span className="font-bold text-red-300">
-													DO NOT USE
-												</span>{" "}
-												as a backend storage shortcut.
-											</li>
-										</ul>
+											<div className="space-y-4">
+												<div>
+													<p className="text-xs uppercase tracking-[0.18em] text-red-300 font-black">
+														Public is ONLY for static assets
+													</p>
+													<h4 className="text-2xl font-black text-white leading-tight mt-1">
+														Good: images, CSS, docs, public files.
+													</h4>
+												</div>
+												<div className="grid sm:grid-cols-2 gap-3 text-sm">
+													<div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-3">
+														<p className="font-black text-emerald-300 uppercase text-[11px] tracking-wider">
+															✅ OK TO MAKE PUBLIC
+														</p>
+														<p className="text-white/90 mt-1">
+															Blog images, app icons, CSS/JS bundles, docs screenshots.
+														</p>
+													</div>
+													<div className="rounded-xl border border-red-400/35 bg-red-500/10 p-3">
+														<p className="font-black text-red-300 uppercase text-[11px] tracking-wider">
+															⛔ DO NOT MAKE PUBLIC
+														</p>
+														<p className="text-white/90 mt-1">
+															User uploads, private docs, backups, secret/config files.
+														</p>
+													</div>
+												</div>
+											</div>
+										</div>
 									</div>
 								) : null}
 
 								{publicWarningStep === 1 ? (
-									<div className="space-y-4">
-										<div className="flex items-center gap-2 text-xs uppercase tracking-wider text-red-300 font-bold">
-											<MdPublic className="text-red-400" />
-											Public means ANYONE
+									<div className="rounded-2xl border border-red-600/50 bg-red-950/20 p-5 md:p-6">
+										<div className="grid md:grid-cols-[120px_1fr] gap-5 items-start">
+											<div className="flex items-center justify-center rounded-2xl border border-red-500/40 bg-red-600/15 p-4">
+												<MdPublic className="text-[72px] text-red-300" />
 										</div>
-										<p className="text-sm text-white/95 leading-relaxed">
-											If you make this public,{" "}
-											<span className="font-bold text-red-300">ANYONE</span> can
-											access it — including bots, crawlers, and AI scrapers.
-										</p>
-										<p className="text-sm text-white/90 leading-relaxed">
-											We{" "}
-											<span className="font-bold text-red-300">
-												cannot protect
-											</span>{" "}
-											public content for you. You are fully responsible for what
-											you expose.
-										</p>
+											<div className="space-y-4">
+												<div>
+													<p className="text-xs uppercase tracking-[0.18em] text-red-300 font-black">
+														Public means global access
+													</p>
+													<h4 className="text-2xl font-black text-white leading-tight mt-1">
+														Anyone can fetch these URLs.
+													</h4>
+												</div>
+												<div className="grid sm:grid-cols-3 gap-2.5 text-xs sm:text-sm">
+													<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
+														<p className="font-black text-white">People</p>
+														<p className="text-white/75 mt-1">Anyone with a link.</p>
+													</div>
+													<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
+														<p className="font-black text-white">Crawlers</p>
+														<p className="text-white/75 mt-1">Search engines and scanners.</p>
+													</div>
+													<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
+														<p className="font-black text-white">AI scrapers</p>
+														<p className="text-white/75 mt-1">Dataset and model collectors.</p>
+													</div>
+												</div>
+												<p className="text-sm text-red-200 font-semibold">
+													We can&apos;t hide or retract already-public links for you.
+												</p>
+											</div>
+										</div>
 									</div>
 								) : null}
 
 								{publicWarningStep === 2 ? (
-									<div className="space-y-4">
-										<div className="flex items-center gap-2 text-xs uppercase tracking-wider text-red-300 font-bold">
-											<MdGroups className="text-red-400" />
-											Quota and abuse risk
+									<div className="rounded-2xl border border-red-600/50 bg-red-950/20 p-5 md:p-6">
+										<div className="grid md:grid-cols-[120px_1fr] gap-5 items-start">
+											<div className="flex items-center justify-center rounded-2xl border border-red-500/40 bg-red-600/15 p-4">
+												<MdGroups className="text-[72px] text-red-300" />
 										</div>
-										<p className="text-sm text-white/95 leading-relaxed">
-											Your quota can be burned quickly by spam or high traffic.
-											If a public bucket causes absurd load, we may need to
-											disable it.
-										</p>
-										<label className="flex items-start gap-3 mt-2">
-											<input
-												type="checkbox"
-												checked={dontShowPublicWarningAgain}
-												onChange={(e) =>
-													setDontShowPublicWarningAgain(e.target.checked)
-												}
-												className="mt-1 rounded border-red-500/50 bg-black/20 text-hc-red focus:ring-hc-red/40"
-											/>
-											<span className="text-xs text-white/80">
-												Don&apos;t show this warning flow again on this device.
-											</span>
-										</label>
+											<div className="space-y-4">
+												<div>
+													<p className="text-xs uppercase tracking-[0.18em] text-red-300 font-black">
+														Quota burn + abuse happens fast
+													</p>
+													<h4 className="text-2xl font-black text-white leading-tight mt-1">
+														Traffic spikes can shut this down.
+													</h4>
+												</div>
+												<div className="grid sm:grid-cols-2 gap-3 text-sm">
+													<div className="rounded-xl border border-red-400/35 bg-red-500/10 p-3">
+														<p className="font-black text-red-300">What can happen</p>
+														<p className="text-white/85 mt-1">
+															Bot traffic burns egress + request quota quickly.
+														</p>
+													</div>
+													<div className="rounded-xl border border-red-400/35 bg-red-500/10 p-3">
+														<p className="font-black text-red-300">Possible outcome</p>
+														<p className="text-white/85 mt-1">
+															We may suspend abusive public traffic to protect the platform.
+														</p>
+													</div>
+												</div>
+												<label className="flex items-start gap-3 rounded-xl border border-white/15 bg-black/20 p-3 mt-1">
+													<input
+														type="checkbox"
+														checked={dontShowPublicWarningAgain}
+														onChange={(e) =>
+															setDontShowPublicWarningAgain(e.target.checked)
+														}
+													className="mt-1 h-4 w-4 rounded border-red-500/50 bg-black/20 text-hc-red focus:ring-hc-red/40"
+													/>
+													<span className="text-sm text-white/90 leading-relaxed">
+														Don&apos;t show this 3-step warning again on this device.
+													</span>
+												</label>
+											</div>
+										</div>
 									</div>
 								) : null}
 
-								<div className="mt-4 text-xs text-white/75 font-bold">
-									Continue in{" "}
-									<span className="text-red-400">{confirmDelayRemaining}s</span>
+								<div className="flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2">
+									<p className="text-xs md:text-sm font-bold text-red-100">
+										Read timer: <span className="text-red-300">{confirmDelayRemaining}s</span>
+									</p>
+									<p className="text-[11px] md:text-xs uppercase tracking-wider text-red-200/90 font-black">
+										Step {publicWarningStep + 1} of 3
+									</p>
 								</div>
 							</div>
 						) : (
