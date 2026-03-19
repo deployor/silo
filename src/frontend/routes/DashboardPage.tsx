@@ -182,7 +182,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				: "bg-hc-blue hover:bg-blue-600 border-hc-blue text-white",
 			pendingKey: `visibility:${bucketName}`,
 			publicRiskWarning: isPublic,
-			confirmDelaySeconds: isPublic ? 5 : 0,
+			confirmDelaySeconds: isPublic ? 15 : 0,
 			onConfirm: async () => {
 				await fetchText(`/api/dashboard/buckets/${bucketName}`, {
 					method: "PATCH",
@@ -827,14 +827,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!confirmDialog}
 				onClose={confirmLoading ? undefined : () => setConfirmDialog(null)}
 				title={confirmDialog?.title}
-				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "border border-red-500/45 bg-hc-dark" : ""}`}
+				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "border-2 border-red-500 bg-[#22080b] shadow-[0_0_0_1px_rgba(239,68,68,0.35)]" : ""}`}
 			>
 				{confirmDialog ? (
 					<>
 						<p
 							className={
 								confirmDialog.publicRiskWarning
-									? "text-red-100 text-sm"
+									? "text-red-200 text-sm"
 									: "text-text-muted text-sm"
 							}
 						>
@@ -842,42 +842,42 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</p>
 						{confirmDialog.publicRiskWarning ? (
 							<div className="mt-4">
-								<div className="flex items-center gap-2 text-red-200 font-black uppercase tracking-wider text-xs mb-4">
-									<MdWarningAmber className="text-base" />
+								<div className="flex items-center gap-2 text-red-300 font-black uppercase tracking-wider text-xs mb-4">
+									<MdWarningAmber className="text-base text-red-400" />
 									Public bucket warning
 								</div>
 
 								<div className="space-y-3">
-									<div className="flex items-start gap-3 border-l-2 border-red-400/70 pl-3 py-1">
-										<div className="mt-0.5 text-red-300">
+									<div className="flex items-start gap-3 border-l-4 border-red-600 pl-3 py-1">
+										<div className="mt-0.5 text-red-400">
 											<MdPublic className="text-lg" />
 										</div>
-										<p className="text-red-100 text-sm">
+										<p className="text-red-200 text-sm">
 											People on the internet can access your files if they have
 											the URL.
 										</p>
 									</div>
 
-									<div className="flex items-start gap-3 border-l-2 border-red-400/70 pl-3 py-1">
-										<div className="mt-0.5 text-red-300">
+									<div className="flex items-start gap-3 border-l-4 border-red-600 pl-3 py-1">
+										<div className="mt-0.5 text-red-400">
 											<MdVisibility className="text-lg" />
 										</div>
-										<p className="text-red-100 text-sm">
+										<p className="text-red-200 text-sm">
 											Public files can be indexed, mirrored, and shared broadly.
 										</p>
 									</div>
 
-									<div className="flex items-start gap-3 border-l-2 border-red-400/70 pl-3 py-1">
-										<div className="mt-0.5 text-red-300">
+									<div className="flex items-start gap-3 border-l-4 border-red-600 pl-3 py-1">
+										<div className="mt-0.5 text-red-400">
 											<MdGroups className="text-lg" />
 										</div>
-										<p className="text-red-100 text-sm">
+										<p className="text-red-200 text-sm">
 											Unexpected traffic from others can burn your quota faster.
 										</p>
 									</div>
 								</div>
 
-								<div className="mt-4 text-xs text-red-200 font-bold">
+								<div className="mt-4 text-xs text-red-300 font-bold">
 									You can confirm in{" "}
 									<span className="text-white">{confirmDelayRemaining}s</span>
 								</div>
