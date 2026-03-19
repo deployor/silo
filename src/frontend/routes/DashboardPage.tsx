@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	MdAccessTimeFilled,
 	MdArrowForward,
+	MdCheckCircle,
 	MdCode,
 	MdContentCopy,
 	MdDeleteForever,
@@ -890,96 +891,128 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			<Modal
 				open={!!credentialModal}
 				onClose={() => setCredentialModal(null)}
-				title={
-					credentialModal?.kind === "bucket"
-						? "Bucket Created"
-						: "Key Generated"
-				}
-				className="max-w-xl p-8"
+				title={undefined}
+				className="max-w-md p-8"
 			>
 				{credentialModal ? (
-					<div className="space-y-5">
-						<div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-							<p className="text-xs uppercase tracking-wider text-text-muted font-bold mb-1">
-								Bucket
-							</p>
-							<p className="font-mono text-sm text-white break-all">
-								{credentialModal.bucketName}
-							</p>
+					<>
+						<div className="flex items-center gap-3 mb-2">
+							<div className="bg-emerald-500/20 p-2 rounded-full text-emerald-400">
+								<MdCheckCircle className="text-2xl" />
+							</div>
+							<h3 className="text-2xl font-bold text-white">
+								{credentialModal.kind === "bucket"
+									? "Bucket Created!"
+									: "Key Generated!"}
+							</h3>
 						</div>
+						<p className="text-text-muted text-sm mb-6 ml-11">
+							Save these credentials now. You won&apos;t be able to see the Secret
+							Key again.
+						</p>
 
-						<div className="space-y-3">
-							<div className="rounded-xl border border-white/10 bg-black/20 p-3">
-								<div className="flex items-center justify-between gap-3">
-									<div>
-										<p className="text-xs uppercase tracking-wider text-text-muted font-bold mb-1">
-											Access Key ID
-										</p>
-										<p className="font-mono text-sm text-white break-all">
-											{credentialModal.accessKey}
-										</p>
+						<div className="space-y-4 bg-black/30 p-6 rounded-xl border border-white/10 mb-8">
+							<div>
+								<p className="text-xs text-text-muted font-bold uppercase tracking-wider block mb-1">
+									Access Key ID
+								</p>
+								<div className="flex items-center gap-2 bg-black/20 rounded-lg p-2 border border-white/5 hover:border-white/10 transition-colors">
+									<div className="font-mono text-sm select-all text-white overflow-x-auto whitespace-nowrap scrollbar-thin flex-1">
+										{credentialModal.accessKey}
 									</div>
 									<button
 										type="button"
 										onClick={() => copyText(credentialModal.accessKey)}
-										className={`${buttonBase} ${buttonSubtle} !px-3 !py-2`}
+										className="text-text-muted hover:text-white transition-colors p-1"
+										title="Copy"
 									>
-										<MdContentCopy className="text-sm" /> Copy
+										<MdContentCopy className="text-lg" />
 									</button>
 								</div>
 							</div>
 
-							<div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
-								<div className="flex items-center justify-between gap-3">
-									<div>
-										<p className="text-xs uppercase tracking-wider text-emerald-300 font-bold mb-1">
-											Secret Access Key
-										</p>
-										<p className="font-mono text-sm text-emerald-200 break-all">
-											{credentialModal.secretKey}
-										</p>
+							<div>
+								<p className="text-xs text-text-muted font-bold uppercase tracking-wider block mb-1">
+									Secret Access Key
+								</p>
+								<div className="flex items-center gap-2 bg-black/20 rounded-lg p-2 border border-white/5 hover:border-white/10 transition-colors">
+									<div className="font-mono text-sm select-all text-emerald-400 overflow-x-auto whitespace-nowrap scrollbar-thin flex-1">
+										{credentialModal.secretKey}
 									</div>
 									<button
 										type="button"
 										onClick={() => copyText(credentialModal.secretKey)}
-										className={`${buttonBase} ${buttonSubtle} !px-3 !py-2`}
+										className="text-text-muted hover:text-white transition-colors p-1"
+										title="Copy"
 									>
-										<MdContentCopy className="text-sm" /> Copy
+										<MdContentCopy className="text-lg" />
 									</button>
 								</div>
 							</div>
 
-							<div className="rounded-xl border border-white/10 bg-black/20 p-3">
-								<div className="flex items-center justify-between gap-3">
-									<div>
-										<p className="text-xs uppercase tracking-wider text-text-muted font-bold mb-1">
-											Public URL Example
-										</p>
-										<p className="font-mono text-sm text-white break-all">
-											{credentialModal.publicUrl}
-										</p>
+							<div>
+								<p className="text-xs text-text-muted font-bold uppercase tracking-wider block mb-1">
+									Endpoint
+								</p>
+								<div className="flex items-center gap-2 bg-black/20 rounded-lg p-2 border border-white/5 hover:border-white/10 transition-colors">
+									<div className="font-mono text-sm select-all text-hc-red overflow-x-auto whitespace-nowrap scrollbar-thin flex-1">
+										{(() => {
+											try {
+												return new URL(credentialModal.publicUrl).origin;
+											} catch {
+												return "https://silo.deployor.dev";
+											}
+										})()}
+									</div>
+									<button
+										type="button"
+										onClick={() =>
+											copyText(
+												(() => {
+													try {
+														return new URL(credentialModal.publicUrl).origin;
+													} catch {
+														return "https://silo.deployor.dev";
+													}
+												})(),
+											)
+										}
+										className="text-text-muted hover:text-white transition-colors p-1"
+										title="Copy"
+									>
+										<MdContentCopy className="text-lg" />
+									</button>
+								</div>
+							</div>
+
+							<div>
+								<p className="text-xs text-text-muted font-bold uppercase tracking-wider block mb-1">
+									Public URL Example
+								</p>
+								<div className="flex items-center gap-2 bg-black/20 rounded-lg p-2 border border-white/5 hover:border-white/10 transition-colors">
+									<div className="font-mono text-sm select-all text-hc-blue overflow-x-auto whitespace-nowrap scrollbar-thin flex-1">
+										{credentialModal.publicUrl}
 									</div>
 									<button
 										type="button"
 										onClick={() => copyText(credentialModal.publicUrl)}
-										className={`${buttonBase} ${buttonSubtle} !px-3 !py-2`}
+										className="text-text-muted hover:text-white transition-colors p-1"
+										title="Copy"
 									>
-										<MdContentCopy className="text-sm" /> Copy
+										<MdContentCopy className="text-lg" />
 									</button>
 								</div>
 							</div>
 						</div>
 
-						<div className="flex justify-end">
-							<button
-								type="button"
-								onClick={() => setCredentialModal(null)}
-								className={`${buttonBase} ${buttonPrimaryBlue}`}
-							>
-								Done
-							</button>
-						</div>
-					</div>
+						<button
+							type="button"
+							onClick={() => setCredentialModal(null)}
+							className="w-full bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors border border-white/5 hover:border-white/20"
+						>
+							I have saved my keys
+						</button>
+					</>
 				) : null}
 			</Modal>
 
