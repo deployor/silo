@@ -907,8 +907,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</h3>
 						</div>
 						<p className="text-text-muted text-sm mb-6 ml-11">
-							Save these credentials now. You won&apos;t be able to see the Secret
-							Key again.
+							Save these credentials now. You won&apos;t be able to see the
+							Secret Key again.
 						</p>
 
 						<div className="space-y-4 bg-black/30 p-6 rounded-xl border border-white/10 mb-8">
