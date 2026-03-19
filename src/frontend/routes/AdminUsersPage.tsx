@@ -221,11 +221,13 @@ function Toggle({
 	onChange,
 	color,
 	label,
+	disabled,
 }: {
 	checked: boolean;
 	onChange: (checked: boolean) => void;
 	color: "red" | "green" | "amber";
 	label: string;
+	disabled?: boolean;
 }) {
 	const colorClass =
 		color === "red"
@@ -235,11 +237,14 @@ function Toggle({
 				: "peer-checked:bg-amber-500 peer-focus:ring-amber-500";
 
 	return (
-		<label className="inline-flex items-center cursor-pointer">
+		<label
+			className={`inline-flex items-center ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+		>
 			<input
 				type="checkbox"
 				className="sr-only peer"
 				checked={checked}
+				disabled={disabled}
 				onChange={(e) => onChange(e.target.checked)}
 			/>
 			<div
@@ -283,6 +288,10 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const searchRef = useRef(search);
 	const adminsOnlyRef = useRef(adminsOnly);
 	const offsetRef = useRef(offset);
+	const [userActionLoading, setUserActionLoading] = useState<string | null>(null);
+	const [bucketActionLoading, setBucketActionLoading] = useState<string | null>(
+		null,
+	);
 
 	const limit = 50;
 
@@ -307,8 +316,8 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				adminsOnly?: boolean;
 				force?: boolean;
 			},
-		) => {
-			if (loadingRef.current) return;
+		): Promise<UsersResponse | null> => {
+			if (loadingRef.current) return null;
 			loadingRef.current = true;
 			setLoading(true);
 			const nextOffset = reset ? 0 : (overrides?.offset ?? offsetRef.current);
@@ -330,7 +339,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			if (shouldDedupe) {
 				loadingRef.current = false;
 				setLoading(false);
-				return;
+				return null;
 			}
 
 			lastRequestKeyRef.current = requestKey;
@@ -351,8 +360,10 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					setOffset(next);
 					offsetRef.current = next;
 				}
+				return data;
 			} catch (e) {
 				window.alert(e instanceof Error ? e.message : "Failed to load users");
+				return null;
 			} finally {
 				loadingRef.current = false;
 				setLoading(false);
@@ -431,12 +442,29 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 	const patchUser = async (path: string, body: unknown) => {
 		if (!selected) return;
-		await fetchText(`/api/admin/users/${selected.id}/${path}`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(body),
-		});
-		await loadUsers(true);
+		setUserActionLoading(path);
+		try {
+			await fetchText(`/api/admin/users/${selected.id}/${path}`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(body),
+			});
+			const updated = await loadUsers(true, { force: true });
+			if (updated) {
+				const refreshed = updated.users.find((u) => u.id === selected.id) || null;
+				setSelected(refreshed);
+				if (refreshed) {
+					const buckets = await fetchJson<BucketRow[]>(
+						`/api/admin/users/${refreshed.id}/buckets`,
+					);
+					setSelectedBuckets(buckets || []);
+				}
+			}
+		} catch (e) {
+			window.alert(e instanceof Error ? e.message : "Update failed");
+		} finally {
+			setUserActionLoading(null);
+		}
 	};
 
 	const updateStorageQuota = async () => {
@@ -462,6 +490,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	};
 
 	const toggleLock = async (isLocked: boolean) => {
+		setSelected((prev) => (prev ? { ...prev, isLocked } : prev));
 		const lockReason = isLocked
 			? window.prompt("Enter reason for locking account (optional):")
 			: null;
@@ -469,10 +498,12 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	};
 
 	const toggleReviewer = async (isReviewer: boolean) => {
+		setSelected((prev) => (prev ? { ...prev, isReviewer } : prev));
 		await patchUser("reviewer", { isReviewer });
 	};
 
 	const toggleImmortal = async (isImmortal: boolean) => {
+		setSelected((prev) => (prev ? { ...prev, isImmortal } : prev));
 		await patchUser("immortal", { isImmortal });
 	};
 
@@ -485,12 +516,17 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		)
 			return;
 
-		await fetchText(`/api/admin/users/${selected.id}/age-out`, {
-			method: "POST",
-		});
-		window.alert("User marked as over-age. Notification sent.");
-		setSelected(null);
-		await loadUsers(true);
+		setUserActionLoading("age-out");
+		try {
+			await fetchText(`/api/admin/users/${selected.id}/age-out`, {
+				method: "POST",
+			});
+			window.alert("User marked as over-age. Notification sent.");
+			setSelected(null);
+			await loadUsers(true, { force: true });
+		} finally {
+			setUserActionLoading(null);
+		}
 	};
 
 	const startImpersonation = async () => {
@@ -502,13 +538,18 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		)
 			return;
 
-		await fetchText("/api/admin/impersonate", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ userId: selected.id }),
-		});
+		setUserActionLoading("impersonate");
+		try {
+			await fetchText("/api/admin/impersonate", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ userId: selected.id }),
+			});
 
-		window.location.href = "/";
+			window.location.href = "/";
+		} finally {
+			setUserActionLoading(null);
+		}
 	};
 
 	const openBucketModal = async (bucketName: string) => {
@@ -538,25 +579,39 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			: "Delete this bucket and ALL data?";
 		if (!window.confirm(message)) return;
 
-		await fetchText(
-			`/api/admin/buckets/${selectedBucketDetails.name}${reset ? "?reset=true" : ""}`,
-			{ method: "DELETE" },
-		);
-		closeBucketModal();
-		await refreshSelectedBuckets();
+		setBucketActionLoading(reset ? "bucket-empty" : "bucket-delete");
+		try {
+			await fetchText(
+				`/api/admin/buckets/${selectedBucketDetails.name}${reset ? "?reset=true" : ""}`,
+				{ method: "DELETE" },
+			);
+			closeBucketModal();
+			await refreshSelectedBuckets();
+		} finally {
+			setBucketActionLoading(null);
+		}
 	};
 
 	const resetBucketCorsAdmin = async () => {
 		if (!selectedBucketDetails) return;
 		if (!window.confirm("Reset CORS configuration for this bucket?")) return;
-		await fetchText(`/api/admin/buckets/${selectedBucketDetails.name}/cors`, {
-			method: "DELETE",
-		});
-		window.alert("CORS configuration reset.");
+		setBucketActionLoading("cors-reset");
+		try {
+			await fetchText(`/api/admin/buckets/${selectedBucketDetails.name}/cors`, {
+				method: "DELETE",
+			});
+			window.alert("CORS configuration reset.");
+		} finally {
+			setBucketActionLoading(null);
+		}
 	};
 
 	const toggleBucketPause = async (isPaused: boolean) => {
 		if (!selectedBucketDetails) return;
+		setBucketActionLoading("pause");
+		setSelectedBucketDetails((prev) =>
+			prev ? { ...prev, isPaused } : prev,
+		);
 		const pauseReason = isPaused
 			? window.prompt("Enter reason for pausing bucket (optional):")
 			: null;
@@ -566,10 +621,12 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			body: JSON.stringify({ isPaused, pauseReason: pauseReason || null }),
 		});
 		await refreshBucketModal();
+		setBucketActionLoading(null);
 	};
 
 	const toggleKeyPause = async (keyId: string, isPaused: boolean) => {
 		if (!selectedBucketDetails) return;
+		setBucketActionLoading(`key-${keyId}`);
 		const pauseReason = isPaused
 			? window.prompt("Enter reason for pausing key (optional):")
 			: null;
@@ -579,23 +636,32 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			body: JSON.stringify({ isPaused, pauseReason: pauseReason || null }),
 		});
 		await refreshBucketModal();
+		setBucketActionLoading(null);
 	};
 
 	const deleteKeyAdmin = async (keyId: string) => {
 		if (!window.confirm("Delete key?")) return;
+		setBucketActionLoading(`key-del-${keyId}`);
 		await fetchText(`/api/admin/keys/${keyId}`, { method: "DELETE" });
 		await refreshBucketModal();
+		setBucketActionLoading(null);
 	};
 
 	const deleteFileAdmin = async (key: string) => {
 		if (!selectedBucketDetails) return;
 		if (!window.confirm("Delete file?")) return;
+		setBucketActionLoading(`file-del-${key}`);
 		await fetchText(
 			`/api/admin/buckets/${selectedBucketDetails.name}/files?key=${encodeURIComponent(key)}`,
 			{ method: "DELETE" },
 		);
 		await refreshBucketModal();
+		setBucketActionLoading(null);
 	};
+
+	const isQuotaLoading = userActionLoading === "quota";
+	const isImpersonating = userActionLoading === "impersonate";
+	const isAgeOutLoading = userActionLoading === "age-out";
 
 	return (
 		<AppShell
@@ -813,9 +879,10 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<button
 										type="button"
 										onClick={updateStorageQuota}
+										disabled={isQuotaLoading}
 										className="bg-hc-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold"
 									>
-										Update
+										{isQuotaLoading ? "Updating..." : "Update"}
 									</button>
 								</div>
 								<p className="text-xs text-text-muted mt-2">
@@ -880,9 +947,12 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<button
 										type="button"
 										onClick={updateEgressQuota}
+										disabled={isQuotaLoading}
 										className="bg-hc-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold w-full"
 									>
-										Update Egress Limit
+										{isQuotaLoading
+											? "Updating..."
+											: "Update Egress Limit"}
 									</button>
 								</div>
 								<p className="text-xs text-text-muted mt-2">
@@ -909,18 +979,21 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										onChange={toggleLock}
 										color="red"
 										label="Account Locked"
+										disabled={userActionLoading === "lock"}
 									/>
 									<Toggle
 										checked={selected.isReviewer}
 										onChange={toggleReviewer}
 										color="green"
 										label="YSWS Reviewer"
+										disabled={userActionLoading === "reviewer"}
 									/>
 									<Toggle
 										checked={selected.isImmortal}
 										onChange={toggleImmortal}
 										color="amber"
 										label="Immortal"
+										disabled={userActionLoading === "immortal"}
 									/>
 								</div>
 								{selected.isLocked && selected.lockReason ? (
@@ -946,9 +1019,10 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<button
 									type="button"
 									onClick={startImpersonation}
+									disabled={isImpersonating}
 									className="bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-300 px-4 py-2 rounded-lg text-sm font-bold border border-yellow-500/20 w-full"
 								>
-									Impersonate
+									{isImpersonating ? "Switching..." : "Impersonate"}
 								</button>
 								<p className="text-[11px] text-text-muted mt-3">
 									Impersonation lasts 30 minutes. To stop impersonating, log
@@ -965,9 +1039,11 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									className="bg-red-500/20 hover:bg-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed text-red-300 px-4 py-2 rounded-lg text-sm font-bold border border-red-500/30 w-full text-left flex justify-between items-center"
 								>
 									<span>
-										{selected.markedAsOverAge
-											? "User marked as Over-Age"
-											: "Mark as Over-Age (Offboarding)"}
+										{isAgeOutLoading
+											? "Marking..."
+											: selected.markedAsOverAge
+												? "User marked as Over-Age"
+												: "Mark as Over-Age (Offboarding)"}
 									</span>
 									{selected.markedAsOverAge ? (
 										<span className="text-xs uppercase bg-black/30 px-2 py-0.5 rounded">
@@ -1063,32 +1139,44 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<button
 									type="button"
 									onClick={() => deleteBucketAdmin(true)}
+									disabled={!!bucketActionLoading}
 									className="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold"
 								>
-									Empty Bucket
+									{bucketActionLoading === "bucket-empty"
+										? "Emptying..."
+										: "Empty Bucket"}
 								</button>
 							) : (
 								<>
 									<button
 										type="button"
 										onClick={() => deleteBucketAdmin(false)}
+										disabled={!!bucketActionLoading}
 										className="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold"
 									>
-										Delete Bucket
+										{bucketActionLoading === "bucket-delete"
+											? "Deleting..."
+											: "Delete Bucket"}
 									</button>
 									<button
 										type="button"
 										onClick={() => deleteBucketAdmin(true)}
+										disabled={!!bucketActionLoading}
 										className="bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 px-4 py-2 rounded-lg text-sm font-bold border border-yellow-500/20"
 									>
-										Empty Bucket
+										{bucketActionLoading === "bucket-empty"
+											? "Emptying..."
+											: "Empty Bucket"}
 									</button>
 									<button
 										type="button"
 										onClick={resetBucketCorsAdmin}
+										disabled={!!bucketActionLoading}
 										className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-bold border border-white/10"
 									>
-										Reset CORS
+										{bucketActionLoading === "cors-reset"
+											? "Resetting..."
+											: "Reset CORS"}
 									</button>
 								</>
 							)}
@@ -1098,11 +1186,16 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									type="checkbox"
 									className="sr-only peer"
 									checked={!!selectedBucketDetails.isPaused}
+									disabled={!!bucketActionLoading}
 									onChange={(e) => toggleBucketPause(e.target.checked)}
 								/>
 								<div className="relative w-9 h-5 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-hc-red rounded-full peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border after:border-gray-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-hc-red" />
 								<span className="ms-2 text-xs font-medium text-text-muted peer-checked:text-white">
-									{selectedBucketDetails.isCdn ? "Suspend CDN" : "Pause Bucket"}
+									{bucketActionLoading === "pause"
+										? "Updating..."
+										: selectedBucketDetails.isCdn
+											? "Suspend CDN"
+											: "Pause Bucket"}
 								</span>
 							</label>
 						</div>
@@ -1155,6 +1248,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												<button
 													type="button"
 													onClick={() => toggleKeyPause(k.id, !k.isPaused)}
+													disabled={!!bucketActionLoading}
 													className={`text-xs font-bold uppercase tracking-wider ${k.isPaused ? "text-emerald-400" : "text-yellow-400"}`}
 												>
 													{k.isPaused ? "Resume" : "Pause"}
@@ -1162,6 +1256,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												<button
 													type="button"
 													onClick={() => deleteKeyAdmin(k.id)}
+													disabled={!!bucketActionLoading}
 													className="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider"
 												>
 													Delete
@@ -1218,6 +1313,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												<button
 													type="button"
 													onClick={() => deleteFileAdmin(f.key)}
+													disabled={!!bucketActionLoading}
 													className="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider"
 												>
 													<MdDeleteForever className="inline text-sm" />
