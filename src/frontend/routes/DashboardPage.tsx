@@ -3,6 +3,7 @@ import {
 	MdAccessTimeFilled,
 	MdArrowForward,
 	MdCode,
+	MdContentCopy,
 	MdDeleteForever,
 	MdDeleteOutline,
 	MdFolderOpen,
@@ -21,6 +22,14 @@ import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 import { formatBytes } from "../shared/utils/format";
 
 type BucketKey = { id: string; accessKey: string };
+type CredentialModalState = {
+	kind: "bucket" | "key";
+	bucketName: string;
+	accessKey: string;
+	secretKey: string;
+	publicUrl: string;
+};
+
 type DashboardBucket = {
 	name: string;
 	keys: BucketKey[];
@@ -88,6 +97,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [publicWarningStep, setPublicWarningStep] = useState(0);
 	const [dontShowPublicWarningAgain, setDontShowPublicWarningAgain] =
 		useState(false);
+	const [credentialModal, setCredentialModal] =
+		useState<CredentialModalState | null>(null);
 	const [pendingActionKey, setPendingActionKey] = useState<string | null>(null);
 
 	const buttonBase =
@@ -163,9 +174,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ name }),
 			});
-			window.alert(
-				`Bucket created.\nAccess key: ${res.accessKey}\nSecret key: ${res.secretKey}\nPublic URL: ${res.publicUrl}`,
-			);
+			setCredentialModal({
+				kind: "bucket",
+				bucketName: name,
+				accessKey: res.accessKey,
+				secretKey: res.secretKey,
+				publicUrl: res.publicUrl,
+			});
 			await load();
 		} catch (e) {
 			window.alert(e instanceof Error ? e.message : "Failed to create bucket");
@@ -282,12 +297,24 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				secretKey: string;
 				publicUrl: string;
 			}>(`/api/dashboard/buckets/${bucketName}/keys`, { method: "POST" });
-			window.alert(
-				`New key for ${bucketName}:\n${r.accessKey}\n${r.secretKey}\n${r.publicUrl}`,
-			);
+			setCredentialModal({
+				kind: "key",
+				bucketName,
+				accessKey: r.accessKey,
+				secretKey: r.secretKey,
+				publicUrl: r.publicUrl,
+			});
 			await load();
 		} catch (e) {
 			window.alert(e instanceof Error ? e.message : "Failed to generate key");
+		}
+	};
+
+	const copyText = async (value: string) => {
+		try {
+			await navigator.clipboard.writeText(value);
+		} catch {
+			window.alert("Failed to copy to clipboard");
 		}
 	};
 
@@ -861,6 +888,102 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			</Modal>
 
 			<Modal
+				open={!!credentialModal}
+				onClose={() => setCredentialModal(null)}
+				title={
+					credentialModal?.kind === "bucket"
+						? "Bucket Created"
+						: "Key Generated"
+				}
+				className="max-w-xl p-8"
+			>
+				{credentialModal ? (
+					<div className="space-y-5">
+						<div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+							<p className="text-xs uppercase tracking-wider text-text-muted font-bold mb-1">
+								Bucket
+							</p>
+							<p className="font-mono text-sm text-white break-all">
+								{credentialModal.bucketName}
+							</p>
+						</div>
+
+						<div className="space-y-3">
+							<div className="rounded-xl border border-white/10 bg-black/20 p-3">
+								<div className="flex items-center justify-between gap-3">
+									<div>
+										<p className="text-xs uppercase tracking-wider text-text-muted font-bold mb-1">
+											Access Key ID
+										</p>
+										<p className="font-mono text-sm text-white break-all">
+											{credentialModal.accessKey}
+										</p>
+									</div>
+									<button
+										type="button"
+										onClick={() => copyText(credentialModal.accessKey)}
+										className={`${buttonBase} ${buttonSubtle} !px-3 !py-2`}
+									>
+										<MdContentCopy className="text-sm" /> Copy
+									</button>
+								</div>
+							</div>
+
+							<div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+								<div className="flex items-center justify-between gap-3">
+									<div>
+										<p className="text-xs uppercase tracking-wider text-emerald-300 font-bold mb-1">
+											Secret Access Key
+										</p>
+										<p className="font-mono text-sm text-emerald-200 break-all">
+											{credentialModal.secretKey}
+										</p>
+									</div>
+									<button
+										type="button"
+										onClick={() => copyText(credentialModal.secretKey)}
+										className={`${buttonBase} ${buttonSubtle} !px-3 !py-2`}
+									>
+										<MdContentCopy className="text-sm" /> Copy
+									</button>
+								</div>
+							</div>
+
+							<div className="rounded-xl border border-white/10 bg-black/20 p-3">
+								<div className="flex items-center justify-between gap-3">
+									<div>
+										<p className="text-xs uppercase tracking-wider text-text-muted font-bold mb-1">
+											Public URL Example
+										</p>
+										<p className="font-mono text-sm text-white break-all">
+											{credentialModal.publicUrl}
+										</p>
+									</div>
+									<button
+										type="button"
+										onClick={() => copyText(credentialModal.publicUrl)}
+										className={`${buttonBase} ${buttonSubtle} !px-3 !py-2`}
+									>
+										<MdContentCopy className="text-sm" /> Copy
+									</button>
+								</div>
+							</div>
+						</div>
+
+						<div className="flex justify-end">
+							<button
+								type="button"
+								onClick={() => setCredentialModal(null)}
+								className={`${buttonBase} ${buttonPrimaryBlue}`}
+							>
+								Done
+							</button>
+						</div>
+					</div>
+				) : null}
+			</Modal>
+
+			<Modal
 				open={!!confirmDialog}
 				onClose={confirmLoading ? undefined : () => setConfirmDialog(null)}
 				title={confirmDialog?.title}
@@ -989,10 +1112,12 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													</p>
 												</div>
 												<div className="rounded-xl border border-white/15 bg-white/[0.03] p-3">
-													<p className="font-black text-hc-red">What this means</p>
+													<p className="font-black text-hc-red">
+														What this means
+													</p>
 													<p className="text-white/85 mt-1">
-														Public traffic can burn your quota very quickly, even if this
-														bucket only has a few files.
+														Public traffic can burn your quota very quickly,
+														even if this bucket only has a few files.
 													</p>
 												</div>
 											</div>
