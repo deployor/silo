@@ -459,6 +459,7 @@ async function runAdminSpeedtest(req: Request) {
 		warmPasses: z.number().int().min(1).max(3).default(1),
 		cacheStressLoops: z.number().int().min(5).max(500).default(80),
 		cacheObjectCount: z.number().int().min(1).max(20).default(4),
+		cacheTimeoutMs: z.number().int().min(1000).max(60000).default(8000),
 	});
 
 	const body = await req.json().catch(() => null);
@@ -486,6 +487,7 @@ async function runAdminSpeedtest(req: Request) {
 		warmPasses,
 		cacheStressLoops,
 		cacheObjectCount,
+		cacheTimeoutMs,
 	} = parsed.data;
 
 	const bucket = await db
@@ -575,6 +577,12 @@ async function runAdminSpeedtest(req: Request) {
 			stressGetAvgMs: number;
 			stressGetP50Ms: number;
 			stressGetP95Ms: number;
+			coldRps: number;
+			hotRps: number;
+			coldSuccessRate: number;
+			hotSuccessRate: number;
+			hotRateLimited: number;
+			hotTimeouts: number;
 		};
 		iterationsDetail: SpeedtestIterationRow[];
 	};
@@ -629,6 +637,20 @@ async function runAdminSpeedtest(req: Request) {
 			diskSizeBytes: diskStats.totalSizeBytes,
 			demandTrackerEntries: diskStats.demandTrackerEntries,
 		};
+	}
+
+	async function fetchWithTimeout(
+		url: string,
+		init: RequestInit,
+		timeoutMs: number,
+	) {
+		const ac = new AbortController();
+		const timer = setTimeout(() => ac.abort("timeout"), timeoutMs);
+		try {
+			return await client.fetch(url, { ...init, signal: ac.signal });
+		} finally {
+			clearTimeout(timer);
+		}
 	}
 
 	async function probeLatency(url: string, sampleCount = 5): Promise<number[]> {
@@ -831,14 +853,28 @@ async function runAdminSpeedtest(req: Request) {
 		});
 		const uploadMs = performance.now() - putStart;
 
+		const coldSamples: number[] = [];
+		let coldOk = 0;
+		let coldFail = 0;
 		const coldStart = performance.now();
 		await runPool(objects, effectiveConcurrency, async (objectItem) => {
-			const res = await client.fetch(objectItem.url, { method: "GET" });
-			const body = await res.arrayBuffer();
-			if (!res.ok || body.byteLength !== fileSizeBytes) {
-				throw new Error(
-					`Cache-heavy cold read failed for ${objectItem.key} (status=${res.status}, size=${body.byteLength})`,
+			const started = performance.now();
+			try {
+				const res = await fetchWithTimeout(
+					objectItem.url,
+					{ method: "GET" },
+					cacheTimeoutMs,
 				);
+				const body = await res.arrayBuffer();
+				coldSamples.push(performance.now() - started);
+				if (res.ok && body.byteLength > 0) {
+					coldOk++;
+				} else {
+					coldFail++;
+				}
+			} catch {
+				coldSamples.push(performance.now() - started);
+				coldFail++;
 			}
 		});
 		const downloadColdMs = performance.now() - coldStart;
@@ -850,24 +886,39 @@ async function runAdminSpeedtest(req: Request) {
 		let downloadWarmMsTotal = 0;
 		let warmHitCount = 0;
 		let warmMissCount = 0;
+		let hotOk = 0;
+		let hotFail = 0;
+		let hotTimeouts = 0;
+		let hotRateLimited = 0;
 
 		for (let i = 0; i < cacheStressLoops; i++) {
 			let warmHeader: string | null = null;
 			const started = performance.now();
 			await runPool(objects, effectiveConcurrency, async (objectItem) => {
 				const reqStart = performance.now();
-				const res = await client.fetch(objectItem.url, { method: "GET" });
-				const body = await res.arrayBuffer();
-				warmLatencies.push(performance.now() - reqStart);
-				if (!res.ok || body.byteLength !== fileSizeBytes) {
-					throw new Error(
-						`Cache-heavy warm read failed for ${objectItem.key} (status=${res.status}, size=${body.byteLength})`,
+				try {
+					const res = await fetchWithTimeout(
+						objectItem.url,
+						{ method: "GET", headers: { Range: "bytes=0-16383" } },
+						cacheTimeoutMs,
 					);
+					const body = await res.arrayBuffer();
+					warmLatencies.push(performance.now() - reqStart);
+					const cacheHeader = res.headers.get("x-cache");
+					if (warmHeader === null && cacheHeader) warmHeader = cacheHeader;
+					if (cacheHeader?.toLowerCase().includes("hit")) warmHitCount++;
+					else warmMissCount++;
+					if (res.ok && body.byteLength > 0) {
+						hotOk++;
+					} else {
+						hotFail++;
+						if (res.status === 429) hotRateLimited++;
+					}
+				} catch (e) {
+					warmLatencies.push(performance.now() - reqStart);
+					hotFail++;
+					if (String(e).includes("timeout")) hotTimeouts++;
 				}
-				const cacheHeader = res.headers.get("x-cache");
-				if (warmHeader === null && cacheHeader) warmHeader = cacheHeader;
-				if (cacheHeader?.toLowerCase().includes("hit")) warmHitCount++;
-				else warmMissCount++;
 			});
 			const loopMs = performance.now() - started;
 			downloadWarmMsTotal += loopMs;
@@ -890,6 +941,14 @@ async function runAdminSpeedtest(req: Request) {
 		});
 
 		const latencyStats = calcLatencyStats(warmLatencies);
+		const coldRps = objects.length / Math.max(downloadColdMs / 1000, 0.001);
+		const hotRps =
+			(cacheStressLoops * objects.length) /
+			Math.max(downloadWarmMsTotal / 1000, 0.001);
+		const coldSuccessRate =
+			coldOk + coldFail > 0 ? (coldOk / (coldOk + coldFail)) * 100 : 0;
+		const hotSuccessRate =
+			hotOk + hotFail > 0 ? (hotOk / (hotOk + hotFail)) * 100 : 0;
 
 		return {
 			id: "cache-heavy",
@@ -930,6 +989,12 @@ async function runAdminSpeedtest(req: Request) {
 				stressGetAvgMs: latencyStats.avgMs,
 				stressGetP50Ms: percentile(warmLatencies, 0.5),
 				stressGetP95Ms: percentile(warmLatencies, 0.95),
+				coldRps,
+				hotRps,
+				coldSuccessRate,
+				hotSuccessRate,
+				hotRateLimited,
+				hotTimeouts,
 			},
 			iterationsDetail,
 		};
