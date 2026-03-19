@@ -827,7 +827,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!confirmDialog}
 				onClose={confirmLoading ? undefined : () => setConfirmDialog(null)}
 				title={confirmDialog?.title}
-				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "border border-red-500/45 bg-gradient-to-b from-red-500/10 via-hc-dark to-hc-dark" : ""}`}
+				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "border border-red-500/45 bg-hc-dark" : ""}`}
 			>
 				{confirmDialog ? (
 					<>
