@@ -18,7 +18,7 @@ type BucketListResponse = {
 };
 
 type SpeedtestSuite = {
-	id: "single" | "many-small" | "concurrent";
+	id: "single" | "many-small" | "concurrent" | "cache-heavy";
 	label: string;
 	config: {
 		iterations: number;
@@ -45,6 +45,16 @@ type SpeedtestSuite = {
 	cache: {
 		warmHitCount: number;
 		warmMissCount: number;
+	};
+	cacheDiagnostics?: {
+		redisHitsDelta: number;
+		redisMissesDelta: number;
+		diskEntriesDelta: number;
+		diskSizeDeltaBytes: number;
+		demandEntriesDelta: number;
+		stressGetAvgMs: number;
+		stressGetP50Ms: number;
+		stressGetP95Ms: number;
 	};
 	iterationsDetail: Array<{
 		index: number;
@@ -89,10 +99,13 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [runSingle, setRunSingle] = useState(true);
 	const [runManySmall, setRunManySmall] = useState(true);
 	const [runConcurrent, setRunConcurrent] = useState(false);
+	const [runCacheHeavy, setRunCacheHeavy] = useState(false);
 	const [smallFileKb, setSmallFileKb] = useState(256);
 	const [smallFileCount, setSmallFileCount] = useState(16);
 	const [concurrency, setConcurrency] = useState(4);
 	const [warmPasses, setWarmPasses] = useState(1);
+	const [cacheStressLoops, setCacheStressLoops] = useState(80);
+	const [cacheObjectCount, setCacheObjectCount] = useState(4);
 	const [running, setRunning] = useState(false);
 	const [startedAt, setStartedAt] = useState<number | null>(null);
 	const [elapsed, setElapsed] = useState(0);
@@ -165,7 +178,7 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 	const runSpeedtest = async () => {
 		if (!bucketName) return;
-		if (!runSingle && !runManySmall && !runConcurrent) {
+		if (!runSingle && !runManySmall && !runConcurrent && !runCacheHeavy) {
 			setError("Enable at least one suite before running benchmark.");
 			return;
 		}
@@ -188,10 +201,13 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					runSingle,
 					runManySmall,
 					runConcurrent,
+					runCacheHeavy,
 					smallFileKb,
 					smallFileCount,
 					concurrency,
 					warmPasses,
+					cacheStressLoops,
+					cacheObjectCount,
 				}),
 			});
 			if (!res.ok) {
@@ -262,10 +278,13 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			setRunSingle(true);
 			setRunManySmall(false);
 			setRunConcurrent(false);
+			setRunCacheHeavy(false);
 			setSmallFileKb(128);
 			setSmallFileCount(8);
 			setConcurrency(2);
 			setWarmPasses(1);
+			setCacheStressLoops(20);
+			setCacheObjectCount(2);
 			return;
 		}
 
@@ -275,10 +294,13 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			setRunSingle(true);
 			setRunManySmall(true);
 			setRunConcurrent(true);
+			setRunCacheHeavy(false);
 			setSmallFileKb(256);
 			setSmallFileCount(16);
 			setConcurrency(4);
 			setWarmPasses(1);
+			setCacheStressLoops(80);
+			setCacheObjectCount(4);
 			return;
 		}
 
@@ -287,10 +309,13 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		setRunSingle(true);
 		setRunManySmall(true);
 		setRunConcurrent(true);
+		setRunCacheHeavy(true);
 		setSmallFileKb(512);
 		setSmallFileCount(32);
 		setConcurrency(8);
 		setWarmPasses(2);
+		setCacheStressLoops(200);
+		setCacheObjectCount(8);
 	};
 
 	return (
@@ -500,6 +525,47 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					</div>
 
 					<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+						<div>
+							<label
+								htmlFor="speedtest-cache-loops"
+								className="block text-xs uppercase font-bold text-text-muted mb-1"
+							>
+								Cache Stress Loops
+							</label>
+							<input
+								id="speedtest-cache-loops"
+								type="number"
+								min={5}
+								max={500}
+								value={cacheStressLoops}
+								onChange={(e) =>
+									setCacheStressLoops(Number(e.target.value) || 5)
+								}
+								className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-white text-sm"
+							/>
+						</div>
+						<div>
+							<label
+								htmlFor="speedtest-cache-objects"
+								className="block text-xs uppercase font-bold text-text-muted mb-1"
+							>
+								Cache Object Count
+							</label>
+							<input
+								id="speedtest-cache-objects"
+								type="number"
+								min={1}
+								max={20}
+								value={cacheObjectCount}
+								onChange={(e) =>
+									setCacheObjectCount(Number(e.target.value) || 1)
+								}
+								className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-white text-sm"
+							/>
+						</div>
+					</div>
+
+					<div className="grid grid-cols-1 md:grid-cols-4 gap-3">
 						<label className="bg-black/30 border border-white/10 rounded-xl p-3 flex items-center gap-2 text-sm text-white">
 							<input
 								type="checkbox"
@@ -523,6 +589,14 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								onChange={(e) => setRunConcurrent(e.target.checked)}
 							/>
 							Concurrent burst suite
+						</label>
+						<label className="bg-black/30 border border-white/10 rounded-xl p-3 flex items-center gap-2 text-sm text-white">
+							<input
+								type="checkbox"
+								checked={runCacheHeavy}
+								onChange={(e) => setRunCacheHeavy(e.target.checked)}
+							/>
+							Cache hammer suite (Redis + Disk)
 						</label>
 					</div>
 
@@ -612,6 +686,45 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												value={`${stat.cacheBoost.toFixed(1)}%`}
 											/>
 										</div>
+
+										{stat.suite.cacheDiagnostics ? (
+											<div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+												<StatCard
+													label="Redis Hits Δ"
+													value={stat.suite.cacheDiagnostics.redisHitsDelta.toLocaleString()}
+												/>
+												<StatCard
+													label="Redis Misses Δ"
+													value={stat.suite.cacheDiagnostics.redisMissesDelta.toLocaleString()}
+												/>
+												<StatCard
+													label="Disk Entries Δ"
+													value={stat.suite.cacheDiagnostics.diskEntriesDelta.toLocaleString()}
+												/>
+												<StatCard
+													label="Disk Size Δ"
+													value={formatBytes(
+														stat.suite.cacheDiagnostics.diskSizeDeltaBytes,
+													)}
+												/>
+												<StatCard
+													label="Demand Entries Δ"
+													value={stat.suite.cacheDiagnostics.demandEntriesDelta.toLocaleString()}
+												/>
+												<StatCard
+													label="Stress GET Avg"
+													value={`${stat.suite.cacheDiagnostics.stressGetAvgMs.toFixed(1)} ms`}
+												/>
+												<StatCard
+													label="Stress GET P50"
+													value={`${stat.suite.cacheDiagnostics.stressGetP50Ms.toFixed(1)} ms`}
+												/>
+												<StatCard
+													label="Stress GET P95"
+													value={`${stat.suite.cacheDiagnostics.stressGetP95Ms.toFixed(1)} ms`}
+												/>
+											</div>
+										) : null}
 
 										<div className="grid grid-cols-1 md:grid-cols-4 gap-3">
 											<StatCard
