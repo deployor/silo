@@ -922,10 +922,10 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														</p>
 													</div>
 													<div className="rounded-xl border border-red-400/35 bg-red-500/10 p-3">
-														<p className="font-black text-red-300 uppercase text-[11px] tracking-wider">
-															⛔ DO NOT MAKE PUBLIC
-														</p>
-														<p className="text-white/90 mt-1">
+													<p className="font-black text-red-300 uppercase text-[11px] tracking-wider">
+														DO NOT MAKE PUBLIC
+													</p>
+<p className="text-white/90 mt-1">
 															User uploads, private docs, backups, secret/config
 															files.
 														</p>
