@@ -17,10 +17,16 @@ type BucketListResponse = {
 	buckets: BucketCandidate[];
 };
 
-type SpeedtestRunResult = {
-	bucketName: string;
-	sizeBytes: number;
-	iterations: number;
+type SpeedtestSuite = {
+	id: "single" | "many-small" | "concurrent";
+	label: string;
+	config: {
+		iterations: number;
+		fileSizeBytes: number;
+		fileCount: number;
+		concurrency: number;
+		warmPasses: number;
+	};
 	totals: {
 		uploadMs: number;
 		downloadColdMs: number;
@@ -47,7 +53,21 @@ type SpeedtestRunResult = {
 		downloadColdMs: number;
 		downloadWarmMs: number;
 		warmCacheHeader: string | null;
+		sizeBytes: number;
 	}>;
+};
+
+type SpeedtestRunResult = {
+	bucketName: string;
+	startedAt: string;
+	completedAt: string;
+	durationMs: number;
+	suites: SpeedtestSuite[];
+	summary: {
+		totalBytesUp: number;
+		totalBytesDown: number;
+		totalRequests: number;
+	};
 };
 
 type SpeedtestRunResponse = {
@@ -65,6 +85,13 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [bucketName, setBucketName] = useState("");
 	const [sizeMb, setSizeMb] = useState(8);
 	const [iterations, setIterations] = useState(3);
+	const [runSingle, setRunSingle] = useState(true);
+	const [runManySmall, setRunManySmall] = useState(true);
+	const [runConcurrent, setRunConcurrent] = useState(false);
+	const [smallFileKb, setSmallFileKb] = useState(256);
+	const [smallFileCount, setSmallFileCount] = useState(16);
+	const [concurrency, setConcurrency] = useState(4);
+	const [warmPasses, setWarmPasses] = useState(1);
 	const [running, setRunning] = useState(false);
 	const [startedAt, setStartedAt] = useState<number | null>(null);
 	const [elapsed, setElapsed] = useState(0);
@@ -96,6 +123,11 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 	const runSpeedtest = async () => {
 		if (!bucketName) return;
+		if (!runSingle && !runManySmall && !runConcurrent) {
+			setError("Enable at least one suite before running benchmark.");
+			return;
+		}
+
 		setRunning(true);
 		setStartedAt(Date.now());
 		setElapsed(0);
@@ -105,7 +137,18 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			const res = await fetch("/api/admin/speedtest/run", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ bucketName, sizeMb, iterations }),
+				body: JSON.stringify({
+					bucketName,
+					sizeMb,
+					iterations,
+					runSingle,
+					runManySmall,
+					runConcurrent,
+					smallFileKb,
+					smallFileCount,
+					concurrency,
+					warmPasses,
+				}),
 			});
 			if (!res.ok) {
 				throw new Error(await res.text());
@@ -119,30 +162,81 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		}
 	};
 
-	const stat = useMemo(() => {
-		if (!result) return null;
-		const upMbps =
-			result.totals.uploadMs > 0
-				? result.totals.bytesUp /
-					(1024 * 1024) /
-					(result.totals.uploadMs / 1000)
-				: 0;
-		const downColdMbps =
-			result.totals.downloadColdMs > 0
-				? result.totals.bytesDown /
-					(1024 * 1024) /
-					(result.totals.downloadColdMs / 1000)
-				: 0;
-		const downWarmMbps =
-			result.totals.downloadWarmMs > 0
-				? result.totals.bytesDown /
-					(1024 * 1024) /
-					(result.totals.downloadWarmMs / 1000)
-				: 0;
-		const cacheBoost =
-			downColdMbps > 0 ? (downWarmMbps / downColdMbps - 1) * 100 : 0;
-		return { upMbps, downColdMbps, downWarmMbps, cacheBoost };
+	const suiteStats = useMemo(() => {
+		if (!result) return [];
+		return result.suites.map((suite) => {
+			const upMbps =
+				suite.totals.uploadMs > 0
+					? suite.totals.bytesUp /
+						(1024 * 1024) /
+						(suite.totals.uploadMs / 1000)
+					: 0;
+			const downColdMbps =
+				suite.totals.downloadColdMs > 0
+					? suite.totals.bytesDown /
+						(1024 * 1024) /
+						(suite.totals.downloadColdMs / 1000)
+					: 0;
+			const downWarmMbps =
+				suite.totals.downloadWarmMs > 0
+					? suite.totals.bytesDown /
+						(1024 * 1024) /
+						(suite.totals.downloadWarmMs / 1000)
+					: 0;
+			const cacheBoost =
+				downColdMbps > 0 ? (downWarmMbps / downColdMbps - 1) * 100 : 0;
+			const cacheTotal = suite.cache.warmHitCount + suite.cache.warmMissCount;
+			const cacheHitRate =
+				cacheTotal > 0 ? (suite.cache.warmHitCount / cacheTotal) * 100 : 0;
+
+			return {
+				suite,
+				upMbps,
+				downColdMbps,
+				downWarmMbps,
+				cacheBoost,
+				cacheHitRate,
+			};
+		});
 	}, [result]);
+
+	const applyPreset = (preset: "quick" | "balanced" | "heavy") => {
+		if (preset === "quick") {
+			setIterations(2);
+			setSizeMb(4);
+			setRunSingle(true);
+			setRunManySmall(false);
+			setRunConcurrent(false);
+			setSmallFileKb(128);
+			setSmallFileCount(8);
+			setConcurrency(2);
+			setWarmPasses(1);
+			return;
+		}
+
+		if (preset === "balanced") {
+			setIterations(3);
+			setSizeMb(8);
+			setRunSingle(true);
+			setRunManySmall(true);
+			setRunConcurrent(true);
+			setSmallFileKb(256);
+			setSmallFileCount(16);
+			setConcurrency(4);
+			setWarmPasses(1);
+			return;
+		}
+
+		setIterations(5);
+		setSizeMb(16);
+		setRunSingle(true);
+		setRunManySmall(true);
+		setRunConcurrent(true);
+		setSmallFileKb(512);
+		setSmallFileCount(32);
+		setConcurrency(8);
+		setWarmPasses(2);
+	};
 
 	return (
 		<AppShell
@@ -158,8 +252,9 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					<div>
 						<h2 className="text-xl font-bold text-white">Proxy Speed Lab</h2>
 						<p className="text-text-muted text-sm mt-1">
-							Admin-only synthetic performance benchmark for upload, cold
-							download, warm/cache download, and latency.
+							Admin-only benchmark suite for single-file throughput, many
+							small-file patterns, concurrent bursts, cache behavior, and
+							latency.
 						</p>
 					</div>
 					<div className="text-right">
@@ -174,6 +269,30 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				</div>
 
 				<div className="p-6 space-y-6">
+					<div className="flex flex-wrap gap-2">
+						<button
+							type="button"
+							onClick={() => applyPreset("quick")}
+							className="px-3 py-1.5 text-xs rounded-lg border border-white/15 text-text-muted hover:text-white hover:border-white/30"
+						>
+							Quick
+						</button>
+						<button
+							type="button"
+							onClick={() => applyPreset("balanced")}
+							className="px-3 py-1.5 text-xs rounded-lg border border-white/15 text-text-muted hover:text-white hover:border-white/30"
+						>
+							Balanced
+						</button>
+						<button
+							type="button"
+							onClick={() => applyPreset("heavy")}
+							className="px-3 py-1.5 text-xs rounded-lg border border-white/15 text-text-muted hover:text-white hover:border-white/30"
+						>
+							Heavy
+						</button>
+					</div>
+
 					<div className="grid grid-cols-1 md:grid-cols-4 gap-3">
 						<div>
 							<label
@@ -229,6 +348,77 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-white text-sm"
 							/>
 						</div>
+						<div>
+							<label
+								htmlFor="speedtest-concurrency"
+								className="block text-xs uppercase font-bold text-text-muted mb-1"
+							>
+								Concurrency
+							</label>
+							<input
+								id="speedtest-concurrency"
+								type="number"
+								min={1}
+								max={20}
+								value={concurrency}
+								onChange={(e) => setConcurrency(Number(e.target.value) || 1)}
+								className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-white text-sm"
+							/>
+						</div>
+					</div>
+
+					<div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+						<div>
+							<label
+								htmlFor="speedtest-small-kb"
+								className="block text-xs uppercase font-bold text-text-muted mb-1"
+							>
+								Small File Size (KB)
+							</label>
+							<input
+								id="speedtest-small-kb"
+								type="number"
+								min={16}
+								max={4096}
+								value={smallFileKb}
+								onChange={(e) => setSmallFileKb(Number(e.target.value) || 16)}
+								className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-white text-sm"
+							/>
+						</div>
+						<div>
+							<label
+								htmlFor="speedtest-small-count"
+								className="block text-xs uppercase font-bold text-text-muted mb-1"
+							>
+								Small Files / Iteration
+							</label>
+							<input
+								id="speedtest-small-count"
+								type="number"
+								min={1}
+								max={200}
+								value={smallFileCount}
+								onChange={(e) => setSmallFileCount(Number(e.target.value) || 1)}
+								className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-white text-sm"
+							/>
+						</div>
+						<div>
+							<label
+								htmlFor="speedtest-warm-passes"
+								className="block text-xs uppercase font-bold text-text-muted mb-1"
+							>
+								Warm Passes
+							</label>
+							<input
+								id="speedtest-warm-passes"
+								type="number"
+								min={1}
+								max={3}
+								value={warmPasses}
+								onChange={(e) => setWarmPasses(Number(e.target.value) || 1)}
+								className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-white text-sm"
+							/>
+						</div>
 						<div className="flex items-end">
 							<button
 								type="button"
@@ -241,87 +431,160 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</div>
 					</div>
 
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+						<label className="bg-black/30 border border-white/10 rounded-xl p-3 flex items-center gap-2 text-sm text-white">
+							<input
+								type="checkbox"
+								checked={runSingle}
+								onChange={(e) => setRunSingle(e.target.checked)}
+							/>
+							Single file throughput suite
+						</label>
+						<label className="bg-black/30 border border-white/10 rounded-xl p-3 flex items-center gap-2 text-sm text-white">
+							<input
+								type="checkbox"
+								checked={runManySmall}
+								onChange={(e) => setRunManySmall(e.target.checked)}
+							/>
+							Many small files suite
+						</label>
+						<label className="bg-black/30 border border-white/10 rounded-xl p-3 flex items-center gap-2 text-sm text-white">
+							<input
+								type="checkbox"
+								checked={runConcurrent}
+								onChange={(e) => setRunConcurrent(e.target.checked)}
+							/>
+							Concurrent burst suite
+						</label>
+					</div>
+
 					{error ? <div className="text-sm text-red-400">{error}</div> : null}
 
-					{stat && result ? (
+					{result ? (
 						<>
 							<div className="grid grid-cols-1 md:grid-cols-4 gap-3">
 								<StatCard
-									label="Upload Throughput"
-									value={`${stat.upMbps.toFixed(2)} MB/s`}
+									label="Total Duration"
+									value={`${(result.durationMs / 1000).toFixed(2)} s`}
 								/>
 								<StatCard
-									label="Cold Download"
-									value={`${stat.downColdMbps.toFixed(2)} MB/s`}
+									label="Total Bytes Up"
+									value={formatBytes(result.summary.totalBytesUp)}
 								/>
 								<StatCard
-									label="Warm Download"
-									value={`${stat.downWarmMbps.toFixed(2)} MB/s`}
+									label="Total Bytes Down"
+									value={formatBytes(result.summary.totalBytesDown)}
 								/>
 								<StatCard
-									label="Cache Boost"
-									value={`${stat.cacheBoost.toFixed(1)}%`}
+									label="Total Requests"
+									value={result.summary.totalRequests.toLocaleString()}
 								/>
 							</div>
 
-							<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-								<StatCard
-									label="Latency Avg"
-									value={`${result.latency.avgMs.toFixed(1)} ms`}
-								/>
-								<StatCard
-									label="Latency P95"
-									value={`${result.latency.p95Ms.toFixed(1)} ms`}
-								/>
-								<StatCard
-									label="Traffic Volume"
-									value={`${formatBytes(result.totals.bytesUp)} up / ${formatBytes(result.totals.bytesDown)} down`}
-								/>
-							</div>
+							{suiteStats.map((stat) => (
+								<div
+									key={stat.suite.id}
+									className="bg-black/30 border border-white/10 rounded-2xl overflow-hidden"
+								>
+									<div className="px-4 py-3 border-b border-white/10">
+										<div className="text-sm font-bold text-white">
+											{stat.suite.label}
+										</div>
+										<div className="text-[11px] text-text-muted mt-1">
+											{stat.suite.config.fileCount} file(s) ×{" "}
+											{formatBytes(stat.suite.config.fileSizeBytes)} ·{" "}
+											{stat.suite.config.iterations} iteration(s) · concurrency{" "}
+											{stat.suite.config.concurrency}
+										</div>
+									</div>
 
-							<div className="bg-black/30 border border-white/10 rounded-2xl overflow-hidden">
-								<div className="px-4 py-3 border-b border-white/10 text-sm font-bold text-white">
-									Detailed Iterations
+									<div className="p-4 space-y-3">
+										<div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+											<StatCard
+												label="Upload Throughput"
+												value={`${stat.upMbps.toFixed(2)} MB/s`}
+											/>
+											<StatCard
+												label="Cold Download"
+												value={`${stat.downColdMbps.toFixed(2)} MB/s`}
+											/>
+											<StatCard
+												label="Warm Download"
+												value={`${stat.downWarmMbps.toFixed(2)} MB/s`}
+											/>
+											<StatCard
+												label="Cache Boost"
+												value={`${stat.cacheBoost.toFixed(1)}%`}
+											/>
+										</div>
+
+										<div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+											<StatCard
+												label="Latency Avg"
+												value={`${stat.suite.latency.avgMs.toFixed(1)} ms`}
+											/>
+											<StatCard
+												label="Latency P95"
+												value={`${stat.suite.latency.p95Ms.toFixed(1)} ms`}
+											/>
+											<StatCard
+												label="Traffic Volume"
+												value={`${formatBytes(stat.suite.totals.bytesUp)} up / ${formatBytes(stat.suite.totals.bytesDown)} down`}
+											/>
+											<StatCard
+												label="Cache Hit Rate"
+												value={`${stat.cacheHitRate.toFixed(1)}%`}
+											/>
+										</div>
+
+										<div className="overflow-x-auto rounded-xl border border-white/10">
+											<table className="w-full text-left text-xs">
+												<thead className="bg-white/5 text-text-muted uppercase tracking-wider">
+													<tr>
+														<th className="px-4 py-2">#</th>
+														<th className="px-4 py-2">Key</th>
+														<th className="px-4 py-2">Size</th>
+														<th className="px-4 py-2">Upload</th>
+														<th className="px-4 py-2">Cold DL</th>
+														<th className="px-4 py-2">Warm DL</th>
+														<th className="px-4 py-2">X-Cache</th>
+													</tr>
+												</thead>
+												<tbody className="divide-y divide-white/5">
+													{stat.suite.iterationsDetail.map((row) => (
+														<tr
+															key={`${stat.suite.id}-${row.index}`}
+															className="hover:bg-white/5"
+														>
+															<td className="px-4 py-2 text-white">
+																{row.index + 1}
+															</td>
+															<td className="px-4 py-2 font-mono text-text-muted">
+																{row.key}
+															</td>
+															<td className="px-4 py-2 text-white">
+																{formatBytes(row.sizeBytes)}
+															</td>
+															<td className="px-4 py-2 text-white">
+																{row.uploadMs.toFixed(1)} ms
+															</td>
+															<td className="px-4 py-2 text-white">
+																{row.downloadColdMs.toFixed(1)} ms
+															</td>
+															<td className="px-4 py-2 text-white">
+																{row.downloadWarmMs.toFixed(1)} ms
+															</td>
+															<td className="px-4 py-2 text-hc-green">
+																{row.warmCacheHeader || "MISS"}
+															</td>
+														</tr>
+													))}
+												</tbody>
+											</table>
+										</div>
+									</div>
 								</div>
-								<div className="overflow-x-auto">
-									<table className="w-full text-left text-xs">
-										<thead className="bg-white/5 text-text-muted uppercase tracking-wider">
-											<tr>
-												<th className="px-4 py-2">#</th>
-												<th className="px-4 py-2">Key</th>
-												<th className="px-4 py-2">Upload</th>
-												<th className="px-4 py-2">Cold DL</th>
-												<th className="px-4 py-2">Warm DL</th>
-												<th className="px-4 py-2">X-Cache</th>
-											</tr>
-										</thead>
-										<tbody className="divide-y divide-white/5">
-											{result.iterationsDetail.map((row) => (
-												<tr key={row.key} className="hover:bg-white/5">
-													<td className="px-4 py-2 text-white">
-														{row.index + 1}
-													</td>
-													<td className="px-4 py-2 font-mono text-text-muted">
-														{row.key}
-													</td>
-													<td className="px-4 py-2 text-white">
-														{row.uploadMs.toFixed(1)} ms
-													</td>
-													<td className="px-4 py-2 text-white">
-														{row.downloadColdMs.toFixed(1)} ms
-													</td>
-													<td className="px-4 py-2 text-white">
-														{row.downloadWarmMs.toFixed(1)} ms
-													</td>
-													<td className="px-4 py-2 text-hc-green">
-														{row.warmCacheHeader || "MISS"}
-													</td>
-												</tr>
-											))}
-										</tbody>
-									</table>
-								</div>
-							</div>
+							))}
 						</>
 					) : null}
 				</div>
