@@ -561,7 +561,7 @@ async function runAdminSpeedtest(req: Request) {
 		}
 
 		const cacheHeader = warmRes.headers.get("x-cache");
-		if (cacheHeader && cacheHeader.toLowerCase().includes("hit")) {
+		if (cacheHeader?.toLowerCase().includes("hit")) {
 			warmHitCount++;
 		} else {
 			warmMissCount++;
