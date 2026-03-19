@@ -1,4 +1,3 @@
-import React from "react";
 import { createRoot } from "react-dom/client";
 import type { AppBootstrap } from "../shared/types/app";
 import { App } from "./App";
@@ -13,9 +12,5 @@ const bootstrap: AppBootstrap = window.__SILO_APP__ ?? {
 const rootEl = document.getElementById("root");
 
 if (rootEl) {
-	createRoot(rootEl).render(
-		<React.StrictMode>
-			<App bootstrap={bootstrap} />
-		</React.StrictMode>,
-	);
+	createRoot(rootEl).render(<App bootstrap={bootstrap} />);
 }
