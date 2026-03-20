@@ -37,6 +37,11 @@ type FolderItem = {
 	parentPrefix: string;
 };
 
+type DirectoryTotals = {
+	totalFiles: number;
+	totalFolders: number;
+};
+
 type BucketContext = {
 	bucket: BucketRecord;
 	owner: typeof users.$inferSelect;
@@ -279,6 +284,76 @@ async function listDirectoryPage(params: {
 	};
 }
 
+async function countDirectoryTotals(params: {
+	bucket: BucketRecord;
+	owner: typeof users.$inferSelect;
+	prefix: string;
+}): Promise<DirectoryTotals> {
+	const internalPrefix = getInternalPath(
+		params.prefix,
+		params.owner,
+		params.bucket,
+	);
+	const rootPrefix = getInternalPath("", params.owner, params.bucket);
+	const normalizedCurrentPrefix = normalizeUserKey(params.prefix, {
+		allowEmpty: true,
+	});
+	let continuationToken: string | null = null;
+	let totalFiles = 0;
+	const folderPrefixes = new Set<string>();
+
+	do {
+		const query = new URLSearchParams();
+		query.set("list-type", "2");
+		query.set("prefix", internalPrefix);
+		query.set("delimiter", "/");
+		query.set("max-keys", "1000");
+		if (continuationToken) {
+			query.set("continuation-token", continuationToken);
+		}
+
+		const s3Res = await s3Client.fetch(`?${query.toString()}`, {
+			method: "GET",
+		});
+		if (!s3Res.ok) {
+			throw new Error(`S3 Error: ${s3Res.status}`);
+		}
+
+		const xml = await s3Res.text();
+		const result = parser.parse(xml).ListBucketResult;
+		const contents = result.Contents
+			? Array.isArray(result.Contents)
+				? result.Contents
+				: [result.Contents]
+			: [];
+		const prefixes = result.CommonPrefixes
+			? Array.isArray(result.CommonPrefixes)
+				? result.CommonPrefixes
+				: [result.CommonPrefixes]
+			: [];
+
+		for (const contentItem of contents as Array<{ Key: string }>) {
+			const relativeKey = contentItem.Key.startsWith(rootPrefix)
+				? contentItem.Key.slice(rootPrefix.length)
+				: contentItem.Key;
+			if (relativeKey !== normalizedCurrentPrefix) {
+				totalFiles += 1;
+			}
+		}
+
+		for (const prefixItem of prefixes as Array<{ Prefix: string }>) {
+			folderPrefixes.add(prefixItem.Prefix);
+		}
+
+		continuationToken = result.NextContinuationToken || null;
+	} while (continuationToken);
+
+	return {
+		totalFiles,
+		totalFolders: folderPrefixes.size,
+	};
+}
+
 async function searchFiles(params: {
 	bucket: BucketRecord;
 	owner: typeof users.$inferSelect;
@@ -372,59 +447,65 @@ async function deleteSingleObject(internalKey: string): Promise<number> {
 async function deletePrefixObjects(params: {
 	bucket: BucketRecord;
 	owner: typeof users.$inferSelect;
-	prefix: string;
+	prefixes: string[];
 }): Promise<{ deletedBytes: number; deletedKeys: string[] }> {
-	const normalizedPrefix = normalizeDirectoryPrefix(params.prefix);
-	if (!normalizedPrefix) {
+	const normalizedPrefixes = Array.from(
+		new Set(params.prefixes.map((prefix) => normalizeDirectoryPrefix(prefix))),
+	);
+	if (normalizedPrefixes.some((prefix) => !prefix)) {
 		throw new Error("Refusing to delete root folder");
 	}
-
-	const internalPrefix = getInternalPath(
-		normalizedPrefix,
-		params.owner,
-		params.bucket,
-	);
-	const rootPrefix = getInternalPath("", params.owner, params.bucket);
-	let continuationToken: string | null = null;
 	let deletedBytes = 0;
 	const deletedKeys: string[] = [];
 
-	do {
-		const query = new URLSearchParams();
-		query.set("list-type", "2");
-		query.set("prefix", internalPrefix);
-		query.set("max-keys", String(S3_LIST_PAGE_SIZE));
-		if (continuationToken) query.set("continuation-token", continuationToken);
+	for (const normalizedPrefix of normalizedPrefixes) {
+		const internalPrefix = getInternalPath(
+			normalizedPrefix,
+			params.owner,
+			params.bucket,
+		);
+		const rootPrefix = getInternalPath("", params.owner, params.bucket);
+		let continuationToken: string | null = null;
 
-		const listRes = await s3Client.fetch(`?${query.toString()}`, {
-			method: "GET",
-		});
-		if (!listRes.ok) {
-			throw new Error(`S3 Error: ${listRes.status}`);
-		}
+		do {
+			const query = new URLSearchParams();
+			query.set("list-type", "2");
+			query.set("prefix", internalPrefix);
+			query.set("max-keys", String(S3_LIST_PAGE_SIZE));
+			if (continuationToken) {
+				query.set("continuation-token", continuationToken);
+			}
 
-		const xml = await listRes.text();
-		const result = parser.parse(xml).ListBucketResult;
-		const contents = result.Contents
-			? Array.isArray(result.Contents)
-				? result.Contents
-				: [result.Contents]
-			: [];
+			const listRes = await s3Client.fetch(`?${query.toString()}`, {
+				method: "GET",
+			});
+			if (!listRes.ok) {
+				throw new Error(`S3 Error: ${listRes.status}`);
+			}
 
-		for (const contentItem of contents as Array<{
-			Key: string;
-			Size: number;
-		}>) {
-			const objectKey = contentItem.Key;
-			const relativeKey = objectKey.startsWith(rootPrefix)
-				? objectKey.slice(rootPrefix.length)
-				: objectKey;
-			deletedBytes += await deleteSingleObject(objectKey);
-			deletedKeys.push(relativeKey);
-		}
+			const xml = await listRes.text();
+			const result = parser.parse(xml).ListBucketResult;
+			const contents = result.Contents
+				? Array.isArray(result.Contents)
+					? result.Contents
+					: [result.Contents]
+				: [];
 
-		continuationToken = result.NextContinuationToken || null;
-	} while (continuationToken);
+			for (const contentItem of contents as Array<{
+				Key: string;
+				Size: number;
+			}>) {
+				const objectKey = contentItem.Key;
+				const relativeKey = objectKey.startsWith(rootPrefix)
+					? objectKey.slice(rootPrefix.length)
+					: objectKey;
+				deletedBytes += await deleteSingleObject(objectKey);
+				deletedKeys.push(relativeKey);
+			}
+
+			continuationToken = result.NextContinuationToken || null;
+		} while (continuationToken);
+	}
 
 	return { deletedBytes, deletedKeys };
 }
@@ -661,6 +742,11 @@ export async function handleFiles(req: Request): Promise<Response> {
 				prefix: currentPrefix,
 				continuationToken,
 			});
+			const totals = await countDirectoryTotals({
+				bucket: bucketData.bucket,
+				owner: bucketData.owner,
+				prefix: currentPrefix,
+			});
 
 			return jsonResponse({
 				mode: "directory",
@@ -668,6 +754,8 @@ export async function handleFiles(req: Request): Promise<Response> {
 				files: result.files,
 				folders: result.folders,
 				nextContinuationToken: result.nextContinuationToken,
+				totalFiles: totals.totalFiles,
+				totalFolders: totals.totalFolders,
 			});
 		} catch (error) {
 			console.error("List Files Error:", error);
@@ -682,15 +770,17 @@ export async function handleFiles(req: Request): Promise<Response> {
 
 		try {
 			const body = await req.json().catch(() => null);
-			const folderPrefix = body?.prefix
-				? normalizeDirectoryPrefix(String(body.prefix))
-				: null;
+			const folderPrefixes = Array.isArray(body?.prefixes)
+				? body.prefixes.map((prefix: unknown) => String(prefix))
+				: body?.prefix
+					? [String(body.prefix)]
+					: [];
 
-			if (folderPrefix) {
+			if (folderPrefixes.length > 0) {
 				const result = await deletePrefixObjects({
 					bucket: bucketData.bucket,
 					owner: bucketData.owner,
-					prefix: folderPrefix,
+					prefixes: folderPrefixes,
 				});
 
 				if (result.deletedBytes > 0) {
@@ -703,8 +793,10 @@ export async function handleFiles(req: Request): Promise<Response> {
 				}
 
 				return jsonResponse({
-					message: "Deleted folder",
-					deletedPrefix: folderPrefix,
+					message: "Deleted folders",
+					deletedPrefixes: folderPrefixes.map((prefix: string) =>
+						normalizeDirectoryPrefix(prefix),
+					),
 					deletedKeys: result.deletedKeys,
 					deletedBytes: result.deletedBytes,
 				});
