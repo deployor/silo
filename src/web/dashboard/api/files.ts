@@ -367,6 +367,66 @@ async function deleteSingleObject(internalKey: string): Promise<number> {
 	return size;
 }
 
+async function deletePrefixObjects(params: {
+	bucket: BucketRecord;
+	owner: typeof users.$inferSelect;
+	prefix: string;
+}): Promise<{ deletedBytes: number; deletedKeys: string[] }> {
+	const normalizedPrefix = normalizeDirectoryPrefix(params.prefix);
+	if (!normalizedPrefix) {
+		throw new Error("Refusing to delete root folder");
+	}
+
+	const internalPrefix = getInternalPath(
+		normalizedPrefix,
+		params.owner,
+		params.bucket,
+	);
+	const rootPrefix = getInternalPath("", params.owner, params.bucket);
+	let continuationToken: string | null = null;
+	let deletedBytes = 0;
+	const deletedKeys: string[] = [];
+
+	do {
+		const query = new URLSearchParams();
+		query.set("list-type", "2");
+		query.set("prefix", internalPrefix);
+		query.set("max-keys", String(S3_LIST_PAGE_SIZE));
+		if (continuationToken) query.set("continuation-token", continuationToken);
+
+		const listRes = await s3Client.fetch(`?${query.toString()}`, {
+			method: "GET",
+		});
+		if (!listRes.ok) {
+			throw new Error(`S3 Error: ${listRes.status}`);
+		}
+
+		const xml = await listRes.text();
+		const result = parser.parse(xml).ListBucketResult;
+		const contents = result.Contents
+			? Array.isArray(result.Contents)
+				? result.Contents
+				: [result.Contents]
+			: [];
+
+		for (const contentItem of contents as Array<{
+			Key: string;
+			Size: number;
+		}>) {
+			const objectKey = contentItem.Key;
+			const relativeKey = objectKey.startsWith(rootPrefix)
+				? objectKey.slice(rootPrefix.length)
+				: objectKey;
+			deletedBytes += await deleteSingleObject(objectKey);
+			deletedKeys.push(relativeKey);
+		}
+
+		continuationToken = result.NextContinuationToken || null;
+	} while (continuationToken);
+
+	return { deletedBytes, deletedKeys };
+}
+
 async function copyObject(
 	sourceInternalKey: string,
 	destinationInternalKey: string,
@@ -609,6 +669,34 @@ export async function handleFiles(req: Request): Promise<Response> {
 
 		try {
 			const body = await req.json().catch(() => null);
+			const folderPrefix = body?.prefix
+				? normalizeDirectoryPrefix(String(body.prefix))
+				: null;
+
+			if (folderPrefix) {
+				const result = await deletePrefixObjects({
+					bucket: bucketData.bucket,
+					owner: bucketData.owner,
+					prefix: folderPrefix,
+				});
+
+				if (result.deletedBytes > 0) {
+					await db
+						.update(buckets)
+						.set({
+							totalBytes: sql`${buckets.totalBytes} - ${result.deletedBytes}`,
+						})
+						.where(eq(buckets.id, bucketData.bucket.id));
+				}
+
+				return jsonResponse({
+					message: "Deleted folder",
+					deletedPrefix: folderPrefix,
+					deletedKeys: result.deletedKeys,
+					deletedBytes: result.deletedBytes,
+				});
+			}
+
 			const keys = Array.isArray(body?.keys)
 				? body.keys
 				: url.searchParams.get("key")
