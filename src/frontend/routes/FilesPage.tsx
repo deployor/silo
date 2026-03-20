@@ -151,6 +151,8 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
 	const [lastSelectedKey, setLastSelectedKey] = useState<string | null>(null);
 	const [deleteTargets, setDeleteTargets] = useState<string[]>([]);
+	const [deleteFolderTarget, setDeleteFolderTarget] =
+		useState<FolderItem | null>(null);
 	const [renameTarget, setRenameTarget] = useState<FileItem | null>(null);
 	const [renameValue, setRenameValue] = useState("");
 	const [moveOpen, setMoveOpen] = useState(false);
@@ -427,6 +429,11 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		setDeleteTargets(Array.from(new Set(keys)));
 	};
 
+	const startDeleteFolder = (folder: FolderItem) => {
+		clearOperationError();
+		setDeleteFolderTarget(folder);
+	};
+
 	const confirmDelete = async () => {
 		if (deleteTargets.length === 0) return;
 		setOperation({ kind: "delete", busy: true, error: null });
@@ -447,6 +454,27 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				kind: "delete",
 				busy: false,
 				error: cause instanceof Error ? cause.message : "Delete failed",
+			});
+		}
+	};
+
+	const confirmDeleteFolder = async () => {
+		if (!deleteFolderTarget) return;
+		setOperation({ kind: "delete", busy: true, error: null });
+		try {
+			await fetchJson(`/api/dashboard/buckets/${bucketName}/files`, {
+				method: "DELETE",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ prefix: deleteFolderTarget.prefix }),
+			});
+			setDeleteFolderTarget(null);
+			await refreshCurrentView();
+			setOperation({ kind: null, busy: false, error: null });
+		} catch (cause) {
+			setOperation({
+				kind: "delete",
+				busy: false,
+				error: cause instanceof Error ? cause.message : "Folder delete failed",
 			});
 		}
 	};
@@ -924,19 +952,15 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												—
 											</td>
 											<td className="px-4 py-3.5 text-text-muted">—</td>
-												<td className="px-4 py-3.5 text-right">
-													<div className="inline-flex gap-2">
-														<button
-															type="button"
-															onClick={() => {
-																openUploadModal(folder.prefix);
-															}}
-															className="text-xs font-medium text-text-muted hover:text-white"
-														>
-															Upload
-														</button>
-													</div>
-												</td>
+											<td className="px-4 py-3.5 text-right">
+												<button
+													type="button"
+													onClick={() => startDeleteFolder(folder)}
+													className="text-hc-red hover:text-red-400 text-xs font-medium"
+												>
+													Delete
+												</button>
+											</td>
 										</tr>
 									))}
 
@@ -1161,6 +1185,44 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<PhIcon className="ph ph-spinner animate-spin" />
 							) : null}
 							{operation.busy ? "Deleting..." : "Delete"}
+						</button>
+					</div>
+				</div>
+			</Modal>
+
+			<Modal
+				open={!!deleteFolderTarget}
+				onClose={() => (operation.busy ? null : setDeleteFolderTarget(null))}
+				title="Delete folder"
+				className="max-w-lg p-8"
+			>
+				<div className="space-y-4">
+					<p className="text-text-muted">
+						This deletes the folder{" "}
+						<span className="text-white font-mono">
+							{deleteFolderTarget?.prefix}
+						</span>{" "}
+						and everything inside it.
+					</p>
+					<div className="flex justify-end gap-3">
+						<button
+							type="button"
+							onClick={() => setDeleteFolderTarget(null)}
+							disabled={operation.busy}
+							className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							onClick={() => void confirmDeleteFolder()}
+							disabled={operation.busy}
+							className="bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
+						>
+							{operation.busy ? (
+								<PhIcon className="ph ph-spinner animate-spin" />
+							) : null}
+							{operation.busy ? "Deleting..." : "Delete folder"}
 						</button>
 					</div>
 				</div>
