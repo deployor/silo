@@ -28,6 +28,7 @@ import {
 	MdMonitorHeart,
 	MdRocketLaunch,
 	MdShield,
+	MdSync,
 	MdThunderstorm,
 	MdTune,
 	MdWarning,
@@ -80,6 +81,7 @@ const ICONS: Record<string, IconType> = {
 	"ph-shield-check": MdShield,
 	"ph-cloud-check": MdCloudUpload,
 	"ph-hand-waving": MdWavingHand,
+	"ph-spinner": MdSync,
 };
 
 function pickIconToken(tokens: string[]): string | null {
