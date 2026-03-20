@@ -1132,15 +1132,25 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												</td>
 												<td className="px-4 py-3">
 													{k.isPaused ? (
-														<span
-															className="inline-flex h-2.5 w-2.5 rounded-full bg-red-400"
-															title={k.pauseReason || k.note || "Deactivated"}
-														/>
+														<div className="inline-flex items-center gap-2 text-red-300">
+															<span
+																className="inline-flex h-3 w-3 rounded-full bg-red-400 ring-2 ring-red-400/20 shrink-0"
+																title={k.pauseReason || k.note || "Deactivated"}
+															/>
+															<span className="text-xs font-bold uppercase tracking-wider">
+																Off
+															</span>
+														</div>
 													) : (
-														<span
-															className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400"
-															title="Active"
-														/>
+														<div className="inline-flex items-center gap-2 text-emerald-300">
+															<span
+																className="inline-flex h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-emerald-400/20 shrink-0"
+																title="Active"
+															/>
+															<span className="text-xs font-bold uppercase tracking-wider">
+																On
+															</span>
+														</div>
 													)}
 												</td>
 												<td className="px-4 py-3 text-right">
