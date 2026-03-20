@@ -671,9 +671,6 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<h1 className="text-xl font-bold text-white truncate">
 									{bucketName}
 								</h1>
-								<p className="text-xs text-text-muted font-mono truncate">
-									{activePrefix || "root/"}
-								</p>
 							</div>
 						</div>
 						<div className="flex flex-wrap gap-2">
@@ -859,11 +856,11 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								/>
 								Select visible
 							</label>
-							<span className="text-xs text-text-muted">
-								{selectedKeys.length > 0
-									? `${selectedKeys.length} selected`
-									: `${folders.length} folders • ${files.length} files`}
-							</span>
+							{selectedKeys.length > 0 ? (
+								<span className="text-xs text-text-muted">
+									{selectedKeys.length} selected
+								</span>
+							) : null}
 							{dragActive ? (
 								<span className="text-xs text-hc-red">{dragHint}</span>
 							) : null}
@@ -927,26 +924,19 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												—
 											</td>
 											<td className="px-4 py-3.5 text-text-muted">—</td>
-											<td className="px-4 py-3.5 text-right">
-												<div className="inline-flex gap-2">
-													<button
-														type="button"
-														onClick={() => {
-															openUploadModal(folder.prefix);
-														}}
-														className="text-xs font-medium text-text-muted hover:text-white"
-													>
-														Upload
-													</button>
-													<button
-														type="button"
-														onClick={() => setMoveTargetPrefix(folder.prefix)}
-														className="text-xs font-medium text-text-muted hover:text-white"
-													>
-														Set target
-													</button>
-												</div>
-											</td>
+												<td className="px-4 py-3.5 text-right">
+													<div className="inline-flex gap-2">
+														<button
+															type="button"
+															onClick={() => {
+																openUploadModal(folder.prefix);
+															}}
+															className="text-xs font-medium text-text-muted hover:text-white"
+														>
+															Upload
+														</button>
+													</div>
+												</td>
 										</tr>
 									))}
 
@@ -1037,9 +1027,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<span className="text-red-400">{error}</span>
 								) : selectedKeys.length > 0 ? (
 									`${selectedKeys.length} selected`
-								) : (
-									`${folders.length} folders • ${files.length} files`
-								)}
+								) : null}
 							</div>
 							{(searchMeta.active && searchCursor) ||
 							(!searchMeta.active && nextToken) ? (
