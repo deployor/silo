@@ -22,9 +22,22 @@ import { fetchJson, fetchText } from "../shared/api/http";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 import { formatBytes } from "../shared/utils/format";
 
-type BucketKey = { id: string; accessKey: string };
+type BucketKey = {
+	id: string;
+	accessKey: string;
+	note?: string | null;
+	isPaused?: boolean;
+	pauseReason?: string | null;
+};
 type BucketCreateState = {
 	name: string;
+	note: string;
+	error: string | null;
+	loading: boolean;
+};
+type KeyCreateState = {
+	bucketName: string;
+	note: string;
 	error: string | null;
 	loading: boolean;
 };
@@ -107,6 +120,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		useState<CredentialModalState | null>(null);
 	const [bucketCreateModal, setBucketCreateModal] =
 		useState<BucketCreateState | null>(null);
+	const [keyCreateModal, setKeyCreateModal] = useState<KeyCreateState | null>(
+		null,
+	);
 	const [pendingActionKey, setPendingActionKey] = useState<string | null>(null);
 
 	const buttonBase =
@@ -168,7 +184,12 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	}, [stats]);
 
 	const handleCreateBucket = async () => {
-		setBucketCreateModal({ name: "", error: null, loading: false });
+		setBucketCreateModal({
+			name: "",
+			note: "Default key",
+			error: null,
+			loading: false,
+		});
 	};
 
 	const submitCreateBucket = async () => {
@@ -191,7 +212,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			}>("/api/dashboard/buckets", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ name }),
+				body: JSON.stringify({ name, note: bucketCreateModal.note }),
 			});
 			setCredentialModal({
 				kind: "bucket",
@@ -318,13 +339,17 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		});
 	};
 
-	const generateKey = async (bucketName: string) => {
+	const generateKey = async (bucketName: string, note?: string) => {
 		try {
 			const r = await fetchJson<{
 				accessKey: string;
 				secretKey: string;
 				publicUrl: string;
-			}>(`/api/dashboard/buckets/${bucketName}/keys`, { method: "POST" });
+			}>(`/api/dashboard/buckets/${bucketName}/keys`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ note: note || null }),
+			});
 			setCredentialModal({
 				kind: "key",
 				bucketName,
@@ -337,6 +362,29 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			window.alert(e instanceof Error ? e.message : "Failed to generate key");
 		}
 	};
+
+	const refreshActiveBucketKeys = useCallback(async (bucketName: string) => {
+		const data = await fetchJson<{ keys: BucketKey[] }>(
+			`/api/dashboard/buckets/${bucketName}/keys`,
+		);
+		setActiveBucket((prev) =>
+			prev && prev.name === bucketName
+				? { ...prev, keys: data.keys || [] }
+				: prev,
+		);
+		setStats((prev) =>
+			prev
+				? {
+						...prev,
+						buckets: prev.buckets.map((bucket) =>
+							bucket.name === bucketName
+								? { ...bucket, keys: data.keys || [] }
+								: bucket,
+						),
+					}
+				: prev,
+		);
+	}, []);
 
 	const copyText = async (value: string) => {
 		try {
@@ -358,9 +406,39 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				await fetchText(`/api/dashboard/buckets/${bucketName}/keys/${keyId}`, {
 					method: "DELETE",
 				});
+				await refreshActiveBucketKeys(bucketName);
 				await load();
 			},
 		});
+	};
+
+	const openGenerateKeyModal = (bucketName: string) => {
+		setKeyCreateModal({ bucketName, note: "", error: null, loading: false });
+	};
+
+	const submitGenerateKey = async () => {
+		if (!keyCreateModal) return;
+		setKeyCreateModal((prev) =>
+			prev ? { ...prev, loading: true, error: null } : prev,
+		);
+		try {
+			await generateKey(
+				keyCreateModal.bucketName,
+				keyCreateModal.note.trim() || undefined,
+			);
+			await refreshActiveBucketKeys(keyCreateModal.bucketName);
+			setKeyCreateModal(null);
+		} catch (e) {
+			setKeyCreateModal((prev) =>
+				prev
+					? {
+							...prev,
+							loading: false,
+							error: e instanceof Error ? e.message : "Failed to generate key",
+						}
+					: prev,
+			);
+		}
 	};
 
 	const openCorsModal = (bucket: DashboardBucket) => {
@@ -772,18 +850,16 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			<Modal
 				open={!!bucketCreateModal}
 				onClose={() => setBucketCreateModal(null)}
-				title="Create New Bucket"
-				className="max-w-lg p-8"
+				title={undefined}
+				className="max-w-md p-8"
 			>
 				{bucketCreateModal ? (
 					<div className="space-y-5">
-						<p className="text-sm text-text-muted">
-							Use lowercase letters, digits, and hyphens only.
-						</p>
+						<h3 className="text-2xl font-bold text-white">Create New Bucket</h3>
 						<div>
 							<label
 								htmlFor="create-bucket-name"
-								className="text-xs font-bold uppercase tracking-wider text-text-muted"
+								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
 							>
 								Bucket Name
 							</label>
@@ -798,8 +874,36 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											: prev,
 									)
 								}
-								placeholder="my-bucket"
-								className="mt-2 w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red"
+								placeholder="my-awesome-project"
+								className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red font-mono placeholder-white/20 transition-colors"
+							/>
+							<p className="text-xs text-text-muted mt-2">
+								Only lowercase letters, numbers, and hyphens. Minimum 3
+								characters.
+							</p>
+							<p className="text-xs text-text-muted mt-2">
+								Bucket names are global and can&apos;t be changed later.
+							</p>
+						</div>
+						<div>
+							<label
+								htmlFor="create-bucket-note"
+								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
+							>
+								Default Key Note
+							</label>
+							<textarea
+								id="create-bucket-note"
+								value={bucketCreateModal.note}
+								onChange={(e) =>
+									setBucketCreateModal((prev) =>
+										prev
+											? { ...prev, note: e.target.value, error: null }
+											: prev,
+									)
+								}
+								placeholder="Optional note for the first key"
+								className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red transition-colors resize-y"
 							/>
 						</div>
 						{bucketCreateModal.error ? (
@@ -830,7 +934,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!activeBucket}
 				onClose={() => setActiveBucket(null)}
 				title="Manage Keys"
-				className="max-w-3xl p-8"
+				className="max-w-4xl p-8"
 			>
 				{activeBucket ? (
 					<>
@@ -842,6 +946,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<thead className="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider sticky top-0">
 									<tr>
 										<th className="px-4 py-3">Access Key ID</th>
+										<th className="px-4 py-3">Note</th>
+										<th className="px-4 py-3">Status</th>
 										<th className="px-4 py-3 text-right">Actions</th>
 									</tr>
 								</thead>
@@ -855,26 +961,91 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												<td className="px-4 py-3 font-mono text-white">
 													{k.accessKey}
 												</td>
-												<td className="px-4 py-3 text-right">
-													<button
-														type="button"
-														onClick={() => deleteKey(activeBucket.name, k.id)}
-														aria-label="Delete key"
-														title="Delete key"
-														className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10 ml-auto`}
-													>
-														<MdDeleteForever className="text-base" />
-														<span className={iconActionTooltip}>
-															Delete this access key
+												<td className="px-4 py-3 text-xs text-text-muted max-w-[260px]">
+													{k.note ? (
+														<span className="text-white/80" title={k.note}>
+															{k.note}
 														</span>
-													</button>
+													) : (
+														<span className="italic">No note</span>
+													)}
+												</td>
+												<td className="px-4 py-3">
+													{k.isPaused ? (
+														<div className="flex flex-col items-start">
+															<span className="text-red-400 text-xs font-bold">
+																PAUSED
+															</span>
+															{k.pauseReason ? (
+																<span
+																	className="text-[10px] text-red-300 max-w-[160px] truncate"
+																	title={k.pauseReason}
+																>
+																	{k.pauseReason}
+																</span>
+															) : null}
+														</div>
+													) : (
+														<span className="text-emerald-400 text-xs font-bold">
+															ACTIVE
+														</span>
+													)}
+												</td>
+												<td className="px-4 py-3 text-right">
+													<div className="flex justify-end gap-2">
+														<button
+															type="button"
+															onClick={() => openKeyCreateModal(k.bucketName)}
+															className="hidden"
+														>
+															noop
+														</button>
+														<button
+															type="button"
+															onClick={async () => {
+																const note = window.prompt(
+																	"Edit note for this key",
+																	k.note || "",
+																);
+																if (note === null) return;
+																await fetchText(
+																	`/api/admin/keys/${k.id}/note`,
+																	{
+																		method: "PATCH",
+																		headers: {
+																			"Content-Type": "application/json",
+																		},
+																		body: JSON.stringify({ note }),
+																	},
+																);
+																await refreshActiveBucketKeys(
+																	activeBucket.name,
+																);
+															}}
+															className="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider"
+														>
+															Note
+														</button>
+														<button
+															type="button"
+															onClick={() => deleteKey(activeBucket.name, k.id)}
+															aria-label="Delete key"
+															title="Delete key"
+															className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10 ml-auto`}
+														>
+															<MdDeleteForever className="text-base" />
+															<span className={iconActionTooltip}>
+																Delete this access key
+															</span>
+														</button>
+													</div>
 												</td>
 											</tr>
 										))
 									) : (
 										<tr>
 											<td
-												colSpan={2}
+												colSpan={4}
 												className="px-4 py-8 text-center text-text-muted italic"
 											>
 												No keys found for this bucket.
@@ -895,13 +1066,74 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</div>
 							<button
 								type="button"
-								onClick={() => generateKey(activeBucket.name)}
+								onClick={() => openGenerateKeyModal(activeBucket.name)}
 								className={`${buttonBase} ${buttonPrimaryBlue}`}
 							>
 								+ Generate New Key
 							</button>
 						</div>
 					</>
+				) : null}
+			</Modal>
+
+			<Modal
+				open={!!keyCreateModal}
+				onClose={() => setKeyCreateModal(null)}
+				title={undefined}
+				className="max-w-md p-8"
+			>
+				{keyCreateModal ? (
+					<div className="space-y-5">
+						<div>
+							<h3 className="text-2xl font-bold text-white">
+								Generate New Key
+							</h3>
+							<p className="text-text-muted text-sm mt-1 font-mono">
+								{keyCreateModal.bucketName}
+							</p>
+						</div>
+						<div>
+							<label
+								htmlFor="generate-key-note"
+								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
+							>
+								Key Note
+							</label>
+							<textarea
+								id="generate-key-note"
+								value={keyCreateModal.note}
+								onChange={(e) =>
+									setKeyCreateModal((prev) =>
+										prev
+											? { ...prev, note: e.target.value, error: null }
+											: prev,
+									)
+								}
+								placeholder="Optional note for this key"
+								className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-blue focus:ring-1 focus:ring-hc-blue transition-colors resize-y"
+							/>
+						</div>
+						{keyCreateModal.error ? (
+							<p className="text-sm text-red-400">{keyCreateModal.error}</p>
+						) : null}
+						<div className="flex justify-end gap-3">
+							<button
+								type="button"
+								onClick={() => setKeyCreateModal(null)}
+								className={`${buttonBase} ${buttonSubtle}`}
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={submitGenerateKey}
+								disabled={keyCreateModal.loading}
+								className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
+							>
+								{keyCreateModal.loading ? "Generating..." : "Generate Key"}
+							</button>
+						</div>
+					</div>
 				) : null}
 			</Modal>
 
