@@ -157,6 +157,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [moveTargetPrefix, setMoveTargetPrefix] = useState("");
 	const [uploadOpen, setUploadOpen] = useState(false);
 	const [uploadPrefix, setUploadPrefix] = useState("");
+	const [uploadMode, setUploadMode] = useState<"files" | "folder">("files");
 	const [uploadQueue, setUploadQueue] = useState<File[]>([]);
 	const [uploadPaths, setUploadPaths] = useState<Record<string, string>>({});
 	const [dragActive, setDragActive] = useState(false);
@@ -300,6 +301,19 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			}),
 		];
 	}, [activePrefix]);
+
+	const moveCrumbs = useMemo(() => {
+		const normalized = normalizePrefix(moveTargetPrefix);
+		const parts = normalized.split("/").filter(Boolean);
+		let acc = "";
+		return [
+			{ label: "root", prefix: "" },
+			...parts.map((part) => {
+				acc += `${part}/`;
+				return { label: part, prefix: acc };
+			}),
+		];
+	}, [moveTargetPrefix]);
 
 	const selectedFiles = useMemo(
 		() => files.filter((file) => selectedKeys.includes(file.key)),
@@ -488,6 +502,15 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		setMoveOpen(true);
 	};
 
+	const openUploadModal = (prefix?: string) => {
+		clearOperationError();
+		setUploadPrefix(prefix ?? currentPrefix);
+		setUploadMode("files");
+		setUploadQueue([]);
+		setUploadPaths({});
+		setUploadOpen(true);
+	};
+
 	const submitMove = async () => {
 		if (selectedKeys.length === 0) return;
 		setOperation({ kind: "move", busy: true, error: null });
@@ -537,8 +560,18 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	);
 
 	const onFolderInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+		setUploadMode("folder");
 		if (event.target.files) ingestFiles(event.target.files);
 		event.target.value = "";
+	};
+
+	const openSystemPicker = (mode: "files" | "folder") => {
+		setUploadMode(mode);
+		if (mode === "folder") {
+			folderInputRef.current?.click();
+			return;
+		}
+		fileInputRef.current?.click();
 	};
 
 	const submitUpload = async () => {
@@ -603,24 +636,6 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		ingestFiles(filesList);
 	};
 
-	const handleCopy = async () => {
-		if (selectedKeys.length === 0) return;
-		try {
-			await navigator.clipboard.writeText(selectedKeys.join("\n"));
-			setOperation({
-				kind: null,
-				busy: false,
-				error: `Copied ${selectedKeys.length} path(s)`,
-			});
-		} catch {
-			setOperation({
-				kind: null,
-				busy: false,
-				error: "Failed to copy file paths",
-			});
-		}
-	};
-
 	useEffect(() => {
 		const onPaste = (event: ClipboardEvent) => {
 			const fileList = event.clipboardData?.files;
@@ -663,21 +678,11 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<button
 								type="button"
 								onClick={() => {
-									setUploadPrefix(currentPrefix);
-									setUploadQueue([]);
-									setUploadPaths({});
-									setUploadOpen(true);
+									openUploadModal(currentPrefix);
 								}}
 								className="bg-hc-red hover:bg-red-500 text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
 							>
 								Upload
-							</button>
-							<button
-								type="button"
-								onClick={() => folderInputRef.current?.click()}
-								className="bg-white/10 hover:bg-white/20 text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
-							>
-								Folder
 							</button>
 							<button
 								type="button"
@@ -925,8 +930,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													<button
 														type="button"
 														onClick={() => {
-															setUploadPrefix(folder.prefix);
-															setUploadOpen(true);
+															openUploadModal(folder.prefix);
 														}}
 														className="text-xs font-medium text-text-muted hover:text-white"
 													>
@@ -1021,9 +1025,12 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</div>
 
 						<div className="p-3 border-t border-white/10 flex flex-wrap justify-between items-center gap-3 bg-white/[0.02]">
-							<div className="text-xs text-text-muted">
+							<div className="text-xs text-text-muted flex items-center gap-2">
 								{loading ? (
-									"Loading..."
+									<>
+										<PhIcon className="ph ph-spinner animate-spin text-sm text-hc-red" />
+										<span>Loading...</span>
+									</>
 								) : error ? (
 									<span className="text-red-400">{error}</span>
 								) : selectedKeys.length > 0 ? (
@@ -1239,6 +1246,28 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						placeholder="folder/subfolder/"
 						className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue"
 					/>
+					<div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
+						<div className="flex items-center gap-2 text-sm font-mono overflow-x-auto whitespace-nowrap">
+							{moveCrumbs.map((crumb, index) => (
+								<Fragment key={crumb.prefix || "move-root"}>
+									{index > 0 ? (
+										<span className="text-text-muted">/</span>
+									) : null}
+									<button
+										type="button"
+										onClick={() => setMoveTargetPrefix(crumb.prefix)}
+										className={
+											index === moveCrumbs.length - 1
+												? "text-white font-bold"
+												: "text-text-muted hover:text-white"
+										}
+									>
+										{crumb.label}
+									</button>
+								</Fragment>
+							))}
+						</div>
+					</div>
 					<div className="flex gap-2 flex-wrap">
 						<button
 							type="button"
@@ -1252,6 +1281,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							onClick={() =>
 								setMoveTargetPrefix(getParentPrefix(currentPrefix))
 							}
+							disabled={!currentPrefix}
 							className="text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white"
 						>
 							Parent folder
@@ -1313,36 +1343,67 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							/>
 						</div>
 						<div className="flex items-end">
-							<button
-								type="button"
-								onClick={() => fileInputRef.current?.click()}
-								className="w-full bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
-							>
-								Pick files
-							</button>
+							<div className="w-full flex gap-2">
+								<button
+									type="button"
+									onClick={() => openSystemPicker("files")}
+									className={`flex-1 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${uploadMode === "files" ? "bg-hc-red text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}
+								>
+									Files
+								</button>
+								<button
+									type="button"
+									onClick={() => openSystemPicker("folder")}
+									className={`flex-1 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${uploadMode === "folder" ? "bg-hc-red text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}
+								>
+									Folder
+								</button>
+							</div>
+						</div>
+					</div>
+					<div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
+						<div className="flex items-center gap-2 text-sm font-mono overflow-x-auto whitespace-nowrap">
+							{[{ label: "root", prefix: "" }, ...crumbs.slice(1)].map(
+								(crumb, index) => (
+									<Fragment key={crumb.prefix || "upload-root"}>
+										{index > 0 ? (
+											<span className="text-text-muted">/</span>
+										) : null}
+										<button
+											type="button"
+											onClick={() => setUploadPrefix(crumb.prefix)}
+											className={
+												normalizePrefix(uploadPrefix) ===
+												normalizePrefix(crumb.prefix)
+													? "text-white font-bold"
+													: "text-text-muted hover:text-white"
+											}
+										>
+											{crumb.label}
+										</button>
+									</Fragment>
+								),
+							)}
 						</div>
 					</div>
 					<div className="rounded-2xl border border-white/10 bg-black/20 p-4 max-h-80 overflow-auto space-y-3">
 						{uploadQueue.length === 0 ? (
 							<div className="text-sm text-text-muted space-y-3">
 								<p>
-									Choose files, drag them in, paste them, or upload an entire
-									folder.
+									Pick {uploadMode === "folder" ? "a folder" : "files"} to
+									upload into{" "}
+									<span className="text-white font-mono">
+										{normalizePrefix(uploadPrefix) || "root/"}
+									</span>
+									.
 								</p>
 								<div className="flex flex-wrap gap-3">
 									<button
 										type="button"
-										onClick={() => fileInputRef.current?.click()}
+										onClick={() => openSystemPicker(uploadMode)}
 										className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
 									>
-										Select files
-									</button>
-									<button
-										type="button"
-										onClick={() => folderInputRef.current?.click()}
-										className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
-									>
-										Select folder
+										Choose {uploadMode === "folder" ? "folder" : "files"}
 									</button>
 								</div>
 							</div>
