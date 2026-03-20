@@ -1,4 +1,12 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import {
+	type ChangeEvent,
+	Fragment,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { AppShell } from "../components/AppShell";
 import { Modal } from "../components/ui/Modal";
 import { PhIcon } from "../components/ui/PhIcon";
@@ -12,17 +20,45 @@ type FileItem = {
 	size: number;
 	lastModified: string;
 	url: string;
+	type: "file";
+	extension: string;
+	parentPrefix: string;
+	relativePath: string;
 };
 
 type FolderItem = {
 	prefix: string;
 	name: string;
+	type: "folder";
+	parentPrefix: string;
 };
 
-type FilesResponse = {
+type DirectoryResponse = {
+	mode: "directory";
+	currentPrefix: string;
 	files: FileItem[];
 	folders: FolderItem[];
-	nextContinuationToken?: string;
+	nextContinuationToken?: string | null;
+};
+
+type SearchResponse = {
+	mode: "search";
+	query: string;
+	scope: "current" | "all";
+	currentPrefix: string;
+	files: FileItem[];
+	folders: FolderItem[];
+	nextCursor?: string | null;
+	truncated?: boolean;
+	scannedPages?: number;
+};
+
+type FilesResponse = DirectoryResponse | SearchResponse;
+
+type OperationState = {
+	kind: null | "delete" | "rename" | "move" | "upload";
+	busy: boolean;
+	error: string | null;
 };
 
 const IMAGE_EXTS = ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif"];
@@ -45,6 +81,37 @@ const TEXT_EXTS = [
 	"log",
 ];
 
+function normalizePrefix(prefix: string): string {
+	const cleaned = prefix.replace(/\\/g, "/").replace(/^\/+/, "");
+	if (!cleaned) return "";
+	return cleaned.endsWith("/") ? cleaned : `${cleaned}/`;
+}
+
+function getParentPrefix(prefix: string): string {
+	const cleaned = normalizePrefix(prefix).replace(/\/$/, "");
+	if (!cleaned) return "";
+	const parts = cleaned.split("/");
+	parts.pop();
+	return parts.length ? `${parts.join("/")}/` : "";
+}
+
+function getFileIcon(file: FileItem): string {
+	if (IMAGE_EXTS.includes(file.extension)) return "ph-image";
+	if (
+		VIDEO_EXTS.includes(file.extension) ||
+		AUDIO_EXTS.includes(file.extension)
+	) {
+		return "ph-file";
+	}
+	if (TEXT_EXTS.includes(file.extension)) return "ph-file-code";
+	return "ph-file";
+}
+
+function formatRelativeTime(value: string): string {
+	const date = new Date(value);
+	return date.toLocaleString();
+}
+
 export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const p = bootstrap.props as {
 		user?: FrontendUser | null;
@@ -54,77 +121,244 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 	const bucketName = p.bucketName;
 	const [search, setSearch] = useState("");
+	const [searchScope, setSearchScope] = useState<"current" | "all">("current");
 	const [currentPrefix, setCurrentPrefix] = useState("");
 	const [files, setFiles] = useState<FileItem[]>([]);
 	const [folders, setFolders] = useState<FolderItem[]>([]);
 	const [nextToken, setNextToken] = useState<string | null>(null);
+	const [searchCursor, setSearchCursor] = useState<string | null>(null);
+	const [searchMeta, setSearchMeta] = useState<{
+		active: boolean;
+		query: string;
+		scope: "current" | "all";
+		truncated: boolean;
+		scannedPages: number;
+	}>({
+		active: false,
+		query: "",
+		scope: "current",
+		truncated: false,
+		scannedPages: 0,
+	});
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [operation, setOperation] = useState<OperationState>({
+		kind: null,
+		busy: false,
+		error: null,
+	});
 
-	const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-	const [deleting, setDeleting] = useState(false);
-
+	const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+	const [lastSelectedKey, setLastSelectedKey] = useState<string | null>(null);
+	const [deleteTargets, setDeleteTargets] = useState<string[]>([]);
+	const [renameTarget, setRenameTarget] = useState<FileItem | null>(null);
+	const [renameValue, setRenameValue] = useState("");
+	const [moveOpen, setMoveOpen] = useState(false);
+	const [moveTargetPrefix, setMoveTargetPrefix] = useState("");
+	const [uploadOpen, setUploadOpen] = useState(false);
+	const [uploadPrefix, setUploadPrefix] = useState("");
+	const [uploadQueue, setUploadQueue] = useState<File[]>([]);
+	const [uploadPaths, setUploadPaths] = useState<Record<string, string>>({});
+	const [dragActive, setDragActive] = useState(false);
+	const [dragHint, setDragHint] = useState(
+		"Drop files to upload into this folder",
+	);
 	const [previewOpen, setPreviewOpen] = useState(false);
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [previewError, setPreviewError] = useState<string | null>(null);
 	const [previewKey, setPreviewKey] = useState("");
 	const [previewUrl, setPreviewUrl] = useState("");
 	const [previewText, setPreviewText] = useState("");
+	const fileInputRef = useRef<HTMLInputElement | null>(null);
+	const folderInputRef = useRef<HTMLInputElement | null>(null);
+	const folderInputAttributes = {
+		webkitdirectory: "true",
+		directory: "true",
+	} as unknown as Record<string, string>;
+
+	const activePrefix = currentPrefix;
 
 	const loadFiles = useCallback(
-		async (prefix = "", token: string | null = null, reset = true) => {
+		async (options?: {
+			prefix?: string;
+			token?: string | null;
+			reset?: boolean;
+			query?: string;
+			scope?: "current" | "all";
+			cursor?: string | null;
+		}) => {
 			setLoading(true);
 			setError(null);
 			try {
-				const q = new URLSearchParams();
-				q.set("prefix", prefix);
-				if (token) q.set("continuation-token", token);
+				const prefix = normalizePrefix(options?.prefix ?? currentPrefix);
+				const reset = options?.reset ?? true;
+				const queryValue = (options?.query ?? searchMeta.query).trim();
+				const scope = options?.scope ?? searchMeta.scope;
+				const params = new URLSearchParams();
+				params.set("prefix", prefix);
+
+				if (queryValue) {
+					params.set("query", queryValue);
+					params.set("scope", scope);
+					if (options?.cursor) params.set("cursor", options.cursor);
+				} else if (options?.token) {
+					params.set("continuation-token", options.token);
+				}
+
 				const data = await fetchJson<FilesResponse>(
-					`/api/dashboard/buckets/${bucketName}/files?${q.toString()}`,
+					`/api/dashboard/buckets/${bucketName}/files?${params.toString()}`,
 				);
-				setCurrentPrefix(prefix);
+
+				setCurrentPrefix(data.currentPrefix);
+				setSelectedKeys([]);
+				setLastSelectedKey(null);
+
+				if (data.mode === "search") {
+					setSearchMeta({
+						active: true,
+						query: data.query,
+						scope: data.scope,
+						truncated: Boolean(data.truncated),
+						scannedPages: data.scannedPages || 0,
+					});
+					setSearchCursor(data.nextCursor || null);
+					setNextToken(null);
+					if (reset) {
+						setFiles(data.files || []);
+						setFolders([]);
+					} else {
+						setFiles((prev) => [...prev, ...(data.files || [])]);
+					}
+					return;
+				}
+
+				setSearchMeta({
+					active: false,
+					query: "",
+					scope: scope,
+					truncated: false,
+					scannedPages: 0,
+				});
+				setSearchCursor(null);
 				setNextToken(data.nextContinuationToken || null);
 				if (reset) {
 					setFiles(data.files || []);
 					setFolders(data.folders || []);
 				} else {
-					setFiles((prev: FileItem[]) => [...prev, ...(data.files || [])]);
-					setFolders((prev: FolderItem[]) => [
-						...prev,
-						...(data.folders || []),
-					]);
+					setFiles((prev) => [...prev, ...(data.files || [])]);
+					setFolders((prev) => [...prev, ...(data.folders || [])]);
 				}
-			} catch (e) {
-				setError(e instanceof Error ? e.message : "Failed to load files");
+			} catch (cause) {
+				setError(
+					cause instanceof Error ? cause.message : "Failed to load files",
+				);
 			} finally {
 				setLoading(false);
 			}
 		},
-		[bucketName],
+		[bucketName, currentPrefix, searchMeta.query, searchMeta.scope],
 	);
 
 	useEffect(() => {
-		loadFiles("", null, true);
+		loadFiles({ prefix: "", reset: true, query: "" });
 	}, [loadFiles]);
 
+	const rows = useMemo(
+		() => [
+			...folders.map((folder) => ({
+				type: "folder" as const,
+				id: folder.prefix,
+				folder,
+			})),
+			...files.map((file) => ({ type: "file" as const, id: file.key, file })),
+		],
+		[files, folders],
+	);
+
 	const crumbs = useMemo(() => {
-		const parts = currentPrefix.split("/").filter(Boolean);
+		const parts = activePrefix.split("/").filter(Boolean);
 		let acc = "";
 		return [
 			{ label: "root", prefix: "" },
-			...parts.map((part: string) => {
+			...parts.map((part) => {
 				acc += `${part}/`;
 				return { label: part, prefix: acc };
 			}),
 		];
-	}, [currentPrefix]);
+	}, [activePrefix]);
 
-	const handleSearch = () => {
-		if (!search.trim()) {
-			loadFiles("", null, true);
+	const selectedFiles = useMemo(
+		() => files.filter((file) => selectedKeys.includes(file.key)),
+		[files, selectedKeys],
+	);
+
+	const allVisibleFilesSelected =
+		files.length > 0 && selectedFiles.length === files.length;
+
+	const clearOperationError = useCallback(() => {
+		setOperation((prev) => ({ ...prev, error: null }));
+	}, []);
+
+	const refreshCurrentView = async () => {
+		if (searchMeta.active) {
+			await loadFiles({
+				prefix: currentPrefix,
+				query: searchMeta.query,
+				scope: searchMeta.scope,
+				reset: true,
+			});
 			return;
 		}
-		loadFiles(search.trim(), null, true);
+		await loadFiles({ prefix: currentPrefix, reset: true, query: "" });
+	};
+
+	const handleSearch = async () => {
+		if (!search.trim()) {
+			await loadFiles({ prefix: currentPrefix, reset: true, query: "" });
+			return;
+		}
+		await loadFiles({
+			prefix: currentPrefix,
+			query: search.trim(),
+			scope: searchScope,
+			reset: true,
+		});
+	};
+
+	const handleRowSelection = (fileKey: string, shiftKey: boolean) => {
+		clearOperationError();
+		if (!shiftKey || !lastSelectedKey) {
+			setSelectedKeys((prev) =>
+				prev.includes(fileKey)
+					? prev.filter((key) => key !== fileKey)
+					: [...prev, fileKey],
+			);
+			setLastSelectedKey(fileKey);
+			return;
+		}
+
+		const visibleKeys = files.map((file) => file.key);
+		const start = visibleKeys.indexOf(lastSelectedKey);
+		const end = visibleKeys.indexOf(fileKey);
+		if (start === -1 || end === -1) {
+			setSelectedKeys((prev) => [...new Set([...prev, fileKey])]);
+			setLastSelectedKey(fileKey);
+			return;
+		}
+
+		const [from, to] = start < end ? [start, end] : [end, start];
+		const keys = visibleKeys.slice(from, to + 1);
+		setSelectedKeys((prev) => Array.from(new Set([...prev, ...keys])));
+		setLastSelectedKey(fileKey);
+	};
+
+	const toggleAllVisibleFiles = () => {
+		clearOperationError();
+		if (allVisibleFilesSelected) {
+			setSelectedKeys([]);
+			return;
+		}
+		setSelectedKeys(files.map((file) => file.key));
 	};
 
 	const openPreview = async (file: FileItem) => {
@@ -132,6 +366,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		setPreviewLoading(true);
 		setPreviewError(null);
 		setPreviewKey(file.key);
+		setPreviewUrl("");
 		setPreviewText("");
 		try {
 			const signed = await fetchJson<{ url: string }>(
@@ -144,38 +379,246 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			);
 			setPreviewUrl(signed.url);
 
-			const ext = file.key.split(".").pop()?.toLowerCase() || "";
-			if (TEXT_EXTS.includes(ext)) {
+			if (TEXT_EXTS.includes(file.extension)) {
 				const text = await fetchText(signed.url);
 				setPreviewText(text);
 			}
-		} catch (e) {
+		} catch (cause) {
 			setPreviewError(
-				e instanceof Error ? e.message : "Failed to preview file",
+				cause instanceof Error ? cause.message : "Failed to preview file",
 			);
 		} finally {
 			setPreviewLoading(false);
 		}
 	};
 
+	const startDelete = (keys: string[]) => {
+		clearOperationError();
+		setDeleteTargets(Array.from(new Set(keys)));
+	};
+
 	const confirmDelete = async () => {
-		if (!deleteTarget) return;
-		setDeleting(true);
+		if (deleteTargets.length === 0) return;
+		setOperation({ kind: "delete", busy: true, error: null });
 		try {
-			await fetchText(
-				`/api/dashboard/buckets/${bucketName}/files?key=${encodeURIComponent(deleteTarget)}`,
-				{
-					method: "DELETE",
-				},
+			await fetchJson(`/api/dashboard/buckets/${bucketName}/files`, {
+				method: "DELETE",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ keys: deleteTargets }),
+			});
+			setDeleteTargets([]);
+			setSelectedKeys((prev) =>
+				prev.filter((key) => !deleteTargets.includes(key)),
 			);
-			setDeleteTarget(null);
-			await loadFiles(currentPrefix, null, true);
-		} catch (e) {
-			window.alert(e instanceof Error ? e.message : "Delete failed");
-		} finally {
-			setDeleting(false);
+			await refreshCurrentView();
+			setOperation({ kind: null, busy: false, error: null });
+		} catch (cause) {
+			setOperation({
+				kind: "delete",
+				busy: false,
+				error: cause instanceof Error ? cause.message : "Delete failed",
+			});
 		}
 	};
+
+	const openRename = (file: FileItem) => {
+		clearOperationError();
+		setRenameTarget(file);
+		setRenameValue(file.name);
+	};
+
+	const submitRename = async () => {
+		if (!renameTarget) return;
+		const trimmed = renameValue.trim();
+		if (!trimmed) {
+			setOperation({
+				kind: "rename",
+				busy: false,
+				error: "Name cannot be empty",
+			});
+			return;
+		}
+
+		const parentPrefix = renameTarget.parentPrefix;
+		const destinationKey = parentPrefix ? `${parentPrefix}${trimmed}` : trimmed;
+		setOperation({ kind: "rename", busy: true, error: null });
+		try {
+			await fetchJson(`/api/dashboard/buckets/${bucketName}/files`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "rename",
+					sourceKey: renameTarget.key,
+					destinationKey,
+				}),
+			});
+			setRenameTarget(null);
+			setRenameValue("");
+			await refreshCurrentView();
+			setOperation({ kind: null, busy: false, error: null });
+		} catch (cause) {
+			setOperation({
+				kind: "rename",
+				busy: false,
+				error: cause instanceof Error ? cause.message : "Rename failed",
+			});
+		}
+	};
+
+	const openMove = (keys?: string[]) => {
+		const targets = keys && keys.length > 0 ? keys : selectedKeys;
+		if (targets.length === 0) return;
+		clearOperationError();
+		setSelectedKeys(Array.from(new Set(targets)));
+		setMoveTargetPrefix(currentPrefix);
+		setMoveOpen(true);
+	};
+
+	const submitMove = async () => {
+		if (selectedKeys.length === 0) return;
+		setOperation({ kind: "move", busy: true, error: null });
+		try {
+			await fetchJson(`/api/dashboard/buckets/${bucketName}/files`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "move",
+					sourceKeys: selectedKeys,
+					destinationPrefix: normalizePrefix(moveTargetPrefix).replace(
+						/\/$/,
+						"",
+					),
+				}),
+			});
+			setMoveOpen(false);
+			await refreshCurrentView();
+			setOperation({ kind: null, busy: false, error: null });
+		} catch (cause) {
+			setOperation({
+				kind: "move",
+				busy: false,
+				error: cause instanceof Error ? cause.message : "Move failed",
+			});
+		}
+	};
+
+	const ingestFiles = useCallback(
+		(incoming: FileList | File[]) => {
+			const nextFiles = Array.from(incoming);
+			if (nextFiles.length === 0) return;
+			clearOperationError();
+			setUploadPrefix(currentPrefix);
+			setUploadOpen(true);
+			setUploadQueue(nextFiles);
+			setUploadPaths(
+				Object.fromEntries(
+					nextFiles.map((file) => [
+						`${file.name}:${file.size}:${file.lastModified}`,
+						file.webkitRelativePath || file.name,
+					]),
+				),
+			);
+		},
+		[clearOperationError, currentPrefix],
+	);
+
+	const onFolderInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+		if (event.target.files) ingestFiles(event.target.files);
+		event.target.value = "";
+	};
+
+	const submitUpload = async () => {
+		if (uploadQueue.length === 0) return;
+		setOperation({ kind: "upload", busy: true, error: null });
+		try {
+			const formData = new FormData();
+			formData.set("prefix", normalizePrefix(uploadPrefix).replace(/\/$/, ""));
+			for (const file of uploadQueue) {
+				formData.append("files", file);
+				const key = `${file.name}:${file.size}:${file.lastModified}`;
+				formData.set(
+					`path:${file.name}:${file.size}`,
+					uploadPaths[key] || file.name,
+				);
+			}
+
+			await fetchJson(`/api/dashboard/buckets/${bucketName}/files`, {
+				method: "POST",
+				body: formData,
+			});
+
+			setUploadOpen(false);
+			setUploadQueue([]);
+			setUploadPaths({});
+			await refreshCurrentView();
+			setOperation({ kind: null, busy: false, error: null });
+		} catch (cause) {
+			setOperation({
+				kind: "upload",
+				busy: false,
+				error: cause instanceof Error ? cause.message : "Upload failed",
+			});
+		}
+	};
+
+	const loadMore = async () => {
+		if (searchMeta.active) {
+			if (!searchCursor) return;
+			await loadFiles({
+				prefix: currentPrefix,
+				query: searchMeta.query,
+				scope: searchMeta.scope,
+				cursor: searchCursor,
+				reset: false,
+			});
+			return;
+		}
+
+		if (!nextToken) return;
+		await loadFiles({
+			prefix: currentPrefix,
+			token: nextToken,
+			reset: false,
+			query: "",
+		});
+	};
+
+	const handleDrop = (filesList: FileList | null) => {
+		setDragActive(false);
+		if (!filesList || filesList.length === 0) return;
+		ingestFiles(filesList);
+	};
+
+	const handleCopy = async () => {
+		if (selectedKeys.length === 0) return;
+		try {
+			await navigator.clipboard.writeText(selectedKeys.join("\n"));
+			setOperation({
+				kind: null,
+				busy: false,
+				error: `Copied ${selectedKeys.length} path(s)`,
+			});
+		} catch {
+			setOperation({
+				kind: null,
+				busy: false,
+				error: "Failed to copy file paths",
+			});
+		}
+	};
+
+	useEffect(() => {
+		const onPaste = (event: ClipboardEvent) => {
+			const fileList = event.clipboardData?.files;
+			if (fileList && fileList.length > 0) {
+				event.preventDefault();
+				ingestFiles(fileList);
+			}
+		};
+
+		window.addEventListener("paste", onPaste);
+		return () => window.removeEventListener("paste", onPaste);
+	}, [ingestFiles]);
 
 	const previewExt = previewKey.split(".").pop()?.toLowerCase() || "";
 
@@ -186,145 +629,480 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			config={bootstrap.config}
 			breadcrumbs={p.breadcrumbs}
 		>
-			<div className="max-w-7xl mx-auto w-full">
-				<div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
-					<h1 className="text-3xl font-bold text-white">File Explorer</h1>
-					<div className="flex gap-3">
-						<input
-							type="text"
-							value={search}
-							onChange={(e) => setSearch(e.target.value)}
-							onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-							placeholder="Search files..."
-							className="bg-hc-dark border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-hc-blue w-64"
-						/>
+			<div className="max-w-7xl mx-auto w-full space-y-6">
+				<div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+					<div>
+						<h1 className="text-3xl font-bold text-white">File Explorer</h1>
+						<p className="text-text-muted text-sm mt-2">
+							Folder-aware explorer with safe bulk actions, uploads, move
+							support, and scalable search.
+						</p>
+					</div>
+					<div className="flex flex-wrap gap-3">
 						<button
 							type="button"
-							onClick={handleSearch}
+							onClick={() => {
+								setUploadPrefix(currentPrefix);
+								setUploadQueue([]);
+								setUploadPaths({});
+								setUploadOpen(true);
+							}}
+							className="bg-hc-red hover:bg-red-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
+						>
+							Upload
+						</button>
+						<button
+							type="button"
+							onClick={() => folderInputRef.current?.click()}
 							className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
 						>
-							Search
+							Upload Folder
 						</button>
+						<input
+							ref={fileInputRef}
+							type="file"
+							multiple
+							className="hidden"
+							onChange={(event) => {
+								if (event.target.files) ingestFiles(event.target.files);
+								event.target.value = "";
+							}}
+						/>
+						<input
+							ref={folderInputRef}
+							type="file"
+							multiple
+							className="hidden"
+							{...folderInputAttributes}
+							onChange={onFolderInputChange}
+						/>
 					</div>
 				</div>
 
-				<div className="flex items-center gap-2 text-sm font-mono mb-4 overflow-x-auto whitespace-nowrap pb-2">
-					{crumbs.map((c, idx) => (
-						<Fragment key={c.prefix || "root"}>
-							{idx > 0 ? <span className="text-text-muted">/</span> : null}
-							<button
-								type="button"
-								onClick={() => loadFiles(c.prefix, null, true)}
-								className={`hover:text-white ${idx === crumbs.length - 1 ? "text-white font-bold" : "text-text-muted"}`}
-							>
-								{c.label}
-							</button>
-						</Fragment>
-					))}
-				</div>
-
-				<div className="bg-hc-dark rounded-3xl border border-white/10 overflow-hidden card-shadow">
-					<div className="overflow-x-auto">
-						<table className="w-full text-left text-sm">
-							<thead className="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
-								<tr>
-									<th className="px-6 py-4 w-10">Type</th>
-									<th className="px-6 py-4">Name</th>
-									<th className="px-6 py-4">Size</th>
-									<th className="px-6 py-4">Last Modified</th>
-									<th className="px-6 py-4 text-right">Actions</th>
-								</tr>
-							</thead>
-							<tbody className="divide-y divide-white/5">
-								{!loading &&
-								!error &&
-								files.length === 0 &&
-								folders.length === 0 ? (
-									<tr>
-										<td
-											colSpan={5}
-											className="px-6 py-8 text-center text-text-muted italic"
+				<div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+					<div className="space-y-4">
+						<div className="bg-hc-dark rounded-3xl border border-white/10 p-4 card-shadow">
+							<div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+								<div className="flex-1 flex flex-col gap-3 sm:flex-row">
+									<input
+										type="text"
+										value={search}
+										onChange={(event) => setSearch(event.target.value)}
+										onKeyDown={(event) => {
+											if (event.key === "Enter") void handleSearch();
+										}}
+										placeholder={
+											searchScope === "current"
+												? "Search inside this folder"
+												: "Search entire bucket"
+										}
+										className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue flex-1"
+									/>
+									<div className="inline-flex rounded-xl border border-white/10 overflow-hidden bg-black/20">
+										<button
+											type="button"
+											onClick={() => setSearchScope("current")}
+											className={`px-4 py-3 text-sm font-bold transition-colors ${searchScope === "current" ? "bg-hc-blue text-white" : "text-text-muted hover:text-white"}`}
 										>
-											No files found.
-										</td>
-									</tr>
+											This folder
+										</button>
+										<button
+											type="button"
+											onClick={() => setSearchScope("all")}
+											className={`px-4 py-3 text-sm font-bold transition-colors ${searchScope === "all" ? "bg-hc-blue text-white" : "text-text-muted hover:text-white"}`}
+										>
+											Everywhere
+										</button>
+									</div>
+								</div>
+								<div className="flex gap-3">
+									<button
+										type="button"
+										onClick={() => void handleSearch()}
+										className="bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
+									>
+										Search
+									</button>
+									{searchMeta.active ? (
+										<button
+											type="button"
+											onClick={() => {
+												setSearch("");
+												void loadFiles({
+													prefix: currentPrefix,
+													reset: true,
+													query: "",
+												});
+											}}
+											className="text-text-muted hover:text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
+										>
+											Clear
+										</button>
+									) : null}
+								</div>
+							</div>
+							{searchMeta.active ? (
+								<div className="mt-3 text-xs text-text-muted flex flex-wrap gap-3">
+									<span>
+										Showing search results for{" "}
+										<span className="text-white">{searchMeta.query}</span>
+									</span>
+									<span>
+										Scope:{" "}
+										<span className="text-white">
+											{searchMeta.scope === "current"
+												? "Current folder"
+												: "Entire bucket"}
+										</span>
+									</span>
+									<span>
+										Scanned pages:{" "}
+										<span className="text-white">
+											{searchMeta.scannedPages}
+										</span>
+									</span>
+									{searchMeta.truncated ? (
+										<span className="text-amber-300">
+											Search limited for performance; refine query for deeper
+											matches.
+										</span>
+									) : null}
+								</div>
+							) : null}
+						</div>
+
+						<div className="flex items-center gap-2 text-sm font-mono overflow-x-auto whitespace-nowrap pb-1">
+							{crumbs.map((crumb, index) => (
+								<Fragment key={crumb.prefix || "root"}>
+									{index > 0 ? (
+										<span className="text-text-muted">/</span>
+									) : null}
+									<button
+										type="button"
+										onClick={() =>
+											void loadFiles({
+												prefix: crumb.prefix,
+												reset: true,
+												query: "",
+											})
+										}
+										className={
+											index === crumbs.length - 1
+												? "text-white font-bold"
+												: "text-text-muted hover:text-white"
+										}
+									>
+										{crumb.label}
+									</button>
+								</Fragment>
+							))}
+						</div>
+
+						<section
+							className={`bg-hc-dark rounded-3xl border overflow-hidden card-shadow transition-colors ${dragActive ? "border-hc-red" : "border-white/10"}`}
+							aria-label="Explorer file table"
+							onDragEnter={(event) => {
+								event.preventDefault();
+								setDragActive(true);
+								setDragHint(`Drop files into ${activePrefix || "root"}`);
+							}}
+							onDragOver={(event) => {
+								event.preventDefault();
+								setDragActive(true);
+							}}
+							onDragLeave={(event) => {
+								event.preventDefault();
+								setDragActive(false);
+							}}
+							onDrop={(event) => {
+								event.preventDefault();
+								handleDrop(event.dataTransfer.files);
+							}}
+						>
+							<div className="px-4 py-3 border-b border-white/10 flex flex-wrap items-center gap-3 bg-white/5">
+								<label className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-text-muted">
+									<input
+										type="checkbox"
+										checked={allVisibleFilesSelected}
+										onChange={toggleAllVisibleFiles}
+										className="rounded border-white/10 bg-black/30"
+									/>
+									Select visible
+								</label>
+								<span className="text-xs text-text-muted">
+									{selectedKeys.length} selected • {files.length} files •{" "}
+									{folders.length} folders
+								</span>
+								{dragActive ? (
+									<span className="text-xs text-hc-red">{dragHint}</span>
 								) : null}
+							</div>
+							<div className="overflow-x-auto">
+								<table className="w-full text-left text-sm">
+									<thead className="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
+										<tr>
+											<th className="px-4 py-4 w-12">Pick</th>
+											<th className="px-4 py-4 w-12">Type</th>
+											<th className="px-4 py-4">Name</th>
+											<th className="px-4 py-4">Path</th>
+											<th className="px-4 py-4">Size</th>
+											<th className="px-4 py-4">Last Modified</th>
+											<th className="px-4 py-4 text-right">Actions</th>
+										</tr>
+									</thead>
+									<tbody className="divide-y divide-white/5">
+										{!loading && !error && rows.length === 0 ? (
+											<tr>
+												<td
+													colSpan={7}
+													className="px-6 py-12 text-center text-text-muted italic"
+												>
+													No files found.
+												</td>
+											</tr>
+										) : null}
 
-								{folders.map((folder) => (
-									<tr
-										key={folder.prefix}
-										className="hover:bg-white/5 transition-colors cursor-pointer group"
-										onClick={() => loadFiles(folder.prefix, null, true)}
-									>
-										<td className="px-6 py-4 text-hc-blue">
-											<PhIcon className="ph-fill ph-folder text-xl" />
-										</td>
-										<td className="px-6 py-4 font-medium text-white font-mono">
-											{folder.name}
-										</td>
-										<td className="px-6 py-4 text-text-muted">-</td>
-										<td className="px-6 py-4 text-text-muted">-</td>
-										<td className="px-6 py-4 text-right" />
-									</tr>
-								))}
+										{folders.map((folder) => (
+											<tr
+												key={folder.prefix}
+												className="hover:bg-white/5 transition-colors cursor-pointer"
+												onDoubleClick={() =>
+													void loadFiles({
+														prefix: folder.prefix,
+														reset: true,
+														query: "",
+													})
+												}
+											>
+												<td className="px-4 py-4" />
+												<td className="px-4 py-4 text-hc-blue">
+													<PhIcon className="ph ph-folder-open text-xl" />
+												</td>
+												<td className="px-4 py-4 font-medium text-white font-mono">
+													<button
+														type="button"
+														onClick={() =>
+															void loadFiles({
+																prefix: folder.prefix,
+																reset: true,
+																query: "",
+															})
+														}
+														className="hover:text-hc-blue"
+													>
+														{folder.name}
+													</button>
+												</td>
+												<td className="px-4 py-4 text-text-muted font-mono text-xs">
+													{folder.prefix}
+												</td>
+												<td className="px-4 py-4 text-text-muted">—</td>
+												<td className="px-4 py-4 text-text-muted">—</td>
+												<td className="px-4 py-4 text-right">
+													<div className="inline-flex gap-2">
+														<button
+															type="button"
+															onClick={() => {
+																setUploadPrefix(folder.prefix);
+																setUploadOpen(true);
+															}}
+															className="text-xs font-bold uppercase tracking-wider text-text-muted hover:text-white"
+														>
+															Upload
+														</button>
+														<button
+															type="button"
+															onClick={() => setMoveTargetPrefix(folder.prefix)}
+															className="text-xs font-bold uppercase tracking-wider text-text-muted hover:text-white"
+														>
+															Set target
+														</button>
+													</div>
+												</td>
+											</tr>
+										))}
 
-								{files.map((file) => (
-									<tr
-										key={file.key}
-										className="hover:bg-white/5 transition-colors group"
+										{files.map((file) => {
+											const selected = selectedKeys.includes(file.key);
+											return (
+												<tr
+													key={file.key}
+													className={`transition-colors ${selected ? "bg-hc-red/5" : "hover:bg-white/5"}`}
+												>
+													<td className="px-4 py-4">
+														<input
+															type="checkbox"
+															checked={selected}
+															onChange={(event) =>
+																handleRowSelection(
+																	file.key,
+																	(event.nativeEvent as MouseEvent).shiftKey,
+																)
+															}
+															className="rounded border-white/10 bg-black/30"
+														/>
+													</td>
+													<td className="px-4 py-4 text-text-muted">
+														<PhIcon
+															className={`ph ${getFileIcon(file)} text-xl`}
+														/>
+													</td>
+													<td className="px-4 py-4 font-medium text-white font-mono break-all">
+														{file.name}
+													</td>
+													<td className="px-4 py-4 text-text-muted font-mono text-xs break-all">
+														{file.relativePath}
+													</td>
+													<td className="px-4 py-4 text-text-muted font-mono text-xs">
+														{formatBytes(file.size)}
+													</td>
+													<td className="px-4 py-4 text-text-muted font-mono text-xs">
+														{formatRelativeTime(file.lastModified)}
+													</td>
+													<td className="px-4 py-4 text-right">
+														<div className="inline-flex flex-wrap justify-end gap-2">
+															<button
+																type="button"
+																onClick={() => void openPreview(file)}
+																className="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider"
+															>
+																Preview
+															</button>
+															<button
+																type="button"
+																onClick={() => openRename(file)}
+																className="text-text-muted hover:text-white text-xs font-bold uppercase tracking-wider"
+															>
+																Rename
+															</button>
+															<button
+																type="button"
+																onClick={() => openMove([file.key])}
+																className="text-text-muted hover:text-white text-xs font-bold uppercase tracking-wider"
+															>
+																Move
+															</button>
+															<button
+																type="button"
+																onClick={() => startDelete([file.key])}
+																className="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider"
+															>
+																Delete
+															</button>
+														</div>
+													</td>
+												</tr>
+											);
+										})}
+									</tbody>
+								</table>
+							</div>
+
+							<div className="p-4 border-t border-white/10 flex flex-wrap justify-between items-center gap-3">
+								<div className="text-sm text-text-muted">
+									{loading ? (
+										"Loading..."
+									) : error ? (
+										<span className="text-red-400">{error}</span>
+									) : (
+										"Explorer ready"
+									)}
+								</div>
+								{(searchMeta.active && searchCursor) ||
+								(!searchMeta.active && nextToken) ? (
+									<button
+										type="button"
+										onClick={() => void loadMore()}
+										className="text-text-muted hover:text-white text-sm font-bold py-2 px-4 rounded-lg hover:bg-white/5 transition-colors"
 									>
-										<td className="px-6 py-4 text-text-muted">
-											<PhIcon className="ph ph-file text-xl" />
-										</td>
-										<td className="px-6 py-4 font-medium text-white font-mono break-all">
-											{file.name}
-										</td>
-										<td className="px-6 py-4 text-text-muted font-mono text-xs">
-											{formatBytes(file.size)}
-										</td>
-										<td className="px-6 py-4 text-text-muted font-mono text-xs">
-											{new Date(file.lastModified).toLocaleString()}
-										</td>
-										<td className="px-6 py-4 text-right flex justify-end gap-2">
-											<button
-												type="button"
-												onClick={() => openPreview(file)}
-												className="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider transition-colors"
-											>
-												Preview
-											</button>
-											<button
-												type="button"
-												onClick={() => setDeleteTarget(file.key)}
-												className="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-all"
-											>
-												Delete
-											</button>
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
+										Load More
+									</button>
+								) : null}
+							</div>
+						</section>
 					</div>
 
-					<div className="p-4 border-t border-white/10 flex justify-center">
-						{loading ? (
-							<span className="text-text-muted text-sm">Loading...</span>
-						) : null}
-						{error ? (
-							<span className="text-red-400 text-sm">{error}</span>
-						) : null}
-						{!loading && nextToken ? (
-							<button
-								type="button"
-								onClick={() => loadFiles(currentPrefix, nextToken, false)}
-								className="text-text-muted hover:text-white text-sm font-bold py-2 px-4 rounded-lg hover:bg-white/5 transition-colors"
-							>
-								Load More
-							</button>
-						) : null}
-					</div>
+					<aside className="space-y-4">
+						<div className="bg-hc-dark rounded-3xl border border-white/10 p-5 card-shadow space-y-4">
+							<h2 className="text-lg font-bold text-white">Bulk actions</h2>
+							<p className="text-sm text-text-muted">
+								Built for large directories: the page only loads one slice at a
+								time, and search is scope-aware instead of pretending folders do
+								not exist.
+							</p>
+							<div className="grid gap-3">
+								<button
+									type="button"
+									disabled={selectedKeys.length === 0}
+									onClick={() => openMove()}
+									className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
+								>
+									Move selected
+								</button>
+								<button
+									type="button"
+									disabled={selectedKeys.length === 0}
+									onClick={handleCopy}
+									className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
+								>
+									Copy paths
+								</button>
+								<button
+									type="button"
+									disabled={selectedKeys.length === 0}
+									onClick={() => startDelete(selectedKeys)}
+									className="bg-hc-red/20 hover:bg-hc-red/30 disabled:opacity-40 disabled:cursor-not-allowed text-hc-red px-4 py-3 rounded-xl text-sm font-bold transition-colors"
+								>
+									Delete selected
+								</button>
+							</div>
+							<div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-text-muted space-y-2">
+								<p>
+									Current target folder:{" "}
+									<span className="text-white font-mono">
+										{moveTargetPrefix || "root/"}
+									</span>
+								</p>
+								<p>
+									Clipboard uploads supported: drag files in or paste
+									screenshots/files directly.
+								</p>
+							</div>
+						</div>
+
+						<div className="bg-hc-dark rounded-3xl border border-white/10 p-5 card-shadow space-y-3">
+							<h2 className="text-lg font-bold text-white">Selection</h2>
+							{selectedFiles.length === 0 ? (
+								<p className="text-sm text-text-muted">No files selected.</p>
+							) : (
+								<div className="space-y-2 max-h-72 overflow-auto pr-1">
+									{selectedFiles.map((file) => (
+										<div
+											key={file.key}
+											className="rounded-2xl border border-white/10 bg-black/20 p-3"
+										>
+											<p className="text-white font-mono text-sm break-all">
+												{file.name}
+											</p>
+											<p className="text-text-muted text-xs mt-1 break-all">
+												{file.relativePath}
+											</p>
+											<p className="text-text-muted text-xs mt-1">
+												{formatBytes(file.size)}
+											</p>
+										</div>
+									))}
+								</div>
+							)}
+						</div>
+					</aside>
 				</div>
+
+				{operation.error ? (
+					<div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+						{operation.error}
+					</div>
+				) : null}
 			</div>
 
 			<Modal
@@ -343,13 +1121,12 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							{previewError}
 						</div>
 					) : null}
-
 					{!previewLoading && !previewError && previewUrl ? (
 						IMAGE_EXTS.includes(previewExt) ? (
 							<div className="flex items-center justify-center min-h-[200px]">
 								<img
 									src={previewUrl}
-									alt={previewKey.split("/").pop() || "Preview image"}
+									alt={previewKey}
 									className="max-w-full max-h-[70vh] object-contain shadow-lg rounded"
 								/>
 							</div>
@@ -401,36 +1178,298 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			</Modal>
 
 			<Modal
-				open={!!deleteTarget}
-				onClose={() => (deleting ? null : setDeleteTarget(null))}
-				title="Delete File"
-				className="max-w-md p-8"
+				open={deleteTargets.length > 0}
+				onClose={() => (operation.busy ? null : setDeleteTargets([]))}
+				title={deleteTargets.length === 1 ? "Delete file" : "Delete files"}
+				className="max-w-lg p-8"
 			>
-				<p className="text-text-muted mb-8 break-all">
-					Are you sure you want to delete{" "}
-					<span className="text-white">{deleteTarget}</span>? This cannot be
-					undone.
-				</p>
-				<div className="flex justify-end gap-3">
-					<button
-						type="button"
-						onClick={() => setDeleteTarget(null)}
-						disabled={deleting}
-						className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
-					>
-						Cancel
-					</button>
-					<button
-						type="button"
-						disabled={deleting}
-						onClick={confirmDelete}
-						className="bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
-					>
-						{deleting ? (
-							<PhIcon className="ph ph-spinner animate-spin" />
-						) : null}
-						{deleting ? "Deleting..." : "Delete"}
-					</button>
+				<div className="space-y-4">
+					<p className="text-text-muted">
+						This action permanently deletes{" "}
+						<span className="text-white">{deleteTargets.length}</span> file
+						{deleteTargets.length === 1 ? "" : "s"} and updates storage
+						accounting.
+					</p>
+					<div className="max-h-48 overflow-auto rounded-2xl border border-white/10 bg-black/20 p-3 space-y-2">
+						{deleteTargets.map((key) => (
+							<p key={key} className="text-sm font-mono text-white break-all">
+								{key}
+							</p>
+						))}
+					</div>
+					<div className="flex justify-end gap-3">
+						<button
+							type="button"
+							onClick={() => setDeleteTargets([])}
+							disabled={operation.busy}
+							className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							onClick={() => void confirmDelete()}
+							disabled={operation.busy}
+							className="bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
+						>
+							{operation.busy ? (
+								<PhIcon className="ph ph-spinner animate-spin" />
+							) : null}
+							{operation.busy ? "Deleting..." : "Delete"}
+						</button>
+					</div>
+				</div>
+			</Modal>
+
+			<Modal
+				open={!!renameTarget}
+				onClose={() => (operation.busy ? null : setRenameTarget(null))}
+				title="Rename file"
+				className="max-w-lg p-8"
+			>
+				<div className="space-y-4">
+					<p className="text-text-muted text-sm">
+						Only the filename changes; the file stays in{" "}
+						<span className="text-white font-mono">
+							{renameTarget?.parentPrefix || "root/"}
+						</span>
+						.
+					</p>
+					<input
+						type="text"
+						value={renameValue}
+						onChange={(event) => setRenameValue(event.target.value)}
+						onKeyDown={(event) => {
+							if (event.key === "Enter") void submitRename();
+						}}
+						className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue"
+					/>
+					<div className="flex justify-end gap-3">
+						<button
+							type="button"
+							onClick={() => setRenameTarget(null)}
+							disabled={operation.busy}
+							className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							onClick={() => void submitRename()}
+							disabled={operation.busy}
+							className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
+						>
+							{operation.busy ? (
+								<PhIcon className="ph ph-spinner animate-spin" />
+							) : null}
+							{operation.busy ? "Renaming..." : "Rename"}
+						</button>
+					</div>
+				</div>
+			</Modal>
+
+			<Modal
+				open={moveOpen}
+				onClose={() => (operation.busy ? null : setMoveOpen(false))}
+				title="Move files"
+				className="max-w-lg p-8"
+			>
+				<div className="space-y-4">
+					<p className="text-text-muted text-sm">
+						Move <span className="text-white">{selectedKeys.length}</span> file
+						{selectedKeys.length === 1 ? "" : "s"} to another folder. Use{" "}
+						<span className="text-white font-mono">folder/subfolder/</span>{" "}
+						format or leave empty for root.
+					</p>
+					<input
+						type="text"
+						value={moveTargetPrefix}
+						onChange={(event) => setMoveTargetPrefix(event.target.value)}
+						onKeyDown={(event) => {
+							if (event.key === "Enter") void submitMove();
+						}}
+						placeholder="folder/subfolder/"
+						className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue"
+					/>
+					<div className="flex gap-2 flex-wrap">
+						<button
+							type="button"
+							onClick={() => setMoveTargetPrefix(currentPrefix)}
+							className="text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white"
+						>
+							Current folder
+						</button>
+						<button
+							type="button"
+							onClick={() =>
+								setMoveTargetPrefix(getParentPrefix(currentPrefix))
+							}
+							className="text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white"
+						>
+							Parent folder
+						</button>
+						<button
+							type="button"
+							onClick={() => setMoveTargetPrefix("")}
+							className="text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white"
+						>
+							Root
+						</button>
+					</div>
+					<div className="flex justify-end gap-3">
+						<button
+							type="button"
+							onClick={() => setMoveOpen(false)}
+							disabled={operation.busy}
+							className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							onClick={() => void submitMove()}
+							disabled={operation.busy}
+							className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
+						>
+							{operation.busy ? (
+								<PhIcon className="ph ph-spinner animate-spin" />
+							) : null}
+							{operation.busy ? "Moving..." : "Move"}
+						</button>
+					</div>
+				</div>
+			</Modal>
+
+			<Modal
+				open={uploadOpen}
+				onClose={() => (operation.busy ? null : setUploadOpen(false))}
+				title="Upload files"
+				className="max-w-2xl p-8"
+			>
+				<div className="space-y-5">
+					<div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
+						<div>
+							<label
+								htmlFor="upload-prefix-input"
+								className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2"
+							>
+								Destination folder
+							</label>
+							<input
+								id="upload-prefix-input"
+								type="text"
+								value={uploadPrefix}
+								onChange={(event) => setUploadPrefix(event.target.value)}
+								placeholder="folder/subfolder/"
+								className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue"
+							/>
+						</div>
+						<div className="flex items-end">
+							<button
+								type="button"
+								onClick={() => fileInputRef.current?.click()}
+								className="w-full bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
+							>
+								Pick files
+							</button>
+						</div>
+					</div>
+					<div className="rounded-2xl border border-white/10 bg-black/20 p-4 max-h-80 overflow-auto space-y-3">
+						{uploadQueue.length === 0 ? (
+							<div className="text-sm text-text-muted space-y-3">
+								<p>
+									Choose files, drag them in, paste them, or upload an entire
+									folder.
+								</p>
+								<div className="flex flex-wrap gap-3">
+									<button
+										type="button"
+										onClick={() => fileInputRef.current?.click()}
+										className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
+									>
+										Select files
+									</button>
+									<button
+										type="button"
+										onClick={() => folderInputRef.current?.click()}
+										className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
+									>
+										Select folder
+									</button>
+								</div>
+							</div>
+						) : (
+							uploadQueue.map((file) => {
+								const mapKey = `${file.name}:${file.size}:${file.lastModified}`;
+								return (
+									<div
+										key={mapKey}
+										className="rounded-2xl border border-white/10 bg-black/30 p-3"
+									>
+										<div className="flex items-center justify-between gap-3 mb-2">
+											<div className="min-w-0">
+												<p className="text-white font-mono text-sm truncate">
+													{file.name}
+												</p>
+												<p className="text-text-muted text-xs">
+													{formatBytes(file.size)}
+												</p>
+											</div>
+											<button
+												type="button"
+												onClick={() =>
+													setUploadQueue((prev) =>
+														prev.filter(
+															(item) =>
+																`${item.name}:${item.size}:${item.lastModified}` !==
+																mapKey,
+														),
+													)
+												}
+												className="text-text-muted hover:text-white text-xs font-bold uppercase tracking-wider"
+											>
+												Remove
+											</button>
+										</div>
+										<input
+											type="text"
+											value={uploadPaths[mapKey] || file.name}
+											onChange={(event) =>
+												setUploadPaths((prev) => ({
+													...prev,
+													[mapKey]: event.target.value,
+												}))
+											}
+											className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-hc-blue font-mono"
+										/>
+									</div>
+								);
+							})
+						)}
+					</div>
+					<div className="flex justify-end gap-3">
+						<button
+							type="button"
+							onClick={() => setUploadOpen(false)}
+							disabled={operation.busy}
+							className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							onClick={() => void submitUpload()}
+							disabled={operation.busy || uploadQueue.length === 0}
+							className="bg-hc-red hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
+						>
+							{operation.busy ? (
+								<PhIcon className="ph ph-spinner animate-spin" />
+							) : null}
+							{operation.busy
+								? "Uploading..."
+								: `Upload ${uploadQueue.length || ""}`}
+						</button>
+					</div>
 				</div>
 			</Modal>
 		</AppShell>
