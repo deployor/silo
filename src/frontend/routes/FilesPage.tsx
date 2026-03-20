@@ -39,6 +39,8 @@ type DirectoryResponse = {
 	files: FileItem[];
 	folders: FolderItem[];
 	nextContinuationToken?: string | null;
+	totalFiles?: number;
+	totalFolders?: number;
 };
 
 type SearchResponse = {
@@ -149,6 +151,9 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	});
 
 	const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+	const [selectedFolderPrefixes, setSelectedFolderPrefixes] = useState<
+		string[]
+	>([]);
 	const [lastSelectedKey, setLastSelectedKey] = useState<string | null>(null);
 	const [deleteTargets, setDeleteTargets] = useState<string[]>([]);
 	const [deleteFolderTarget, setDeleteFolderTarget] =
@@ -166,6 +171,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [dragHint, setDragHint] = useState(
 		"Drop files to upload into this folder",
 	);
+	const [totals, setTotals] = useState({ files: 0, folders: 0 });
 	const [previewOpen, setPreviewOpen] = useState(false);
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [previewError, setPreviewError] = useState<string | null>(null);
@@ -228,6 +234,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 				setCurrentPrefix(data.currentPrefix);
 				setSelectedKeys([]);
+				setSelectedFolderPrefixes([]);
 				setLastSelectedKey(null);
 
 				if (data.mode === "search") {
@@ -257,6 +264,10 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					scannedPages: 0,
 				});
 				setSearchCursor(null);
+				setTotals({
+					files: data.totalFiles || (data.files || []).length,
+					folders: data.totalFolders || (data.folders || []).length,
+				});
 				setNextToken(data.nextContinuationToken || null);
 				if (reset) {
 					setFiles(data.files || []);
@@ -322,10 +333,20 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		[files, selectedKeys],
 	);
 
+	const selectedFolders = useMemo(
+		() =>
+			folders.filter((folder) =>
+				selectedFolderPrefixes.includes(folder.prefix),
+			),
+		[folders, selectedFolderPrefixes],
+	);
+
 	const isMoveAtRoot = normalizePrefix(moveTargetPrefix) === "";
 
 	const allVisibleFilesSelected =
 		files.length > 0 && selectedFiles.length === files.length;
+	const allVisibleFoldersSelected =
+		folders.length > 0 && selectedFolders.length === folders.length;
 
 	const clearOperationError = useCallback(() => {
 		setOperation((prev) => ({ ...prev, error: null }));
@@ -391,6 +412,24 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			return;
 		}
 		setSelectedKeys(files.map((file) => file.key));
+	};
+
+	const toggleFolderSelection = (prefix: string) => {
+		clearOperationError();
+		setSelectedFolderPrefixes((prev) =>
+			prev.includes(prefix)
+				? prev.filter((value) => value !== prefix)
+				: [...prev, prefix],
+		);
+	};
+
+	const toggleAllVisibleFolders = () => {
+		clearOperationError();
+		if (allVisibleFoldersSelected) {
+			setSelectedFolderPrefixes([]);
+			return;
+		}
+		setSelectedFolderPrefixes(folders.map((folder) => folder.prefix));
 	};
 
 	const openPreview = async (file: FileItem) => {
@@ -459,15 +498,19 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	};
 
 	const confirmDeleteFolder = async () => {
-		if (!deleteFolderTarget) return;
+		const prefixes = deleteFolderTarget
+			? [deleteFolderTarget.prefix]
+			: selectedFolderPrefixes;
+		if (prefixes.length === 0) return;
 		setOperation({ kind: "delete", busy: true, error: null });
 		try {
 			await fetchJson(`/api/dashboard/buckets/${bucketName}/files`, {
 				method: "DELETE",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ prefix: deleteFolderTarget.prefix }),
+				body: JSON.stringify({ prefixes }),
 			});
 			setDeleteFolderTarget(null);
+			setSelectedFolderPrefixes([]);
 			await refreshCurrentView();
 			setOperation({ kind: null, busy: false, error: null });
 		} catch (cause) {
@@ -721,8 +764,17 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</button>
 							<button
 								type="button"
-								disabled={selectedKeys.length === 0}
-								onClick={() => startDelete(selectedKeys)}
+								disabled={
+									selectedKeys.length === 0 &&
+									selectedFolderPrefixes.length === 0
+								}
+								onClick={() => {
+									if (selectedFolderPrefixes.length > 0) {
+										void confirmDeleteFolder();
+										return;
+									}
+									startDelete(selectedKeys);
+								}}
 								className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
 							>
 								Delete
@@ -889,6 +941,15 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									{selectedKeys.length} selected
 								</span>
 							) : null}
+							<label className="inline-flex items-center gap-2 text-xs font-medium text-text-muted">
+								<input
+									type="checkbox"
+									checked={allVisibleFoldersSelected}
+									onChange={toggleAllVisibleFolders}
+									className="rounded border-white/10 bg-black/30"
+								/>
+								Folders
+							</label>
 							{dragActive ? (
 								<span className="text-xs text-hc-red">{dragHint}</span>
 							) : null}
@@ -929,7 +990,16 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												})
 											}
 										>
-											<td className="px-4 py-4" />
+											<td className="px-4 py-4">
+												<input
+													type="checkbox"
+													checked={selectedFolderPrefixes.includes(
+														folder.prefix,
+													)}
+													onChange={() => toggleFolderSelection(folder.prefix)}
+													className="rounded border-white/10 bg-black/30"
+												/>
+											</td>
 											<td className="px-4 py-4 text-hc-blue">
 												<PhIcon className="ph ph-folder-open text-xl" />
 											</td>
@@ -1049,9 +1119,13 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</>
 								) : error ? (
 									<span className="text-red-400">{error}</span>
-								) : selectedKeys.length > 0 ? (
-									`${selectedKeys.length} selected`
+								) : selectedKeys.length > 0 ||
+									selectedFolderPrefixes.length > 0 ? (
+									`${selectedFolderPrefixes.length} folders • ${selectedKeys.length} files selected`
 								) : null}
+								<span className="text-text-muted/70">
+									{totals.folders} folders • {totals.files} files total
+								</span>
 							</div>
 							{(searchMeta.active && searchCursor) ||
 							(!searchMeta.active && nextToken) ? (
@@ -1191,16 +1265,18 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			</Modal>
 
 			<Modal
-				open={!!deleteFolderTarget}
+				open={!!deleteFolderTarget || selectedFolderPrefixes.length > 0}
 				onClose={() => (operation.busy ? null : setDeleteFolderTarget(null))}
 				title="Delete folder"
 				className="max-w-lg p-8"
 			>
 				<div className="space-y-4">
 					<p className="text-text-muted">
-						This deletes the folder{" "}
+						This deletes{" "}
+						{deleteFolderTarget ? "the folder" : "the selected folders"}{" "}
 						<span className="text-white font-mono">
-							{deleteFolderTarget?.prefix}
+							{deleteFolderTarget?.prefix ||
+								`${selectedFolderPrefixes.length} folders`}
 						</span>{" "}
 						and everything inside it.
 					</p>
