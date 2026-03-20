@@ -629,149 +629,81 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			config={bootstrap.config}
 			breadcrumbs={p.breadcrumbs}
 		>
-			<div className="max-w-7xl mx-auto w-full space-y-6">
-				<div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-					<div>
-						<h1 className="text-3xl font-bold text-white">File Explorer</h1>
-						<p className="text-text-muted text-sm mt-2">
-							Folder-aware explorer with safe bulk actions, uploads, move
-							support, and scalable search.
-						</p>
-					</div>
-					<div className="flex flex-wrap gap-3">
-						<button
-							type="button"
-							onClick={() => {
-								setUploadPrefix(currentPrefix);
-								setUploadQueue([]);
-								setUploadPaths({});
-								setUploadOpen(true);
-							}}
-							className="bg-hc-red hover:bg-red-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
-						>
-							Upload
-						</button>
-						<button
-							type="button"
-							onClick={() => folderInputRef.current?.click()}
-							className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
-						>
-							Upload Folder
-						</button>
-						<input
-							ref={fileInputRef}
-							type="file"
-							multiple
-							className="hidden"
-							onChange={(event) => {
-								if (event.target.files) ingestFiles(event.target.files);
-								event.target.value = "";
-							}}
-						/>
-						<input
-							ref={folderInputRef}
-							type="file"
-							multiple
-							className="hidden"
-							{...folderInputAttributes}
-							onChange={onFolderInputChange}
-						/>
-					</div>
-				</div>
-
-				<div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-					<div className="space-y-4">
-						<div className="bg-hc-dark rounded-3xl border border-white/10 p-4 card-shadow">
-							<div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-								<div className="flex-1 flex flex-col gap-3 sm:flex-row">
-									<input
-										type="text"
-										value={search}
-										onChange={(event) => setSearch(event.target.value)}
-										onKeyDown={(event) => {
-											if (event.key === "Enter") void handleSearch();
-										}}
-										placeholder={
-											searchScope === "current"
-												? "Search inside this folder"
-												: "Search entire bucket"
-										}
-										className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue flex-1"
-									/>
-									<div className="inline-flex rounded-xl border border-white/10 overflow-hidden bg-black/20">
-										<button
-											type="button"
-											onClick={() => setSearchScope("current")}
-											className={`px-4 py-3 text-sm font-bold transition-colors ${searchScope === "current" ? "bg-hc-blue text-white" : "text-text-muted hover:text-white"}`}
-										>
-											This folder
-										</button>
-										<button
-											type="button"
-											onClick={() => setSearchScope("all")}
-											className={`px-4 py-3 text-sm font-bold transition-colors ${searchScope === "all" ? "bg-hc-blue text-white" : "text-text-muted hover:text-white"}`}
-										>
-											Everywhere
-										</button>
-									</div>
-								</div>
-								<div className="flex gap-3">
-									<button
-										type="button"
-										onClick={() => void handleSearch()}
-										className="bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
-									>
-										Search
-									</button>
-									{searchMeta.active ? (
-										<button
-											type="button"
-											onClick={() => {
-												setSearch("");
-												void loadFiles({
-													prefix: currentPrefix,
-													reset: true,
-													query: "",
-												});
-											}}
-											className="text-text-muted hover:text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
-										>
-											Clear
-										</button>
-									) : null}
-								</div>
+			<div className="max-w-[1400px] mx-auto w-full">
+				<div className="bg-hc-dark rounded-[28px] border border-white/10 overflow-hidden card-shadow min-h-[72vh]">
+					<div className="px-4 py-3 border-b border-white/10 bg-white/[0.03] flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+						<div className="flex items-center gap-3 min-w-0">
+							<div className="h-10 w-10 rounded-2xl bg-hc-red/15 text-hc-red flex items-center justify-center shrink-0">
+								<PhIcon className="ph ph-folder-open text-xl" />
 							</div>
-							{searchMeta.active ? (
-								<div className="mt-3 text-xs text-text-muted flex flex-wrap gap-3">
-									<span>
-										Showing search results for{" "}
-										<span className="text-white">{searchMeta.query}</span>
-									</span>
-									<span>
-										Scope:{" "}
-										<span className="text-white">
-											{searchMeta.scope === "current"
-												? "Current folder"
-												: "Entire bucket"}
-										</span>
-									</span>
-									<span>
-										Scanned pages:{" "}
-										<span className="text-white">
-											{searchMeta.scannedPages}
-										</span>
-									</span>
-									{searchMeta.truncated ? (
-										<span className="text-amber-300">
-											Search limited for performance; refine query for deeper
-											matches.
-										</span>
-									) : null}
-								</div>
-							) : null}
+							<div className="min-w-0">
+								<h1 className="text-xl font-bold text-white truncate">
+									{bucketName}
+								</h1>
+								<p className="text-xs text-text-muted font-mono truncate">
+									{activePrefix || "root/"}
+								</p>
+							</div>
 						</div>
+						<div className="flex flex-wrap gap-2">
+							<button
+								type="button"
+								onClick={() => {
+									setUploadPrefix(currentPrefix);
+									setUploadQueue([]);
+									setUploadPaths({});
+									setUploadOpen(true);
+								}}
+								className="bg-hc-red hover:bg-red-500 text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
+							>
+								Upload
+							</button>
+							<button
+								type="button"
+								onClick={() => folderInputRef.current?.click()}
+								className="bg-white/10 hover:bg-white/20 text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
+							>
+								Folder
+							</button>
+							<button
+								type="button"
+								disabled={selectedKeys.length === 0}
+								onClick={() => openMove()}
+								className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
+							>
+								Move
+							</button>
+							<button
+								type="button"
+								disabled={selectedKeys.length === 0}
+								onClick={() => startDelete(selectedKeys)}
+								className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
+							>
+								Delete
+							</button>
+							<input
+								ref={fileInputRef}
+								type="file"
+								multiple
+								className="hidden"
+								onChange={(event) => {
+									if (event.target.files) ingestFiles(event.target.files);
+									event.target.value = "";
+								}}
+							/>
+							<input
+								ref={folderInputRef}
+								type="file"
+								multiple
+								className="hidden"
+								{...folderInputAttributes}
+								onChange={onFolderInputChange}
+							/>
+						</div>
+					</div>
 
-						<div className="flex items-center gap-2 text-sm font-mono overflow-x-auto whitespace-nowrap pb-1">
+					<div className="px-4 py-3 border-b border-white/10 bg-black/10 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+						<div className="flex items-center gap-2 text-sm font-mono overflow-x-auto whitespace-nowrap min-w-0">
 							{crumbs.map((crumb, index) => (
 								<Fragment key={crumb.prefix || "root"}>
 									{index > 0 ? (
@@ -797,309 +729,311 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</Fragment>
 							))}
 						</div>
-
-						<section
-							className={`bg-hc-dark rounded-3xl border overflow-hidden card-shadow transition-colors ${dragActive ? "border-hc-red" : "border-white/10"}`}
-							aria-label="Explorer file table"
-							onDragEnter={(event) => {
-								event.preventDefault();
-								setDragActive(true);
-								setDragHint(`Drop files into ${activePrefix || "root"}`);
-							}}
-							onDragOver={(event) => {
-								event.preventDefault();
-								setDragActive(true);
-							}}
-							onDragLeave={(event) => {
-								event.preventDefault();
-								setDragActive(false);
-							}}
-							onDrop={(event) => {
-								event.preventDefault();
-								handleDrop(event.dataTransfer.files);
-							}}
-						>
-							<div className="px-4 py-3 border-b border-white/10 flex flex-wrap items-center gap-3 bg-white/5">
-								<label className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-text-muted">
-									<input
-										type="checkbox"
-										checked={allVisibleFilesSelected}
-										onChange={toggleAllVisibleFiles}
-										className="rounded border-white/10 bg-black/30"
-									/>
-									Select visible
-								</label>
-								<span className="text-xs text-text-muted">
-									{selectedKeys.length} selected • {files.length} files •{" "}
-									{folders.length} folders
-								</span>
-								{dragActive ? (
-									<span className="text-xs text-hc-red">{dragHint}</span>
+						<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:min-w-[520px]">
+							<div className="flex-1 flex flex-col gap-3 sm:flex-row">
+								<input
+									type="text"
+									value={search}
+									onChange={(event) => setSearch(event.target.value)}
+									onKeyDown={(event) => {
+										if (event.key === "Enter") void handleSearch();
+									}}
+									placeholder={
+										searchScope === "current"
+											? "Search inside this folder"
+											: "Search entire bucket"
+									}
+									className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue flex-1"
+								/>
+								<div className="inline-flex rounded-xl border border-white/10 overflow-hidden bg-black/20">
+									<button
+										type="button"
+										onClick={() => setSearchScope("current")}
+										className={`px-4 py-3 text-sm font-bold transition-colors ${searchScope === "current" ? "bg-hc-blue text-white" : "text-text-muted hover:text-white"}`}
+									>
+										This folder
+									</button>
+									<button
+										type="button"
+										onClick={() => setSearchScope("all")}
+										className={`px-4 py-3 text-sm font-bold transition-colors ${searchScope === "all" ? "bg-hc-blue text-white" : "text-text-muted hover:text-white"}`}
+									>
+										Everywhere
+									</button>
+								</div>
+							</div>
+							<div className="flex gap-2">
+								<button
+									type="button"
+									onClick={() => void handleSearch()}
+									className="bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
+								>
+									Search
+								</button>
+								{searchMeta.active ? (
+									<button
+										type="button"
+										onClick={() => {
+											setSearch("");
+											void loadFiles({
+												prefix: currentPrefix,
+												reset: true,
+												query: "",
+											});
+										}}
+										className="text-text-muted hover:text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
+									>
+										Clear
+									</button>
 								) : null}
 							</div>
-							<div className="overflow-x-auto">
-								<table className="w-full text-left text-sm">
-									<thead className="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
-										<tr>
-											<th className="px-4 py-4 w-12">Pick</th>
-											<th className="px-4 py-4 w-12">Type</th>
-											<th className="px-4 py-4">Name</th>
-											<th className="px-4 py-4">Path</th>
-											<th className="px-4 py-4">Size</th>
-											<th className="px-4 py-4">Last Modified</th>
-											<th className="px-4 py-4 text-right">Actions</th>
-										</tr>
-									</thead>
-									<tbody className="divide-y divide-white/5">
-										{!loading && !error && rows.length === 0 ? (
-											<tr>
-												<td
-													colSpan={7}
-													className="px-6 py-12 text-center text-text-muted italic"
-												>
-													No files found.
-												</td>
-											</tr>
-										) : null}
+						</div>
+					</div>
 
-										{folders.map((folder) => (
-											<tr
-												key={folder.prefix}
-												className="hover:bg-white/5 transition-colors cursor-pointer"
-												onDoubleClick={() =>
-													void loadFiles({
-														prefix: folder.prefix,
-														reset: true,
-														query: "",
-													})
-												}
+					{searchMeta.active ? (
+						<div className="px-4 py-2 border-b border-white/10 bg-amber-500/5 text-xs text-text-muted flex flex-wrap gap-x-4 gap-y-1">
+							<span>
+								Results for{" "}
+								<span className="text-white">{searchMeta.query}</span>
+							</span>
+							<span>
+								{searchMeta.scope === "current" ? "This folder" : "Everywhere"}
+							</span>
+							{searchMeta.truncated ? (
+								<span className="text-amber-300">
+									Refine search for deeper results
+								</span>
+							) : null}
+						</div>
+					) : null}
+
+					<section
+						className={`bg-hc-dark rounded-3xl border overflow-hidden card-shadow transition-colors ${dragActive ? "border-hc-red" : "border-white/10"}`}
+						aria-label="Explorer file table"
+						onDragEnter={(event) => {
+							event.preventDefault();
+							setDragActive(true);
+							setDragHint(`Drop files into ${activePrefix || "root"}`);
+						}}
+						onDragOver={(event) => {
+							event.preventDefault();
+							setDragActive(true);
+						}}
+						onDragLeave={(event) => {
+							event.preventDefault();
+							setDragActive(false);
+						}}
+						onDrop={(event) => {
+							event.preventDefault();
+							handleDrop(event.dataTransfer.files);
+						}}
+					>
+						<div className="px-4 py-2.5 border-b border-white/10 flex flex-wrap items-center gap-3 bg-white/[0.03]">
+							<label className="inline-flex items-center gap-2 text-xs font-medium text-text-muted">
+								<input
+									type="checkbox"
+									checked={allVisibleFilesSelected}
+									onChange={toggleAllVisibleFiles}
+									className="rounded border-white/10 bg-black/30"
+								/>
+								Select visible
+							</label>
+							<span className="text-xs text-text-muted">
+								{selectedKeys.length > 0
+									? `${selectedKeys.length} selected`
+									: `${folders.length} folders • ${files.length} files`}
+							</span>
+							{dragActive ? (
+								<span className="text-xs text-hc-red">{dragHint}</span>
+							) : null}
+						</div>
+						<div className="overflow-x-auto">
+							<table className="w-full text-left text-sm">
+								<thead className="bg-white/[0.02] text-text-muted font-medium text-[11px] tracking-wide">
+									<tr>
+										<th className="px-4 py-3 w-12"> </th>
+										<th className="px-4 py-3 w-12"> </th>
+										<th className="px-4 py-3">Name</th>
+										<th className="px-4 py-3">Modified</th>
+										<th className="px-4 py-3">Size</th>
+										<th className="px-4 py-3 text-right">Actions</th>
+									</tr>
+								</thead>
+								<tbody className="divide-y divide-white/5">
+									{!loading && !error && rows.length === 0 ? (
+										<tr>
+											<td
+												colSpan={6}
+												className="px-6 py-16 text-center text-text-muted italic"
 											>
-												<td className="px-4 py-4" />
-												<td className="px-4 py-4 text-hc-blue">
-													<PhIcon className="ph ph-folder-open text-xl" />
-												</td>
-												<td className="px-4 py-4 font-medium text-white font-mono">
+												No files found.
+											</td>
+										</tr>
+									) : null}
+
+									{folders.map((folder) => (
+										<tr
+											key={folder.prefix}
+											className="hover:bg-white/5 transition-colors cursor-pointer"
+											onDoubleClick={() =>
+												void loadFiles({
+													prefix: folder.prefix,
+													reset: true,
+													query: "",
+												})
+											}
+										>
+											<td className="px-4 py-4" />
+											<td className="px-4 py-4 text-hc-blue">
+												<PhIcon className="ph ph-folder-open text-xl" />
+											</td>
+											<td className="px-4 py-3.5 font-medium text-white font-mono">
+												<button
+													type="button"
+													onClick={() =>
+														void loadFiles({
+															prefix: folder.prefix,
+															reset: true,
+															query: "",
+														})
+													}
+													className="hover:text-hc-blue"
+												>
+													{folder.name}
+												</button>
+											</td>
+											<td className="px-4 py-3.5 text-text-muted text-xs whitespace-nowrap">
+												—
+											</td>
+											<td className="px-4 py-3.5 text-text-muted">—</td>
+											<td className="px-4 py-3.5 text-right">
+												<div className="inline-flex gap-2">
 													<button
 														type="button"
-														onClick={() =>
-															void loadFiles({
-																prefix: folder.prefix,
-																reset: true,
-																query: "",
-															})
-														}
-														className="hover:text-hc-blue"
+														onClick={() => {
+															setUploadPrefix(folder.prefix);
+															setUploadOpen(true);
+														}}
+														className="text-xs font-medium text-text-muted hover:text-white"
 													>
-														{folder.name}
+														Upload
 													</button>
+													<button
+														type="button"
+														onClick={() => setMoveTargetPrefix(folder.prefix)}
+														className="text-xs font-medium text-text-muted hover:text-white"
+													>
+														Set target
+													</button>
+												</div>
+											</td>
+										</tr>
+									))}
+
+									{files.map((file) => {
+										const selected = selectedKeys.includes(file.key);
+										return (
+											<tr
+												key={file.key}
+												className={`transition-colors ${selected ? "bg-hc-red/5" : "hover:bg-white/5"}`}
+											>
+												<td className="px-4 py-4">
+													<input
+														type="checkbox"
+														checked={selected}
+														onChange={(event) =>
+															handleRowSelection(
+																file.key,
+																(event.nativeEvent as MouseEvent).shiftKey,
+															)
+														}
+														className="rounded border-white/10 bg-black/30"
+													/>
 												</td>
-												<td className="px-4 py-4 text-text-muted font-mono text-xs">
-													{folder.prefix}
+												<td className="px-4 py-3.5 text-text-muted">
+													<PhIcon
+														className={`ph ${getFileIcon(file)} text-xl`}
+													/>
 												</td>
-												<td className="px-4 py-4 text-text-muted">—</td>
-												<td className="px-4 py-4 text-text-muted">—</td>
-												<td className="px-4 py-4 text-right">
-													<div className="inline-flex gap-2">
+												<td className="px-4 py-3.5 font-medium text-white min-w-0">
+													<div className="font-mono break-all">{file.name}</div>
+													<div className="text-[11px] text-text-muted mt-0.5 break-all font-mono">
+														{file.relativePath}
+													</div>
+												</td>
+												<td className="px-4 py-3.5 text-text-muted text-xs whitespace-nowrap">
+													{formatRelativeTime(file.lastModified)}
+												</td>
+												<td className="px-4 py-3.5 text-text-muted text-xs whitespace-nowrap">
+													{formatBytes(file.size)}
+												</td>
+												<td className="px-4 py-3.5 text-right">
+													<div className="inline-flex flex-wrap justify-end gap-2">
 														<button
 															type="button"
-															onClick={() => {
-																setUploadPrefix(folder.prefix);
-																setUploadOpen(true);
-															}}
-															className="text-xs font-bold uppercase tracking-wider text-text-muted hover:text-white"
+															onClick={() => void openPreview(file)}
+															className="text-hc-blue hover:text-blue-400 text-xs font-medium"
 														>
-															Upload
+															Preview
 														</button>
 														<button
 															type="button"
-															onClick={() => setMoveTargetPrefix(folder.prefix)}
-															className="text-xs font-bold uppercase tracking-wider text-text-muted hover:text-white"
+															onClick={() => openRename(file)}
+															className="text-text-muted hover:text-white text-xs font-medium"
 														>
-															Set target
+															Rename
+														</button>
+														<button
+															type="button"
+															onClick={() => openMove([file.key])}
+															className="text-text-muted hover:text-white text-xs font-medium"
+														>
+															Move
+														</button>
+														<button
+															type="button"
+															onClick={() => startDelete([file.key])}
+															className="text-hc-red hover:text-red-400 text-xs font-medium"
+														>
+															Delete
 														</button>
 													</div>
 												</td>
 											</tr>
-										))}
-
-										{files.map((file) => {
-											const selected = selectedKeys.includes(file.key);
-											return (
-												<tr
-													key={file.key}
-													className={`transition-colors ${selected ? "bg-hc-red/5" : "hover:bg-white/5"}`}
-												>
-													<td className="px-4 py-4">
-														<input
-															type="checkbox"
-															checked={selected}
-															onChange={(event) =>
-																handleRowSelection(
-																	file.key,
-																	(event.nativeEvent as MouseEvent).shiftKey,
-																)
-															}
-															className="rounded border-white/10 bg-black/30"
-														/>
-													</td>
-													<td className="px-4 py-4 text-text-muted">
-														<PhIcon
-															className={`ph ${getFileIcon(file)} text-xl`}
-														/>
-													</td>
-													<td className="px-4 py-4 font-medium text-white font-mono break-all">
-														{file.name}
-													</td>
-													<td className="px-4 py-4 text-text-muted font-mono text-xs break-all">
-														{file.relativePath}
-													</td>
-													<td className="px-4 py-4 text-text-muted font-mono text-xs">
-														{formatBytes(file.size)}
-													</td>
-													<td className="px-4 py-4 text-text-muted font-mono text-xs">
-														{formatRelativeTime(file.lastModified)}
-													</td>
-													<td className="px-4 py-4 text-right">
-														<div className="inline-flex flex-wrap justify-end gap-2">
-															<button
-																type="button"
-																onClick={() => void openPreview(file)}
-																className="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider"
-															>
-																Preview
-															</button>
-															<button
-																type="button"
-																onClick={() => openRename(file)}
-																className="text-text-muted hover:text-white text-xs font-bold uppercase tracking-wider"
-															>
-																Rename
-															</button>
-															<button
-																type="button"
-																onClick={() => openMove([file.key])}
-																className="text-text-muted hover:text-white text-xs font-bold uppercase tracking-wider"
-															>
-																Move
-															</button>
-															<button
-																type="button"
-																onClick={() => startDelete([file.key])}
-																className="text-hc-red hover:text-red-400 text-xs font-bold uppercase tracking-wider"
-															>
-																Delete
-															</button>
-														</div>
-													</td>
-												</tr>
-											);
-										})}
-									</tbody>
-								</table>
-							</div>
-
-							<div className="p-4 border-t border-white/10 flex flex-wrap justify-between items-center gap-3">
-								<div className="text-sm text-text-muted">
-									{loading ? (
-										"Loading..."
-									) : error ? (
-										<span className="text-red-400">{error}</span>
-									) : (
-										"Explorer ready"
-									)}
-								</div>
-								{(searchMeta.active && searchCursor) ||
-								(!searchMeta.active && nextToken) ? (
-									<button
-										type="button"
-										onClick={() => void loadMore()}
-										className="text-text-muted hover:text-white text-sm font-bold py-2 px-4 rounded-lg hover:bg-white/5 transition-colors"
-									>
-										Load More
-									</button>
-								) : null}
-							</div>
-						</section>
-					</div>
-
-					<aside className="space-y-4">
-						<div className="bg-hc-dark rounded-3xl border border-white/10 p-5 card-shadow space-y-4">
-							<h2 className="text-lg font-bold text-white">Bulk actions</h2>
-							<p className="text-sm text-text-muted">
-								Built for large directories: the page only loads one slice at a
-								time, and search is scope-aware instead of pretending folders do
-								not exist.
-							</p>
-							<div className="grid gap-3">
-								<button
-									type="button"
-									disabled={selectedKeys.length === 0}
-									onClick={() => openMove()}
-									className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
-								>
-									Move selected
-								</button>
-								<button
-									type="button"
-									disabled={selectedKeys.length === 0}
-									onClick={handleCopy}
-									className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
-								>
-									Copy paths
-								</button>
-								<button
-									type="button"
-									disabled={selectedKeys.length === 0}
-									onClick={() => startDelete(selectedKeys)}
-									className="bg-hc-red/20 hover:bg-hc-red/30 disabled:opacity-40 disabled:cursor-not-allowed text-hc-red px-4 py-3 rounded-xl text-sm font-bold transition-colors"
-								>
-									Delete selected
-								</button>
-							</div>
-							<div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-text-muted space-y-2">
-								<p>
-									Current target folder:{" "}
-									<span className="text-white font-mono">
-										{moveTargetPrefix || "root/"}
-									</span>
-								</p>
-								<p>
-									Clipboard uploads supported: drag files in or paste
-									screenshots/files directly.
-								</p>
-							</div>
+										);
+									})}
+								</tbody>
+							</table>
 						</div>
 
-						<div className="bg-hc-dark rounded-3xl border border-white/10 p-5 card-shadow space-y-3">
-							<h2 className="text-lg font-bold text-white">Selection</h2>
-							{selectedFiles.length === 0 ? (
-								<p className="text-sm text-text-muted">No files selected.</p>
-							) : (
-								<div className="space-y-2 max-h-72 overflow-auto pr-1">
-									{selectedFiles.map((file) => (
-										<div
-											key={file.key}
-											className="rounded-2xl border border-white/10 bg-black/20 p-3"
-										>
-											<p className="text-white font-mono text-sm break-all">
-												{file.name}
-											</p>
-											<p className="text-text-muted text-xs mt-1 break-all">
-												{file.relativePath}
-											</p>
-											<p className="text-text-muted text-xs mt-1">
-												{formatBytes(file.size)}
-											</p>
-										</div>
-									))}
-								</div>
-							)}
+						<div className="p-3 border-t border-white/10 flex flex-wrap justify-between items-center gap-3 bg-white/[0.02]">
+							<div className="text-xs text-text-muted">
+								{loading ? (
+									"Loading..."
+								) : error ? (
+									<span className="text-red-400">{error}</span>
+								) : selectedKeys.length > 0 ? (
+									`${selectedKeys.length} selected`
+								) : (
+									`${folders.length} folders • ${files.length} files`
+								)}
+							</div>
+							{(searchMeta.active && searchCursor) ||
+							(!searchMeta.active && nextToken) ? (
+								<button
+									type="button"
+									onClick={() => void loadMore()}
+									className="text-text-muted hover:text-white text-sm font-bold py-2 px-4 rounded-lg hover:bg-white/5 transition-colors"
+								>
+									Load More
+								</button>
+							) : null}
 						</div>
-					</aside>
+					</section>
 				</div>
 
 				{operation.error ? (
-					<div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+					<div className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
 						{operation.error}
 					</div>
 				) : null}
