@@ -39,8 +39,32 @@ type BucketRow = {
 type KeyRow = {
 	id: string;
 	accessKey: string;
+	note?: string | null;
 	isPaused?: boolean;
 	pauseReason?: string | null;
+};
+
+type ConfirmActionState = {
+	title: string;
+	message: string;
+	confirmLabel: string;
+	confirmClassName?: string;
+	onConfirm: () => Promise<void>;
+};
+
+type ReasonModalState = {
+	title: string;
+	label: string;
+	placeholder?: string;
+	initialValue?: string;
+	confirmLabel: string;
+	onSubmit: (value: string) => Promise<void>;
+};
+
+type KeyNoteModalState = {
+	keyId: string;
+	accessKey: string;
+	note: string;
 };
 
 type FileRow = {
@@ -299,6 +323,17 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [bucketActionLoading, setBucketActionLoading] = useState<string | null>(
 		null,
 	);
+	const [confirmAction, setConfirmAction] = useState<ConfirmActionState | null>(
+		null,
+	);
+	const [confirmLoading, setConfirmLoading] = useState(false);
+	const [reasonModal, setReasonModal] = useState<ReasonModalState | null>(null);
+	const [reasonValue, setReasonValue] = useState("");
+	const [reasonLoading, setReasonLoading] = useState(false);
+	const [keyNoteModal, setKeyNoteModal] = useState<KeyNoteModalState | null>(
+		null,
+	);
+	const [keyNoteLoading, setKeyNoteLoading] = useState(false);
 
 	const limit = 50;
 
@@ -499,10 +534,20 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 	const toggleLock = async (isLocked: boolean) => {
 		setSelected((prev) => (prev ? { ...prev, isLocked } : prev));
-		const lockReason = isLocked
-			? window.prompt("Enter reason for locking account (optional):")
-			: null;
-		await patchUser("lock", { isLocked, lockReason: lockReason || null });
+		if (!isLocked) {
+			await patchUser("lock", { isLocked, lockReason: null });
+			return;
+		}
+		setReasonValue("");
+		setReasonModal({
+			title: "Lock Account",
+			label: "Reason",
+			placeholder: "Optional reason shown to admins",
+			confirmLabel: "Lock Account",
+			onSubmit: async (value) => {
+				await patchUser("lock", { isLocked, lockReason: value || null });
+			},
+		});
 	};
 
 	const toggleReviewer = async (isReviewer: boolean) => {
@@ -517,47 +562,48 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 	const markAsOverAge = async () => {
 		if (!selected) return;
-		if (
-			!window.confirm(
-				`Mark ${selected.email} as over-age? This will immediately notify them via Slack and start the 2-month deletion countdown.`,
-			)
-		)
-			return;
-
-		setUserActionLoading("age-out");
-		try {
-			await fetchText(`/api/admin/users/${selected.id}/age-out`, {
-				method: "POST",
-			});
-			window.alert("User marked as over-age. Notification sent.");
-			setSelected(null);
-			await loadUsers(true, { force: true });
-		} finally {
-			setUserActionLoading(null);
-		}
+		setConfirmAction({
+			title: "Mark User as Over-Age",
+			message: `Mark ${selected.email} as over-age? This will notify them via Slack and start the 2-month deletion countdown.`,
+			confirmLabel: "Mark Over-Age",
+			confirmClassName: "bg-hc-red hover:bg-red-600 text-white",
+			onConfirm: async () => {
+				setUserActionLoading("age-out");
+				try {
+					await fetchText(`/api/admin/users/${selected.id}/age-out`, {
+						method: "POST",
+					});
+					setSelected(null);
+					await loadUsers(true, { force: true });
+				} finally {
+					setUserActionLoading(null);
+				}
+			},
+		});
 	};
 
 	const startImpersonation = async () => {
 		if (!selected) return;
-		if (
-			!window.confirm(
-				`Impersonate ${selected.email}? This will switch YOUR session.`,
-			)
-		)
-			return;
-
-		setUserActionLoading("impersonate");
-		try {
-			await fetchText("/api/admin/impersonate", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ userId: selected.id }),
-			});
-
-			window.location.href = "/";
-		} finally {
-			setUserActionLoading(null);
-		}
+		setConfirmAction({
+			title: "Impersonate User",
+			message: `Impersonate ${selected.email}? This will switch your current session immediately.`,
+			confirmLabel: "Impersonate",
+			confirmClassName:
+				"bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-200 border-yellow-500/30",
+			onConfirm: async () => {
+				setUserActionLoading("impersonate");
+				try {
+					await fetchText("/api/admin/impersonate", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ userId: selected.id }),
+					});
+					window.location.href = "/";
+				} finally {
+					setUserActionLoading(null);
+				}
+			},
+		});
 	};
 
 	const openBucketModal = async (bucketName: string) => {
@@ -585,84 +631,189 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				? "Empty this CDN bucket? This will delete ALL files in it."
 				: "Empty this bucket? This will delete ALL files in it."
 			: "Delete this bucket and ALL data?";
-		if (!window.confirm(message)) return;
-
-		setBucketActionLoading(reset ? "bucket-empty" : "bucket-delete");
-		try {
-			await fetchText(
-				`/api/admin/buckets/${selectedBucketDetails.name}${reset ? "?reset=true" : ""}`,
-				{ method: "DELETE" },
-			);
-			closeBucketModal();
-			await refreshSelectedBuckets();
-		} finally {
-			setBucketActionLoading(null);
-		}
+		setConfirmAction({
+			title: reset ? "Empty Bucket" : "Delete Bucket",
+			message,
+			confirmLabel: reset ? "Empty Bucket" : "Delete Bucket",
+			confirmClassName: "bg-hc-red hover:bg-red-600 text-white",
+			onConfirm: async () => {
+				setBucketActionLoading(reset ? "bucket-empty" : "bucket-delete");
+				try {
+					await fetchText(
+						`/api/admin/buckets/${selectedBucketDetails.name}${reset ? "?reset=true" : ""}`,
+						{ method: "DELETE" },
+					);
+					closeBucketModal();
+					await refreshSelectedBuckets();
+				} finally {
+					setBucketActionLoading(null);
+				}
+			},
+		});
 	};
 
 	const resetBucketCorsAdmin = async () => {
 		if (!selectedBucketDetails) return;
-		if (!window.confirm("Reset CORS configuration for this bucket?")) return;
-		setBucketActionLoading("cors-reset");
-		try {
-			await fetchText(`/api/admin/buckets/${selectedBucketDetails.name}/cors`, {
-				method: "DELETE",
-			});
-			window.alert("CORS configuration reset.");
-		} finally {
-			setBucketActionLoading(null);
-		}
+		setConfirmAction({
+			title: "Reset Bucket CORS",
+			message: "Reset CORS configuration for this bucket?",
+			confirmLabel: "Reset CORS",
+			confirmClassName: "bg-white/10 hover:bg-white/20 text-white",
+			onConfirm: async () => {
+				setBucketActionLoading("cors-reset");
+				try {
+					await fetchText(
+						`/api/admin/buckets/${selectedBucketDetails.name}/cors`,
+						{
+							method: "DELETE",
+						},
+					);
+				} finally {
+					setBucketActionLoading(null);
+				}
+			},
+		});
 	};
 
 	const toggleBucketPause = async (isPaused: boolean) => {
 		if (!selectedBucketDetails) return;
-		setBucketActionLoading("pause");
-		setSelectedBucketDetails((prev) => (prev ? { ...prev, isPaused } : prev));
-		const pauseReason = isPaused
-			? window.prompt("Enter reason for pausing bucket (optional):")
-			: null;
-		await fetchText(`/api/admin/buckets/${selectedBucketDetails.name}/pause`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ isPaused, pauseReason: pauseReason || null }),
+		if (!isPaused) {
+			setBucketActionLoading("pause");
+			await fetchText(
+				`/api/admin/buckets/${selectedBucketDetails.name}/pause`,
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ isPaused, pauseReason: null }),
+				},
+			);
+			await refreshBucketModal();
+			setBucketActionLoading(null);
+			return;
+		}
+		setReasonValue("");
+		setReasonModal({
+			title: "Pause Bucket",
+			label: "Pause reason",
+			placeholder: "Optional reason visible in admin UI",
+			confirmLabel: "Pause Bucket",
+			onSubmit: async (value) => {
+				setBucketActionLoading("pause");
+				try {
+					await fetchText(
+						`/api/admin/buckets/${selectedBucketDetails.name}/pause`,
+						{
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ isPaused, pauseReason: value || null }),
+						},
+					);
+					await refreshBucketModal();
+				} finally {
+					setBucketActionLoading(null);
+				}
+			},
 		});
-		await refreshBucketModal();
-		setBucketActionLoading(null);
 	};
 
 	const toggleKeyPause = async (keyId: string, isPaused: boolean) => {
 		if (!selectedBucketDetails) return;
-		setBucketActionLoading(`key-${keyId}`);
-		const pauseReason = isPaused
-			? window.prompt("Enter reason for pausing key (optional):")
-			: null;
-		await fetchText(`/api/admin/keys/${keyId}/pause`, {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ isPaused, pauseReason: pauseReason || null }),
+		if (!isPaused) {
+			setBucketActionLoading(`key-${keyId}`);
+			await fetchText(`/api/admin/keys/${keyId}/pause`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ isPaused, pauseReason: null }),
+			});
+			await refreshBucketModal();
+			setBucketActionLoading(null);
+			return;
+		}
+		setReasonValue("");
+		setReasonModal({
+			title: "Pause Key",
+			label: "Pause reason",
+			placeholder: "Optional reason visible in admin UI",
+			confirmLabel: "Pause Key",
+			onSubmit: async (value) => {
+				setBucketActionLoading(`key-${keyId}`);
+				try {
+					await fetchText(`/api/admin/keys/${keyId}/pause`, {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ isPaused, pauseReason: value || null }),
+					});
+					await refreshBucketModal();
+				} finally {
+					setBucketActionLoading(null);
+				}
+			},
 		});
-		await refreshBucketModal();
-		setBucketActionLoading(null);
 	};
 
 	const deleteKeyAdmin = async (keyId: string) => {
-		if (!window.confirm("Delete key?")) return;
-		setBucketActionLoading(`key-del-${keyId}`);
-		await fetchText(`/api/admin/keys/${keyId}`, { method: "DELETE" });
-		await refreshBucketModal();
-		setBucketActionLoading(null);
+		setConfirmAction({
+			title: "Delete Key",
+			message:
+				"Delete this key? Any clients using it will immediately lose access.",
+			confirmLabel: "Delete Key",
+			confirmClassName: "bg-hc-red hover:bg-red-600 text-white",
+			onConfirm: async () => {
+				setBucketActionLoading(`key-del-${keyId}`);
+				try {
+					await fetchText(`/api/admin/keys/${keyId}`, { method: "DELETE" });
+					await refreshBucketModal();
+				} finally {
+					setBucketActionLoading(null);
+				}
+			},
+		});
 	};
 
 	const deleteFileAdmin = async (key: string) => {
 		if (!selectedBucketDetails) return;
-		if (!window.confirm("Delete file?")) return;
-		setBucketActionLoading(`file-del-${key}`);
-		await fetchText(
-			`/api/admin/buckets/${selectedBucketDetails.name}/files?key=${encodeURIComponent(key)}`,
-			{ method: "DELETE" },
-		);
-		await refreshBucketModal();
-		setBucketActionLoading(null);
+		setConfirmAction({
+			title: "Delete File",
+			message: `Delete file ${key}? This cannot be undone.`,
+			confirmLabel: "Delete File",
+			confirmClassName: "bg-hc-red hover:bg-red-600 text-white",
+			onConfirm: async () => {
+				setBucketActionLoading(`file-del-${key}`);
+				try {
+					await fetchText(
+						`/api/admin/buckets/${selectedBucketDetails.name}/files?key=${encodeURIComponent(key)}`,
+						{ method: "DELETE" },
+					);
+					await refreshBucketModal();
+				} finally {
+					setBucketActionLoading(null);
+				}
+			},
+		});
+	};
+
+	const openKeyNoteModal = (key: KeyRow) => {
+		setKeyNoteModal({
+			keyId: key.id,
+			accessKey: key.accessKey,
+			note: key.note || "",
+		});
+	};
+
+	const saveKeyNote = async () => {
+		if (!keyNoteModal) return;
+		setKeyNoteLoading(true);
+		try {
+			await fetchText(`/api/admin/keys/${keyNoteModal.keyId}/note`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ note: keyNoteModal.note }),
+			});
+			await refreshBucketModal();
+			setKeyNoteModal(null);
+		} finally {
+			setKeyNoteLoading(false);
+		}
 	};
 
 	const isQuotaLoading = userActionLoading === "quota";
@@ -1217,6 +1368,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<thead className="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
 									<tr>
 										<th className="px-4 py-3">Access Key</th>
+										<th className="px-4 py-3">Note</th>
 										<th className="px-4 py-3">Status</th>
 										<th className="px-4 py-3 text-right">Actions</th>
 									</tr>
@@ -1226,6 +1378,18 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<tr key={k.id} className="hover:bg-white/5">
 											<td className="px-4 py-3 font-mono text-white">
 												{k.accessKey}
+											</td>
+											<td className="px-4 py-3 text-xs text-text-muted max-w-[220px]">
+												{k.note ? (
+													<span
+														title={k.note}
+														className="line-clamp-2 text-white/80"
+													>
+														{k.note}
+													</span>
+												) : (
+													<span className="italic">No note</span>
+												)}
 											</td>
 											<td className="px-4 py-3">
 												{k.isPaused ? (
@@ -1249,6 +1413,14 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												)}
 											</td>
 											<td className="px-4 py-3 text-right space-x-2">
+												<button
+													type="button"
+													onClick={() => openKeyNoteModal(k)}
+													disabled={!!bucketActionLoading}
+													className="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider"
+												>
+													Note
+												</button>
 												<button
 													type="button"
 													onClick={() => toggleKeyPause(k.id, !k.isPaused)}
@@ -1327,6 +1499,142 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									))}
 								</tbody>
 							</table>
+						</div>
+					</div>
+				) : null}
+			</Modal>
+
+			<Modal
+				open={!!reasonModal}
+				onClose={reasonLoading ? undefined : () => setReasonModal(null)}
+				title={reasonModal?.title}
+				className="max-w-lg p-8"
+			>
+				{reasonModal ? (
+					<div className="space-y-5">
+						<div>
+							<label
+								htmlFor="admin-reason-modal-input"
+								className="text-xs font-bold uppercase tracking-wider text-text-muted"
+							>
+								{reasonModal.label}
+							</label>
+							<textarea
+								id="admin-reason-modal-input"
+								value={reasonValue}
+								onChange={(e) => setReasonValue(e.target.value)}
+								placeholder={reasonModal.placeholder}
+								className="mt-2 w-full min-h-28 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red resize-y"
+							/>
+						</div>
+						<div className="flex justify-end gap-3">
+							<button
+								type="button"
+								onClick={() => setReasonModal(null)}
+								disabled={reasonLoading}
+								className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-4 py-2.5 rounded-lg text-sm font-bold disabled:opacity-50"
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={async () => {
+									setReasonLoading(true);
+									try {
+										await reasonModal.onSubmit(reasonValue.trim());
+										setReasonModal(null);
+										setReasonValue("");
+									} finally {
+										setReasonLoading(false);
+									}
+								}}
+								className="bg-hc-red hover:bg-red-600 text-white px-4 py-2.5 rounded-lg text-sm font-bold disabled:opacity-50"
+								disabled={reasonLoading}
+							>
+								{reasonLoading ? "Saving..." : reasonModal.confirmLabel}
+							</button>
+						</div>
+					</div>
+				) : null}
+			</Modal>
+
+			<Modal
+				open={!!keyNoteModal}
+				onClose={keyNoteLoading ? undefined : () => setKeyNoteModal(null)}
+				title="Key Note"
+				className="max-w-lg p-8"
+			>
+				{keyNoteModal ? (
+					<div className="space-y-5">
+						<p className="text-sm text-text-muted font-mono break-all">
+							{keyNoteModal.accessKey}
+						</p>
+						<textarea
+							value={keyNoteModal.note}
+							onChange={(e) =>
+								setKeyNoteModal((prev) =>
+									prev ? { ...prev, note: e.target.value } : prev,
+								)
+							}
+							placeholder="Add internal admin note for this key"
+							className="w-full min-h-32 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-blue resize-y"
+						/>
+						<div className="flex justify-end gap-3">
+							<button
+								type="button"
+								onClick={() => setKeyNoteModal(null)}
+								disabled={keyNoteLoading}
+								className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-4 py-2.5 rounded-lg text-sm font-bold disabled:opacity-50"
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={saveKeyNote}
+								disabled={keyNoteLoading}
+								className="bg-hc-blue hover:bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-bold disabled:opacity-50"
+							>
+								{keyNoteLoading ? "Saving..." : "Save Note"}
+							</button>
+						</div>
+					</div>
+				) : null}
+			</Modal>
+
+			<Modal
+				open={!!confirmAction}
+				onClose={confirmLoading ? undefined : () => setConfirmAction(null)}
+				title={confirmAction?.title}
+				className="max-w-lg p-8"
+			>
+				{confirmAction ? (
+					<div className="space-y-5">
+						<p className="text-sm text-text-muted">{confirmAction.message}</p>
+						<div className="flex justify-end gap-3">
+							<button
+								type="button"
+								onClick={() => setConfirmAction(null)}
+								disabled={confirmLoading}
+								className="bg-white/5 hover:bg-white/10 border border-white/10 text-white px-4 py-2.5 rounded-lg text-sm font-bold disabled:opacity-50"
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={async () => {
+									setConfirmLoading(true);
+									try {
+										await confirmAction.onConfirm();
+										setConfirmAction(null);
+									} finally {
+										setConfirmLoading(false);
+									}
+								}}
+								className={`${confirmAction.confirmClassName || "bg-hc-red hover:bg-red-600 text-white"} px-4 py-2.5 rounded-lg text-sm font-bold disabled:opacity-50`}
+								disabled={confirmLoading}
+							>
+								{confirmLoading ? "Working..." : confirmAction.confirmLabel}
+							</button>
 						</div>
 					</div>
 				) : null}

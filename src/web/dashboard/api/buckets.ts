@@ -42,7 +42,7 @@ export async function handleBuckets(req: Request): Promise<Response> {
 			const { name: bucketName } = result.data;
 
 			const newBucket = await createBucket(user.id, bucketName);
-			const keys = await createKey(newBucket.id);
+			const keys = await createKey(newBucket.id, "dashboard", "Default key");
 
 			const publicUrl = `https://${config.s3Domain}/${bucketName}/file.png`;
 

@@ -1508,6 +1508,23 @@ async function pauseKey(keyId: string, req: Request) {
 	return new Response("Updated", { status: 200 });
 }
 
+async function updateKeyNote(keyId: string, req: Request) {
+	const body = (await req.json().catch(() => null)) as {
+		note?: unknown;
+	} | null;
+	if (!body || (typeof body.note !== "string" && body.note !== null)) {
+		return new Response("Invalid note", { status: 400 });
+	}
+
+	await db
+		.update(bucketKeys)
+		.set({
+			note: typeof body.note === "string" ? body.note.trim() || null : null,
+		})
+		.where(eq(bucketKeys.id, keyId));
+	return new Response("Updated", { status: 200 });
+}
+
 async function deleteKey(keyId: string) {
 	await db.delete(bucketKeys).where(eq(bucketKeys.id, keyId));
 	return new Response("Deleted", { status: 200 });
@@ -2063,6 +2080,11 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		);
 		if (keyPauseMatch && req.method === "POST") {
 			return pauseKey(keyPauseMatch[1], req);
+		}
+
+		const keyNoteMatch = path.match(/^\/api\/admin\/keys\/([a-z0-9-]+)\/note$/);
+		if (keyNoteMatch && req.method === "PATCH") {
+			return updateKeyNote(keyNoteMatch[1], req);
 		}
 
 		// Delete Key
