@@ -24,6 +24,10 @@ export function renderReactDocument(
 	options: RenderOptions = { layout: "main" },
 ): string {
 	const title = viewData.title || "Silo";
+	const assetVersion =
+		config.git?.shortSha || config.git?.buildDate || String(Date.now());
+	const cssHref = `/assets/react/app.css?v=${encodeURIComponent(assetVersion)}`;
+	const jsSrc = `/assets/react/app.js?v=${encodeURIComponent(assetVersion)}`;
 	const bootstrap = {
 		page: templateName,
 		title,
@@ -55,12 +59,12 @@ export function renderReactDocument(
     <meta property="twitter:title" content="Silo - Free S3 Storage for Hack Club" />
     <meta property="twitter:description" content="Free S3-compatible object storage for Hack Club members. Ship your projects, earn more storage." />
     <meta property="twitter:image" content="https://assets.hackclub.com/icon-rounded.png" />
-    <link rel="stylesheet" href="/assets/react/app.css" />
-  </head>
-  <body class="min-h-screen selection:bg-hc-red selection:text-white font-sans ${viewData.bodyClass || ""}">
-    <div id="root"></div>
-    <script>window.__SILO_APP__ = ${bootstrapJson};</script>
-    <script type="module" src="/assets/react/app.js"></script>
-  </body>
-</html>`;
+	    <link rel="stylesheet" href="${cssHref}" />
+	  </head>
+	  <body class="min-h-screen selection:bg-hc-red selection:text-white font-sans ${viewData.bodyClass || ""}">
+	    <div id="root"></div>
+	    <script>window.__SILO_APP__ = ${bootstrapJson};</script>
+	    <script type="module" src="${jsSrc}"></script>
+	  </body>
+	</html>`;
 }
