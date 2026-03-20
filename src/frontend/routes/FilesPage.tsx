@@ -320,6 +320,8 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		[files, selectedKeys],
 	);
 
+	const isMoveAtRoot = normalizePrefix(moveTargetPrefix) === "";
+
 	const allVisibleFilesSelected =
 		files.length > 0 && selectedFiles.length === files.length;
 
@@ -658,8 +660,8 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			config={bootstrap.config}
 			breadcrumbs={p.breadcrumbs}
 		>
-			<div className="max-w-[1400px] mx-auto w-full">
-				<div className="bg-hc-dark rounded-[28px] border border-white/10 overflow-hidden card-shadow min-h-[72vh]">
+			<div className="max-w-[1400px] mx-auto w-full min-h-[72vh] flex flex-col">
+				<div className="bg-hc-dark rounded-[28px] border border-white/10 overflow-hidden card-shadow flex-1 flex flex-col">
 					<div className="px-4 py-3 border-b border-white/10 bg-white/[0.03] flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
 						<div className="flex items-center gap-3 min-w-0">
 							<div className="h-10 w-10 rounded-2xl bg-hc-red/15 text-hc-red flex items-center justify-center shrink-0">
@@ -827,7 +829,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					) : null}
 
 					<section
-						className={`bg-hc-dark rounded-3xl border overflow-hidden card-shadow transition-colors ${dragActive ? "border-hc-red" : "border-white/10"}`}
+						className={`flex-1 flex flex-col transition-colors ${dragActive ? "border-hc-red" : "border-white/10"}`}
 						aria-label="Explorer file table"
 						onDragEnter={(event) => {
 							event.preventDefault();
@@ -866,7 +868,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<span className="text-xs text-hc-red">{dragHint}</span>
 							) : null}
 						</div>
-						<div className="overflow-x-auto">
+						<div className="overflow-x-auto flex-1">
 							<table className="w-full text-left text-sm">
 								<thead className="bg-white/[0.02] text-text-muted font-medium text-[11px] tracking-wide">
 									<tr>
@@ -1276,16 +1278,17 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						>
 							Current folder
 						</button>
-						<button
-							type="button"
-							onClick={() =>
-								setMoveTargetPrefix(getParentPrefix(currentPrefix))
-							}
-							disabled={!currentPrefix}
-							className="text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white"
-						>
-							Parent folder
-						</button>
+						{!isMoveAtRoot ? (
+							<button
+								type="button"
+								onClick={() =>
+									setMoveTargetPrefix((prev) => getParentPrefix(prev))
+								}
+								className="text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white"
+							>
+								Parent folder
+							</button>
+						) : null}
 						<button
 							type="button"
 							onClick={() => setMoveTargetPrefix("")}
