@@ -5,7 +5,11 @@ import { buckets } from "../../../db/schema";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import { getCurrentUser } from "../../../lib/session";
 import { bucketNameSchema } from "../../../lib/validation";
-import { createKey, deleteKey } from "../../../services/key-service";
+import {
+	createKey,
+	deleteKey,
+	listKeysForBucket,
+} from "../../../services/key-service";
 
 export async function handleKeys(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
@@ -55,7 +59,9 @@ export async function handleKeys(req: Request): Promise<Response> {
 		}
 
 		try {
-			const keys = await createKey(bucket[0].id, "dashboard");
+			const body = (await req.json().catch(() => ({}))) as { note?: unknown };
+			const note = typeof body.note === "string" ? body.note : null;
+			const keys = await createKey(bucket[0].id, "dashboard", note);
 			const publicUrl = `https://${config.s3Domain}/${bucketName}/file.png`;
 			return jsonResponse({ ...keys, publicUrl });
 		} catch (e) {
@@ -80,6 +86,20 @@ export async function handleKeys(req: Request): Promise<Response> {
 		try {
 			await deleteKey(keyId, bucketName, user.id, user.isAdmin);
 			return jsonResponse({ message: "Deleted" });
+		} catch (e) {
+			const message = e instanceof Error ? e.message : "Unknown error";
+			return errorResponse(message, 403);
+		}
+	}
+
+	const listKeysMatch = path.match(
+		/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/keys$/,
+	);
+	if (listKeysMatch && req.method === "GET") {
+		const bucketName = listKeysMatch[1];
+		try {
+			const keys = await listKeysForBucket(bucketName, user.id, user.isAdmin);
+			return jsonResponse({ keys });
 		} catch (e) {
 			const message = e instanceof Error ? e.message : "Unknown error";
 			return errorResponse(message, 403);

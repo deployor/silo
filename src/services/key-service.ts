@@ -114,8 +114,35 @@ export async function deleteKey(
 	await db.delete(bucketKeys).where(eq(bucketKeys.id, keyId));
 }
 
+export async function listKeysForBucket(
+	bucketName: string,
+	userId: string,
+	isAdmin = false,
+) {
+	const bucket = await db
+		.select()
+		.from(buckets)
+		.where(eq(buckets.name, bucketName))
+		.limit(1);
+
+	if (bucket.length === 0) throw new Error("Bucket not found");
+	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
+
+	return db
+		.select({
+			id: bucketKeys.id,
+			accessKey: bucketKeys.accessKey,
+			note: bucketKeys.note,
+			isPaused: bucketKeys.isPaused,
+			pauseReason: bucketKeys.pauseReason,
+		})
+		.from(bucketKeys)
+		.where(eq(bucketKeys.bucketId, bucket[0].id));
+}
+
 export const KeyService = {
 	createKey,
 	deleteKey,
+	listKeysForBucket,
 	updateKeyNote,
 };
