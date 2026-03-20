@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { config } from "../../../config";
 import { db } from "../../../db";
-import { buckets } from "../../../db/schema";
+import { bucketKeys, buckets } from "../../../db/schema";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import { getCurrentUser } from "../../../lib/session";
 import { bucketNameSchema } from "../../../lib/validation";
@@ -9,6 +9,7 @@ import {
 	createKey,
 	deleteKey,
 	listKeysForBucket,
+	updateKeyNote,
 } from "../../../services/key-service";
 
 export async function handleKeys(req: Request): Promise<Response> {
@@ -89,6 +90,70 @@ export async function handleKeys(req: Request): Promise<Response> {
 		} catch (e) {
 			const message = e instanceof Error ? e.message : "Unknown error";
 			return errorResponse(message, 403);
+		}
+	}
+
+	const patchKeyMatch = path.match(
+		/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/keys\/([^/]+)$/,
+	);
+	if (patchKeyMatch && req.method === "PATCH") {
+		if (user.dataExported) {
+			return errorResponse("Account is frozen. Keys cannot be updated.", 403);
+		}
+
+		const bucketName = patchKeyMatch[1];
+		const keyId = patchKeyMatch[2];
+
+		const bucket = await db
+			.select()
+			.from(buckets)
+			.where(eq(buckets.name, bucketName))
+			.limit(1);
+
+		if (bucket.length === 0) return errorResponse("Bucket not found", 404);
+		if (bucket[0].userId !== user.id && !user.isAdmin)
+			return errorResponse("Unauthorized", 403);
+		if (bucket[0].isPaused && !user.isAdmin)
+			return errorResponse("Bucket is paused", 403);
+		if (bucket[0].isCdn)
+			return errorResponse("Cannot modify CDN bucket keys", 403);
+
+		const body = (await req.json().catch(() => null)) as {
+			note?: unknown;
+			isPaused?: unknown;
+			pauseReason?: unknown;
+		} | null;
+
+		if (!body) return errorResponse("Invalid body", 400);
+
+		try {
+			if (body.note !== undefined) {
+				await updateKeyNote(
+					keyId,
+					bucketName,
+					user.id,
+					typeof body.note === "string" ? body.note : null,
+					user.isAdmin,
+				);
+			}
+
+			if (body.isPaused !== undefined) {
+				await db
+					.update(bucketKeys)
+					.set({
+						isPaused: Boolean(body.isPaused),
+						pauseReason:
+							typeof body.pauseReason === "string"
+								? body.pauseReason.trim() || null
+								: null,
+					})
+					.where(eq(bucketKeys.id, keyId));
+			}
+
+			return jsonResponse({ ok: true });
+		} catch (e) {
+			const message = e instanceof Error ? e.message : "Unknown error";
+			return errorResponse(message, 400);
 		}
 	}
 

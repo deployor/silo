@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	MdAccessTimeFilled,
 	MdArrowForward,
+	MdCheck,
 	MdCheckCircle,
 	MdCode,
 	MdContentCopy,
 	MdDeleteForever,
 	MdDeleteOutline,
+	MdEdit,
 	MdFolderOpen,
 	MdGroups,
 	MdInfoOutline,
@@ -40,6 +42,18 @@ type KeyCreateState = {
 	note: string;
 	error: string | null;
 	loading: boolean;
+};
+type EditingKeyNoteState = {
+	keyId: string;
+	value: string;
+	saving: boolean;
+};
+type KeyDeactivateState = {
+	bucketName: string;
+	key: BucketKey;
+	note: string;
+	loading: boolean;
+	error: string | null;
 };
 type CredentialModalState = {
 	kind: "bucket" | "key";
@@ -123,6 +137,10 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [keyCreateModal, setKeyCreateModal] = useState<KeyCreateState | null>(
 		null,
 	);
+	const [editingKeyNote, setEditingKeyNote] =
+		useState<EditingKeyNoteState | null>(null);
+	const [keyDeactivateModal, setKeyDeactivateModal] =
+		useState<KeyDeactivateState | null>(null);
 	const [pendingActionKey, setPendingActionKey] = useState<string | null>(null);
 
 	const buttonBase =
@@ -438,6 +456,98 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						}
 					: prev,
 			);
+		}
+	};
+
+	const setKeyPaused = async (
+		bucketName: string,
+		key: BucketKey,
+		pauseReason: string | null,
+		isPaused: boolean,
+	) => {
+		const pendingKey = `dashboard-key-toggle:${bucketName}:${key.id}`;
+		setPendingActionKey(pendingKey);
+		try {
+			await fetchText(`/api/dashboard/buckets/${bucketName}/keys/${key.id}`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					isPaused,
+					pauseReason,
+				}),
+			});
+			await refreshActiveBucketKeys(bucketName);
+		} catch (e) {
+			window.alert(
+				e instanceof Error ? e.message : "Failed to update key status",
+			);
+		} finally {
+			setPendingActionKey(null);
+		}
+	};
+
+	const openDeactivateKeyModal = (bucketName: string, key: BucketKey) => {
+		setKeyDeactivateModal({
+			bucketName,
+			key,
+			note: key.pauseReason || key.note || "",
+			loading: false,
+			error: null,
+		});
+	};
+
+	const submitDeactivateKey = async () => {
+		if (!keyDeactivateModal) return;
+		setKeyDeactivateModal((prev) =>
+			prev ? { ...prev, loading: true, error: null } : prev,
+		);
+		try {
+			await setKeyPaused(
+				keyDeactivateModal.bucketName,
+				keyDeactivateModal.key,
+				keyDeactivateModal.note.trim() || null,
+				true,
+			);
+			setKeyDeactivateModal(null);
+		} catch (e) {
+			setKeyDeactivateModal((prev) =>
+				prev
+					? {
+							...prev,
+							loading: false,
+							error:
+								e instanceof Error ? e.message : "Failed to deactivate key",
+						}
+					: prev,
+			);
+		}
+	};
+
+	const startEditingKeyNote = (key: BucketKey) => {
+		setEditingKeyNote({
+			keyId: key.id,
+			value: key.note || "",
+			saving: false,
+		});
+	};
+
+	const saveInlineKeyNote = async (bucketName: string) => {
+		if (!editingKeyNote) return;
+		setEditingKeyNote((prev) => (prev ? { ...prev, saving: true } : prev));
+		try {
+			await fetchText(
+				`/api/dashboard/buckets/${bucketName}/keys/${editingKeyNote.keyId}`,
+				{
+					method: "PATCH",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ note: editingKeyNote.value }),
+				},
+			);
+			await refreshActiveBucketKeys(bucketName);
+			setEditingKeyNote(null);
+		} catch (e) {
+			window.alert(e instanceof Error ? e.message : "Failed to save note");
+			setEditingKeyNote((prev) => (prev ? { ...prev, saving: false } : prev));
 		}
 	};
 
@@ -962,69 +1072,103 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													{k.accessKey}
 												</td>
 												<td className="px-4 py-3 text-xs text-text-muted max-w-[260px]">
-													{k.note ? (
-														<span className="text-white/80" title={k.note}>
-															{k.note}
-														</span>
+													{editingKeyNote?.keyId === k.id ? (
+														<div className="flex items-center gap-2">
+															<input
+																type="text"
+																value={editingKeyNote.value}
+																onChange={(e) =>
+																	setEditingKeyNote((prev) =>
+																		prev
+																			? { ...prev, value: e.target.value }
+																			: prev,
+																	)
+																}
+																onKeyDown={(e) => {
+																	if (e.key === "Enter") {
+																		e.preventDefault();
+																		void saveInlineKeyNote(activeBucket.name);
+																	}
+																	if (e.key === "Escape") {
+																		setEditingKeyNote(null);
+																	}
+																}}
+																className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-hc-blue"
+															/>
+															<button
+																type="button"
+																onClick={() =>
+																	void saveInlineKeyNote(activeBucket.name)
+																}
+																disabled={editingKeyNote.saving}
+																className="text-emerald-400 hover:text-emerald-300"
+															>
+																<MdCheck className="text-base" />
+															</button>
+														</div>
+													) : k.note ? (
+														<div className="flex items-center gap-2">
+															<span className="text-white/80" title={k.note}>
+																{k.note}
+															</span>
+															<button
+																type="button"
+																onClick={() => startEditingKeyNote(k)}
+																className="text-text-muted hover:text-white"
+																title="Edit note"
+															>
+																<MdEdit className="text-sm" />
+															</button>
+														</div>
 													) : (
-														<span className="italic">No note</span>
+														<button
+															type="button"
+															onClick={() => startEditingKeyNote(k)}
+															className="inline-flex items-center gap-2 italic hover:not-italic text-text-muted hover:text-white"
+														>
+															No note <MdEdit className="text-sm" />
+														</button>
 													)}
 												</td>
 												<td className="px-4 py-3">
 													{k.isPaused ? (
-														<div className="flex flex-col items-start">
-															<span className="text-red-400 text-xs font-bold">
-																PAUSED
-															</span>
-															{k.pauseReason ? (
-																<span
-																	className="text-[10px] text-red-300 max-w-[160px] truncate"
-																	title={k.pauseReason}
-																>
-																	{k.pauseReason}
-																</span>
-															) : null}
-														</div>
+														<span
+															className="inline-flex h-2.5 w-2.5 rounded-full bg-red-400"
+															title={k.pauseReason || k.note || "Deactivated"}
+														/>
 													) : (
-														<span className="text-emerald-400 text-xs font-bold">
-															ACTIVE
-														</span>
+														<span
+															className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400"
+															title="Active"
+														/>
 													)}
 												</td>
 												<td className="px-4 py-3 text-right">
 													<div className="flex justify-end gap-2">
 														<button
 															type="button"
-															onClick={() => openKeyCreateModal(k.bucketName)}
-															className="hidden"
+															onClick={() =>
+																k.isPaused
+																	? void setKeyPaused(
+																			activeBucket.name,
+																			k,
+																			null,
+																			false,
+																		)
+																	: openDeactivateKeyModal(activeBucket.name, k)
+															}
+															disabled={
+																pendingActionKey ===
+																`dashboard-key-toggle:${activeBucket.name}:${k.id}`
+															}
+															className={`text-xs font-bold uppercase tracking-wider ${k.isPaused ? "text-emerald-400 hover:text-emerald-300" : "text-yellow-300 hover:text-yellow-200"}`}
 														>
-															noop
-														</button>
-														<button
-															type="button"
-															onClick={async () => {
-																const note = window.prompt(
-																	"Edit note for this key",
-																	k.note || "",
-																);
-																if (note === null) return;
-																await fetchText(
-																	`/api/admin/keys/${k.id}/note`,
-																	{
-																		method: "PATCH",
-																		headers: {
-																			"Content-Type": "application/json",
-																		},
-																		body: JSON.stringify({ note }),
-																	},
-																);
-																await refreshActiveBucketKeys(
-																	activeBucket.name,
-																);
-															}}
-															className="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider"
-														>
-															Note
+															{pendingActionKey ===
+															`dashboard-key-toggle:${activeBucket.name}:${k.id}`
+																? "..."
+																: k.isPaused
+																	? "Activate"
+																	: "Deactivate"}
 														</button>
 														<button
 															type="button"
@@ -1073,6 +1217,65 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</button>
 						</div>
 					</>
+				) : null}
+			</Modal>
+
+			<Modal
+				open={!!keyDeactivateModal}
+				onClose={() => setKeyDeactivateModal(null)}
+				title="Deactivate Key"
+				className="max-w-md p-8"
+			>
+				{keyDeactivateModal ? (
+					<div className="space-y-5">
+						<p className="text-text-muted text-sm font-mono break-all">
+							{keyDeactivateModal.key.accessKey}
+						</p>
+						<div>
+							<label
+								htmlFor="deactivate-key-note"
+								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
+							>
+								Deactivate Note
+							</label>
+							<textarea
+								id="deactivate-key-note"
+								value={keyDeactivateModal.note}
+								onChange={(e) =>
+									setKeyDeactivateModal((prev) =>
+										prev
+											? { ...prev, note: e.target.value, error: null }
+											: prev,
+									)
+								}
+								placeholder="Optional note shown when hovering the red status dot"
+								className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red transition-colors resize-y"
+							/>
+						</div>
+						{keyDeactivateModal.error ? (
+							<p className="text-sm text-red-400">{keyDeactivateModal.error}</p>
+						) : null}
+						<div className="flex justify-end gap-3">
+							<button
+								type="button"
+								onClick={() => setKeyDeactivateModal(null)}
+								disabled={keyDeactivateModal.loading}
+								className={`${buttonBase} ${buttonSubtle}`}
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={submitDeactivateKey}
+								disabled={keyDeactivateModal.loading}
+								className={`${buttonBase} ${buttonPrimaryRed} disabled:opacity-50`}
+							>
+								{keyDeactivateModal.loading
+									? "Deactivating..."
+									: "Deactivate Key"}
+							</button>
+						</div>
+					</div>
 				) : null}
 			</Modal>
 
