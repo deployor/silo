@@ -2,6 +2,8 @@ import { createHmac } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { config } from "../../../config";
+import { getCorsHeaders } from "../../../core/s3/cors";
+import { handleGetRequest } from "../../../core/s3/get";
 import { getInternalPath } from "../../../core/s3/utils";
 import { db } from "../../../db";
 import { buckets, users } from "../../../db/schema";
@@ -543,14 +545,25 @@ export async function handleFiles(req: Request): Promise<Response> {
 		);
 
 		try {
-			const s3Res = await s3Client.fetch(internalKey, { method: "GET" });
+			const corsHeaders = getCorsHeaders(req, bucketData.bucket);
+			const response = await handleGetRequest(
+				req,
+				bucketData.owner,
+				bucketData.bucket,
+				safeKey,
+				internalKey,
+				url,
+				corsHeaders,
+				{ consumeQuota: false },
+			);
 
-			if (!s3Res.ok) {
-				if (s3Res.status === 404) return errorResponse("File not found", 404);
-				return new Response(s3Res.body, { status: s3Res.status });
+			if (!response.ok) {
+				if (response.status === 404)
+					return errorResponse("File not found", 404);
+				return response;
 			}
 
-			const headers = new Headers(s3Res.headers);
+			const headers = new Headers(response.headers);
 			headers.set("Content-Disposition", "inline");
 			headers.set("Cache-Control", "private, max-age=300");
 			headers.delete("x-amz-request-id");
@@ -570,8 +583,8 @@ export async function handleFiles(req: Request): Promise<Response> {
 				headers.set("Content-Type", "text/plain");
 			}
 
-			return new Response(s3Res.body, {
-				status: s3Res.status,
+			return new Response(response.body, {
+				status: response.status,
 				headers,
 			});
 		} catch (error) {

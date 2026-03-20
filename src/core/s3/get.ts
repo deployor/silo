@@ -73,7 +73,11 @@ export async function handleGetRequest(
 	internalPath: string,
 	url: URL,
 	corsHeaders: Headers,
+	options?: {
+		consumeQuota?: boolean;
+	},
 ) {
+	const shouldConsumeQuota = options?.consumeQuota ?? true;
 	if (key === "" && url.searchParams.has("cors")) {
 		if (!bucket.corsConfig) {
 			return S3Errors.NoSuchCORSConfiguration().toResponse();
@@ -147,6 +151,7 @@ ${rulesXml}
 	}
 
 	async function reserveEgressQuota(bytesToSend: number) {
+		if (!shouldConsumeQuota) return true;
 		if (!user || user.isImmortal) return true;
 		if (!Number.isFinite(bytesToSend) || bytesToSend <= 0) return true;
 
