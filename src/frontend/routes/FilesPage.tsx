@@ -347,6 +347,10 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		files.length > 0 && selectedFiles.length === files.length;
 	const allVisibleFoldersSelected =
 		folders.length > 0 && selectedFolders.length === folders.length;
+	const allVisibleItemsSelected =
+		(files.length === 0 || allVisibleFilesSelected) &&
+		(folders.length === 0 || allVisibleFoldersSelected) &&
+		(files.length > 0 || folders.length > 0);
 
 	const clearOperationError = useCallback(() => {
 		setOperation((prev) => ({ ...prev, error: null }));
@@ -432,6 +436,17 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		setSelectedFolderPrefixes(folders.map((folder) => folder.prefix));
 	};
 
+	const toggleAllVisibleItems = () => {
+		clearOperationError();
+		if (allVisibleItemsSelected) {
+			setSelectedKeys([]);
+			setSelectedFolderPrefixes([]);
+			return;
+		}
+		setSelectedKeys(files.map((file) => file.key));
+		setSelectedFolderPrefixes(folders.map((folder) => folder.prefix));
+	};
+
 	const openPreview = async (file: FileItem) => {
 		setPreviewOpen(true);
 		setPreviewLoading(true);
@@ -471,6 +486,15 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const startDeleteFolder = (folder: FolderItem) => {
 		clearOperationError();
 		setDeleteFolderTarget(folder);
+	};
+
+	const startDeleteSelection = () => {
+		clearOperationError();
+		if (selectedFolderPrefixes.length > 0) {
+			setDeleteFolderTarget(null);
+			return;
+		}
+		startDelete(selectedKeys);
 	};
 
 	const confirmDelete = async () => {
@@ -756,7 +780,9 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</button>
 							<button
 								type="button"
-								disabled={selectedKeys.length === 0}
+								disabled={
+									selectedKeys.length === 0 || selectedFolderPrefixes.length > 0
+								}
 								onClick={() => openMove()}
 								className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
 							>
@@ -768,13 +794,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									selectedKeys.length === 0 &&
 									selectedFolderPrefixes.length === 0
 								}
-								onClick={() => {
-									if (selectedFolderPrefixes.length > 0) {
-										void confirmDeleteFolder();
-										return;
-									}
-									startDelete(selectedKeys);
-								}}
+								onClick={startDeleteSelection}
 								className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
 							>
 								Delete
@@ -930,8 +950,8 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<label className="inline-flex items-center gap-2 text-xs font-medium text-text-muted">
 								<input
 									type="checkbox"
-									checked={allVisibleFilesSelected}
-									onChange={toggleAllVisibleFiles}
+									checked={allVisibleItemsSelected}
+									onChange={toggleAllVisibleItems}
 									className="rounded border-white/10 bg-black/30"
 								/>
 								Select visible
@@ -941,15 +961,6 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									{selectedKeys.length} selected
 								</span>
 							) : null}
-							<label className="inline-flex items-center gap-2 text-xs font-medium text-text-muted">
-								<input
-									type="checkbox"
-									checked={allVisibleFoldersSelected}
-									onChange={toggleAllVisibleFolders}
-									className="rounded border-white/10 bg-black/30"
-								/>
-								Folders
-							</label>
 							{dragActive ? (
 								<span className="text-xs text-hc-red">{dragHint}</span>
 							) : null}
