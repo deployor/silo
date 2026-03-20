@@ -149,7 +149,14 @@ async function getCacheStatsJson() {
 	const info = parseRedisInfo(redisInfo);
 
 	// Key breakdown by prefix using SCAN
-	const prefixes = ["s3:meta:", "s3:obj:", "auth:", "stats:", "rl:"];
+	const prefixes = [
+		"s3:meta:",
+		"s3:body:",
+		"s3:obj:",
+		"auth:",
+		"stats:",
+		"rl:",
+	];
 	const keyBreakdown: Array<{ name: string; count: number }> = [];
 	for (const prefix of prefixes) {
 		let cursor = "0";
