@@ -171,12 +171,22 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [previewText, setPreviewText] = useState("");
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 	const folderInputRef = useRef<HTMLInputElement | null>(null);
+	const currentPrefixRef = useRef("");
+	const searchMetaRef = useRef(searchMeta);
 	const folderInputAttributes = {
 		webkitdirectory: "true",
 		directory: "true",
 	} as unknown as Record<string, string>;
 
 	const activePrefix = currentPrefix;
+
+	useEffect(() => {
+		currentPrefixRef.current = currentPrefix;
+	}, [currentPrefix]);
+
+	useEffect(() => {
+		searchMetaRef.current = searchMeta;
+	}, [searchMeta]);
 
 	const loadFiles = useCallback(
 		async (options?: {
@@ -190,10 +200,14 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			setLoading(true);
 			setError(null);
 			try {
-				const prefix = normalizePrefix(options?.prefix ?? currentPrefix);
+				const prefix = normalizePrefix(
+					options?.prefix ?? currentPrefixRef.current,
+				);
 				const reset = options?.reset ?? true;
-				const queryValue = (options?.query ?? searchMeta.query).trim();
-				const scope = options?.scope ?? searchMeta.scope;
+				const queryValue = (
+					options?.query ?? searchMetaRef.current.query
+				).trim();
+				const scope = options?.scope ?? searchMetaRef.current.scope;
 				const params = new URLSearchParams();
 				params.set("prefix", prefix);
 
@@ -256,7 +270,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				setLoading(false);
 			}
 		},
-		[bucketName, currentPrefix, searchMeta.query, searchMeta.scope],
+		[bucketName],
 	);
 
 	useEffect(() => {
