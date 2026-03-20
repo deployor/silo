@@ -23,6 +23,11 @@ import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 import { formatBytes } from "../shared/utils/format";
 
 type BucketKey = { id: string; accessKey: string };
+type BucketCreateState = {
+	name: string;
+	error: string | null;
+	loading: boolean;
+};
 type CredentialModalState = {
 	kind: "bucket" | "key";
 	bucketName: string;
@@ -100,6 +105,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		useState(false);
 	const [credentialModal, setCredentialModal] =
 		useState<CredentialModalState | null>(null);
+	const [bucketCreateModal, setBucketCreateModal] =
+		useState<BucketCreateState | null>(null);
 	const [pendingActionKey, setPendingActionKey] = useState<string | null>(null);
 
 	const buttonBase =
@@ -161,10 +168,21 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	}, [stats]);
 
 	const handleCreateBucket = async () => {
-		const name = window.prompt(
-			"Bucket name (lowercase letters, digits, hyphens)",
+		setBucketCreateModal({ name: "", error: null, loading: false });
+	};
+
+	const submitCreateBucket = async () => {
+		if (!bucketCreateModal) return;
+		const name = bucketCreateModal.name.trim();
+		if (!name) {
+			setBucketCreateModal((prev) =>
+				prev ? { ...prev, error: "Bucket name is required." } : prev,
+			);
+			return;
+		}
+		setBucketCreateModal((prev) =>
+			prev ? { ...prev, loading: true, error: null } : prev,
 		);
-		if (!name) return;
 		try {
 			const res = await fetchJson<{
 				accessKey: string;
@@ -182,9 +200,18 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				secretKey: res.secretKey,
 				publicUrl: res.publicUrl,
 			});
+			setBucketCreateModal(null);
 			await load();
 		} catch (e) {
-			window.alert(e instanceof Error ? e.message : "Failed to create bucket");
+			setBucketCreateModal((prev) =>
+				prev
+					? {
+							...prev,
+							loading: false,
+							error: e instanceof Error ? e.message : "Failed to create bucket",
+						}
+					: prev,
+			);
 		}
 	};
 
@@ -741,6 +768,63 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					</table>
 				</div>
 			</div>
+
+			<Modal
+				open={!!bucketCreateModal}
+				onClose={() => setBucketCreateModal(null)}
+				title="Create New Bucket"
+				className="max-w-lg p-8"
+			>
+				{bucketCreateModal ? (
+					<div className="space-y-5">
+						<p className="text-sm text-text-muted">
+							Use lowercase letters, digits, and hyphens only.
+						</p>
+						<div>
+							<label
+								htmlFor="create-bucket-name"
+								className="text-xs font-bold uppercase tracking-wider text-text-muted"
+							>
+								Bucket Name
+							</label>
+							<input
+								id="create-bucket-name"
+								type="text"
+								value={bucketCreateModal.name}
+								onChange={(e) =>
+									setBucketCreateModal((prev) =>
+										prev
+											? { ...prev, name: e.target.value, error: null }
+											: prev,
+									)
+								}
+								placeholder="my-bucket"
+								className="mt-2 w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red"
+							/>
+						</div>
+						{bucketCreateModal.error ? (
+							<p className="text-sm text-red-400">{bucketCreateModal.error}</p>
+						) : null}
+						<div className="flex justify-end gap-3">
+							<button
+								type="button"
+								onClick={() => setBucketCreateModal(null)}
+								className={`${buttonBase} ${buttonSubtle}`}
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								onClick={submitCreateBucket}
+								disabled={bucketCreateModal.loading}
+								className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
+							>
+								{bucketCreateModal.loading ? "Creating..." : "Create Bucket"}
+							</button>
+						</div>
+					</div>
+				) : null}
+			</Modal>
 
 			<Modal
 				open={!!activeBucket}

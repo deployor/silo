@@ -7,6 +7,7 @@ import { getAppSettings } from "./settings-service";
 export async function createKey(
 	bucketId: string,
 	source: "dashboard" | "slack" = "dashboard",
+	note?: string | null,
 ) {
 	const settings = await getAppSettings();
 	const maxKeys = settings.defaultMaxKeysPerBucket;
@@ -63,9 +64,34 @@ export async function createKey(
 		accessKey,
 		secretKey,
 		source,
+		note: note?.trim() || null,
 	});
 
 	return { accessKey, secretKey };
+}
+
+export async function updateKeyNote(
+	keyId: string,
+	bucketName: string,
+	userId: string,
+	note: string | null,
+	isAdmin = false,
+) {
+	const bucket = await db
+		.select()
+		.from(buckets)
+		.where(eq(buckets.name, bucketName))
+		.limit(1);
+
+	if (bucket.length === 0) throw new Error("Bucket not found");
+	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
+	if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
+	if (bucket[0].isCdn) throw new Error("Cannot modify keys for CDN bucket");
+
+	await db
+		.update(bucketKeys)
+		.set({ note: note?.trim() || null })
+		.where(eq(bucketKeys.id, keyId));
 }
 
 export async function deleteKey(
@@ -91,4 +117,5 @@ export async function deleteKey(
 export const KeyService = {
 	createKey,
 	deleteKey,
+	updateKeyNote,
 };
