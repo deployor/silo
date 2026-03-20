@@ -143,6 +143,14 @@ function normalizeUserKey(
 	return cleaned;
 }
 
+function normalizeDirectoryPrefix(
+	rawPrefix: string | null | undefined,
+): string {
+	const normalized = normalizeUserKey(rawPrefix || "", { allowEmpty: true });
+	if (!normalized) return "";
+	return `${normalized}/`;
+}
+
 function getParentPrefix(key: string): string {
 	const parts = key.split("/");
 	parts.pop();
@@ -531,11 +539,8 @@ export async function handleFiles(req: Request): Promise<Response> {
 
 	if (req.method === "GET") {
 		const searchQuery = (url.searchParams.get("query") || "").trim();
-		const currentPrefix = normalizeUserKey(
-			url.searchParams.get("prefix") || "",
-			{
-				allowEmpty: true,
-			},
+		const currentPrefix = normalizeDirectoryPrefix(
+			url.searchParams.get("prefix"),
 		);
 
 		if (searchQuery) {
@@ -827,9 +832,8 @@ export async function handleFiles(req: Request): Promise<Response> {
 			}
 
 			if (action === "move") {
-				const destinationPrefix = normalizeUserKey(
+				const destinationPrefix = normalizeDirectoryPrefix(
 					String(body.destinationPrefix || ""),
-					{ allowEmpty: true },
 				);
 				const sourceKeys = Array.isArray(body.sourceKeys)
 					? body.sourceKeys.map((value: unknown) =>
