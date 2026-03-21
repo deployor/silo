@@ -119,9 +119,19 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		user?: FrontendUser | null;
 		bucketName: string;
 		breadcrumbs?: string;
+		bucketAccess?: {
+			isCollaborative?: boolean;
+			permissions?: string[];
+			canReadFiles?: boolean;
+			canWriteFiles?: boolean;
+			ownerId?: string;
+		};
 	};
 
 	const bucketName = p.bucketName;
+	const bucketAccess = p.bucketAccess;
+	const canWriteFiles = bucketAccess?.canWriteFiles !== false;
+	const collaborationPermissions = bucketAccess?.permissions || [];
 	const [search, setSearch] = useState("");
 	const [searchScope, setSearchScope] = useState<"current" | "all">("current");
 	const [currentPrefix, setCurrentPrefix] = useState("");
@@ -420,7 +430,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		setLastSelectedKey(fileKey);
 	};
 
-	const toggleAllVisibleFiles = () => {
+	const _toggleAllVisibleFiles = () => {
 		clearOperationError();
 		if (allVisibleFilesSelected) {
 			setSelectedKeys([]);
@@ -438,7 +448,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		);
 	};
 
-	const toggleAllVisibleFolders = () => {
+	const _toggleAllVisibleFolders = () => {
 		clearOperationError();
 		if (allVisibleFoldersSelected) {
 			setSelectedFolderPrefixes([]);
@@ -789,6 +799,42 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			breadcrumbs={p.breadcrumbs}
 		>
 			<div className="max-w-[1400px] mx-auto w-full min-h-[72vh] flex flex-col">
+				{bucketAccess?.isCollaborative ? (
+					<div className="mb-4 rounded-3xl border border-yellow-400/30 bg-yellow-400/10 px-5 py-4 text-sm text-yellow-100">
+						<div className="flex flex-wrap items-center gap-3">
+							<span className="inline-flex items-center gap-2 font-bold uppercase tracking-wider text-[11px] text-yellow-200">
+								<i className="ph ph-handshake text-base" /> Shared bucket
+							</span>
+							<span>
+								You are collaborating on{" "}
+								<span className="font-mono">{bucketName}</span>
+								{bucketAccess.ownerId ? (
+									<>
+										{" "}
+										with owner{" "}
+										<span className="font-mono">{bucketAccess.ownerId}</span>
+									</>
+								) : null}
+								.
+							</span>
+						</div>
+						<div className="mt-3 flex flex-wrap gap-2">
+							{collaborationPermissions.map((permission) => (
+								<span
+									key={permission}
+									className="rounded-full border border-yellow-300/30 bg-black/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider"
+								>
+									{permission.replace(/_/g, " ")}
+								</span>
+							))}
+							{!canWriteFiles ? (
+								<span className="rounded-full border border-white/15 bg-black/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white/80">
+									Read only
+								</span>
+							) : null}
+						</div>
+					</div>
+				) : null}
 				<div className="bg-hc-dark rounded-[28px] border border-white/10 overflow-hidden card-shadow flex-1 flex flex-col">
 					<div className="px-4 py-3 border-b border-white/10 bg-white/[0.03] flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
 						<div className="flex items-center gap-3 min-w-0">
@@ -807,14 +853,17 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								onClick={() => {
 									openUploadModal(currentPrefix);
 								}}
-								className="bg-hc-red hover:bg-red-500 text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
+								disabled={!canWriteFiles}
+								className="bg-hc-red hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
 							>
 								Upload
 							</button>
 							<button
 								type="button"
 								disabled={
-									selectedKeys.length === 0 || selectedFolderPrefixes.length > 0
+									!canWriteFiles ||
+									selectedKeys.length === 0 ||
+									selectedFolderPrefixes.length > 0
 								}
 								onClick={() => openMove()}
 								className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
@@ -824,8 +873,9 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<button
 								type="button"
 								disabled={
-									selectedKeys.length === 0 &&
-									selectedFolderPrefixes.length === 0
+									!canWriteFiles ||
+									(selectedKeys.length === 0 &&
+										selectedFolderPrefixes.length === 0)
 								}
 								onClick={startDeleteSelection}
 								className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
@@ -1070,7 +1120,8 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												<button
 													type="button"
 													onClick={() => startDeleteFolder(folder)}
-													className="text-hc-red hover:text-red-400 text-xs font-medium"
+													disabled={!canWriteFiles}
+													className="text-hc-red hover:text-red-400 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
 												>
 													Delete
 												</button>
@@ -1127,21 +1178,24 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														<button
 															type="button"
 															onClick={() => openRename(file)}
-															className="text-text-muted hover:text-white text-xs font-medium"
+															disabled={!canWriteFiles}
+															className="text-text-muted hover:text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
 														>
 															Rename
 														</button>
 														<button
 															type="button"
 															onClick={() => openMove([file.key])}
-															className="text-text-muted hover:text-white text-xs font-medium"
+															disabled={!canWriteFiles}
+															className="text-text-muted hover:text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
 														>
 															Move
 														</button>
 														<button
 															type="button"
 															onClick={() => startDelete([file.key])}
-															className="text-hc-red hover:text-red-400 text-xs font-medium"
+															disabled={!canWriteFiles}
+															className="text-hc-red hover:text-red-400 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
 														>
 															Delete
 														</button>

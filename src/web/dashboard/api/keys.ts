@@ -6,6 +6,10 @@ import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import { getCurrentUser } from "../../../lib/session";
 import { bucketNameSchema } from "../../../lib/validation";
 import {
+	assertCanManageKeys,
+	getBucketAccessForUser,
+} from "../../../services/collaboration-service";
+import {
 	createKey,
 	deleteKey,
 	listKeysForBucket,
@@ -37,13 +41,21 @@ export async function handleKeys(req: Request): Promise<Response> {
 			.limit(1);
 
 		if (bucket.length === 0) return errorResponse("Bucket not found", 404);
-		if (bucket[0].userId !== user.id && !user.isAdmin)
-			return errorResponse("Unauthorized", 403);
-		if (bucket[0].isPaused && !user.isAdmin)
+		const access = await getBucketAccessForUser({
+			bucketName,
+			userId: user.id,
+			isAdmin: user.isAdmin,
+		});
+		if (access.bucket.isPaused && !user.isAdmin)
 			return errorResponse("Bucket is paused", 403);
-
-		if (bucket[0].isCdn)
-			return errorResponse("Cannot create keys for CDN bucket", 403);
+		try {
+			assertCanManageKeys(access);
+		} catch (e) {
+			return errorResponse(
+				e instanceof Error ? e.message : "Unauthorized",
+				403,
+			);
+		}
 
 		if (user.markedAsOverAge) {
 			return errorResponse(
@@ -62,7 +74,7 @@ export async function handleKeys(req: Request): Promise<Response> {
 		try {
 			const body = (await req.json().catch(() => ({}))) as { note?: unknown };
 			const note = typeof body.note === "string" ? body.note : null;
-			const keys = await createKey(bucket[0].id, "dashboard", note);
+			const keys = await createKey(access.bucket.id, "dashboard", note);
 			const publicUrl = `https://${config.s3Domain}/${bucketName}/file.png`;
 			return jsonResponse({ ...keys, publicUrl });
 		} catch (e) {
@@ -104,19 +116,21 @@ export async function handleKeys(req: Request): Promise<Response> {
 		const bucketName = patchKeyMatch[1];
 		const keyId = patchKeyMatch[2];
 
-		const bucket = await db
-			.select()
-			.from(buckets)
-			.where(eq(buckets.name, bucketName))
-			.limit(1);
-
-		if (bucket.length === 0) return errorResponse("Bucket not found", 404);
-		if (bucket[0].userId !== user.id && !user.isAdmin)
-			return errorResponse("Unauthorized", 403);
-		if (bucket[0].isPaused && !user.isAdmin)
+		const access = await getBucketAccessForUser({
+			bucketName,
+			userId: user.id,
+			isAdmin: user.isAdmin,
+		});
+		if (access.bucket.isPaused && !user.isAdmin)
 			return errorResponse("Bucket is paused", 403);
-		if (bucket[0].isCdn)
-			return errorResponse("Cannot modify CDN bucket keys", 403);
+		try {
+			assertCanManageKeys(access);
+		} catch (e) {
+			return errorResponse(
+				e instanceof Error ? e.message : "Unauthorized",
+				403,
+			);
+		}
 
 		const body = (await req.json().catch(() => null)) as {
 			note?: unknown;

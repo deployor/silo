@@ -112,6 +112,44 @@ export const bucketKeys = pgTable(
 	},
 );
 
+export const bucketCollaborators = pgTable(
+	"bucket_collaborators",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		bucketId: uuid("bucket_id")
+			.references(() => buckets.id, { onDelete: "cascade" })
+			.notNull(),
+		inviteeUserId: text("invitee_user_id")
+			.references(() => users.id, { onDelete: "cascade" })
+			.notNull(),
+		invitedByUserId: text("invited_by_user_id")
+			.references(() => users.id, { onDelete: "cascade" })
+			.notNull(),
+		status: text("status").default("pending").notNull(),
+		permissions: text("permissions").notNull(),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+		respondedAt: timestamp("responded_at"),
+		acceptedAt: timestamp("accepted_at"),
+	},
+	(table) => {
+		return {
+			bucketUserIdx: index("bucket_collaborator_bucket_user_idx").on(
+				table.bucketId,
+				table.inviteeUserId,
+			),
+			inviteeIdx: index("bucket_collaborator_invitee_idx").on(
+				table.inviteeUserId,
+				table.status,
+			),
+			inviterIdx: index("bucket_collaborator_inviter_idx").on(
+				table.invitedByUserId,
+			),
+			statusIdx: index("bucket_collaborator_status_idx").on(table.status),
+		};
+	},
+);
+
 export const requestLogs = pgTable(
 	"request_logs",
 	{
@@ -284,6 +322,7 @@ export const redemptionLogs = pgTable(
 
 export const usersRelations = relations(users, ({ many }) => ({
 	buckets: many(buckets),
+	collaborationInvites: many(bucketCollaborators),
 }));
 
 export const bucketsRelations = relations(buckets, ({ one, many }) => ({
@@ -292,6 +331,7 @@ export const bucketsRelations = relations(buckets, ({ one, many }) => ({
 		references: [users.id],
 	}),
 	keys: many(bucketKeys),
+	collaborators: many(bucketCollaborators),
 }));
 
 export const bucketKeysRelations = relations(bucketKeys, ({ one }) => ({
@@ -300,3 +340,21 @@ export const bucketKeysRelations = relations(bucketKeys, ({ one }) => ({
 		references: [buckets.id],
 	}),
 }));
+
+export const bucketCollaboratorsRelations = relations(
+	bucketCollaborators,
+	({ one }) => ({
+		bucket: one(buckets, {
+			fields: [bucketCollaborators.bucketId],
+			references: [buckets.id],
+		}),
+		invitee: one(users, {
+			fields: [bucketCollaborators.inviteeUserId],
+			references: [users.id],
+		}),
+		inviter: one(users, {
+			fields: [bucketCollaborators.invitedByUserId],
+			references: [users.id],
+		}),
+	}),
+);

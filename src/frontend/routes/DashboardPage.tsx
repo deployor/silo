@@ -74,6 +74,20 @@ type DashboardBucket = {
 	pauseReason?: string | null;
 	corsConfig?: string | null;
 	isCdn?: boolean;
+	isCollaborative?: boolean;
+	collaborationPermissions?: string[] | null;
+	collaborators?: Array<{
+		id: string;
+		status: string;
+		permissions: string[];
+		invitedAt?: string;
+		acceptedAt?: string | null;
+		user: {
+			id: string;
+			email?: string | null;
+			slackId?: string | null;
+		};
+	}>;
 };
 
 type DashboardStats = {
@@ -104,6 +118,28 @@ type ConfirmDialogState = {
 	publicRiskWarning?: boolean;
 	confirmDelaySeconds?: number;
 	onConfirm: () => Promise<void>;
+};
+
+type CollaborationModalState = {
+	bucket: DashboardBucket;
+	inviteeUserId: string;
+	permissions: {
+		manageKeys: boolean;
+		manageCors: boolean;
+		filesRead: boolean;
+		filesWrite: boolean;
+	};
+	lookup: {
+		loading: boolean;
+		error: string | null;
+		user: {
+			id: string;
+			email?: string;
+			avatarUrl?: string | null;
+		} | null;
+	};
+	saving: boolean;
+	error: string | null;
 };
 
 export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
@@ -142,6 +178,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [keyDeactivateModal, setKeyDeactivateModal] =
 		useState<KeyDeactivateState | null>(null);
 	const [pendingActionKey, setPendingActionKey] = useState<string | null>(null);
+	const [collaborationModal, setCollaborationModal] =
+		useState<CollaborationModalState | null>(null);
 
 	const buttonBase =
 		"inline-flex items-center justify-center gap-2 rounded-xl border text-sm font-bold transition-colors";
@@ -187,6 +225,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
 		);
 	}, [stats?.buckets]);
+
+	const collaborationPermissionState = (permissions?: string[] | null) => ({
+		manageKeys: permissions?.includes("manage_keys") ?? false,
+		manageCors: permissions?.includes("manage_cors") ?? false,
+		filesRead: permissions?.includes("files_read") ?? false,
+		filesWrite: permissions?.includes("files_write") ?? false,
+	});
 
 	const egressLimitBytes = useMemo(() => {
 		if (!stats) return 0;
@@ -567,6 +612,123 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		}
 	};
 
+	const openCollaborationModal = (bucket: DashboardBucket) => {
+		setCollaborationModal({
+			bucket,
+			inviteeUserId: "",
+			permissions: {
+				manageKeys: false,
+				manageCors: false,
+				filesRead: true,
+				filesWrite: false,
+			},
+			lookup: { loading: false, error: null, user: null },
+			saving: false,
+			error: null,
+		});
+	};
+
+	const lookupCollaborator = async () => {
+		if (!collaborationModal) return;
+		const inviteeUserId = collaborationModal.inviteeUserId.trim();
+		if (!inviteeUserId) {
+			setCollaborationModal((prev) =>
+				prev
+					? {
+							...prev,
+							lookup: {
+								loading: false,
+								error: "User ID is required",
+								user: null,
+							},
+						}
+					: prev,
+			);
+			return;
+		}
+
+		setCollaborationModal((prev) =>
+			prev
+				? {
+						...prev,
+						lookup: { loading: true, error: null, user: null },
+					}
+				: prev,
+		);
+
+		try {
+			const result = await fetchJson<{
+				user: { id: string; email?: string; avatarUrl?: string | null };
+			}>(
+				`/api/dashboard/buckets/${collaborationModal.bucket.name}/collaborators/lookup?userId=${encodeURIComponent(inviteeUserId)}`,
+			);
+			setCollaborationModal((prev) =>
+				prev
+					? {
+							...prev,
+							lookup: { loading: false, error: null, user: result.user },
+						}
+					: prev,
+			);
+		} catch (error) {
+			setCollaborationModal((prev) =>
+				prev
+					? {
+							...prev,
+							lookup: {
+								loading: false,
+								error: error instanceof Error ? error.message : "Lookup failed",
+								user: null,
+							},
+						}
+					: prev,
+			);
+		}
+	};
+
+	const saveCollaborationInvite = async () => {
+		if (!collaborationModal) return;
+		const permissions = [
+			collaborationModal.permissions.manageKeys ? "manage_keys" : null,
+			collaborationModal.permissions.manageCors ? "manage_cors" : null,
+			collaborationModal.permissions.filesRead ? "files_read" : null,
+			collaborationModal.permissions.filesWrite ? "files_write" : null,
+		].filter(Boolean);
+
+		setCollaborationModal((prev) =>
+			prev ? { ...prev, saving: true, error: null } : prev,
+		);
+
+		try {
+			await fetchJson(
+				`/api/dashboard/buckets/${collaborationModal.bucket.name}/collaborators`,
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						inviteeUserId: collaborationModal.inviteeUserId.trim(),
+						permissions,
+					}),
+				},
+			);
+			setCollaborationModal(null);
+			await load();
+		} catch (error) {
+			setCollaborationModal((prev) =>
+				prev
+					? {
+							...prev,
+							saving: false,
+							error:
+								error instanceof Error
+									? error.message
+									: "Failed to save invite",
+						}
+					: prev,
+			);
+		}
+	};
+
 	const saveCors = async () => {
 		if (!corsBucket) return;
 		try {
@@ -797,6 +959,16 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<tbody className="divide-y divide-white/5">
 							{sortedBuckets.map((bucket) =>
 								(() => {
+									const isCollaborative = !!bucket.isCollaborative;
+									const permissions = collaborationPermissionState(
+										bucket.collaborationPermissions,
+									);
+									const canManageKeys =
+										!isCollaborative || permissions.manageKeys;
+									const canManageCors =
+										!isCollaborative || permissions.manageCors;
+									const canOpenFiles =
+										!isCollaborative || permissions.filesRead;
 									const visibilityBusy =
 										pendingActionKey === `visibility:${bucket.name}`;
 									const bucketBusy =
@@ -804,10 +976,15 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									return (
 										<tr
 											key={bucket.name}
-											className="hover:bg-white/5 transition-colors group"
+											className={`transition-colors group ${isCollaborative ? "bg-yellow-400/[0.04] hover:bg-yellow-400/[0.08]" : "hover:bg-white/5"}`}
 										>
 											<td className="px-6 py-4 font-medium text-white font-mono">
 												{bucket.name}
+												{bucket.isCollaborative ? (
+													<span className="ml-2 bg-yellow-400/15 text-yellow-200 px-1.5 py-0.5 rounded text-[10px] font-bold border border-yellow-400/30 uppercase tracking-wider">
+														Shared
+													</span>
+												) : null}
 												{bucket.isPaused ? (
 													<span className="ml-2 bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-500/30">
 														PAUSED
@@ -823,6 +1000,10 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												{bucket.isCdn ? (
 													<span className="text-text-muted italic">
 														Managed
+													</span>
+												) : !canManageKeys ? (
+													<span className="text-text-muted italic">
+														No access
 													</span>
 												) : (
 													<button
@@ -849,6 +1030,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													role="switch"
 													aria-checked={bucket.isPublic}
 													disabled={
+														isCollaborative ||
 														!!bucket.isPaused ||
 														!!bucket.isCdn ||
 														visibilityBusy
@@ -878,7 +1060,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												{new Date(bucket.createdAt).toLocaleDateString()}
 											</td>
 											<td className="px-6 py-4 text-right flex justify-end items-center gap-1.5">
-												{!bucket.isCdn ? (
+												{!bucket.isCdn && !isCollaborative && canManageCors ? (
 													<button
 														type="button"
 														onClick={() => openCorsModal(bucket)}
@@ -892,18 +1074,20 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														</span>
 													</button>
 												) : null}
-												<a
-													href={`/dashboard/buckets/${bucket.name}`}
-													aria-label="Open bucket files"
-													title="Open bucket files"
-													className={`${iconActionBase} group text-hc-blue hover:text-blue-300 hover:bg-hc-blue/10`}
-												>
-													<MdFolderOpen className="text-base" />
-													<span className={iconActionTooltip}>
-														View bucket files
-													</span>
-												</a>
-												{!bucket.isCdn ? (
+												{canOpenFiles ? (
+													<a
+														href={`/dashboard/buckets/${bucket.name}`}
+														aria-label="Open bucket files"
+														title="Open bucket files"
+														className={`${iconActionBase} group text-hc-blue hover:text-blue-300 hover:bg-hc-blue/10`}
+													>
+														<MdFolderOpen className="text-base" />
+														<span className={iconActionTooltip}>
+															View bucket files
+														</span>
+													</a>
+												) : null}
+												{!bucket.isCdn && !isCollaborative ? (
 													<button
 														type="button"
 														onClick={() => deleteBucket(bucket.name, true)}
@@ -932,7 +1116,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														</span>
 													</button>
 												)}
-												{!bucket.isCdn ? (
+												{!bucket.isCdn && !isCollaborative ? (
 													<button
 														type="button"
 														onClick={() => deleteBucket(bucket.name, false)}
@@ -947,6 +1131,20 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														</span>
 													</button>
 												) : null}
+												{!isCollaborative && !bucket.isCdn ? (
+													<button
+														type="button"
+														onClick={() => openCollaborationModal(bucket)}
+														aria-label="Manage collaborators"
+														title="Manage collaborators"
+														className={`${iconActionBase} group text-yellow-200 hover:text-yellow-100 hover:bg-yellow-400/10`}
+													>
+														<MdGroups className="text-base" />
+														<span className={iconActionTooltip}>
+															Manage collaboration
+														</span>
+													</button>
+												) : null}
 											</td>
 										</tr>
 									);
@@ -956,6 +1154,207 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					</table>
 				</div>
 			</div>
+
+			<Modal
+				open={!!collaborationModal}
+				onClose={() => setCollaborationModal(null)}
+				title="Bucket Collaboration"
+				className="max-w-3xl p-8"
+			>
+				{collaborationModal ? (
+					<div className="space-y-6">
+						<div>
+							<p className="text-text-muted text-sm font-mono">
+								{collaborationModal.bucket.name}
+							</p>
+							<p className="text-text-muted text-sm mt-2">
+								Invite someone by user ID. Shared access is disabled for CDN
+								buckets and never includes destructive owner-only actions.
+							</p>
+						</div>
+						<div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+							<input
+								type="text"
+								value={collaborationModal.inviteeUserId}
+								onChange={(event) =>
+									setCollaborationModal((prev) =>
+										prev
+											? {
+													...prev,
+													inviteeUserId: event.target.value,
+													lookup: { loading: false, error: null, user: null },
+													error: null,
+												}
+											: prev,
+									)
+								}
+								placeholder="Enter user ID"
+								className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-300"
+							/>
+							<button
+								type="button"
+								onClick={() => void lookupCollaborator()}
+								disabled={collaborationModal.lookup.loading}
+								className={`${buttonBase} ${buttonNeutral}`}
+							>
+								{collaborationModal.lookup.loading
+									? "Checking..."
+									: "Check user"}
+							</button>
+						</div>
+						{collaborationModal.lookup.error ? (
+							<p className="text-sm text-red-400">
+								{collaborationModal.lookup.error}
+							</p>
+						) : null}
+						{collaborationModal.lookup.user ? (
+							<div className="rounded-2xl border border-yellow-400/20 bg-yellow-400/5 p-4 flex items-center gap-3">
+								{collaborationModal.lookup.user.avatarUrl ? (
+									<img
+										src={collaborationModal.lookup.user.avatarUrl}
+										alt={collaborationModal.lookup.user.id}
+										className="w-10 h-10 rounded-full"
+									/>
+								) : null}
+								<div>
+									<p className="text-white font-bold font-mono">
+										{collaborationModal.lookup.user.id}
+									</p>
+									{collaborationModal.lookup.user.email ? (
+										<p className="text-text-muted text-sm">
+											{collaborationModal.lookup.user.email}
+										</p>
+									) : null}
+								</div>
+							</div>
+						) : null}
+						<div className="grid sm:grid-cols-2 gap-3">
+							{[
+								[
+									"manageKeys",
+									"Manage keys",
+									"Create, update, and delete bucket keys",
+								],
+								[
+									"manageCors",
+									"Manage CORS",
+									"Edit CORS rules for this bucket",
+								],
+								[
+									"filesRead",
+									"Access file explorer (read)",
+									"Browse, preview, and download files",
+								],
+								[
+									"filesWrite",
+									"Access file explorer (write)",
+									"Upload, move, rename, and delete files",
+								],
+							].map(([key, label, hint]) => (
+								<label
+									key={String(key)}
+									className="rounded-2xl border border-white/10 bg-black/20 p-4 flex items-start gap-3"
+								>
+									<input
+										type="checkbox"
+										checked={
+											collaborationModal.permissions[
+												key as keyof CollaborationModalState["permissions"]
+											]
+										}
+										onChange={(event) =>
+											setCollaborationModal((prev) => {
+												if (!prev) return prev;
+												const nextPermissions = {
+													...prev.permissions,
+													[key]: event.target.checked,
+												};
+												if (key === "filesWrite" && event.target.checked) {
+													nextPermissions.filesRead = true;
+												}
+												if (key === "filesRead" && !event.target.checked) {
+													nextPermissions.filesWrite = false;
+												}
+												return {
+													...prev,
+													permissions: nextPermissions,
+													error: null,
+												};
+											})
+										}
+										className="mt-1"
+									/>
+									<div>
+										<p className="text-white font-bold text-sm">{label}</p>
+										<p className="text-text-muted text-xs mt-1">{hint}</p>
+									</div>
+								</label>
+							))}
+						</div>
+						{collaborationModal.error ? (
+							<p className="text-sm text-red-400">{collaborationModal.error}</p>
+						) : null}
+						<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+							<p className="text-white font-bold text-sm mb-3">
+								Current collaborators
+							</p>
+							<div className="space-y-3 max-h-64 overflow-auto">
+								{(collaborationModal.bucket.collaborators || []).length ===
+								0 ? (
+									<p className="text-text-muted text-sm">
+										No invites or collaborators yet.
+									</p>
+								) : (
+									(collaborationModal.bucket.collaborators || []).map(
+										(collaborator) => (
+											<div
+												key={collaborator.id}
+												className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3"
+											>
+												<div>
+													<p className="text-white font-mono text-sm">
+														{collaborator.user.id}
+													</p>
+													<p className="text-text-muted text-xs mt-1 uppercase tracking-wider">
+														{collaborator.status}
+													</p>
+												</div>
+												<div className="flex flex-wrap justify-end gap-2">
+													{collaborator.permissions.map((permission) => (
+														<span
+															key={permission}
+															className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-text-muted"
+														>
+															{permission.replace(/_/g, " ")}
+														</span>
+													))}
+												</div>
+											</div>
+										),
+									)
+								)}
+							</div>
+						</div>
+						<div className="flex justify-end gap-3">
+							<button
+								type="button"
+								onClick={() => setCollaborationModal(null)}
+								className={`${buttonBase} ${buttonSubtle}`}
+							>
+								Close
+							</button>
+							<button
+								type="button"
+								onClick={() => void saveCollaborationInvite()}
+								disabled={collaborationModal.saving}
+								className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
+							>
+								{collaborationModal.saving ? "Saving..." : "Send invite"}
+							</button>
+						</div>
+					</div>
+				) : null}
+			</Modal>
 
 			<Modal
 				open={!!bucketCreateModal}

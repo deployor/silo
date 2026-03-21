@@ -2,6 +2,10 @@ import { config } from "../../config";
 import { formatBytes } from "../../lib/format";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
+import {
+	getBucketAccessForUser,
+	listPendingInviteCount,
+} from "../../services/collaboration-service";
 import { getAppSettings } from "../../services/settings-service";
 import { YswsService } from "../../services/ysws-service";
 import { handleApiRequest } from "./api/index";
@@ -26,10 +30,16 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 	if (path === "/docs" || path === "/docs/") {
 		const user = await getCurrentUser(req);
+		const viewUser = user
+			? {
+					...user,
+					pendingCollaborationInvites: await listPendingInviteCount(user.id),
+				}
+			: null;
 		const settings = await getAppSettings();
 		const html = await render("docs", {
 			title: "Documentation - Silo",
-			user,
+			user: viewUser,
 			s3Domain: config.s3Domain,
 			yswsQuotaPerHour: settings.yswsQuotaPerHourBytes,
 			yswsBonusTiers: settings.yswsBonusTiers,
@@ -84,7 +94,10 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		const html = await render("cdn", {
 			title: "Silo CDN",
 			layout: "main",
-			user,
+			user: {
+				...user,
+				pendingCollaborationInvites: await listPendingInviteCount(user.id),
+			},
 			pageTitle: "CDN",
 		});
 
@@ -123,12 +136,17 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		});
 	}
 
+	const viewUser = {
+		...user,
+		pendingCollaborationInvites: await listPendingInviteCount(user.id),
+	};
+
 	// 1. Check for deletion (Aged Out) - Redirect to landing page explanation
 	if (user.filesDeleted) {
 		const html = await render("aged-out", {
 			title: "Silo - Offboarding",
 			layout: "blank",
-			user,
+			user: viewUser,
 		});
 		return new Response(html, {
 			headers: { "Content-Type": "text/html" },
@@ -146,6 +164,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			hideNavLinks: true,
 			mainClass: "flex items-center justify-center",
 			reason: user.lockReason,
+			user: viewUser,
 		});
 
 		return new Response(html, {
@@ -161,12 +180,24 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	const fileExplorerMatch = path.match(/^\/dashboard\/buckets\/([a-z0-9-]+)$/);
 	if (fileExplorerMatch) {
 		const bucketName = fileExplorerMatch[1];
+		const access = await getBucketAccessForUser({
+			bucketName,
+			userId: user.id,
+			isAdmin: user.isAdmin,
+		});
 		const html = await render("files", {
 			title: "File Explorer - Silo",
 			layout: "main",
 			bucketName,
-			user,
+			user: viewUser,
 			isAdmin: user.isAdmin,
+			bucketAccess: {
+				isCollaborative: access.isCollaborator,
+				permissions: access.permissions,
+				canReadFiles: access.permissionSet.files_read,
+				canWriteFiles: access.permissionSet.files_write,
+				ownerId: access.owner.id,
+			},
 			breadcrumbs: `<span class="text-text-muted">/</span> <span class="bg-hc-blue/20 text-hc-blue px-2 py-0.5 rounded text-sm font-mono border border-hc-blue/30">${bucketName}</span>`,
 		});
 
@@ -181,7 +212,7 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 	const settings = await getAppSettings();
 	const html = await render("dashboard", {
 		title: "Dashboard - Silo",
-		user,
+		user: viewUser,
 		s3Domain: config.s3Domain,
 		latestSubmission,
 		yswsQuotaPerHourHuman: formatBytes(settings.yswsQuotaPerHourBytes),

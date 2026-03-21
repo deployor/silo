@@ -2,6 +2,10 @@ import { count, eq } from "drizzle-orm";
 import { config } from "../config";
 import { db } from "../db";
 import { bucketKeys, buckets, type users } from "../db/schema";
+import {
+	assertCanManageKeys,
+	getBucketAccessForUser,
+} from "./collaboration-service";
 import { getAppSettings } from "./settings-service";
 
 export async function createKey(
@@ -77,16 +81,13 @@ export async function updateKeyNote(
 	note: string | null,
 	isAdmin = false,
 ) {
-	const bucket = await db
-		.select()
-		.from(buckets)
-		.where(eq(buckets.name, bucketName))
-		.limit(1);
-
-	if (bucket.length === 0) throw new Error("Bucket not found");
-	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
-	if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
-	if (bucket[0].isCdn) throw new Error("Cannot modify keys for CDN bucket");
+	const access = await getBucketAccessForUser({
+		bucketName,
+		userId,
+		isAdmin,
+	});
+	if (access.bucket.isPaused && !isAdmin) throw new Error("Bucket is paused");
+	assertCanManageKeys(access);
 
 	await db
 		.update(bucketKeys)
@@ -100,16 +101,13 @@ export async function deleteKey(
 	userId: string,
 	isAdmin = false,
 ) {
-	const bucket = await db
-		.select()
-		.from(buckets)
-		.where(eq(buckets.name, bucketName))
-		.limit(1);
-
-	if (bucket.length === 0) throw new Error("Bucket not found");
-	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
-	if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
-	if (bucket[0].isCdn) throw new Error("Cannot delete keys for CDN bucket");
+	const access = await getBucketAccessForUser({
+		bucketName,
+		userId,
+		isAdmin,
+	});
+	if (access.bucket.isPaused && !isAdmin) throw new Error("Bucket is paused");
+	assertCanManageKeys(access);
 
 	await db.delete(bucketKeys).where(eq(bucketKeys.id, keyId));
 }
@@ -119,14 +117,12 @@ export async function listKeysForBucket(
 	userId: string,
 	isAdmin = false,
 ) {
-	const bucket = await db
-		.select()
-		.from(buckets)
-		.where(eq(buckets.name, bucketName))
-		.limit(1);
-
-	if (bucket.length === 0) throw new Error("Bucket not found");
-	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
+	const access = await getBucketAccessForUser({
+		bucketName,
+		userId,
+		isAdmin,
+	});
+	assertCanManageKeys(access);
 
 	return db
 		.select({
@@ -137,7 +133,7 @@ export async function listKeysForBucket(
 			pauseReason: bucketKeys.pauseReason,
 		})
 		.from(bucketKeys)
-		.where(eq(bucketKeys.bucketId, bucket[0].id));
+		.where(eq(bucketKeys.bucketId, access.bucket.id));
 }
 
 export const KeyService = {
