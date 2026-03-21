@@ -6,7 +6,15 @@ import {
 } from "../core/s3/utils";
 import { db } from "../db";
 import { bucketKeys, buckets, users } from "../db/schema";
+import { redis } from "../lib/redis";
 import { getAppSettings } from "./settings-service";
+
+async function invalidateBucketAuthCache(bucketName: string) {
+	await Promise.allSettled([
+		redis.del(`auth:pub:${bucketName}`),
+		redis.del(`s3:list:${bucketName}:`),
+	]);
+}
 
 export type CorsRule = {
 	ID?: string;
@@ -93,6 +101,8 @@ export async function createBucket(
 		})
 		.returning();
 
+	await invalidateBucketAuthCache(name);
+
 	return newBucket[0];
 }
 
@@ -165,6 +175,7 @@ export async function deleteBucket(
 	}
 
 	await db.delete(buckets).where(eq(buckets.name, name));
+	await invalidateBucketAuthCache(name);
 }
 
 export async function updateBucketVisibility(
@@ -185,6 +196,7 @@ export async function updateBucketVisibility(
 	if (bucket[0].isCdn) throw new Error("Cannot modify CDN bucket");
 
 	await db.update(buckets).set({ isPublic }).where(eq(buckets.name, name));
+	await invalidateBucketAuthCache(name);
 }
 
 export async function updateCorsConfig(
