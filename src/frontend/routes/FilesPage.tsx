@@ -177,11 +177,13 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [previewError, setPreviewError] = useState<string | null>(null);
 	const [previewKey, setPreviewKey] = useState("");
 	const [previewUrl, setPreviewUrl] = useState("");
+	const [previewDownloadUrl, setPreviewDownloadUrl] = useState("");
 	const [previewText, setPreviewText] = useState("");
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 	const folderInputRef = useRef<HTMLInputElement | null>(null);
 	const currentPrefixRef = useRef("");
 	const searchMetaRef = useRef(searchMeta);
+	const previewObjectUrlRef = useRef<string | null>(null);
 	const folderInputAttributes = {
 		webkitdirectory: "true",
 		directory: "true",
@@ -196,6 +198,15 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	useEffect(() => {
 		searchMetaRef.current = searchMeta;
 	}, [searchMeta]);
+
+	useEffect(() => {
+		return () => {
+			if (previewObjectUrlRef.current) {
+				URL.revokeObjectURL(previewObjectUrlRef.current);
+				previewObjectUrlRef.current = null;
+			}
+		};
+	}, []);
 
 	const loadFiles = useCallback(
 		async (options?: {
@@ -448,11 +459,16 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	};
 
 	const openPreview = async (file: FileItem) => {
+		if (previewObjectUrlRef.current) {
+			URL.revokeObjectURL(previewObjectUrlRef.current);
+			previewObjectUrlRef.current = null;
+		}
 		setPreviewOpen(true);
 		setPreviewLoading(true);
 		setPreviewError(null);
 		setPreviewKey(file.key);
 		setPreviewUrl("");
+		setPreviewDownloadUrl("");
 		setPreviewText("");
 		try {
 			const signed = await fetchJson<{ url: string }>(
@@ -463,11 +479,24 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					body: JSON.stringify({ key: file.key }),
 				},
 			);
-			setPreviewUrl(signed.url);
+			setPreviewDownloadUrl(signed.url);
+
+			const response = await fetch(signed.url, {
+				credentials: "same-origin",
+			});
+			if (!response.ok) {
+				throw new Error(`Preview failed (${response.status})`);
+			}
+
+			const blob = await response.blob();
 
 			if (TEXT_EXTS.includes(file.extension)) {
-				const text = await fetchText(signed.url);
+				const text = await blob.text();
 				setPreviewText(text);
+			} else {
+				const objectUrl = URL.createObjectURL(blob);
+				previewObjectUrlRef.current = objectUrl;
+				setPreviewUrl(objectUrl);
 			}
 		} catch (cause) {
 			setPreviewError(
@@ -1165,7 +1194,16 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 			<Modal
 				open={previewOpen}
-				onClose={() => setPreviewOpen(false)}
+				onClose={() => {
+					setPreviewOpen(false);
+					if (previewObjectUrlRef.current) {
+						URL.revokeObjectURL(previewObjectUrlRef.current);
+						previewObjectUrlRef.current = null;
+					}
+					setPreviewUrl("");
+					setPreviewDownloadUrl("");
+					setPreviewText("");
+				}}
 				className="max-w-4xl p-8"
 			>
 				<div className="w-full max-h-[75vh] overflow-auto rounded-lg border border-white/10 bg-hc-dark">
@@ -1222,9 +1260,9 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					<p className="text-white font-bold text-lg">
 						{previewKey.split("/").pop()}
 					</p>
-					{previewUrl ? (
+					{previewDownloadUrl ? (
 						<a
-							href={previewUrl}
+							href={previewDownloadUrl}
 							target="_blank"
 							rel="noreferrer"
 							className="text-hc-blue hover:underline text-sm"
