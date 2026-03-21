@@ -35,6 +35,20 @@ async function maybeWaitForCachePopulation(cacheId: string, timeoutMs = 350) {
 	]);
 }
 
+function getCachedObjectSize(
+	headers: Headers | Record<string, string>,
+	fallbackSize: number,
+): number {
+	const contentLength =
+		headers instanceof Headers
+			? headers.get("content-length") || headers.get("Content-Length")
+			: headers["content-length"] || headers["Content-Length"];
+	const parsed = contentLength
+		? Number.parseInt(contentLength, 10)
+		: Number.NaN;
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackSize;
+}
+
 /**
  * Parse an HTTP Range header and return the byte range.
  * Supports formats: bytes=0-499, bytes=500-, bytes=-500
@@ -315,6 +329,8 @@ ${rulesXml}
 		const rangeHeader = req.headers.get("range");
 		const isCacheable = !url.searchParams.has("uploadId");
 		const isSimpleGet = isCacheable && !rangeHeader;
+		const REDIS_CACHE_LIMIT = 10 * 1024 * 1024; // 10 MB hard ceiling
+		const diskMinSize = getDiskCacheMinSizeBytes();
 
 		// Record demand for smart disk cache admission tracking
 		if (isCacheable && key !== "") {
@@ -363,61 +379,71 @@ ${rulesXml}
 
 				if (cachedBody && cachedMeta) {
 					const headers = new Headers(JSON.parse(cachedMeta));
-					for (const [k, v] of corsHeaders.entries()) {
-						headers.set(k, v);
-					}
-					// Add Cache-Control if not already set
-					if (!headers.has("cache-control")) {
-						if (!user) {
-							headers.set("Cache-Control", "public, max-age=3600");
-						} else {
-							headers.set("Cache-Control", "private, no-cache");
-						}
-					}
-					headers.set("Accept-Ranges", "bytes");
+					const cachedSize = getCachedObjectSize(
+						headers,
+						cachedBody.byteLength,
+					);
 
-					// Range request support for Redis L1 cache
-					if (rangeHeader) {
-						const totalSize = cachedBody.byteLength;
-						const range = parseRangeHeader(rangeHeader, totalSize);
-						if (range) {
-							const sliced = new Uint8Array(cachedBody).slice(
-								range.start,
-								range.end + 1,
-							);
-							const allowed = await reserveEgressQuota(sliced.byteLength);
-							if (!allowed) {
-								return S3Errors.QuotaExceeded(
-									"You have exceeded your egress quota.",
-								).toResponse();
-							}
-							headers.set("Content-Length", sliced.byteLength.toString());
-							headers.set(
-								"Content-Range",
-								`bytes ${range.start}-${range.end}/${totalSize}`,
-							);
-							return new Response(sliced, { status: 206, headers });
+					if (cachedSize >= diskMinSize || cachedSize >= REDIS_CACHE_LIMIT) {
+						Promise.all([
+							redis.del(cacheKeyBody),
+							redis.del(cacheKeyMeta),
+						]).catch(() => undefined);
+					} else {
+						recordDemand(bucket.name, key, cachedSize);
+						for (const [k, v] of corsHeaders.entries()) {
+							headers.set(k, v);
 						}
-						// Invalid range
-						return new Response(null, {
-							status: 416,
-							headers: {
-								"Content-Range": `bytes */${totalSize}`,
-							},
+						if (!headers.has("cache-control")) {
+							if (!user) {
+								headers.set("Cache-Control", "public, max-age=3600");
+							} else {
+								headers.set("Cache-Control", "private, no-cache");
+							}
+						}
+						headers.set("Accept-Ranges", "bytes");
+
+						if (rangeHeader) {
+							const totalSize = cachedBody.byteLength;
+							const range = parseRangeHeader(rangeHeader, totalSize);
+							if (range) {
+								const sliced = new Uint8Array(cachedBody).slice(
+									range.start,
+									range.end + 1,
+								);
+								const allowed = await reserveEgressQuota(sliced.byteLength);
+								if (!allowed) {
+									return S3Errors.QuotaExceeded(
+										"You have exceeded your egress quota.",
+									).toResponse();
+								}
+								headers.set("Content-Length", sliced.byteLength.toString());
+								headers.set(
+									"Content-Range",
+									`bytes ${range.start}-${range.end}/${totalSize}`,
+								);
+								return new Response(sliced, { status: 206, headers });
+							}
+							return new Response(null, {
+								status: 416,
+								headers: {
+									"Content-Range": `bytes */${totalSize}`,
+								},
+							});
+						}
+
+						const allowed = await reserveEgressQuota(cachedBody.byteLength);
+						if (!allowed) {
+							return S3Errors.QuotaExceeded(
+								"You have exceeded your egress quota.",
+							).toResponse();
+						}
+
+						return new Response(new Uint8Array(cachedBody), {
+							status: 200,
+							headers,
 						});
 					}
-
-					const allowed = await reserveEgressQuota(cachedBody.byteLength);
-					if (!allowed) {
-						return S3Errors.QuotaExceeded(
-							"You have exceeded your egress quota.",
-						).toResponse();
-					}
-
-					return new Response(new Uint8Array(cachedBody), {
-						status: 200,
-						headers,
-					});
 				}
 			} catch (e) {
 				console.error("Redis object cache error:", e);
@@ -547,28 +573,41 @@ ${rulesXml}
 
 					if (cachedBodyAfterWait && cachedMetaAfterWait) {
 						const headers = new Headers(JSON.parse(cachedMetaAfterWait));
-						for (const [k, v] of corsHeaders.entries()) {
-							headers.set(k, v);
-						}
-						if (!headers.has("cache-control")) {
-							if (!user) headers.set("Cache-Control", "public, max-age=3600");
-							else headers.set("Cache-Control", "private, no-cache");
-						}
-						headers.set("Accept-Ranges", "bytes");
-
-						const allowed = await reserveEgressQuota(
+						const cachedSize = getCachedObjectSize(
+							headers,
 							cachedBodyAfterWait.byteLength,
 						);
-						if (!allowed) {
-							return S3Errors.QuotaExceeded(
-								"You have exceeded your egress quota.",
-							).toResponse();
-						}
 
-						return new Response(new Uint8Array(cachedBodyAfterWait), {
-							status: 200,
-							headers,
-						});
+						if (cachedSize >= diskMinSize || cachedSize >= REDIS_CACHE_LIMIT) {
+							Promise.all([
+								redis.del(cacheKeyBody),
+								redis.del(cacheKeyMeta),
+							]).catch(() => undefined);
+						} else {
+							recordDemand(bucket.name, key, cachedSize);
+							for (const [k, v] of corsHeaders.entries()) {
+								headers.set(k, v);
+							}
+							if (!headers.has("cache-control")) {
+								if (!user) headers.set("Cache-Control", "public, max-age=3600");
+								else headers.set("Cache-Control", "private, no-cache");
+							}
+							headers.set("Accept-Ranges", "bytes");
+
+							const allowed = await reserveEgressQuota(
+								cachedBodyAfterWait.byteLength,
+							);
+							if (!allowed) {
+								return S3Errors.QuotaExceeded(
+									"You have exceeded your egress quota.",
+								).toResponse();
+							}
+
+							return new Response(new Uint8Array(cachedBodyAfterWait), {
+								status: 200,
+								headers,
+							});
+						}
 					}
 
 					const diskHitAfterWait = await diskCacheGet(bucket.name, key);
@@ -691,8 +730,6 @@ ${rulesXml}
 		// Cache population (background, non-blocking)
 		if (isSimpleGet && response.status === 200 && response.body) {
 			const sizeHint = contentLength ? parseInt(contentLength, 10) : 0;
-			const REDIS_CACHE_LIMIT = 10 * 1024 * 1024; // 10 MB
-			const diskMinSize = getDiskCacheMinSizeBytes();
 			const shouldCacheRedis =
 				sizeHint > 0 && sizeHint < REDIS_CACHE_LIMIT && sizeHint < diskMinSize;
 			const shouldCacheDisk = sizeHint > 0 && isDiskCacheEligible(sizeHint);
