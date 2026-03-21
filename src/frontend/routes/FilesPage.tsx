@@ -779,6 +779,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	}, [ingestFiles]);
 
 	const previewExt = previewKey.split(".").pop()?.toLowerCase() || "";
+	const previewFileName = previewKey.split("/").pop() || "download";
 
 	return (
 		<AppShell
@@ -1262,8 +1263,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					{previewDownloadUrl ? (
 						<a
 							href={previewDownloadUrl}
-							target="_blank"
-							rel="noreferrer"
+							download={previewFileName}
 							className="text-hc-blue hover:underline text-sm"
 						>
 							Download File
