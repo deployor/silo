@@ -36,6 +36,46 @@ export const updateBucketVisibilitySchema = z.object({
 	isPublic: z.boolean(),
 });
 
+export const collaborationPermissionValues = [
+	"manage_keys",
+	"manage_cors",
+	"files_read",
+	"files_write",
+] as const;
+
+export const collaborationPermissionSchema = z.enum(
+	collaborationPermissionValues,
+);
+
+export const collaborationPermissionsSchema = z
+	.array(collaborationPermissionSchema)
+	.max(4, "Too many permissions")
+	.refine((value) => new Set(value).size === value.length, {
+		message: "Permissions must be unique",
+	})
+	.refine(
+		(value) => !value.includes("files_write") || value.includes("files_read"),
+		{
+			message: "File write permission also requires file read permission",
+		},
+	);
+
+export const createCollaborationInviteSchema = z.object({
+	inviteeUserId: z
+		.string()
+		.min(1, "User ID is required")
+		.max(128, "User ID is too long"),
+	permissions: collaborationPermissionsSchema,
+});
+
+export const updateCollaborationInviteSchema = z.object({
+	permissions: collaborationPermissionsSchema,
+});
+
+export const respondToCollaborationInviteSchema = z.object({
+	action: z.enum(["accept", "decline"]),
+});
+
 export const corsRuleSchema = z.object({
 	AllowedOrigins: z.array(z.string()),
 	AllowedMethods: z.array(z.string()),

@@ -10,6 +10,7 @@ import { getCurrentUser } from "../../../lib/session";
 import { getBucketsForUser } from "../../../services/bucket-service";
 import { getAppSettings } from "../../../services/settings-service";
 import { handleBucketOperations, handleBuckets } from "./buckets";
+import { handleCollaboration } from "./collaboration";
 import { handleCors } from "./cors";
 import { handleFiles } from "./files";
 import { handleKeys } from "./keys";
@@ -220,6 +221,13 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 					pauseReason: b.pauseReason,
 					corsConfig: b.corsConfig,
 					isCdn: b.isCdn,
+					isCollaborative: (b as { isCollaborative?: boolean }).isCollaborative,
+					collaborationPermissions: (
+						b as {
+							collaborationPermissions?: string[] | null;
+						}
+					).collaborationPermissions,
+					collaborators: (b as { collaborators?: unknown[] }).collaborators,
 				})),
 			};
 
@@ -236,6 +244,13 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 
 		if (path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+\/keys/)) {
 			return handleKeys(req);
+		}
+
+		if (
+			path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+\/collaborators/) ||
+			path.startsWith("/api/dashboard/collaboration/")
+		) {
+			return handleCollaboration(req);
 		}
 
 		if (path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+\/files/)) {

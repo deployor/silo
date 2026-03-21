@@ -6,7 +6,7 @@ import { getCorsHeaders } from "../../../core/s3/cors";
 import { handleGetRequest } from "../../../core/s3/get";
 import { getInternalPath } from "../../../core/s3/utils";
 import { db } from "../../../db";
-import { buckets, users } from "../../../db/schema";
+import { buckets, type users } from "../../../db/schema";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import {
 	consumeStorageQuota,
@@ -14,6 +14,11 @@ import {
 } from "../../../lib/quota-cache";
 import { s3Client } from "../../../lib/s3-client";
 import { getCurrentUser } from "../../../lib/session";
+import {
+	assertCanReadFiles,
+	assertCanWriteFiles,
+	getBucketAccessForUser,
+} from "../../../services/collaboration-service";
 
 type BucketRecord = typeof buckets.$inferSelect;
 type UserRecord = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
@@ -67,43 +72,23 @@ async function getBucketAndOwner(
 	requestUser: UserRecord,
 	bucketName: string,
 ): Promise<BucketContext> {
-	const bucket = await db
-		.select()
-		.from(buckets)
-		.where(eq(buckets.name, bucketName))
-		.limit(1);
+	const access = await getBucketAccessForUser({
+		bucketName,
+		userId: requestUser.id,
+		isAdmin: requestUser.isAdmin,
+	});
 
-	if (bucket.length === 0) {
-		throw new Error("Bucket not found");
-	}
-
-	if (bucket[0].userId !== requestUser.id && !requestUser.isAdmin) {
-		throw new Error("Unauthorized");
-	}
-
-	if (bucket[0].isPaused && !requestUser.isAdmin) {
+	if (access.bucket.isPaused && !requestUser.isAdmin) {
 		throw new Error("Bucket is paused");
 	}
 
-	if (bucket[0].userId === requestUser.id) {
-		return { bucket: bucket[0], owner: requestUser };
-	}
-
-	if (!bucket[0].userId) {
-		throw new Error("Owner not found");
-	}
-
-	const ownerResult = await db
-		.select()
-		.from(users)
-		.where(eq(users.id, bucket[0].userId))
-		.limit(1);
-
-	if (ownerResult.length === 0) {
-		throw new Error("Owner not found");
-	}
-
-	return { bucket: bucket[0], owner: cloneOwnerUser(ownerResult[0]) };
+	return {
+		bucket: access.bucket,
+		owner:
+			access.owner.id === requestUser.id
+				? requestUser
+				: cloneOwnerUser(access.owner),
+	};
 }
 
 function responseForBucketError(error: unknown): Response | null {
@@ -692,6 +677,19 @@ export async function handleFiles(req: Request): Promise<Response> {
 	}
 
 	if (req.method === "GET") {
+		try {
+			const access = await getBucketAccessForUser({
+				bucketName,
+				userId: user.id,
+				isAdmin: user.isAdmin,
+			});
+			assertCanReadFiles(access);
+		} catch (error) {
+			return (
+				responseForBucketError(error) || errorResponse("Unauthorized", 403)
+			);
+		}
+
 		const searchQuery = (url.searchParams.get("query") || "").trim();
 		const currentPrefix = normalizeDirectoryPrefix(
 			url.searchParams.get("prefix"),
@@ -764,6 +762,19 @@ export async function handleFiles(req: Request): Promise<Response> {
 	}
 
 	if (req.method === "DELETE") {
+		try {
+			const access = await getBucketAccessForUser({
+				bucketName,
+				userId: user.id,
+				isAdmin: user.isAdmin,
+			});
+			assertCanWriteFiles(access);
+		} catch (error) {
+			return (
+				responseForBucketError(error) || errorResponse("Unauthorized", 403)
+			);
+		}
+
 		if (user.dataExported) {
 			return errorResponse("Account is frozen. Files cannot be deleted.", 403);
 		}
@@ -875,6 +886,19 @@ export async function handleFiles(req: Request): Promise<Response> {
 	}
 
 	if (req.method === "POST") {
+		try {
+			const access = await getBucketAccessForUser({
+				bucketName,
+				userId: user.id,
+				isAdmin: user.isAdmin,
+			});
+			assertCanWriteFiles(access);
+		} catch (error) {
+			return (
+				responseForBucketError(error) || errorResponse("Unauthorized", 403)
+			);
+		}
+
 		const action = url.searchParams.get("action") || "upload";
 
 		if (action === "upload") {
@@ -1010,6 +1034,19 @@ export async function handleFiles(req: Request): Promise<Response> {
 	}
 
 	if (req.method === "PATCH") {
+		try {
+			const access = await getBucketAccessForUser({
+				bucketName,
+				userId: user.id,
+				isAdmin: user.isAdmin,
+			});
+			assertCanWriteFiles(access);
+		} catch (error) {
+			return (
+				responseForBucketError(error) || errorResponse("Unauthorized", 403)
+			);
+		}
+
 		if (user.dataExported) {
 			return errorResponse("Account is frozen. Files cannot be updated.", 403);
 		}

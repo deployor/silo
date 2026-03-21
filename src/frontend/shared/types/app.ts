@@ -18,6 +18,7 @@ export type FrontendUser = {
 	email?: string;
 	slackId?: string | null;
 	avatarUrl?: string | null;
+	pendingCollaborationInvites?: number;
 	isAdmin?: boolean;
 	isReviewer?: boolean;
 	isImmortal?: boolean;

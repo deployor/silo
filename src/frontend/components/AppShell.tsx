@@ -1,7 +1,21 @@
 import type React from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { fetchJson } from "../shared/api/http";
 import type { FrontendConfig, FrontendUser } from "../shared/types/app";
 import { timeAgo } from "../shared/utils/format";
+import { Modal } from "./ui/Modal";
+
+type CollaborationInvite = {
+	id: string;
+	bucketName: string;
+	permissions: string[];
+	invitedAt: string;
+	inviter: {
+		id: string;
+		email?: string;
+		avatarUrl?: string | null;
+	};
+};
 
 function stripTags(value: string): string {
 	return value.replace(/<[^>]*>/g, "").trim();
@@ -35,6 +49,60 @@ export function AppShell({
 			return false;
 		}
 	}, []);
+	const [inviteOpen, setInviteOpen] = useState(false);
+	const [inviteCount, setInviteCount] = useState(
+		user?.pendingCollaborationInvites || 0,
+	);
+	const [inviteLoading, setInviteLoading] = useState(false);
+	const [inviteBusyId, setInviteBusyId] = useState<string | null>(null);
+	const [inviteError, setInviteError] = useState<string | null>(null);
+	const [invites, setInvites] = useState<CollaborationInvite[]>([]);
+
+	useEffect(() => {
+		setInviteCount(user?.pendingCollaborationInvites || 0);
+	}, [user?.pendingCollaborationInvites]);
+
+	const loadInvites = async () => {
+		if (!user) return;
+		setInviteLoading(true);
+		setInviteError(null);
+		try {
+			const data = await fetchJson<{
+				count: number;
+				invites: CollaborationInvite[];
+			}>("/api/dashboard/collaboration/invites");
+			setInviteCount(data.count || 0);
+			setInvites(data.invites || []);
+		} catch (error) {
+			setInviteError(
+				error instanceof Error ? error.message : "Failed to load invites",
+			);
+		} finally {
+			setInviteLoading(false);
+		}
+	};
+
+	const respondToInvite = async (
+		inviteId: string,
+		action: "accept" | "decline",
+	) => {
+		setInviteBusyId(inviteId);
+		setInviteError(null);
+		try {
+			await fetchJson(`/api/dashboard/collaboration/invites/${inviteId}`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ action }),
+			});
+			await loadInvites();
+		} catch (error) {
+			setInviteError(
+				error instanceof Error ? error.message : "Failed to update invite",
+			);
+		} finally {
+			setInviteBusyId(null);
+		}
+	};
 
 	return (
 		<div className="min-h-screen selection:bg-hc-red selection:text-white flex flex-col font-sans">
@@ -105,6 +173,24 @@ export function AppShell({
 					{!hideNavLinks ? (
 						user ? (
 							<>
+								{inviteCount > 0 ? (
+									<button
+										type="button"
+										onClick={() => {
+											setInviteOpen(true);
+											void loadInvites();
+										}}
+										className="relative text-text-muted hover:text-white transition-colors"
+										aria-label="Open collaboration invites"
+									>
+										<span className="inline-flex items-center justify-center h-9 w-9 rounded-full border border-white/10 bg-white/5">
+											<i className="ph ph-inbox text-lg" />
+										</span>
+										<span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-yellow-400 text-black text-[10px] font-black flex items-center justify-center">
+											{inviteCount}
+										</span>
+									</button>
+								) : null}
 								<a
 									href="/ysws"
 									className="text-white hover:text-hc-green transition-colors font-bold border border-white/20 rounded px-3 py-1 bg-white/5 hover:bg-white/10"
@@ -180,6 +266,85 @@ export function AppShell({
 				{title ? <h1 className="sr-only">{title}</h1> : null}
 				{children}
 			</main>
+			<Modal
+				open={inviteOpen}
+				onClose={() => setInviteOpen(false)}
+				title="Collaboration Invites"
+				className="max-w-2xl p-8"
+			>
+				<div className="space-y-4">
+					<p className="text-sm text-text-muted">
+						Accept or decline pending bucket collaboration invites.
+					</p>
+					{inviteError ? (
+						<p className="text-sm text-red-400">{inviteError}</p>
+					) : null}
+					<div className="space-y-3 max-h-[60vh] overflow-auto">
+						{inviteLoading ? (
+							<p className="text-text-muted text-sm">Loading invites…</p>
+						) : invites.length === 0 ? (
+							<p className="text-text-muted text-sm">No pending invites.</p>
+						) : (
+							invites.map((invite) => (
+								<div
+									key={invite.id}
+									className="rounded-2xl border border-white/10 bg-black/20 p-4"
+								>
+									<div className="flex items-start justify-between gap-4">
+										<div className="min-w-0">
+											<p className="text-white font-bold font-mono break-all">
+												{invite.bucketName}
+											</p>
+											<div className="mt-2 flex items-center gap-2 text-xs text-text-muted">
+												{invite.inviter.avatarUrl ? (
+													<img
+														src={invite.inviter.avatarUrl}
+														alt={invite.inviter.id}
+														className="w-5 h-5 rounded-full"
+													/>
+												) : null}
+												<span>Invited by {invite.inviter.id}</span>
+											</div>
+											<div className="mt-3 flex flex-wrap gap-2">
+												{invite.permissions.map((permission) => (
+													<span
+														key={permission}
+														className="rounded-full border border-yellow-400/30 bg-yellow-400/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-yellow-200"
+													>
+														{permission.replace(/_/g, " ")}
+													</span>
+												))}
+											</div>
+										</div>
+										<div className="flex items-center gap-2 shrink-0">
+											<button
+												type="button"
+												onClick={() =>
+													void respondToInvite(invite.id, "decline")
+												}
+												disabled={inviteBusyId === invite.id}
+												className="px-3 py-2 rounded-xl text-sm font-bold text-text-muted hover:text-white bg-white/5 hover:bg-white/10 disabled:opacity-50"
+											>
+												Decline
+											</button>
+											<button
+												type="button"
+												onClick={() =>
+													void respondToInvite(invite.id, "accept")
+												}
+												disabled={inviteBusyId === invite.id}
+												className="px-4 py-2 rounded-xl text-sm font-bold text-black bg-yellow-400 hover:bg-yellow-300 disabled:opacity-50"
+											>
+												{inviteBusyId === invite.id ? "Working..." : "Accept"}
+											</button>
+										</div>
+									</div>
+								</div>
+							))
+						)}
+					</div>
+				</div>
+			</Modal>
 		</div>
 	);
 }
