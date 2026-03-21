@@ -356,6 +356,10 @@ export function isDiskCacheEligible(sizeBytes: number): boolean {
 	return ENABLED && sizeBytes >= MIN_SIZE && sizeBytes <= MAX_FILE_SIZE;
 }
 
+export function getDiskCacheMinSizeBytes(): number {
+	return MIN_SIZE;
+}
+
 /**
  * Attempt a disk cache read. Returns null on miss.
  *
