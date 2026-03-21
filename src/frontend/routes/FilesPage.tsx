@@ -10,7 +10,7 @@ import {
 import { AppShell } from "../components/AppShell";
 import { Modal } from "../components/ui/Modal";
 import { PhIcon } from "../components/ui/PhIcon";
-import { fetchJson, fetchText } from "../shared/api/http";
+import { fetchJson } from "../shared/api/http";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 import { formatBytes } from "../shared/utils/format";
 
