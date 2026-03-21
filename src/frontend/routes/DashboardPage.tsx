@@ -969,7 +969,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<span className="text-hc-red">Get paid in storage.</span>
 						</h2>
 						<p className="text-text-muted text-lg max-w-xl mb-6">
-							Built something cool? Submit it to YSWS. Every shipped project
+							Built something cool? Submit it to YSWS. Every shipped hour
 							unlocks{" "}
 							<span className="text-white font-bold">
 								{p.yswsQuotaPerHourHuman || "more"} of permanent storage
