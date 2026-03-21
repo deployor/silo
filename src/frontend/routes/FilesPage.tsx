@@ -491,7 +491,12 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const startDeleteSelection = () => {
 		clearOperationError();
 		if (selectedFolderPrefixes.length > 0) {
-			setDeleteFolderTarget(null);
+			setDeleteFolderTarget({
+				prefix: `${selectedFolderPrefixes.length} selected folder(s)`,
+				name: `${selectedFolderPrefixes.length} selected folder(s)`,
+				type: "folder",
+				parentPrefix: selectedKeys.length > 0 ? "__mixed__" : "",
+			});
 			return;
 		}
 		startDelete(selectedKeys);
@@ -522,19 +527,18 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	};
 
 	const confirmDeleteFolder = async () => {
-		const prefixes = deleteFolderTarget
-			? [deleteFolderTarget.prefix]
-			: selectedFolderPrefixes;
+		const prefixes = selectedFolderPrefixes;
 		if (prefixes.length === 0) return;
 		setOperation({ kind: "delete", busy: true, error: null });
 		try {
 			await fetchJson(`/api/dashboard/buckets/${bucketName}/files`, {
 				method: "DELETE",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ prefixes }),
+				body: JSON.stringify({ prefixes, keys: selectedKeys }),
 			});
 			setDeleteFolderTarget(null);
 			setSelectedFolderPrefixes([]);
+			setSelectedKeys([]);
 			await refreshCurrentView();
 			setOperation({ kind: null, busy: false, error: null });
 		} catch (cause) {
@@ -1276,18 +1280,27 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			</Modal>
 
 			<Modal
-				open={!!deleteFolderTarget || selectedFolderPrefixes.length > 0}
-				onClose={() => (operation.busy ? null : setDeleteFolderTarget(null))}
+				open={!!deleteFolderTarget}
+				onClose={() => {
+					if (operation.busy) return;
+					setDeleteFolderTarget(null);
+				}}
 				title="Delete folder"
 				className="max-w-lg p-8"
 			>
 				<div className="space-y-4">
 					<p className="text-text-muted">
 						This deletes{" "}
-						{deleteFolderTarget ? "the folder" : "the selected folders"}{" "}
+						{deleteFolderTarget?.parentPrefix === "__mixed__"
+							? "the selected folders and files"
+							: deleteFolderTarget
+								? "the folder"
+								: "the selected folders"}{" "}
 						<span className="text-white font-mono">
-							{deleteFolderTarget?.prefix ||
-								`${selectedFolderPrefixes.length} folders`}
+							{deleteFolderTarget?.parentPrefix === "__mixed__"
+								? `${selectedFolderPrefixes.length} folders + ${selectedKeys.length} files`
+								: deleteFolderTarget?.prefix ||
+									`${selectedFolderPrefixes.length} folders`}
 						</span>{" "}
 						and everything inside it.
 					</p>
