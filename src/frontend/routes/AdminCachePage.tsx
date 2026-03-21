@@ -25,7 +25,11 @@ type CacheStats = {
 			bucket: string;
 			key: string;
 			hits: number;
+			sizeBytes: number;
 			sizeMB: number;
+			sizeLabel: string;
+			cachedOnDisk: boolean;
+			cachedInRedis: boolean;
 		}>;
 	};
 	system?: {
@@ -211,6 +215,7 @@ export function AdminCachePage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												<th className="pb-2 font-bold">Key</th>
 												<th className="pb-2 font-bold">Hits</th>
 												<th className="pb-2 font-bold">Size</th>
+												<th className="pb-2 font-bold">Cached</th>
 											</tr>
 										</thead>
 										<tbody>
@@ -231,7 +236,29 @@ export function AdminCachePage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														</span>
 													</td>
 													<td className="py-2 font-mono text-xs">
-														{obj.sizeMB} MB
+														{obj.sizeLabel}
+													</td>
+													<td className="py-2">
+														<div className="flex items-center gap-2 text-xs">
+															{obj.cachedInRedis ? (
+																<span className="inline-flex items-center gap-1 rounded border border-hc-blue/30 bg-hc-blue/10 px-2 py-1 text-hc-blue">
+																	<PhIcon className="ph ph-lightning text-[11px]" />
+																	Redis
+																</span>
+															) : null}
+															{obj.cachedOnDisk ? (
+																<span className="inline-flex items-center gap-1 rounded border border-white/15 bg-white/5 px-2 py-1 text-white/75">
+																	<PhIcon className="ph ph-hard-drives text-[11px]" />
+																	Disk
+																</span>
+															) : null}
+															{!obj.cachedInRedis && !obj.cachedOnDisk ? (
+																<span className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-white/50">
+																	<PhIcon className="ph ph-minus text-[11px]" />
+																	Not cached
+																</span>
+															) : null}
+														</div>
 													</td>
 												</tr>
 											))}
@@ -239,7 +266,7 @@ export function AdminCachePage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												<tr>
 													<td
 														className="py-4 text-text-muted italic"
-														colSpan={4}
+														colSpan={5}
 													>
 														No hot objects yet.
 													</td>

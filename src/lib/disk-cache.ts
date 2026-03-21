@@ -798,8 +798,17 @@ export interface DiskCacheStats {
 		bucket: string;
 		key: string;
 		hits: number;
+		sizeBytes: number;
 		sizeMB: number;
+		cachedOnDisk: boolean;
 	}>;
+}
+
+export function isDiskCached(bucket: string, key: string): boolean {
+	if (!ENABLED || !cacheWritable) return false;
+
+	const hash = hashKey(bucket, key);
+	return existsSync(blobPath(hash)) && existsSync(metaPath(hash));
 }
 
 export function getDiskCacheStats(): DiskCacheStats {
@@ -820,7 +829,9 @@ export function getDiskCacheStats(): DiskCacheStats {
 				bucket,
 				key,
 				hits: v.hits,
+				sizeBytes: v.size,
 				sizeMB: Math.round((v.size / (1024 * 1024)) * 100) / 100,
+				cachedOnDisk: isDiskCached(bucket, key),
 			};
 		});
 

@@ -215,7 +215,14 @@ async function getCacheStatsJson() {
 			capacityPercent: `${capacityPercent}%`,
 			capacityPercentNum: Number.parseFloat(capacityPercent),
 			admissionThreshold: diskStats.currentAdmissionThreshold,
-			topHotObjects: diskStats.topHotObjects,
+			topHotObjects: await Promise.all(
+				diskStats.topHotObjects.map(async (obj) => ({
+					...obj,
+					sizeLabel: formatBytes(obj.sizeBytes),
+					cachedInRedis:
+						(await redis.exists(`s3:body:${obj.bucket}:${obj.key}`)) > 0,
+				})),
+			),
 		},
 		system: {
 			circuitState: circuit.state,
