@@ -4,6 +4,7 @@ import {
 	diskCacheGet,
 	diskCacheGetPath,
 	diskCachePut,
+	getDiskCacheMinSizeBytes,
 	isDiskCacheEligible,
 	recordDemand,
 } from "../../lib/disk-cache";
@@ -691,7 +692,9 @@ ${rulesXml}
 		if (isSimpleGet && response.status === 200 && response.body) {
 			const sizeHint = contentLength ? parseInt(contentLength, 10) : 0;
 			const REDIS_CACHE_LIMIT = 10 * 1024 * 1024; // 10 MB
-			const shouldCacheRedis = sizeHint > 0 && sizeHint < REDIS_CACHE_LIMIT;
+			const diskMinSize = getDiskCacheMinSizeBytes();
+			const shouldCacheRedis =
+				sizeHint > 0 && sizeHint < REDIS_CACHE_LIMIT && sizeHint < diskMinSize;
 			const shouldCacheDisk = sizeHint > 0 && isDiskCacheEligible(sizeHint);
 
 			// Update demand tracker with actual size
