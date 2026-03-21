@@ -337,7 +337,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</p>
 								<p className="text-lg mb-6 text-text-muted">
 									You can toggle a bucket to be <strong>Public</strong> in the
-									dashboard settings.
+									dashboard.
 								</p>
 								<h3 className="text-2xl font-bold mb-4 text-white">
 									What does Public mean?
@@ -357,8 +357,9 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</li>
 								</ul>
 								<p className="text-text-muted">
-									This is ideal for hosting static assets like images, CSS, or
-									game files that need to be publicly accessible on the web.
+									This is okay for hosting static assets like images, CSS, or
+									game files that need to be publicly accessible on the web,
+									but should be used with alot of caution.
 								</p>
 							</div>
 						) : null}
@@ -517,7 +518,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											Multipart Uploads
 										</h3>
 										<p className="text-sm text-text-muted mb-3">
-											Fully supported for large files.
+											Full support for large files.
 										</p>
 										<ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-text-muted font-mono text-sm">
 											<li className="flex items-center gap-2">
@@ -576,9 +577,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<div className="p-6 border-t border-white/5 space-y-8">
 												<p className="text-sm text-text-muted">
 													The following operations are{" "}
-													<strong>not supported</strong>. We prioritize
-													simplicity and security, so many complex or legacy S3
-													features are intentionally omitted.
+													<strong>not supported</strong>.
 												</p>
 
 												<div className="flex gap-4 mb-6 text-xs font-mono">
@@ -602,9 +601,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													</h4>
 													<p className="text-xs text-text-muted mb-3 italic">
 														These features are deprecated, discontinued, or
-														discouraged by Amazon S3. We do not implement them
-														because they are obsolete. We only support standard
-														"hot" storage.
+														discouraged by S3.
 													</p>
 													<div className="flex flex-wrap gap-2 font-mono text-xs">
 														<span

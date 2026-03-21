@@ -65,9 +65,9 @@ const MAX_TOTAL_SIZE =
 	parseInt(process.env.DISK_CACHE_MAX_TOTAL_SIZE || "", 10) ||
 	20 * 1024 * 1024 * 1024;
 
-/** Minimum object size to even consider (default 1 MB). Below this Redis handles it fine. */
+/** Minimum object size to even consider (default 10 MB). Below this Redis handles it fine. */
 const MIN_SIZE =
-	parseInt(process.env.DISK_CACHE_MIN_SIZE || "", 10) || 1 * 1024 * 1024;
+	parseInt(process.env.DISK_CACHE_MIN_SIZE || "", 10) || 10 * 1024 * 1024;
 
 /** Maximum single file size (default 2 GB). */
 const MAX_FILE_SIZE =
