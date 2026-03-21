@@ -44,6 +44,7 @@
 import { createHash } from "node:crypto";
 import {
 	accessSync,
+	constants,
 	existsSync,
 	mkdirSync,
 	readdirSync,
@@ -276,7 +277,7 @@ function ensureParentDir(filePath: string): void {
 function ensureCacheDirectoryWritable(): boolean {
 	try {
 		mkdirSync(CACHE_DIR, { recursive: true });
-		accessSync(CACHE_DIR);
+		accessSync(CACHE_DIR, constants.W_OK);
 		return true;
 	} catch (error) {
 		console.warn(
@@ -789,6 +790,7 @@ export interface DiskCacheStats {
 	maxTotalSizeMB: number;
 	utilizationPercent: number;
 	minFileSizeBytes: number;
+	minFileSizeLabel: string;
 	maxFileSizeBytes: number;
 	maxEntryAgeMs: number;
 	baseAdmissionHits: number;
@@ -862,6 +864,12 @@ export function getDiskCacheStats(): DiskCacheStats {
 		maxTotalSizeMB: Math.round(MAX_TOTAL_SIZE / (1024 * 1024)),
 		utilizationPercent: Math.round(pressure * 100),
 		minFileSizeBytes: MIN_SIZE,
+		minFileSizeLabel:
+			MIN_SIZE < 1024
+				? `${MIN_SIZE} B`
+				: MIN_SIZE < 1024 * 1024
+					? `${(MIN_SIZE / 1024).toFixed(0)} KB`
+					: `${(MIN_SIZE / (1024 * 1024)).toFixed(2)} MB`,
 		maxFileSizeBytes: MAX_FILE_SIZE,
 		maxEntryAgeMs: MAX_ENTRY_AGE_MS,
 		baseAdmissionHits: BASE_ADMISSION_HITS,
