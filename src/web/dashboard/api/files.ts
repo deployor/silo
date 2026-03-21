@@ -775,6 +775,11 @@ export async function handleFiles(req: Request): Promise<Response> {
 				: body?.prefix
 					? [String(body.prefix)]
 					: [];
+			const keys = Array.isArray(body?.keys)
+				? body.keys
+				: url.searchParams.get("key")
+					? [url.searchParams.get("key")]
+					: [];
 
 			if (folderPrefixes.length > 0) {
 				const result = await deletePrefixObjects({
@@ -783,30 +788,50 @@ export async function handleFiles(req: Request): Promise<Response> {
 					prefixes: folderPrefixes,
 				});
 
-				if (result.deletedBytes > 0) {
+				let deletedBytes = result.deletedBytes;
+				const deletedKeys = [...result.deletedKeys];
+
+				if (keys.length > 0) {
+					if (keys.length > MAX_BULK_KEYS) {
+						return errorResponse(
+							`Too many files selected (max ${MAX_BULK_KEYS})`,
+							400,
+						);
+					}
+
+					const normalizedKeys = keys.map((key: unknown) =>
+						normalizeUserKey(String(key)),
+					);
+					for (const key of normalizedKeys) {
+						const internalKey = getInternalPath(
+							key,
+							bucketData.owner,
+							bucketData.bucket,
+						);
+						deletedBytes += await deleteSingleObject(internalKey);
+						deletedKeys.push(key);
+					}
+				}
+
+				if (deletedBytes > 0) {
 					await db
 						.update(buckets)
 						.set({
-							totalBytes: sql`${buckets.totalBytes} - ${result.deletedBytes}`,
+							totalBytes: sql`${buckets.totalBytes} - ${deletedBytes}`,
 						})
 						.where(eq(buckets.id, bucketData.bucket.id));
 				}
 
 				return jsonResponse({
-					message: "Deleted folders",
+					message:
+						keys.length > 0 ? "Deleted folders and files" : "Deleted folders",
 					deletedPrefixes: folderPrefixes.map((prefix: string) =>
 						normalizeDirectoryPrefix(prefix),
 					),
-					deletedKeys: result.deletedKeys,
-					deletedBytes: result.deletedBytes,
+					deletedKeys,
+					deletedBytes,
 				});
 			}
-
-			const keys = Array.isArray(body?.keys)
-				? body.keys
-				: url.searchParams.get("key")
-					? [url.searchParams.get("key")]
-					: [];
 
 			if (keys.length === 0) return errorResponse("Missing key", 400);
 			if (keys.length > MAX_BULK_KEYS) {
