@@ -209,9 +209,13 @@ async function getCacheStatsJson() {
 			keyBreakdown,
 		},
 		disk: {
+			enabled: diskStats.enabled,
+			writable: diskStats.writable,
+			directory: diskStats.directory,
 			fileCount: diskStats.entryCount,
 			currentSize: formatBytes(diskStats.totalSizeBytes),
 			maxSize: formatBytes(diskStats.maxTotalSizeBytes),
+			minFileSize: diskStats.minFileSizeLabel,
 			capacityPercent: `${capacityPercent}%`,
 			capacityPercentNum: Number.parseFloat(capacityPercent),
 			admissionThreshold: diskStats.currentAdmissionThreshold,

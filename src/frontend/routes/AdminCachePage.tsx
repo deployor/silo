@@ -16,8 +16,13 @@ type CacheStats = {
 		keyBreakdown?: Array<{ name: string; count: number }>;
 	};
 	disk?: {
+		enabled?: boolean;
+		writable?: boolean;
+		directory?: string;
 		fileCount?: number;
 		currentSize?: string;
+		maxSize?: string;
+		minFileSize?: string;
 		capacityPercent?: string;
 		capacityPercentNum?: number;
 		admissionThreshold?: number;
@@ -147,16 +152,33 @@ export function AdminCachePage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									title="Disk L2 Cache"
 									icon="ph-hard-drives"
 									rows={[
+										[
+											"Status",
+											stats.disk?.enabled
+												? stats.disk?.writable
+													? "Active"
+													: "Read-only / disabled"
+												: "Disabled",
+										],
 										["Files", String(stats.disk?.fileCount ?? 0)],
 										["Size", stats.disk?.currentSize || "-"],
-										["Capacity", stats.disk?.capacityPercent || "-"],
+										[
+											"Capacity",
+											stats.disk?.maxSize
+												? `${stats.disk?.capacityPercent || "-"} of ${stats.disk.maxSize}`
+												: stats.disk?.capacityPercent || "-",
+										],
 										[
 											"Admission Threshold",
 											String(stats.disk?.admissionThreshold ?? "-"),
 										],
+										["Min File Size", stats.disk?.minFileSize || "-"],
 									]}
 									extra={
 										<div className="mt-4">
+											<div className="mb-3 text-[11px] text-text-muted font-mono break-all">
+												{stats.disk?.directory || "-"}
+											</div>
 											<div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
 												<div
 													className="bg-hc-blue rounded-full h-2 transition-all duration-500"
