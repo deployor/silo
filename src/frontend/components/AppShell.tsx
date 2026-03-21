@@ -1,5 +1,6 @@
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
+import { FiMail } from "react-icons/fi";
 import { fetchJson } from "../shared/api/http";
 import type { FrontendConfig, FrontendUser } from "../shared/types/app";
 import { timeAgo } from "../shared/utils/format";
@@ -183,8 +184,8 @@ export function AppShell({
 										className="relative text-text-muted hover:text-white transition-colors"
 										aria-label="Open collaboration invites"
 									>
-										<span className="inline-flex items-center justify-center h-9 w-9 rounded-full border border-white/10 bg-white/5">
-											<i className="ph ph-inbox text-lg" />
+										<span className="inline-flex items-center justify-center h-9 w-9 rounded-xl border border-white/10 bg-white/5">
+											<FiMail className="text-base" />
 										</span>
 										<span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-yellow-400 text-black text-[10px] font-black flex items-center justify-center">
 											{inviteCount}

@@ -209,9 +209,12 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		setLoading(true);
 		setError(null);
 		try {
-			setStats(await fetchJson<DashboardStats>("/api/dashboard/stats"));
+			const nextStats = await fetchJson<DashboardStats>("/api/dashboard/stats");
+			setStats(nextStats);
+			return nextStats;
 		} catch (e) {
 			setError(e instanceof Error ? e.message : "Failed to load dashboard");
+			return null;
 		} finally {
 			setLoading(false);
 		}
@@ -788,10 +791,19 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					body: JSON.stringify({ permissions }),
 				},
 			);
-			await load();
-			setCollaborationModal((prev) =>
-				prev ? { ...prev, savingId: null } : prev,
-			);
+			const latestStats = await load();
+			setCollaborationModal((prev) => {
+				if (!prev) return prev;
+				const nextBucket = latestStats?.buckets.find(
+					(bucket) => bucket.name === bucketName,
+				);
+				return {
+					...prev,
+					bucket: nextBucket || prev.bucket,
+					savingId: null,
+					error: null,
+				};
+			});
 		} catch (error) {
 			setCollaborationModal((prev) =>
 				prev
@@ -820,10 +832,19 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				`/api/dashboard/buckets/${bucketName}/collaborators/${collaboratorId}`,
 				{ method: "DELETE" },
 			);
-			await load();
-			setCollaborationModal((prev) =>
-				prev ? { ...prev, deletingId: null } : prev,
-			);
+			const latestStats = await load();
+			setCollaborationModal((prev) => {
+				if (!prev) return prev;
+				const nextBucket = latestStats?.buckets.find(
+					(bucket) => bucket.name === bucketName,
+				);
+				return {
+					...prev,
+					bucket: nextBucket || prev.bucket,
+					deletingId: null,
+					error: null,
+				};
+			});
 		} catch (error) {
 			setCollaborationModal((prev) =>
 				prev
