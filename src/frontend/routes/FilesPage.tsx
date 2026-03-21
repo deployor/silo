@@ -481,6 +481,11 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			);
 			setPreviewDownloadUrl(signed.url);
 
+			const isTextPreview = TEXT_EXTS.includes(file.extension);
+			if (!isTextPreview) {
+				setPreviewUrl(signed.url);
+			}
+
 			const response = await fetch(signed.url, {
 				credentials: "same-origin",
 			});
@@ -488,15 +493,9 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				throw new Error(`Preview failed (${response.status})`);
 			}
 
-			const blob = await response.blob();
-
-			if (TEXT_EXTS.includes(file.extension)) {
-				const text = await blob.text();
+			if (isTextPreview) {
+				const text = await response.text();
 				setPreviewText(text);
-			} else {
-				const objectUrl = URL.createObjectURL(blob);
-				previewObjectUrlRef.current = objectUrl;
-				setPreviewUrl(objectUrl);
 			}
 		} catch (cause) {
 			setPreviewError(
