@@ -64,24 +64,40 @@ type OperationState = {
 };
 
 const IMAGE_EXTS = ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif"];
-const VIDEO_EXTS = ["mp4", "webm", "ogg", "mov"];
-const AUDIO_EXTS = ["mp3", "wav", "aac", "m4a", "flac"];
-const TEXT_EXTS = [
-	"txt",
-	"md",
-	"json",
+const VIDEO_EXTS = ["mp4", "webm", "ogg", "mov", "mkv", "avi", "m4v"];
+const AUDIO_EXTS = ["mp3", "wav", "aac", "m4a", "flac", "ogg", "opus"];
+const ARCHIVE_EXTS = ["zip", "tar", "gz", "tgz", "rar", "7z", "bz2", "xz"];
+const PDF_EXTS = ["pdf"];
+const TABLE_EXTS = ["csv", "tsv", "xlsx", "xls"];
+const DOC_EXTS = ["doc", "docx", "rtf", "odt"];
+const SLIDE_EXTS = ["ppt", "pptx", "key"];
+const CODE_EXTS = [
 	"js",
-	"css",
-	"html",
-	"xml",
-	"csv",
+	"jsx",
 	"ts",
 	"tsx",
+	"css",
+	"scss",
+	"html",
+	"xml",
 	"sql",
 	"yml",
 	"yaml",
-	"log",
+	"py",
+	"rs",
+	"go",
+	"java",
+	"c",
+	"cpp",
+	"h",
+	"hpp",
+	"sh",
+	"toml",
+	"ini",
+	"env",
+	"json",
 ];
+const TEXT_EXTS = ["txt", "md", "log"];
 
 function normalizePrefix(prefix: string): string {
 	const cleaned = prefix.replace(/\\/g, "/").replace(/^\/+/, "");
@@ -99,13 +115,15 @@ function getParentPrefix(prefix: string): string {
 
 function getFileIcon(file: FileItem): string {
 	if (IMAGE_EXTS.includes(file.extension)) return "ph-image";
-	if (
-		VIDEO_EXTS.includes(file.extension) ||
-		AUDIO_EXTS.includes(file.extension)
-	) {
-		return "ph-file";
-	}
-	if (TEXT_EXTS.includes(file.extension)) return "ph-file-code";
+	if (VIDEO_EXTS.includes(file.extension)) return "ph-file-video";
+	if (AUDIO_EXTS.includes(file.extension)) return "ph-file-audio";
+	if (ARCHIVE_EXTS.includes(file.extension)) return "ph-file-zip";
+	if (PDF_EXTS.includes(file.extension)) return "ph-file-pdf";
+	if (TABLE_EXTS.includes(file.extension)) return "ph-file-csv";
+	if (SLIDE_EXTS.includes(file.extension)) return "ph-file-slides";
+	if (DOC_EXTS.includes(file.extension)) return "ph-file-doc";
+	if (CODE_EXTS.includes(file.extension)) return "ph-file-code";
+	if (TEXT_EXTS.includes(file.extension)) return "ph-file-text";
 	return "ph-file";
 }
 
@@ -838,9 +856,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				<div className="bg-hc-dark rounded-[28px] border border-white/10 overflow-hidden card-shadow flex-1 flex flex-col">
 					<div className="px-4 py-3 border-b border-white/10 bg-white/[0.03] flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
 						<div className="flex items-center gap-3 min-w-0">
-							<div className="h-10 w-10 rounded-2xl bg-hc-red/15 text-hc-red flex items-center justify-center shrink-0">
-								<PhIcon className="ph ph-folder-open text-xl" />
-							</div>
+							<PhIcon className="ph ph-folder-open text-xl text-hc-red shrink-0" />
 							<div className="min-w-0">
 								<h1 className="text-xl font-bold text-white truncate">
 									{bucketName}
