@@ -43,6 +43,7 @@
 
 import { createHash } from "node:crypto";
 import {
+	accessSync,
 	existsSync,
 	mkdirSync,
 	readdirSync,
@@ -82,6 +83,11 @@ const EVICTION_LOW_WATERMARK = 0.7;
 /** Background sweep interval (ms). */
 const EVICTION_INTERVAL_MS = 120_000;
 
+/** Max age for a cached object before it self-destructs. */
+const MAX_ENTRY_AGE_MS =
+	parseInt(process.env.DISK_CACHE_MAX_ENTRY_AGE_MS || "", 10) ||
+	12 * 60 * 60 * 1000;
+
 /** Heat counter decay: halve counters every N ms to prevent stale popularity. */
 const HEAT_DECAY_INTERVAL_MS = 600_000; // 10 min
 
@@ -89,11 +95,22 @@ const HEAT_DECAY_INTERVAL_MS = 600_000; // 10 min
 const MAX_DEMAND_ENTRIES = 50_000;
 
 /** Cache root directory. */
-const CACHE_DIR =
-	process.env.DISK_CACHE_DIR || join(process.cwd(), ".s3-disk-cache");
+const CACHE_DIR = resolveCacheDir();
 
 /** Kill switch. */
 const ENABLED = process.env.DISK_CACHE_ENABLED !== "false";
+
+function resolveCacheDir(): string {
+	if (process.env.DISK_CACHE_DIR) {
+		return process.env.DISK_CACHE_DIR;
+	}
+
+	if (process.env.NODE_ENV === "production") {
+		return "/tmp/s3-disk-cache";
+	}
+
+	return join(process.cwd(), ".s3-disk-cache");
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -256,12 +273,30 @@ function ensureParentDir(filePath: string): void {
 	}
 }
 
+function ensureCacheDirectoryWritable(): boolean {
+	try {
+		mkdirSync(CACHE_DIR, { recursive: true });
+		accessSync(CACHE_DIR);
+		return true;
+	} catch (error) {
+		console.warn(
+			`[disk-cache] disabled writes for dir=${CACHE_DIR}: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		return false;
+	}
+}
+
+function isExpired(meta: CacheMeta, now = Date.now()): boolean {
+	return now - meta.cachedAt > MAX_ENTRY_AGE_MS;
+}
+
 // ---------------------------------------------------------------------------
 // Bookkeeping — track total size without scanning disk every time
 // ---------------------------------------------------------------------------
 
 let currentTotalSize = 0;
 let sizeInitialized = false;
+let cacheWritable = ENABLED;
 
 function initSizeTracking(): void {
 	if (sizeInitialized || !ENABLED) return;
@@ -331,7 +366,7 @@ export async function diskCacheGet(
 	key: string,
 	expectedEtag?: string,
 ): Promise<CacheHit | null> {
-	if (!ENABLED) return null;
+	if (!ENABLED || !cacheWritable) return null;
 
 	const hash = hashKey(bucket, key);
 	const bp = blobPath(hash);
@@ -342,6 +377,11 @@ export async function diskCacheGet(
 
 		const rawMeta = await readFile(mp, "utf-8");
 		const meta: CacheMeta = JSON.parse(rawMeta);
+
+		if (isExpired(meta)) {
+			setImmediate(() => evictEntry(hash, meta.size));
+			return null;
+		}
 
 		// ETag validation
 		if (expectedEtag && meta.etag !== expectedEtag) {
@@ -386,7 +426,7 @@ export async function diskCacheGetPath(
 	bucket: string,
 	key: string,
 ): Promise<CachePathHit | null> {
-	if (!ENABLED) return null;
+	if (!ENABLED || !cacheWritable) return null;
 
 	const hash = hashKey(bucket, key);
 	const bp = blobPath(hash);
@@ -397,6 +437,11 @@ export async function diskCacheGetPath(
 
 		const rawMeta = await readFile(mp, "utf-8");
 		const meta: CacheMeta = JSON.parse(rawMeta);
+
+		if (isExpired(meta)) {
+			setImmediate(() => evictEntry(hash, meta.size));
+			return null;
+		}
 
 		// Update hit stats (non-blocking write-back)
 		meta.hitCount++;
@@ -436,7 +481,7 @@ export async function diskCachePut(
 	body: Uint8Array | Buffer,
 	headers: Record<string, string>,
 ): Promise<boolean> {
-	if (!ENABLED) return false;
+	if (!ENABLED || !cacheWritable) return false;
 
 	const size = body.byteLength;
 
@@ -580,13 +625,14 @@ function scheduleEviction(): void {
 
 function runEviction(): void {
 	try {
-		if (!existsSync(CACHE_DIR)) return;
+		if (!cacheWritable || !existsSync(CACHE_DIR)) return;
 		initSizeTracking();
-
-		if (currentTotalSize <= MAX_TOTAL_SIZE) return;
 
 		const candidates: EvictCandidate[] = [];
 		const prefixDirs = readdirSync(CACHE_DIR, { withFileTypes: true });
+		const now = Date.now();
+		let reclaimed = 0;
+		let evicted = 0;
 
 		for (const dir of prefixDirs) {
 			if (!dir.isDirectory()) continue;
@@ -601,6 +647,23 @@ function runEviction(): void {
 				try {
 					const rawMeta = require("node:fs").readFileSync(mp, "utf-8");
 					const meta: CacheMeta = JSON.parse(rawMeta);
+
+					if (isExpired(meta, now)) {
+						try {
+							unlinkSync(bp);
+						} catch {
+							/* ignore */
+						}
+						try {
+							unlinkSync(mp);
+						} catch {
+							/* ignore */
+						}
+						reclaimed += meta.size;
+						evicted++;
+						continue;
+					}
+
 					const score = computeHeatScore(meta);
 
 					candidates.push({ hash, blobPath: bp, metaPath: mp, meta, score });
@@ -620,15 +683,27 @@ function runEviction(): void {
 			}
 		}
 
+		currentTotalSize = Math.max(0, currentTotalSize - reclaimed);
+
+		if (currentTotalSize <= MAX_TOTAL_SIZE) {
+			if (evicted > 0) {
+				const totalMB = (currentTotalSize / (1024 * 1024)).toFixed(1);
+				console.log(
+					`[disk-cache] evicted ${evicted} stale entries, reclaimed ${(reclaimed / (1024 * 1024)).toFixed(1)} MB, now at ${totalMB} MB / ${(MAX_TOTAL_SIZE / (1024 * 1024)).toFixed(0)} MB`,
+				);
+			}
+			return;
+		}
+
 		// Sort by score ascending — coldest entries first
 		candidates.sort((a, b) => a.score - b.score);
 
 		const target = MAX_TOTAL_SIZE * EVICTION_LOW_WATERMARK;
-		let reclaimed = 0;
-		let evicted = 0;
+		let reclaimedCold = 0;
+		let evictedCold = 0;
 
 		for (const candidate of candidates) {
-			if (currentTotalSize - reclaimed <= target) break;
+			if (currentTotalSize - reclaimedCold <= target) break;
 
 			try {
 				unlinkSync(candidate.blobPath);
@@ -640,16 +715,16 @@ function runEviction(): void {
 			} catch {
 				/* ignore */
 			}
-			reclaimed += candidate.meta.size;
-			evicted++;
+			reclaimedCold += candidate.meta.size;
+			evictedCold++;
 		}
 
-		currentTotalSize = Math.max(0, currentTotalSize - reclaimed);
+		currentTotalSize = Math.max(0, currentTotalSize - reclaimedCold);
 
-		if (evicted > 0) {
+		if (evicted + evictedCold > 0) {
 			const totalMB = (currentTotalSize / (1024 * 1024)).toFixed(1);
 			console.log(
-				`[disk-cache] evicted ${evicted} entries, reclaimed ${(reclaimed / (1024 * 1024)).toFixed(1)} MB, now at ${totalMB} MB / ${(MAX_TOTAL_SIZE / (1024 * 1024)).toFixed(0)} MB`,
+				`[disk-cache] evicted ${evicted + evictedCold} entries, reclaimed ${((reclaimed + reclaimedCold) / (1024 * 1024)).toFixed(1)} MB, now at ${totalMB} MB / ${(MAX_TOTAL_SIZE / (1024 * 1024)).toFixed(0)} MB`,
 			);
 		}
 
@@ -705,6 +780,7 @@ export function stopPeriodicEviction(): void {
 
 export interface DiskCacheStats {
 	enabled: boolean;
+	writable: boolean;
 	directory: string;
 	entryCount: number;
 	totalSizeBytes: number;
@@ -714,6 +790,7 @@ export interface DiskCacheStats {
 	utilizationPercent: number;
 	minFileSizeBytes: number;
 	maxFileSizeBytes: number;
+	maxEntryAgeMs: number;
 	baseAdmissionHits: number;
 	currentAdmissionThreshold: number;
 	demandTrackerEntries: number;
@@ -765,6 +842,7 @@ export function getDiskCacheStats(): DiskCacheStats {
 
 	return {
 		enabled: ENABLED,
+		writable: cacheWritable,
 		directory: CACHE_DIR,
 		entryCount,
 		totalSizeBytes: currentTotalSize,
@@ -774,6 +852,7 @@ export function getDiskCacheStats(): DiskCacheStats {
 		utilizationPercent: Math.round(pressure * 100),
 		minFileSizeBytes: MIN_SIZE,
 		maxFileSizeBytes: MAX_FILE_SIZE,
+		maxEntryAgeMs: MAX_ENTRY_AGE_MS,
 		baseAdmissionHits: BASE_ADMISSION_HITS,
 		currentAdmissionThreshold: threshold,
 		demandTrackerEntries: demandMap.size,
@@ -786,11 +865,7 @@ export function getDiskCacheStats(): DiskCacheStats {
 // ---------------------------------------------------------------------------
 
 if (ENABLED) {
-	try {
-		mkdirSync(CACHE_DIR, { recursive: true });
-	} catch {
-		/* ignore */
-	}
+	cacheWritable = ensureCacheDirectoryWritable();
 	initSizeTracking();
 	startPeriodicEviction();
 	startDemandDecay();
