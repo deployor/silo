@@ -90,20 +90,19 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<h3 className="font-mono text-hc-red mb-2">01 / COMPATIBLE</h3>
 							<p className="text-sm text-gray-400">
 								Full S3 API compatibility. Use the AWS SDK, Rclone, or any
-								S3-compatible tool.
+								S3-compatible thing.
 							</p>
 						</div>
 						<div>
 							<h3 className="font-mono text-hc-blue mb-2">02 / FAST</h3>
 							<p className="text-sm text-gray-400">
-								Built on Cloudflare R2. Global CDN caching for low-latency asset
-								delivery.
+								Built on Cloudflare R2.
 							</p>
 						</div>
 						<div>
 							<h3 className="font-mono text-green-500 mb-2">03 / FREE</h3>
 							<p className="text-sm text-gray-400">
-								Start with free object storage. Ship your projects to unlock
+								Start with free object storage. Ship projects to unlock
 								more quota.
 							</p>
 						</div>
