@@ -9,6 +9,7 @@ import { s3Client } from "../../../lib/s3-client";
 import { getCurrentUser } from "../../../lib/session";
 import { getBucketsForUser } from "../../../services/bucket-service";
 import { getAppSettings } from "../../../services/settings-service";
+import { handleAnalytics } from "./analytics";
 import { handleBucketOperations, handleBuckets } from "./buckets";
 import { handleCollaboration } from "./collaboration";
 import { handleCors } from "./cors";
@@ -255,6 +256,10 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 
 		if (path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+\/files/)) {
 			return handleFiles(req);
+		}
+
+		if (path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+\/analytics\//)) {
+			return handleAnalytics(req);
 		}
 
 		if (path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+\/cors$/)) {

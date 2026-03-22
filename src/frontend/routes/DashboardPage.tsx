@@ -204,6 +204,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		"peer relative inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors";
 	const iconActionTooltip =
 		"pointer-events-none absolute bottom-full right-0 mb-2 whitespace-nowrap rounded-md border border-white/15 bg-black/90 px-2 py-1 text-[10px] font-medium text-white opacity-0 translate-y-1 transition-all peer-hover:opacity-100 peer-hover:translate-y-0 peer-focus-visible:opacity-100 peer-focus-visible:translate-y-0";
+	const analyticsIconAction =
+		"peer relative inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors text-emerald-300 hover:text-emerald-200 hover:bg-emerald-500/10";
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -1224,6 +1226,17 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														</span>
 													</a>
 												) : null}
+												<a
+													href={`/dashboard/buckets/${bucket.name}/analytics`}
+													aria-label="Open bucket analytics"
+													title="Open bucket analytics"
+													className={analyticsIconAction}
+												>
+													<PhIcon className="ph ph-heartbeat text-base" />
+													<span className={iconActionTooltip}>
+														View analytics
+													</span>
+												</a>
 												{!bucket.isCdn && !isCollaborative ? (
 													<button
 														type="button"

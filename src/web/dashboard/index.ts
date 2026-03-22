@@ -206,6 +206,33 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		});
 	}
 
+	const bucketAnalyticsMatch = path.match(
+		/^\/dashboard\/buckets\/([a-z0-9-]+)\/analytics$/,
+	);
+	if (bucketAnalyticsMatch) {
+		const bucketName = bucketAnalyticsMatch[1];
+		const access = await getBucketAccessForUser({
+			bucketName,
+			userId: user.id,
+			isAdmin: user.isAdmin,
+		});
+		const html = await render("bucket-analytics", {
+			title: "Bucket Analytics - Silo",
+			layout: "main",
+			bucketName,
+			user: viewUser,
+			bucketAccess: {
+				isCollaborative: access.isCollaborator,
+				ownerId: access.owner.id,
+			},
+			breadcrumbs: `<span class="text-text-muted">/</span> <span class="bg-hc-blue/20 text-hc-blue px-2 py-0.5 rounded text-sm font-mono border border-hc-blue/30">${bucketName}</span> <span class="text-text-muted">/ analytics</span>`,
+		});
+
+		return new Response(html, {
+			headers: { "Content-Type": "text/html" },
+		});
+	}
+
 	const submissions = await YswsService.getSubmissionsByUserId(user.id);
 	const latestSubmission = submissions.length > 0 ? submissions[0] : null;
 

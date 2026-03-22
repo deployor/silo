@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { requestLogs } from "../db/schema";
 import { getContext } from "../lib/context";
+import { analyticsService } from "./analytics-service";
 
 interface LogEntry {
 	id: string;
@@ -52,6 +53,8 @@ class LogService {
 		} else {
 			this.scheduleFlush();
 		}
+
+		void analyticsService.recordRequestMetrics(response);
 	}
 
 	private async flush() {
