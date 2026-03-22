@@ -1157,36 +1157,41 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												</div>
 											</td>
 											<td className="px-6 py-4">
-												<button
-													type="button"
-													role="switch"
-													aria-checked={bucket.isPublic}
-													disabled={
-														isCollaborative ||
-														!!bucket.isPaused ||
-														!!bucket.isCdn ||
-														visibilityBusy
-													}
-													onClick={() =>
-														togglePublic(bucket.name, !bucket.isPublic)
-													}
-													className={`inline-flex items-center gap-2 px-1 py-1 transition-colors ${bucket.isPaused || bucket.isCdn || visibilityBusy ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}
-												>
-													<span
-														className={`relative h-6 w-11 rounded-full border transition-colors ${bucket.isPublic ? "bg-hc-blue/80 border-hc-blue" : "bg-white/10 border-white/20"}`}
+												{isCollaborative ? (
+													<span className="text-text-muted text-xs italic">
+														Owner only
+													</span>
+												) : (
+													<button
+														type="button"
+														role="switch"
+														aria-checked={bucket.isPublic}
+														disabled={
+															!!bucket.isPaused ||
+															!!bucket.isCdn ||
+															visibilityBusy
+														}
+														onClick={() =>
+															togglePublic(bucket.name, !bucket.isPublic)
+														}
+														className={`inline-flex items-center gap-2 px-1 py-1 transition-colors ${bucket.isPaused || bucket.isCdn || visibilityBusy ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}
 													>
 														<span
-															className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform ${bucket.isPublic ? "translate-x-5" : "translate-x-0"}`}
-														/>
-													</span>
-													<span className="text-xs font-semibold text-text-muted min-w-12 text-left">
-														{visibilityBusy
-															? "Updating..."
-															: bucket.isPublic
-																? "Public"
-																: "Private"}
-													</span>
-												</button>
+															className={`relative h-6 w-11 rounded-full border transition-colors ${bucket.isPublic ? "bg-hc-blue/80 border-hc-blue" : "bg-white/10 border-white/20"}`}
+														>
+															<span
+																className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform ${bucket.isPublic ? "translate-x-5" : "translate-x-0"}`}
+															/>
+														</span>
+														<span className="text-xs font-semibold text-text-muted min-w-12 text-left">
+															{visibilityBusy
+																? "Updating..."
+																: bucket.isPublic
+																	? "Public"
+																	: "Private"}
+														</span>
+													</button>
+												)}
 											</td>
 											<td className="px-6 py-4 text-text-muted text-xs font-mono">
 												{new Date(bucket.createdAt).toLocaleDateString()}
@@ -1233,21 +1238,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 															Delete all files in bucket
 														</span>
 													</button>
-												) : (
-													<button
-														type="button"
-														onClick={() => deleteBucket(bucket.name, true)}
-														disabled={bucketBusy}
-														aria-label="Empty bucket"
-														title="Empty bucket"
-														className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10`}
-													>
-														<MdDeleteOutline className="text-base" />
-														<span className={iconActionTooltip}>
-															Delete all files in bucket
-														</span>
-													</button>
-												)}
+												) : null}
 												{!bucket.isCdn && !isCollaborative ? (
 													<button
 														type="button"
