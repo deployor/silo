@@ -1301,8 +1301,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									{collaborationModal.bucket.name}
 								</p>
 								<p className="text-text-muted text-sm mt-2">
-									Manage pending invites and active collaborators. Permissions
-									can be changed at any time before or after acceptance.
+									Manage who can collabroativly manage this bucket.
 								</p>
 							</div>
 							<div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
