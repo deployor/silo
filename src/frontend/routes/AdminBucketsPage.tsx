@@ -318,22 +318,30 @@ export function AdminBucketsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										)}
 									</td>
 									<td className="px-6 py-4 text-right">
-										<button
-											type="button"
-											onClick={() => void togglePause(row)}
-											disabled={actionLoading === row.id}
-											className={`text-xs font-bold uppercase tracking-wider ${
-												row.isPaused
-													? "text-emerald-400 hover:text-emerald-300"
-													: "text-yellow-400 hover:text-yellow-300"
-											}`}
-										>
-											{actionLoading === row.id
-												? "Updating..."
-												: row.isPaused
-													? "Resume"
-													: "Pause"}
-										</button>
+										<div className="flex items-center justify-end gap-3">
+											<a
+												href={`/admin/buckets/${row.name}/analytics`}
+												className="text-emerald-300 hover:text-emerald-200 text-xs font-bold uppercase tracking-wider"
+											>
+												Analytics
+											</a>
+											<button
+												type="button"
+												onClick={() => void togglePause(row)}
+												disabled={actionLoading === row.id}
+												className={`text-xs font-bold uppercase tracking-wider ${
+													row.isPaused
+														? "text-emerald-400 hover:text-emerald-300"
+														: "text-yellow-400 hover:text-yellow-300"
+												}`}
+											>
+												{actionLoading === row.id
+													? "Updating..."
+													: row.isPaused
+														? "Resume"
+														: "Pause"}
+											</button>
+										</div>
 									</td>
 								</tr>
 							))}

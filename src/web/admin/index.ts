@@ -19,6 +19,7 @@ import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
+import { analyticsService } from "../../services/analytics-service";
 import {
 	getAppSettings,
 	updateAppSettings,
@@ -60,6 +61,20 @@ async function serveAdminBucketsPage(req: Request) {
 		title: "Admin Buckets",
 		user,
 		pageTitle: "ADMIN",
+	});
+	return new Response(html, {
+		headers: { "Content-Type": "text/html" },
+	});
+}
+
+async function serveAdminBucketAnalyticsPage(req: Request, bucketName: string) {
+	const user = await getCurrentUser(req);
+	const html = await render("admin-bucket-analytics", {
+		title: "Admin Bucket Analytics",
+		user,
+		pageTitle: "ADMIN",
+		bucketName,
+		breadcrumbs: `<span class="text-text-muted">/</span> <span class="bg-hc-blue/20 text-hc-blue px-2 py-0.5 rounded text-sm font-mono border border-hc-blue/30">${bucketName}</span> <span class="text-text-muted">/ analytics</span>`,
 	});
 	return new Response(html, {
 		headers: { "Content-Type": "text/html" },
@@ -1755,6 +1770,12 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	if (path === "/admin/buckets") {
 		return serveAdminBucketsPage(req);
 	}
+	const adminBucketAnalyticsMatch = path.match(
+		/^\/admin\/buckets\/([a-z0-9-]+)\/analytics$/,
+	);
+	if (adminBucketAnalyticsMatch) {
+		return serveAdminBucketAnalyticsPage(req, adminBucketAnalyticsMatch[1]);
+	}
 	if (path === "/admin/speedtest") {
 		return serveAdminSpeedtestPage(req);
 	}
@@ -1966,6 +1987,49 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 
 		if (path === "/api/admin/buckets" && req.method === "GET") {
 			return listAdminBuckets(url);
+		}
+
+		const adminBucketAnalyticsApiMatch = path.match(
+			/^\/api\/admin\/buckets\/([a-z0-9-]+)\/analytics\/(summary|timeseries|objects|live)$/,
+		);
+		if (adminBucketAnalyticsApiMatch && req.method === "GET") {
+			const bucketName = adminBucketAnalyticsApiMatch[1];
+			const kind = adminBucketAnalyticsApiMatch[2];
+			if (kind === "summary") {
+				return jsonResponse(
+					await analyticsService.getBucketAnalyticsSnapshot({
+						bucketName,
+						userId: user.id,
+						isAdmin: true,
+					}),
+				);
+			}
+			if (kind === "timeseries") {
+				return jsonResponse({
+					series: await analyticsService.getBucketAnalyticsTimeseries({
+						bucketName,
+						userId: user.id,
+						isAdmin: true,
+						range: url.searchParams.get("range") || "24h",
+					}),
+				});
+			}
+			if (kind === "objects") {
+				return jsonResponse({
+					objects: await analyticsService.getBucketHotObjects({
+						bucketName,
+						userId: user.id,
+						isAdmin: true,
+					}),
+				});
+			}
+			return jsonResponse(
+				await analyticsService.getBucketAnalyticsLive({
+					bucketName,
+					userId: user.id,
+					isAdmin: true,
+				}),
+			);
 		}
 
 		if (path === "/api/admin/speedtest/run" && req.method === "POST") {

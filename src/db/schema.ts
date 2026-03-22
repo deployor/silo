@@ -183,6 +183,128 @@ export const requestLogs = pgTable(
 	},
 );
 
+export const bucketAnalyticsMinute = pgTable(
+	"bucket_analytics_minute",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		bucketId: uuid("bucket_id")
+			.references(() => buckets.id, { onDelete: "cascade" })
+			.notNull(),
+		minuteStart: timestamp("minute_start").notNull(),
+		requestCount: bigint("request_count", { mode: "number" })
+			.notNull()
+			.default(0),
+		getCount: bigint("get_count", { mode: "number" }).notNull().default(0),
+		putCount: bigint("put_count", { mode: "number" }).notNull().default(0),
+		deleteCount: bigint("delete_count", { mode: "number" })
+			.notNull()
+			.default(0),
+		headCount: bigint("head_count", { mode: "number" }).notNull().default(0),
+		status2xx: bigint("status_2xx", { mode: "number" }).notNull().default(0),
+		status3xx: bigint("status_3xx", { mode: "number" }).notNull().default(0),
+		status4xx: bigint("status_4xx", { mode: "number" }).notNull().default(0),
+		status5xx: bigint("status_5xx", { mode: "number" }).notNull().default(0),
+		status401: bigint("status_401", { mode: "number" }).notNull().default(0),
+		status403: bigint("status_403", { mode: "number" }).notNull().default(0),
+		status404: bigint("status_404", { mode: "number" }).notNull().default(0),
+		status429: bigint("status_429", { mode: "number" }).notNull().default(0),
+		errorCount: bigint("error_count", { mode: "number" }).notNull().default(0),
+		ingressBytes: bigint("ingress_bytes", { mode: "number" })
+			.notNull()
+			.default(0),
+		egressBytes: bigint("egress_bytes", { mode: "number" })
+			.notNull()
+			.default(0),
+		latencyTotalMs: bigint("latency_total_ms", { mode: "number" })
+			.notNull()
+			.default(0),
+		latencyMaxMs: bigint("latency_max_ms", { mode: "number" })
+			.notNull()
+			.default(0),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(table) => {
+		return {
+			bucketMinuteIdx: index("bucket_analytics_minute_bucket_minute_idx").on(
+				table.bucketId,
+				table.minuteStart,
+			),
+			minuteIdx: index("bucket_analytics_minute_minute_idx").on(
+				table.minuteStart,
+			),
+		};
+	},
+);
+
+export const bucketObjectAnalytics = pgTable(
+	"bucket_object_analytics",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		bucketId: uuid("bucket_id")
+			.references(() => buckets.id, { onDelete: "cascade" })
+			.notNull(),
+		objectKey: text("object_key").notNull(),
+		hitCount: bigint("hit_count", { mode: "number" }).notNull().default(0),
+		errorCount: bigint("error_count", { mode: "number" }).notNull().default(0),
+		ingressBytes: bigint("ingress_bytes", { mode: "number" })
+			.notNull()
+			.default(0),
+		egressBytes: bigint("egress_bytes", { mode: "number" })
+			.notNull()
+			.default(0),
+		lastAccessedAt: timestamp("last_accessed_at"),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(table) => {
+		return {
+			bucketObjectIdx: index("bucket_object_analytics_bucket_object_idx").on(
+				table.bucketId,
+				table.objectKey,
+			),
+			hitCountIdx: index("bucket_object_analytics_bucket_hits_idx").on(
+				table.bucketId,
+				table.hitCount,
+			),
+			egressIdx: index("bucket_object_analytics_bucket_egress_idx").on(
+				table.bucketId,
+				table.egressBytes,
+			),
+		};
+	},
+);
+
+export const bucketAnalyticsSnapshot = pgTable("bucket_analytics_snapshot", {
+	bucketId: uuid("bucket_id")
+		.references(() => buckets.id, { onDelete: "cascade" })
+		.primaryKey(),
+	windowStart: timestamp("window_start").notNull(),
+	windowEnd: timestamp("window_end").notNull(),
+	requestCount24h: bigint("request_count_24h", { mode: "number" })
+		.notNull()
+		.default(0),
+	egressBytes24h: bigint("egress_bytes_24h", { mode: "number" })
+		.notNull()
+		.default(0),
+	ingressBytes24h: bigint("ingress_bytes_24h", { mode: "number" })
+		.notNull()
+		.default(0),
+	errorCount24h: bigint("error_count_24h", { mode: "number" })
+		.notNull()
+		.default(0),
+	status42924h: bigint("status_429_24h", { mode: "number" })
+		.notNull()
+		.default(0),
+	avgLatencyMs24h: doublePrecision("avg_latency_ms_24h").notNull().default(0),
+	peakMinuteRequests24h: bigint("peak_minute_requests_24h", { mode: "number" })
+		.notNull()
+		.default(0),
+	peakMinuteAt24h: timestamp("peak_minute_at_24h"),
+	hotObjectsJson: text("hot_objects_json").notNull().default("[]"),
+	statusBreakdownJson: text("status_breakdown_json").notNull().default("{}"),
+	methodBreakdownJson: text("method_breakdown_json").notNull().default("{}"),
+	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Global settings (single-row table)
 export const appSettings = pgTable("app_settings", {
 	id: text("id").primaryKey().default("global"),
