@@ -6,12 +6,12 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends python3 make g++ && \
     rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /temp/dev
-COPY package.json package-lock.json /temp/dev/
-RUN cd /temp/dev && npm ci
+COPY package.json bun.lock /temp/dev/
+RUN cd /temp/dev && bun install --frozen-lockfile && bun pm trust @mongodb-js/zstd
 
 RUN mkdir -p /temp/prod
-COPY package.json package-lock.json /temp/prod/
-RUN cd /temp/prod && npm ci --omit=dev
+COPY package.json bun.lock /temp/prod/
+RUN cd /temp/prod && bun install --frozen-lockfile --production && bun pm trust @mongodb-js/zstd
 
 FROM base AS prerelease
 # Install git early to allow caching (it won't re-run on code changes)
