@@ -9,6 +9,7 @@ const envSchema = z.object({
 	S3_ENDPOINT: z.string().min(1, "S3_ENDPOINT is required"),
 	S3_BUCKET_NAME: z.string().min(1, "S3_BUCKET_NAME is required"),
 	S3_REGION: z.string().default("auto"),
+	DEEP_FREEZE_STORAGE_PREFIX: z.string().default("deep-freeze"),
 	REDIS_URL: z.string().default("redis://localhost:6379"),
 	HC_AUTH_CLIENT_ID: z.string().min(1, "HC_AUTH_CLIENT_ID is required"),
 	HC_AUTH_CLIENT_SECRET: z.string().min(1, "HC_AUTH_CLIENT_SECRET is required"),
@@ -88,6 +89,9 @@ export const config = {
 		endpoint: env.S3_ENDPOINT,
 		bucket: env.S3_BUCKET_NAME,
 		region: env.S3_REGION,
+	},
+	deepFreeze: {
+		storagePrefix: env.DEEP_FREEZE_STORAGE_PREFIX,
 	},
 	hcAuth: {
 		clientId: env.HC_AUTH_CLIENT_ID,

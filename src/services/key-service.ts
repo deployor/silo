@@ -6,6 +6,7 @@ import {
 	assertCanManageKeys,
 	getBucketAccessForUser,
 } from "./collaboration-service";
+import { getBucketDeepFreezeMessage } from "./deep-freeze-service";
 import { getAppSettings } from "./settings-service";
 
 export async function createKey(
@@ -25,6 +26,8 @@ export async function createKey(
 	});
 
 	if (!bucket) throw new Error("Bucket not found");
+	const createDeepFreezeMessage = getBucketDeepFreezeMessage(bucket);
+	if (createDeepFreezeMessage) throw new Error(createDeepFreezeMessage);
 
 	// Relation user is fetched but TS might complain depending on schema inference
 	const isImmortal = (bucket.user as typeof users.$inferSelect | null)
@@ -87,6 +90,8 @@ export async function updateKeyNote(
 		isAdmin,
 	});
 	if (access.bucket.isPaused && !isAdmin) throw new Error("Bucket is paused");
+	const noteDeepFreezeMessage = getBucketDeepFreezeMessage(access.bucket);
+	if (noteDeepFreezeMessage && !isAdmin) throw new Error(noteDeepFreezeMessage);
 	assertCanManageKeys(access);
 
 	await db
@@ -107,6 +112,9 @@ export async function deleteKey(
 		isAdmin,
 	});
 	if (access.bucket.isPaused && !isAdmin) throw new Error("Bucket is paused");
+	const deleteDeepFreezeMessage = getBucketDeepFreezeMessage(access.bucket);
+	if (deleteDeepFreezeMessage && !isAdmin)
+		throw new Error(deleteDeepFreezeMessage);
 	assertCanManageKeys(access);
 
 	await db.delete(bucketKeys).where(eq(bucketKeys.id, keyId));
@@ -122,6 +130,8 @@ export async function listKeysForBucket(
 		userId,
 		isAdmin,
 	});
+	const listDeepFreezeMessage = getBucketDeepFreezeMessage(access.bucket);
+	if (listDeepFreezeMessage && !isAdmin) throw new Error(listDeepFreezeMessage);
 	assertCanManageKeys(access);
 
 	return db
