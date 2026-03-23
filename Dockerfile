@@ -2,13 +2,16 @@ FROM oven/bun:1 AS base
 WORKDIR /usr/src/app
 
 FROM base AS install
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends python3 make g++ && \
+    rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /temp/dev
-COPY package.json bun.lock /temp/dev/
-RUN cd /temp/dev && bun install --frozen-lockfile
+COPY package.json package-lock.json /temp/dev/
+RUN cd /temp/dev && npm ci
 
 RUN mkdir -p /temp/prod
-COPY package.json bun.lock /temp/prod/
-RUN cd /temp/prod && bun install --frozen-lockfile --production
+COPY package.json package-lock.json /temp/prod/
+RUN cd /temp/prod && npm ci --omit=dev
 
 FROM base AS prerelease
 # Install git early to allow caching (it won't re-run on code changes)
