@@ -13,7 +13,7 @@ RUN cd /temp/prod && bun install --frozen-lockfile --production
 FROM base AS prerelease
 # Install git early to allow caching (it won't re-run on code changes)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends git && \
+    apt-get install -y --no-install-recommends git zstd && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=install /temp/dev/node_modules node_modules
@@ -23,6 +23,9 @@ RUN echo "{\"sha\": \"$(git rev-parse HEAD)\", \"date\": \"$(git show -s --forma
 RUN bun run build
 
 FROM base AS release
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends zstd && \
+    rm -rf /var/lib/apt/lists/*
 COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=prerelease /usr/src/app/src src
 COPY --from=prerelease /usr/src/app/package.json .
