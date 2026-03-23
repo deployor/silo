@@ -16,6 +16,10 @@ import {
 	parseCollaborationPermissions,
 	toCollaborationPermissionSet,
 } from "./collaboration-service";
+import {
+	getBucketDeepFreezeMessage,
+	syncBucketsDeepFreezeState,
+} from "./deep-freeze-service";
 import { getAppSettings } from "./settings-service";
 
 async function invalidateBucketAuthCache(bucketName: string) {
@@ -35,10 +39,11 @@ export type CorsRule = {
 };
 
 export async function getBucketsForUser(userId: string) {
-	const userBuckets = await db
+	const rawUserBuckets = await db
 		.select()
 		.from(buckets)
 		.where(eq(buckets.userId, userId));
+	const userBuckets = await syncBucketsDeepFreezeState(rawUserBuckets);
 
 	const bucketsWithKeys = await Promise.all(
 		userBuckets.map(async (b) => {
@@ -56,7 +61,9 @@ export async function getBucketsForUser(userId: string) {
 		}),
 	);
 
-	const sharedBuckets = await listAcceptedCollaboratorBuckets(userId);
+	const sharedBuckets = await syncBucketsDeepFreezeState(
+		await listAcceptedCollaboratorBuckets(userId),
+	);
 	const sharedKeys = await Promise.all(
 		sharedBuckets.map(async (bucket) => {
 			const permissions = bucket.permissions;
@@ -191,6 +198,9 @@ export async function emptyBucket(
 	if (bucket.length === 0) throw new Error("Bucket not found");
 	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
 	if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
+	const emptyDeepFreezeMessage = getBucketDeepFreezeMessage(bucket[0]);
+	if (emptyDeepFreezeMessage && !isAdmin)
+		throw new Error(emptyDeepFreezeMessage);
 	assertBucketCollaborationAllowed(bucket[0]);
 
 	if (!bucket[0].userId)
@@ -227,6 +237,9 @@ export async function deleteBucket(
 	if (bucket.length === 0) throw new Error("Bucket not found");
 	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
 	if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
+	const deleteDeepFreezeMessage = getBucketDeepFreezeMessage(bucket[0]);
+	if (deleteDeepFreezeMessage && !isAdmin)
+		throw new Error(deleteDeepFreezeMessage);
 	if (bucket[0].isSystem) throw new Error("Cannot delete system bucket");
 
 	// Best-effort: remove all objects first so upstream storage doesn't leak
@@ -265,6 +278,9 @@ export async function updateBucketVisibility(
 	if (bucket.length === 0) throw new Error("Bucket not found");
 	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
 	if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
+	const visibilityDeepFreezeMessage = getBucketDeepFreezeMessage(bucket[0]);
+	if (visibilityDeepFreezeMessage && !isAdmin)
+		throw new Error(visibilityDeepFreezeMessage);
 	if (bucket[0].isCdn) throw new Error("Cannot modify CDN bucket");
 
 	await db.update(buckets).set({ isPublic }).where(eq(buckets.name, name));
@@ -283,6 +299,9 @@ export async function updateCorsConfig(
 		isAdmin,
 	});
 	if (access.bucket.isPaused && !isAdmin) throw new Error("Bucket is paused");
+	const updateCorsDeepFreezeMessage = getBucketDeepFreezeMessage(access.bucket);
+	if (updateCorsDeepFreezeMessage && !isAdmin)
+		throw new Error(updateCorsDeepFreezeMessage);
 	assertCanManageCors(access);
 
 	const corsConfig = {
@@ -306,6 +325,9 @@ export async function deleteCorsConfig(
 		isAdmin,
 	});
 	if (access.bucket.isPaused && !isAdmin) throw new Error("Bucket is paused");
+	const deleteCorsDeepFreezeMessage = getBucketDeepFreezeMessage(access.bucket);
+	if (deleteCorsDeepFreezeMessage && !isAdmin)
+		throw new Error(deleteCorsDeepFreezeMessage);
 	assertCanManageCors(access);
 
 	await db

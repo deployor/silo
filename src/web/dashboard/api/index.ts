@@ -7,7 +7,12 @@ import { postUploadSummary } from "../../../integrations/slack/message-handler";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import { s3Client } from "../../../lib/s3-client";
 import { getCurrentUser } from "../../../lib/session";
+import { deepFreezeActionSchema } from "../../../lib/validation";
 import { getBucketsForUser } from "../../../services/bucket-service";
+import {
+	getDeepFreezeSnapshot,
+	requestBucketDeepFreezeAction,
+} from "../../../services/deep-freeze-service";
 import { getAppSettings } from "../../../services/settings-service";
 import { handleAnalytics } from "./analytics";
 import { handleBucketOperations, handleBuckets } from "./buckets";
@@ -220,6 +225,7 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 					isPublic: b.isPublic,
 					isPaused: b.isPaused,
 					pauseReason: b.pauseReason,
+					deepFreeze: getDeepFreezeSnapshot(b),
 					corsConfig: b.corsConfig,
 					isCdn: b.isCdn,
 					isCollaborative: (b as { isCollaborative?: boolean }).isCollaborative,
@@ -256,6 +262,49 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 
 		if (path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+\/files/)) {
 			return handleFiles(req);
+		}
+
+		if (path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+\/deep-freeze$/)) {
+			if (req.method !== "POST") {
+				return errorResponse("Method not allowed", 405);
+			}
+			const bucketName = path.split("/")[4];
+			if (!bucketName) {
+				return errorResponse("Invalid bucket name", 400);
+			}
+			if (user.dataExported) {
+				return errorResponse(
+					"Account is frozen. Deep Freeze actions are not available.",
+					403,
+				);
+			}
+			try {
+				const body = await req.json();
+				const parsed = deepFreezeActionSchema.safeParse(body);
+				if (!parsed.success) {
+					return errorResponse(
+						parsed.error.issues[0]?.message || "Invalid request",
+						400,
+					);
+				}
+				const snapshot = await requestBucketDeepFreezeAction({
+					bucketName,
+					userId: user.id,
+					action: parsed.data.action,
+					isAdmin: user.isAdmin,
+				});
+				return jsonResponse({
+					message:
+						parsed.data.action === "freeze"
+							? "Deep Freeze started"
+							: "Bucket restore started",
+					deepFreeze: snapshot,
+				});
+			} catch (error) {
+				const message =
+					error instanceof Error ? error.message : "Internal Error";
+				return errorResponse(message, 500);
+			}
 		}
 
 		if (path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+\/analytics\//)) {

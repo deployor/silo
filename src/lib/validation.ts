@@ -36,6 +36,10 @@ export const updateBucketVisibilitySchema = z.object({
 	isPublic: z.boolean(),
 });
 
+export const deepFreezeActionSchema = z.object({
+	action: z.enum(["freeze", "unfreeze"]),
+});
+
 export const collaborationPermissionValues = [
 	"manage_keys",
 	"manage_cors",

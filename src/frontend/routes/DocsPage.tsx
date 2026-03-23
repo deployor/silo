@@ -358,8 +358,8 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</ul>
 								<p className="text-text-muted">
 									This is okay for hosting static assets like images, CSS, or
-									game files that need to be publicly accessible on the web,
-									but should be used with alot of caution.
+									game files that need to be publicly accessible on the web, but
+									should be used with alot of caution.
 								</p>
 							</div>
 						) : null}

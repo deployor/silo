@@ -15,6 +15,7 @@ import { compressResponse } from "./middleware/compression";
 import { rateLimit } from "./middleware/rate-limit";
 import { securityHeaders } from "./middleware/security-headers";
 import { analyticsService } from "./services/analytics-service";
+import { deepFreezeWorkerService } from "./services/deep-freeze-worker-service";
 import { logService } from "./services/log-service";
 import { statsService } from "./services/stats-service";
 import { handleAdminRequest } from "./web/admin";
@@ -364,6 +365,7 @@ const server = Bun.serve({
 });
 
 console.log(`Silo S3 Gateway running on port ${process.env.PORT || 3000}`);
+deepFreezeWorkerService.start();
 
 let shuttingDown = false;
 
@@ -402,6 +404,7 @@ async function gracefulShutdown(signal: string) {
 	}
 
 	// 4. Stop background timers
+	deepFreezeWorkerService.stop();
 	stopPeriodicEviction();
 
 	// 5. Close connections

@@ -2,6 +2,7 @@ import type { SVGProps } from "react";
 import type { IconType } from "react-icons";
 import { FaCrown, FaGithub } from "react-icons/fa6";
 import {
+	MdAcUnit,
 	MdAdd,
 	MdArchive,
 	MdArrowBack,
@@ -105,6 +106,7 @@ const ICONS: Record<string, IconType> = {
 	"ph-cloud-check": MdCloudUpload,
 	"ph-hand-waving": MdWavingHand,
 	"ph-spinner": MdSync,
+	"ph-snowflake": MdAcUnit,
 };
 
 function pickIconToken(tokens: string[]): string | null {

@@ -95,15 +95,13 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</div>
 						<div>
 							<h3 className="font-mono text-hc-blue mb-2">02 / FAST</h3>
-							<p className="text-sm text-gray-400">
-								Built on Cloudflare R2.
-							</p>
+							<p className="text-sm text-gray-400">Built on Cloudflare R2.</p>
 						</div>
 						<div>
 							<h3 className="font-mono text-green-500 mb-2">03 / FREE</h3>
 							<p className="text-sm text-gray-400">
-								Start with free object storage. Ship projects to unlock
-								more quota.
+								Start with free object storage. Ship projects to unlock more
+								quota.
 							</p>
 						</div>
 					</div>

@@ -15,6 +15,8 @@ import {
 	MdKey,
 	MdOutlineRocketLaunch,
 	MdPublic,
+	MdSevereCold,
+	MdSync,
 	MdWarning,
 	MdWarningAmber,
 } from "react-icons/md";
@@ -73,6 +75,18 @@ type DashboardBucket = {
 	isPublic: boolean;
 	isPaused?: boolean;
 	pauseReason?: string | null;
+	deepFreeze?: {
+		state: "active" | "freezing" | "frozen" | "unfreezing";
+		isLocked: boolean;
+		progressPercent: number;
+		archiveBytes: number;
+		estimatedFreezeSeconds: number;
+		estimatedUnfreezeSeconds: number;
+		etaSeconds: number | null;
+		statusLabel: string;
+		statusDescription: string;
+		reason?: string | null;
+	};
 	corsConfig?: string | null;
 	isCdn?: boolean;
 	isCollaborative?: boolean;
@@ -151,6 +165,26 @@ type InviteModalState = {
 	error: string | null;
 };
 
+type DeepFreezeModalState = {
+	bucket: DashboardBucket;
+	submitting: boolean;
+	error: string | null;
+};
+
+function formatDurationEstimate(totalSeconds: number | null | undefined) {
+	const seconds = Math.max(0, Math.round(totalSeconds || 0));
+	if (seconds < 60) return `${seconds}s`;
+	const minutes = Math.ceil(seconds / 60);
+	if (minutes < 60) return `${minutes} min`;
+	const hours = Math.floor(minutes / 60);
+	const remainingMinutes = minutes % 60;
+	if (hours < 48)
+		return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+	const days = Math.floor(hours / 24);
+	const remainingHours = hours % 24;
+	return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`;
+}
+
 export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const p = bootstrap.props as {
 		user?: FrontendUser | null;
@@ -190,6 +224,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [collaborationModal, setCollaborationModal] =
 		useState<CollaborationModalState | null>(null);
 	const [inviteModal, setInviteModal] = useState<InviteModalState | null>(null);
+	const [deepFreezeModal, setDeepFreezeModal] =
+		useState<DeepFreezeModalState | null>(null);
 
 	const buttonBase =
 		"inline-flex items-center justify-center gap-2 rounded-xl border text-sm font-bold transition-colors";
@@ -227,6 +263,18 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		load();
 	}, [load]);
 
+	useEffect(() => {
+		if (
+			!stats?.buckets.some((bucket) => bucket.deepFreeze?.state !== "active")
+		) {
+			return;
+		}
+		const interval = window.setInterval(() => {
+			void load();
+		}, 15000);
+		return () => window.clearInterval(interval);
+	}, [stats?.buckets, load]);
+
 	const storagePercent = useMemo(() => {
 		if (!stats) return 0;
 		if (stats.user.isImmortal) return 100;
@@ -240,6 +288,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
 		);
 	}, [stats?.buckets]);
+
+	const deepFreezeModalBucket = deepFreezeModal?.bucket || null;
+	const deepFreezeSnapshot = deepFreezeModalBucket?.deepFreeze;
 
 	const collaborationPermissionState = (permissions?: string[] | null) => ({
 		manageKeys: permissions?.includes("manage_keys") ?? false,
@@ -908,6 +959,36 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		}
 	};
 
+	const submitDeepFreezeAction = async (action: "freeze" | "unfreeze") => {
+		if (!deepFreezeModalBucket) return;
+		setDeepFreezeModal((prev) =>
+			prev ? { ...prev, submitting: true, error: null } : prev,
+		);
+		try {
+			await fetchJson(
+				`/api/dashboard/buckets/${deepFreezeModalBucket.name}/deep-freeze`,
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ action }),
+				},
+			);
+			await load();
+			setDeepFreezeModal(null);
+		} catch (e) {
+			setDeepFreezeModal((prev) =>
+				prev
+					? {
+							...prev,
+							submitting: false,
+							error:
+								e instanceof Error ? e.message : "Deep Freeze action failed",
+						}
+					: prev,
+			);
+		}
+	};
+
 	const runConfirmDialog = async () => {
 		if (!confirmDialog) return;
 		if (confirmDelayRemaining > 0) return;
@@ -1070,6 +1151,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					<button
 						type="button"
 						onClick={handleCreateBucket}
+						disabled={loading}
 						className={`${buttonBase} ${buttonNeutral} px-6 py-3`}
 					>
 						+ New Bucket
@@ -1108,10 +1190,12 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										pendingActionKey === `visibility:${bucket.name}`;
 									const bucketBusy =
 										pendingActionKey === `bucket:${bucket.name}`;
+									const deepFreezeState = bucket.deepFreeze?.state || "active";
+									const isDeepFrozen = !!bucket.deepFreeze?.isLocked;
 									return (
 										<tr
 											key={bucket.name}
-											className={`transition-colors group ${isCollaborative ? "bg-yellow-400/[0.04] hover:bg-yellow-400/[0.08]" : "hover:bg-white/5"}`}
+											className={`transition-colors group ${deepFreezeState === "frozen" ? "bg-sky-500/[0.09] hover:bg-sky-500/[0.13]" : deepFreezeState === "freezing" || deepFreezeState === "unfreezing" ? "bg-cyan-500/[0.07] hover:bg-cyan-500/[0.11]" : isCollaborative ? "bg-yellow-400/[0.04] hover:bg-yellow-400/[0.08]" : "hover:bg-white/5"}`}
 										>
 											<td className="px-6 py-4 font-medium text-white font-mono">
 												{bucket.name}
@@ -1130,6 +1214,17 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														CDN
 													</span>
 												) : null}
+												{deepFreezeState !== "active" ? (
+													<span
+														className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${deepFreezeState === "frozen" ? "bg-sky-500/20 text-sky-300 border-sky-400/30" : "bg-cyan-500/20 text-cyan-200 border-cyan-400/30"}`}
+													>
+														{deepFreezeState === "frozen"
+															? "DEEP FREEZE"
+															: deepFreezeState === "freezing"
+																? "FREEZING"
+																: "UNFREEZING"}
+													</span>
+												) : null}
 											</td>
 											<td className="px-6 py-4">
 												{bucket.isCdn ? (
@@ -1144,6 +1239,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													<button
 														type="button"
 														onClick={() => setActiveBucket(bucket)}
+														disabled={bucketBusy || isDeepFrozen}
 														className={`${buttonBase} ${buttonNeutral} text-xs px-3 py-1.5 rounded-lg`}
 													>
 														<MdKey className="text-sm mr-1" />{" "}
@@ -1177,7 +1273,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														onClick={() =>
 															togglePublic(bucket.name, !bucket.isPublic)
 														}
-														className={`inline-flex items-center gap-2 px-1 py-1 transition-colors ${bucket.isPaused || bucket.isCdn || visibilityBusy ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}
+														className={`inline-flex items-center gap-2 px-1 py-1 transition-colors ${bucket.isPaused || bucket.isCdn || isDeepFrozen || visibilityBusy ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}
 													>
 														<span
 															className={`relative h-6 w-11 rounded-full border transition-colors ${bucket.isPublic ? "bg-hc-blue/80 border-hc-blue" : "bg-white/10 border-white/20"}`}
@@ -1214,7 +1310,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														</span>
 													</button>
 												) : null}
-												{canOpenFiles ? (
+												{canOpenFiles && !isDeepFrozen ? (
 													<a
 														href={`/dashboard/buckets/${bucket.name}`}
 														aria-label="Open bucket files"
@@ -1226,6 +1322,34 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 															View bucket files
 														</span>
 													</a>
+												) : null}
+												{!bucket.isCdn && !isCollaborative ? (
+													<button
+														type="button"
+														onClick={() =>
+															setDeepFreezeModal({
+																bucket,
+																submitting: false,
+																error: null,
+															})
+														}
+														disabled={bucketBusy || isDeepFrozen}
+														aria-label="Deep Freeze"
+														title="Deep Freeze"
+														className={`${iconActionBase} group ${deepFreezeState === "active" ? "text-sky-300 hover:text-sky-200 hover:bg-sky-500/10" : "text-cyan-200 hover:text-cyan-100 hover:bg-cyan-500/10"}`}
+													>
+														<MdSevereCold
+															className={`text-base ${deepFreezeState === "freezing" || deepFreezeState === "unfreezing" ? "animate-pulse" : ""}`}
+														/>
+														<span className={iconActionTooltip}>
+															{deepFreezeState === "active"
+																? "Move bucket into Deep Freeze"
+																: deepFreezeState === "frozen"
+																	? "Restore bucket from Deep Freeze"
+																	: bucket.deepFreeze?.statusLabel ||
+																		"Deep Freeze in progress"}
+														</span>
+													</button>
 												) : null}
 												<a
 													href={`/dashboard/buckets/${bucket.name}/analytics`}
@@ -1242,7 +1366,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													<button
 														type="button"
 														onClick={() => deleteBucket(bucket.name, true)}
-														disabled={bucketBusy}
+														disabled={bucketBusy || isDeepFrozen}
 														aria-label="Empty bucket"
 														title="Empty bucket"
 														className={`${iconActionBase} group text-yellow-300 hover:text-yellow-200 hover:bg-yellow-500/10`}
@@ -1257,7 +1381,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													<button
 														type="button"
 														onClick={() => deleteBucket(bucket.name, false)}
-														disabled={bucketBusy}
+														disabled={bucketBusy || isDeepFrozen}
 														aria-label="Delete bucket"
 														title="Delete bucket"
 														className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10`}
@@ -2233,6 +2357,147 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			</Modal>
 
 			<Modal
+				open={!!deepFreezeModalBucket}
+				onClose={
+					deepFreezeModal?.submitting
+						? undefined
+						: () => setDeepFreezeModal(null)
+				}
+				title="Deep Freeze"
+				className="max-w-3xl p-8"
+			>
+				{deepFreezeModalBucket ? (
+					<div className="space-y-6">
+						<p className="text-text-muted text-sm font-mono">
+							{deepFreezeModalBucket.name}
+						</p>
+						<div className="rounded-3xl border border-sky-400/20 bg-sky-500/10 p-6">
+							<div className="flex items-center gap-3 mb-3">
+								<MdSevereCold
+									className={`text-2xl text-sky-300 ${deepFreezeSnapshot?.state === "freezing" || deepFreezeSnapshot?.state === "unfreezing" ? "animate-pulse" : ""}`}
+								/>
+								<h3 className="text-2xl font-black text-white">
+									{deepFreezeSnapshot?.statusLabel || "Deep Freeze"}
+								</h3>
+							</div>
+							<p className="text-text-muted text-sm leading-relaxed">
+								Deep Freeze compresses this entire bucket into a single
+								Zstandard archive and moves it to colder S3 storage for
+								long-term retention. While freezing, frozen, or unfreezing, the
+								bucket is completely locked: no reads, writes, previews, or file
+								access are allowed.
+							</p>
+							<div className="grid gap-4 md:grid-cols-3 mt-5">
+								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+									<p className="text-xs uppercase tracking-[0.18em] text-text-muted font-bold">
+										Current size
+									</p>
+									<p className="text-white text-2xl font-black mt-2">
+										{formatBytes(deepFreezeModalBucket.totalBytes)}
+									</p>
+								</div>
+								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+									<p className="text-xs uppercase tracking-[0.18em] text-text-muted font-bold">
+										Freeze estimate
+									</p>
+									<p className="text-white text-2xl font-black mt-2">
+										{formatDurationEstimate(
+											deepFreezeSnapshot?.estimatedFreezeSeconds,
+										)}
+									</p>
+								</div>
+								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+									<p className="text-xs uppercase tracking-[0.18em] text-text-muted font-bold">
+										Unfreeze estimate
+									</p>
+									<p className="text-white text-2xl font-black mt-2">
+										{formatDurationEstimate(
+											deepFreezeSnapshot?.estimatedUnfreezeSeconds,
+										)}
+									</p>
+								</div>
+							</div>
+							<div className="mt-5">
+								<div className="flex justify-between text-xs uppercase tracking-wider text-text-muted mb-2">
+									<span>Progress</span>
+									<span>
+										{typeof deepFreezeSnapshot?.progressPercent === "number"
+											? `${Math.round(deepFreezeSnapshot.progressPercent)}%`
+											: ""}
+										{deepFreezeSnapshot?.etaSeconds !== null &&
+										deepFreezeSnapshot?.etaSeconds !== undefined
+											? ` · ETA ${formatDurationEstimate(deepFreezeSnapshot.etaSeconds)}`
+											: ""}
+									</span>
+								</div>
+								<div className="h-3 rounded-full bg-white/5 overflow-hidden">
+									<div
+										className={`h-3 rounded-full ${deepFreezeSnapshot?.state === "frozen" ? "bg-sky-400" : deepFreezeSnapshot?.state === "active" ? "bg-white/20" : "bg-cyan-400 animate-pulse"}`}
+										style={{
+											width: `${Math.max(0, Math.round(deepFreezeSnapshot?.progressPercent || 0))}%`,
+										}}
+									/>
+								</div>
+							</div>
+						</div>
+						{deepFreezeModal?.error ? (
+							<p className="text-sm text-red-400">{deepFreezeModal.error}</p>
+						) : null}
+						<div className="flex justify-end gap-3">
+							<button
+								type="button"
+								onClick={() => setDeepFreezeModal(null)}
+								disabled={deepFreezeModal?.submitting}
+								className={`${buttonBase} ${buttonSubtle} disabled:opacity-50`}
+							>
+								Close
+							</button>
+							{deepFreezeSnapshot?.state === "active" ? (
+								<button
+									type="button"
+									onClick={() => void submitDeepFreezeAction("freeze")}
+									disabled={deepFreezeModal?.submitting}
+									className={`${buttonBase} bg-sky-500 hover:bg-sky-400 border-sky-500 text-black px-6 py-3 disabled:opacity-50`}
+								>
+									{deepFreezeModal?.submitting ? (
+										<>
+											<MdSync className="animate-spin" /> Starting...
+										</>
+									) : (
+										<>
+											<MdSevereCold /> Start Deep Freeze
+										</>
+									)}
+								</button>
+							) : deepFreezeSnapshot?.state === "frozen" ? (
+								<button
+									type="button"
+									onClick={() => void submitDeepFreezeAction("unfreeze")}
+									disabled={deepFreezeModal?.submitting}
+									className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
+								>
+									{deepFreezeModal?.submitting ? (
+										<>
+											<MdSync className="animate-spin" /> Starting restore...
+										</>
+									) : (
+										<>
+											<MdSevereCold /> Unfreeze Bucket
+										</>
+									)}
+								</button>
+							) : (
+								<div className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-cyan-100 text-sm font-medium">
+									This bucket is locked while archive work continues in the
+									background.
+								</div>
+							)}
+						</div>
+					</div>
+				) : null}
+			</Modal>
+
+			<Modal
 				open={!!confirmDialog}
 				onClose={confirmLoading ? undefined : () => setConfirmDialog(null)}
 				title={confirmDialog?.title}
@@ -2370,7 +2635,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													</p>
 												</div>
 											</div>
-											<label className="flex items-start gap-3 rounded-xl border border-white/15 bg-black/20 p-3 mt-1">
+											<label className="flex items-start gap-3 rounded-xl border border-white/10 bg-black/20 p-3 mt-1">
 												<input
 													type="checkbox"
 													checked={dontShowPublicWarningAgain}

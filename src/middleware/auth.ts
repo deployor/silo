@@ -6,6 +6,7 @@ import { verifyAwsV4Signature } from "../lib/auth-v4";
 import { context } from "../lib/context";
 import { redis } from "../lib/redis";
 import { S3Errors } from "../lib/s3-errors";
+import { getBucketDeepFreezeMessage } from "../services/deep-freeze-service";
 
 const S3_DOMAIN = config.s3Domain;
 const AUTH_CACHE_TTL_SECONDS = 300;
@@ -282,6 +283,11 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 					).toResponse();
 				}
 
+				const systemDeepFreezeMessage = getBucketDeepFreezeMessage(bucket);
+				if (systemDeepFreezeMessage) {
+					return S3Errors.AccessDenied(systemDeepFreezeMessage).toResponse();
+				}
+
 				if (!bucket.isPublic) {
 					return S3Errors.AccessDenied().toResponse();
 				}
@@ -322,6 +328,11 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 			return S3Errors.AccessDenied(
 				`Bucket is temporarily paused.${bucket.pauseReason ? ` Reason: ${bucket.pauseReason}` : ""}`,
 			).toResponse();
+		}
+
+		const publicDeepFreezeMessage = getBucketDeepFreezeMessage(bucket);
+		if (publicDeepFreezeMessage) {
+			return S3Errors.AccessDenied(publicDeepFreezeMessage).toResponse();
 		}
 
 		if (!bucket.isPublic) {
@@ -380,6 +391,11 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 		return S3Errors.AccessDenied(
 			`Bucket is temporarily paused.${bucket.pauseReason ? ` Reason: ${bucket.pauseReason}` : ""}`,
 		).toResponse();
+	}
+
+	const signedDeepFreezeMessage = getBucketDeepFreezeMessage(bucket);
+	if (signedDeepFreezeMessage) {
+		return S3Errors.AccessDenied(signedDeepFreezeMessage).toResponse();
 	}
 
 	if (key.isPaused) {

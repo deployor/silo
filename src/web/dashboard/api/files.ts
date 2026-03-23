@@ -19,6 +19,7 @@ import {
 	assertCanWriteFiles,
 	getBucketAccessForUser,
 } from "../../../services/collaboration-service";
+import { getBucketDeepFreezeMessage } from "../../../services/deep-freeze-service";
 
 type BucketRecord = typeof buckets.$inferSelect;
 type UserRecord = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
@@ -81,6 +82,10 @@ async function getBucketAndOwner(
 	if (access.bucket.isPaused && !requestUser.isAdmin) {
 		throw new Error("Bucket is paused");
 	}
+	const deepFreezeMessage = getBucketDeepFreezeMessage(access.bucket);
+	if (deepFreezeMessage && !requestUser.isAdmin) {
+		throw new Error(deepFreezeMessage);
+	}
 
 	return {
 		bucket: access.bucket,
@@ -96,6 +101,7 @@ function responseForBucketError(error: unknown): Response | null {
 	if (message === "Bucket not found") return errorResponse(message, 404);
 	if (message === "Unauthorized") return errorResponse(message, 403);
 	if (message === "Bucket is paused") return errorResponse(message, 403);
+	if (message.includes("Deep Freeze")) return errorResponse(message, 423);
 	if (message === "Owner not found") return errorResponse(message, 404);
 	return null;
 }

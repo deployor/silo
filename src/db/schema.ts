@@ -73,6 +73,33 @@ export const buckets = pgTable(
 		isCdn: boolean("is_cdn").default(false).notNull(),
 		isPaused: boolean("is_paused").default(false).notNull(),
 		pauseReason: text("pause_reason"),
+		deepFreezeState: text("deep_freeze_state").default("active").notNull(),
+		deepFreezeReason: text("deep_freeze_reason"),
+		deepFreezeRequestedAt: timestamp("deep_freeze_requested_at"),
+		deepFreezeStartedAt: timestamp("deep_freeze_started_at"),
+		deepFreezeCompletedAt: timestamp("deep_freeze_completed_at"),
+		deepFreezeArchiveKey: text("deep_freeze_archive_key"),
+		deepFreezeArchiveBytes: bigint("deep_freeze_archive_bytes", {
+			mode: "number",
+		})
+			.notNull()
+			.default(0),
+		deepFreezeProgress: doublePrecision("deep_freeze_progress")
+			.notNull()
+			.default(0),
+		deepFreezeEstimatedFreezeSeconds: bigint(
+			"deep_freeze_estimated_freeze_seconds",
+			{ mode: "number" },
+		)
+			.notNull()
+			.default(0),
+		deepFreezeEstimatedUnfreezeSeconds: bigint(
+			"deep_freeze_estimated_unfreeze_seconds",
+			{ mode: "number" },
+		)
+			.notNull()
+			.default(0),
+		deepFreezeLastUpdatedAt: timestamp("deep_freeze_last_updated_at"),
 		corsConfig: text("cors_config"), // JSON string of CORS rules
 		totalBytes: bigint("total_bytes", { mode: "number" }).notNull().default(0),
 		totalRequests: bigint("total_requests", { mode: "number" })
@@ -479,4 +506,56 @@ export const bucketCollaboratorsRelations = relations(
 			references: [users.id],
 		}),
 	}),
+);
+export const deepFreezeJobs = pgTable(
+	"deep_freeze_jobs",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		bucketId: uuid("bucket_id")
+			.references(() => buckets.id, { onDelete: "cascade" })
+			.notNull(),
+		requestedByUserId: text("requested_by_user_id")
+			.references(() => users.id, { onDelete: "set null" })
+			.notNull(),
+		action: text("action").notNull(),
+		status: text("status").default("queued").notNull(),
+		archiveKey: text("archive_key"),
+		manifestKey: text("manifest_key"),
+		lockToken: text("lock_token"),
+		workerId: text("worker_id"),
+		totalObjects: bigint("total_objects", { mode: "number" })
+			.notNull()
+			.default(0),
+		processedObjects: bigint("processed_objects", { mode: "number" })
+			.notNull()
+			.default(0),
+		totalBytes: bigint("total_bytes", { mode: "number" }).notNull().default(0),
+		processedBytes: bigint("processed_bytes", { mode: "number" })
+			.notNull()
+			.default(0),
+		archiveBytes: bigint("archive_bytes", { mode: "number" })
+			.notNull()
+			.default(0),
+		progressPercent: doublePrecision("progress_percent").notNull().default(0),
+		checksumSha256: text("checksum_sha256"),
+		manifestJson: text("manifest_json").notNull().default("[]"),
+		failureCode: text("failure_code"),
+		failureMessage: text("failure_message"),
+		retryCount: bigint("retry_count", { mode: "number" }).notNull().default(0),
+		startedAt: timestamp("started_at"),
+		completedAt: timestamp("completed_at"),
+		heartbeatAt: timestamp("heartbeat_at"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(table) => {
+		return {
+			bucketIdx: index("deep_freeze_jobs_bucket_idx").on(table.bucketId),
+			statusIdx: index("deep_freeze_jobs_status_idx").on(table.status),
+			actionIdx: index("deep_freeze_jobs_action_idx").on(table.action),
+			heartbeatIdx: index("deep_freeze_jobs_heartbeat_idx").on(
+				table.heartbeatAt,
+			),
+		};
+	},
 );
