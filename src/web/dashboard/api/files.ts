@@ -574,6 +574,75 @@ export async function handleFiles(req: Request): Promise<Response> {
 		}
 	}
 
+	const infoFileMatch = path.match(
+		/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/files\/info$/,
+	);
+	if (infoFileMatch && req.method === "GET") {
+		const bucketName = infoFileMatch[1];
+		const key = url.searchParams.get("key");
+
+		if (!key) {
+			return errorResponse("Missing params", 400);
+		}
+
+		const safeKey = normalizeUserKey(key);
+
+		let bucketData: BucketContext;
+		try {
+			bucketData = await getBucketAndOwner(user, bucketName);
+		} catch (error) {
+			return (
+				responseForBucketError(error) || errorResponse("Internal Error", 500)
+			);
+		}
+
+		try {
+			const access = await getBucketAccessForUser({
+				bucketName,
+				userId: user.id,
+				isAdmin: user.isAdmin,
+			});
+			assertCanReadFiles(access);
+		} catch (error) {
+			return (
+				responseForBucketError(error) || errorResponse("Unauthorized", 403)
+			);
+		}
+
+		const internalKey = getInternalPath(
+			safeKey,
+			bucketData.owner,
+			bucketData.bucket,
+		);
+
+		try {
+			const stat = await headObject(internalKey);
+
+			let publicUrl: string | null = null;
+			if (bucketData.bucket.publicAccess) {
+				publicUrl = `https://${config.s3Domain}/${bucketData.bucket.name}/${safeKey}`;
+				if (bucketData.bucket.customDomain) {
+					publicUrl = `https://${bucketData.bucket.customDomain}/${safeKey}`;
+				}
+			}
+
+			return jsonResponse({
+				file: {
+					key: safeKey,
+					size: stat.size,
+					contentType: stat.contentType,
+				},
+				publicUrl,
+			});
+		} catch (error) {
+			console.error("Info File Error:", error);
+			if (error instanceof Error && error.message === "File not found") {
+				return errorResponse("File not found", 404);
+			}
+			return errorResponse("Failed to get file info", 500);
+		}
+	}
+
 	const previewFileMatch = path.match(
 		/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/files\/preview$/,
 	);

@@ -63,6 +63,15 @@ type OperationState = {
 	error: string | null;
 };
 
+type FileInfoState = {
+	file: FileItem;
+	publicUrl: string | null;
+	previewUrl: string;
+	previewText: string;
+	loading: boolean;
+	error: string | null;
+};
+
 const IMAGE_EXTS = ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif"];
 const VIDEO_EXTS = ["mp4", "webm", "ogg", "mov", "mkv", "avi", "m4v"];
 const AUDIO_EXTS = ["mp3", "wav", "aac", "m4a", "flac", "ogg", "opus"];
@@ -200,6 +209,13 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		"Drop files to upload into this folder",
 	);
 	const [totals, setTotals] = useState({ files: 0, folders: 0 });
+
+	const [infoOpen, setInfoOpen] = useState(false);
+	const [infoLoading, setInfoLoading] = useState(false);
+	const [infoError, setInfoError] = useState<string | null>(null);
+	const [infoFile, setInfoFile] = useState<FileItem | null>(null);
+	const [infoDetails, setInfoDetails] = useState<any>(null);
+
 	const [previewOpen, setPreviewOpen] = useState(false);
 	const [previewLoading, setPreviewLoading] = useState(false);
 	const [previewError, setPreviewError] = useState<string | null>(null);
@@ -531,6 +547,27 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			);
 		} finally {
 			setPreviewLoading(false);
+		}
+	};
+
+	const openInfo = async (file: FileItem) => {
+		setInfoOpen(true);
+		setInfoLoading(true);
+		setInfoError(null);
+		setInfoFile(file);
+		setInfoDetails(null);
+
+		try {
+			const res = await fetchJson<{ file: any; publicUrl: string | null }>(
+				`/api/dashboard/buckets/${bucketName}/files/info?key=${encodeURIComponent(file.key)}`,
+			);
+			setInfoDetails(res);
+		} catch (cause) {
+			setInfoError(
+				cause instanceof Error ? cause.message : "Failed to load file info",
+			);
+		} finally {
+			setInfoLoading(false);
 		}
 	};
 
@@ -966,14 +1003,14 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<button
 										type="button"
 										onClick={() => setSearchScope("current")}
-										className={`px-4 py-3 text-sm font-bold transition-colors ${searchScope === "current" ? "bg-hc-blue text-white" : "text-text-muted hover:text-white"}`}
+									 className={`px-4 py-3 text-sm font-bold transition-colors ${searchScope === "current" ? "bg-hc-blue text-white" : "text-text-muted hover:text-white"}`}
 									>
 										This folder
 									</button>
 									<button
 										type="button"
 										onClick={() => setSearchScope("all")}
-										className={`px-4 py-3 text-sm font-bold transition-colors ${searchScope === "all" ? "bg-hc-blue text-white" : "text-text-muted hover:text-white"}`}
+									 className={`px-4 py-3 text-sm font-bold transition-colors ${searchScope === "all" ? "bg-hc-blue text-white" : "text-text-muted hover:text-white"}`}
 									>
 										Everywhere
 									</button>
@@ -983,7 +1020,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<button
 									type="button"
 									onClick={() => void handleSearch()}
-									className="bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
+								 className="bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
 								>
 									Search
 								</button>
@@ -998,7 +1035,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												query: "",
 											});
 										}}
-										className="text-text-muted hover:text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
+									 className="text-text-muted hover:text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
 									>
 										Clear
 									</button>
@@ -1051,7 +1088,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									type="checkbox"
 									checked={allVisibleItemsSelected}
 									onChange={toggleAllVisibleItems}
-									className="rounded border-white/10 bg-black/30"
+								 className="rounded border-white/10 bg-black/30"
 								/>
 								Select visible
 							</label>
@@ -1081,7 +1118,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<tr>
 											<td
 												colSpan={6}
-												className="px-6 py-16 text-center text-text-muted italic"
+											 className="px-6 py-16 text-center text-text-muted italic"
 											>
 												No files found.
 											</td>
@@ -1091,7 +1128,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									{folders.map((folder) => (
 										<tr
 											key={folder.prefix}
-											className="hover:bg-white/5 transition-colors cursor-pointer"
+										 className="hover:bg-white/5 transition-colors cursor-pointer"
 											onDoubleClick={() =>
 												void loadFiles({
 													prefix: folder.prefix,
@@ -1106,8 +1143,8 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													checked={selectedFolderPrefixes.includes(
 														folder.prefix,
 													)}
-													onChange={() => toggleFolderSelection(folder.prefix)}
-													className="rounded border-white/10 bg-black/30"
+												 onChange={() => toggleFolderSelection(folder.prefix)}
+												 className="rounded border-white/10 bg-black/30"
 												/>
 											</td>
 											<td className="px-4 py-4 text-hc-blue">
@@ -1123,7 +1160,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 															query: "",
 														})
 													}
-													className="hover:text-hc-blue"
+												 className="hover:text-hc-blue"
 												>
 													{folder.name}
 												</button>
@@ -1137,7 +1174,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													type="button"
 													onClick={() => startDeleteFolder(folder)}
 													disabled={!canWriteFiles}
-													className="text-hc-red hover:text-red-400 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
+												 className="text-hc-red hover:text-red-400 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
 												>
 													Delete
 												</button>
@@ -1150,7 +1187,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										return (
 											<tr
 												key={file.key}
-												className={`transition-colors ${selected ? "bg-hc-red/5" : "hover:bg-white/5"}`}
+											 className={`transition-colors ${selected ? "bg-hc-red/5" : "hover:bg-white/5"}`}
 											>
 												<td className="px-4 py-4">
 													<input
@@ -1162,12 +1199,12 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																(event.nativeEvent as MouseEvent).shiftKey,
 															)
 														}
-														className="rounded border-white/10 bg-black/30"
+													 className="rounded border-white/10 bg-black/30"
 													/>
 												</td>
 												<td className="px-4 py-3.5 text-text-muted">
 													<PhIcon
-														className={`ph ${getFileIcon(file)} text-xl`}
+													 className={`ph ${getFileIcon(file)} text-xl`}
 													/>
 												</td>
 												<td className="px-4 py-3.5 font-medium text-white min-w-0">
@@ -1186,8 +1223,15 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													<div className="inline-flex flex-wrap justify-end gap-2">
 														<button
 															type="button"
+															onClick={() => void openInfo(file)}
+														 className="text-white hover:text-gray-300 text-xs font-medium"
+														>
+															Info
+														</button>
+														<button
+															type="button"
 															onClick={() => void openPreview(file)}
-															className="text-hc-blue hover:text-blue-400 text-xs font-medium"
+														 className="text-hc-blue hover:text-blue-400 text-xs font-medium"
 														>
 															Preview
 														</button>
@@ -1195,7 +1239,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 															type="button"
 															onClick={() => openRename(file)}
 															disabled={!canWriteFiles}
-															className="text-text-muted hover:text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
+														 className="text-text-muted hover:text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
 														>
 															Rename
 														</button>
@@ -1203,7 +1247,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 															type="button"
 															onClick={() => openMove([file.key])}
 															disabled={!canWriteFiles}
-															className="text-text-muted hover:text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
+														 className="text-text-muted hover:text-white disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
 														>
 															Move
 														</button>
@@ -1211,7 +1255,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 															type="button"
 															onClick={() => startDelete([file.key])}
 															disabled={!canWriteFiles}
-															className="text-hc-red hover:text-red-400 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
+														 className="text-hc-red hover:text-red-400 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
 														>
 															Delete
 														</button>
@@ -1246,7 +1290,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<button
 									type="button"
 									onClick={() => void loadMore()}
-									className="text-text-muted hover:text-white text-sm font-bold py-2 px-4 rounded-lg hover:bg-white/5 transition-colors"
+								 className="text-text-muted hover:text-white text-sm font-bold py-2 px-4 rounded-lg hover:bg-white/5 transition-colors"
 								>
 									Load More
 								</button>
@@ -1293,7 +1337,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<img
 									src={previewUrl}
 									alt={previewKey}
-									className="max-w-full max-h-[70vh] object-contain shadow-lg rounded"
+								 className="max-w-full max-h-[70vh] object-contain shadow-lg rounded"
 								/>
 							</div>
 						) : VIDEO_EXTS.includes(previewExt) ? (
@@ -1301,7 +1345,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<video
 									src={previewUrl}
 									controls
-									className="max-w-full max-h-[70vh] rounded shadow-lg"
+								 className="max-w-full max-h-[70vh] rounded shadow-lg"
 								>
 									<track kind="captions" />
 								</video>
@@ -1326,21 +1370,131 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						)
 					) : null}
 				</div>
-				<div className="mt-4 text-center flex flex-col gap-2">
-					<p className="text-white font-bold text-lg">
-						{previewKey.split("/").pop()}
-					</p>
-					{previewDownloadUrl ? (
-						<a
-							href={previewDownloadUrl}
-							download={previewFileName}
-							className="text-hc-blue hover:underline text-sm"
-						>
-							Download File
-						</a>
-					) : null}
-				</div>
 			</Modal>
+
+			{infoOpen && infoFile && (
+				<Modal
+					open={infoOpen}
+					onClose={() => {
+						setInfoOpen(false);
+						setInfoFile(null);
+						setInfoDetails(null);
+					}}
+					title="Object Details"
+					className="max-w-4xl p-8"
+				>
+					<div className="space-y-8">
+						<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+							<div>
+								<div className="text-xs text-text-muted mb-1">Date Created</div>
+								<div className="text-white text-sm">{formatRelativeTime(infoFile.lastModified)}</div>
+							</div>
+							<div>
+								<div className="text-xs text-text-muted mb-1">Type</div>
+								<div className="text-white text-sm">{infoFile.extension || "unknown"}</div>
+							</div>
+							<div>
+								<div className="text-xs text-text-muted mb-1">Storage Class</div>
+								<div className="text-white text-sm">Standard</div>
+							</div>
+							<div>
+								<div className="text-xs text-text-muted mb-1">Size</div>
+								<div className="text-white text-sm">{formatBytes(infoFile.size)}</div>
+							</div>
+						</div>
+
+						<div className="border-t border-white/10 pt-6">
+							<h3 className="text-lg font-bold text-white mb-4">URLs</h3>
+							{infoLoading ? (
+								<div className="text-text-muted">Loading...</div>
+							) : infoError ? (
+								<div className="text-hc-red">{infoError}</div>
+							) : infoDetails?.publicUrl ? (
+								<div>
+									<div className="text-xs text-text-muted mb-2">Custom Domains</div>
+									<div className="flex items-center gap-2">
+										<input 
+											type="text" 
+											readOnly 
+											value={infoDetails.publicUrl} 
+										 className="flex-1 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-mono focus:outline-none"
+										/>
+										<button 
+										 onClick={() => {
+												navigator.clipboard.writeText(infoDetails.publicUrl);
+											}}
+										 className="bg-white/10 hover:bg-white/20 p-3 rounded-xl transition-colors"
+										 title="Copy to clipboard"
+										>
+											<PhIcon className="ph ph-copy text-white" />
+										</button>
+									</div>
+								</div>
+							) : (
+								<div className="text-text-muted">No public URL available</div>
+							)}
+						</div>
+
+						<div className="border-t border-white/10 pt-6">
+							<h3 className="text-lg font-bold text-white mb-4">Custom Metadata</h3>
+							<div className="text-text-muted">No custom metadata set</div>
+						</div>
+
+						<div className="border-t border-white/10 pt-6">
+							<div className="flex items-center justify-between mb-4">
+								<h3 className="text-lg font-bold text-white">Object Preview</h3>
+								<button
+									type="button"
+									onClick={() => {
+										setInfoOpen(false);
+										openPreview(infoFile);
+									}}
+								 className="text-hc-blue hover:text-blue-400 text-sm font-medium"
+								>
+									Open full preview
+								</button>
+							</div>
+							
+							{IMAGE_EXTS.includes(infoFile.extension.toLowerCase()) ? (
+								<div className="bg-hc-dark rounded-xl border border-white/10 overflow-hidden flex items-center justify-center p-4">
+									{infoDetails?.publicUrl ? (
+										<img 
+											src={infoDetails.publicUrl} 
+											alt="Preview" 
+										 className="max-h-[300px] object-contain rounded"
+										/>
+									) : (
+										<div className="text-text-muted text-sm p-8 text-center">
+											Loading preview image...
+											<br />
+											<span className="text-xs opacity-70">Requires public access</span>
+										</div>
+									)}
+								</div>
+							) : (
+								<div className="bg-hc-dark rounded-xl border border-white/10 p-8 text-center flex flex-col items-center justify-center">
+									<PhIcon className="ph ph-file-x text-4xl text-text-muted mb-2" />
+									<p className="text-text-muted text-sm">Preview not supported in info view for this file type.</p>
+								</div>
+							)}
+						</div>
+						
+						<div className="flex justify-end gap-3 pt-4 border-t border-white/10">
+							<button
+								type="button"
+								onClick={() => {
+									setInfoOpen(false);
+									startDelete([infoFile.key]);
+								}}
+							 className="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
+							>
+								<PhIcon className="ph ph-trash" />
+								Delete
+							</button>
+						</div>
+					</div>
+				</Modal>
+			)}
 
 			<Modal
 				open={deleteTargets.length > 0}
@@ -1367,7 +1521,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							type="button"
 							onClick={() => setDeleteTargets([])}
 							disabled={operation.busy}
-							className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+						 className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
 						>
 							Cancel
 						</button>
@@ -1375,7 +1529,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							type="button"
 							onClick={() => void confirmDelete()}
 							disabled={operation.busy}
-							className="bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
+						 className="bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
 						>
 							{operation.busy ? (
 								<PhIcon className="ph ph-spinner animate-spin" />
@@ -1416,7 +1570,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							type="button"
 							onClick={() => setDeleteFolderTarget(null)}
 							disabled={operation.busy}
-							className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+						 className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
 						>
 							Cancel
 						</button>
@@ -1424,7 +1578,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							type="button"
 							onClick={() => void confirmDeleteFolder()}
 							disabled={operation.busy}
-							className="bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
+						 className="bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
 						>
 							{operation.busy ? (
 								<PhIcon className="ph ph-spinner animate-spin" />
@@ -1456,14 +1610,14 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						onKeyDown={(event) => {
 							if (event.key === "Enter") void submitRename();
 						}}
-						className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue"
+					 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue"
 					/>
 					<div className="flex justify-end gap-3">
 						<button
 							type="button"
 							onClick={() => setRenameTarget(null)}
 							disabled={operation.busy}
-							className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+						 className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
 						>
 							Cancel
 						</button>
@@ -1471,7 +1625,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							type="button"
 							onClick={() => void submitRename()}
 							disabled={operation.busy}
-							className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
+						 className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
 						>
 							{operation.busy ? (
 								<PhIcon className="ph ph-spinner animate-spin" />
@@ -1503,7 +1657,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							if (event.key === "Enter") void submitMove();
 						}}
 						placeholder="folder/subfolder/"
-						className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue"
+					 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue"
 					/>
 					<div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
 						<div className="flex items-center gap-2 text-sm font-mono overflow-x-auto whitespace-nowrap">
@@ -1515,7 +1669,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<button
 										type="button"
 										onClick={() => setMoveTargetPrefix(crumb.prefix)}
-										className={
+									 className={
 											index === moveCrumbs.length - 1
 												? "text-white font-bold"
 												: "text-text-muted hover:text-white"
@@ -1531,7 +1685,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<button
 							type="button"
 							onClick={() => setMoveTargetPrefix(currentPrefix)}
-							className="text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white"
+						 className="text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white"
 						>
 							Current folder
 						</button>
@@ -1541,7 +1695,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								onClick={() =>
 									setMoveTargetPrefix((prev) => getParentPrefix(prev))
 								}
-								className="text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white"
+							 className="text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white"
 							>
 								Parent folder
 							</button>
@@ -1549,7 +1703,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<button
 							type="button"
 							onClick={() => setMoveTargetPrefix("")}
-							className="text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white"
+						 className="text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-muted hover:text-white"
 						>
 							Root
 						</button>
@@ -1559,7 +1713,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							type="button"
 							onClick={() => setMoveOpen(false)}
 							disabled={operation.busy}
-							className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+						 className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
 						>
 							Cancel
 						</button>
@@ -1567,7 +1721,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							type="button"
 							onClick={() => void submitMove()}
 							disabled={operation.busy}
-							className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
+						 className="bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
 						>
 							{operation.busy ? (
 								<PhIcon className="ph ph-spinner animate-spin" />
@@ -1589,7 +1743,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div>
 							<label
 								htmlFor="upload-prefix-input"
-								className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2"
+							 className="block text-xs font-bold uppercase tracking-wider text-text-muted mb-2"
 							>
 								Destination folder
 							</label>
@@ -1599,7 +1753,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								value={uploadPrefix}
 								onChange={(event) => setUploadPrefix(event.target.value)}
 								placeholder="folder/subfolder/"
-								className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue"
+							 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue"
 							/>
 						</div>
 						<div className="flex items-end">
@@ -1607,14 +1761,14 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<button
 									type="button"
 									onClick={() => openSystemPicker("files")}
-									className={`flex-1 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${uploadMode === "files" ? "bg-hc-red text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}
+								 className={`flex-1 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${uploadMode === "files" ? "bg-hc-red text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}
 								>
 									Files
 								</button>
 								<button
 									type="button"
 									onClick={() => openSystemPicker("folder")}
-									className={`flex-1 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${uploadMode === "folder" ? "bg-hc-red text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}
+								 className={`flex-1 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${uploadMode === "folder" ? "bg-hc-red text-white" : "bg-white/10 hover:bg-white/20 text-white"}`}
 								>
 									Folder
 								</button>
@@ -1632,7 +1786,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<button
 											type="button"
 											onClick={() => setUploadPrefix(crumb.prefix)}
-											className={
+										 className={
 												normalizePrefix(uploadPrefix) ===
 												normalizePrefix(crumb.prefix)
 													? "text-white font-bold"
@@ -1661,7 +1815,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<button
 										type="button"
 										onClick={() => openSystemPicker(uploadMode)}
-										className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
+									 className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-bold transition-colors"
 									>
 										Choose {uploadMode === "folder" ? "folder" : "files"}
 									</button>
@@ -1673,7 +1827,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								return (
 									<div
 										key={mapKey}
-										className="rounded-2xl border border-white/10 bg-black/30 p-3"
+									 className="rounded-2xl border border-white/10 bg-black/30 p-3"
 									>
 										<div className="flex items-center justify-between gap-3 mb-2">
 											<div className="min-w-0">
@@ -1695,7 +1849,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														),
 													)
 												}
-												className="text-text-muted hover:text-white text-xs font-bold uppercase tracking-wider"
+											 className="text-text-muted hover:text-white text-xs font-bold uppercase tracking-wider"
 											>
 												Remove
 											</button>
@@ -1709,7 +1863,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													[mapKey]: event.target.value,
 												}))
 											}
-											className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-hc-blue font-mono"
+										 className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-hc-blue font-mono"
 										/>
 									</div>
 								);
@@ -1721,7 +1875,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							type="button"
 							onClick={() => setUploadOpen(false)}
 							disabled={operation.busy}
-							className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
+						 className="text-text-muted hover:text-white px-4 py-2 text-sm font-bold transition-colors"
 						>
 							Cancel
 						</button>
@@ -1729,7 +1883,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							type="button"
 							onClick={() => void submitUpload()}
 							disabled={operation.busy || uploadQueue.length === 0}
-							className="bg-hc-red hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
+						 className="bg-hc-red hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
 						>
 							{operation.busy ? (
 								<PhIcon className="ph ph-spinner animate-spin" />
