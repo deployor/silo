@@ -5,6 +5,7 @@ import { buckets, deepFreezeJobs, users } from "../db/schema";
 import {
 	buildDeepFreezeArchive,
 	buildDeepFreezeStorageKeys,
+	deleteLiveBucketObjects,
 	readDeepFreezeManifest,
 	restoreDeepFreezeArchive,
 } from "./deep-freeze-archive-service";
@@ -153,6 +154,11 @@ export class DeepFreezeWorkerService {
 					bucket,
 					archiveKey: storageKeys.archiveKey,
 					manifestKey: storageKeys.manifestKey,
+					onProgress,
+				});
+
+				await deleteLiveBucketObjects({
+					manifest: archive.manifest,
 					onProgress,
 				});
 
