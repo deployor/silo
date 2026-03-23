@@ -313,6 +313,40 @@ export async function restoreDeepFreezeArchive(params: {
 	};
 }
 
+export async function deleteLiveBucketObjects(params: {
+	manifest: DeepFreezeManifestEntry[];
+	onProgress?: (progress: {
+		processedObjects: number;
+		totalObjects: number;
+		processedBytes: number;
+		totalBytes: number;
+	}) => Promise<void> | void;
+}) {
+	const totalBytes = params.manifest.reduce((sum, item) => sum + item.size, 0);
+	let processedObjects = 0;
+	let processedBytes = 0;
+
+	for (const item of params.manifest) {
+		const deleteRes = await s3Client.fetch(item.internalKey, { method: "DELETE" });
+		if (!deleteRes.ok) {
+			throw new Error(`Failed to delete live object ${item.key} (${deleteRes.status})`);
+		}
+		processedObjects += 1;
+		processedBytes += item.size;
+		await params.onProgress?.({
+			processedObjects,
+			totalObjects: params.manifest.length,
+			processedBytes,
+			totalBytes,
+		});
+	}
+
+	return {
+		totalObjects: params.manifest.length,
+		totalBytes,
+	};
+}
+
 export function buildDeepFreezeStorageKeys(params: {
 	bucket: BucketRecord;
 	archiveFileName?: string;
