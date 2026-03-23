@@ -157,7 +157,7 @@ type InviteModalState = {
 		error: string | null;
 		user: {
 			id: string;
-			email?: string;
+			email?: string | null;
 			avatarUrl?: string | null;
 		} | null;
 	};
@@ -274,6 +274,18 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		}, 15000);
 		return () => window.clearInterval(interval);
 	}, [stats?.buckets, load]);
+
+	// prevent race condition in modal render
+	useEffect(() => {
+		if (!deepFreezeModal || !stats?.buckets) return;
+		const nextBucket = stats.buckets.find(
+			(bucket) => bucket.name === deepFreezeModal.bucket.name,
+		);
+		if (!nextBucket) return;
+		setDeepFreezeModal((prev) =>
+			prev ? { ...prev, bucket: nextBucket } : prev,
+		);
+	}, [deepFreezeModal?.bucket.name, stats?.buckets]);
 
 	const storagePercent = useMemo(() => {
 		if (!stats) return 0;
@@ -1195,7 +1207,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									return (
 										<tr
 											key={bucket.name}
-											className={`transition-colors group ${
+										 className={`transition-colors group ${
 												deepFreezeState === "frozen"
 													? "bg-sky-500/[0.09] hover:bg-sky-500/[0.13]"
 													: deepFreezeState === "freezing" ||
@@ -1250,9 +1262,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													</span>
 												) : (
 													<button
-														type="button"
-														onClick={() => setActiveBucket(bucket)}
-														disabled={bucketBusy}
+													 type="button"
+													 onClick={() => setActiveBucket(bucket)}
+													 disabled={bucketBusy}
 													 className={`${buttonBase} ${buttonNeutral} text-xs px-3 py-1.5 rounded-lg`}
 													>
 														<MdKey className="text-sm mr-1" />{" "}
@@ -1275,7 +1287,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													</span>
 												) : (
 													<button
-														type="button"
+													 type="button"
 														role="switch"
 														aria-checked={bucket.isPublic}
 														disabled={
@@ -1283,7 +1295,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 															!!bucket.isCdn ||
 															visibilityBusy
 														}
-														onClick={() =>
+													 onClick={() =>
 															togglePublic(bucket.name, !bucket.isPublic)
 														}
 													 className={`inline-flex items-center gap-2 px-1 py-1 transition-colors ${
@@ -1544,7 +1556,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											);
 											return (
 												<div
-													key={collaborator.id}
+												 key={collaborator.id}
 												 className="rounded-2xl border border-white/10 bg-black/20 p-4"
 												>
 													<div className="flex items-start justify-between gap-4">
@@ -1666,7 +1678,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!inviteModal}
 				onClose={() => setInviteModal(null)}
 				title="Invite Collaborator"
-				className="max-w-2xl p-8"
+			 className="max-w-2xl p-8"
 			>
 				{inviteModal ? (
 					<div className="space-y-5">
@@ -1677,7 +1689,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<input
 								type="text"
 								value={inviteModal.inviteeUserId}
-							 onChange={(event) =>
+								onChange={(event) =>
 									setInviteModal((prev) =>
 										prev
 											? {
@@ -1794,7 +1806,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<button
 								type="button"
 							 onClick={() => void saveCollaborationInvite()}
-								disabled={inviteModal.saving || !inviteModal.lookup.user}
+							 disabled={inviteModal.saving || !inviteModal.lookup.user}
 							 className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
 							>
 								{inviteModal.saving ? "Sending..." : "Send invite"}
@@ -1824,7 +1836,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								id="create-bucket-name"
 								type="text"
 								value={bucketCreateModal.name}
-							 onChange={(e) =>
+								onChange={(e) =>
 									setBucketCreateModal((prev) =>
 										prev
 											? { ...prev, name: e.target.value, error: null }
@@ -1852,7 +1864,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<textarea
 								id="create-bucket-note"
 								value={bucketCreateModal.note}
-							 onChange={(e) =>
+								onChange={(e) =>
 									setBucketCreateModal((prev) =>
 										prev
 											? { ...prev, note: e.target.value, error: null }
@@ -1970,7 +1982,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												 ) : (
 														<button
 															type="button"
-															onClick={() => startEditingKeyNote(k)}
+														 onClick={() => startEditingKeyNote(k)}
 														 className="inline-flex items-center gap-2 italic hover:not-italic text-text-muted hover:text-white"
 														>
 															No note <MdEdit className="text-sm" />
@@ -2070,7 +2082,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</div>
 							<button
 								type="button"
-							 onClick={() => openGenerateKeyModal(activeBucket.name)}
+								onClick={() => openGenerateKeyModal(activeBucket.name)}
 							 className={`${buttonBase} ${buttonPrimaryBlue}`}
 							>
 								+ Generate New Key
@@ -2165,7 +2177,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<textarea
 								id="generate-key-note"
 								value={keyCreateModal.note}
-							 onChange={(e) =>
+								onChange={(e) =>
 									setKeyCreateModal((prev) =>
 										prev
 											? { ...prev, note: e.target.value, error: null }
@@ -2457,7 +2469,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</div>
 							</div>
 							<div className="mt-5">
-								<div className="flex justify-between text-xs uppercase tracking-wider text-text-muted mb-2">
+								<div className="flex justify-between text-xs uppercase tracking-[0.18em] text-text-muted mb-2">
 									<span>Progress</span>
 									<span>
 										{typeof deepFreezeSnapshot?.progressPercent === "number"
@@ -2573,7 +2585,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<div
 											 key={step.label}
 											 className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
-													active
+												 active
 														? "border-hc-red bg-hc-red/20 text-red-200"
 														: complete
 															? "border-hc-red/40 bg-hc-red/10 text-red-200"
@@ -2690,7 +2702,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												<input
 													type="checkbox"
 													checked={dontShowPublicWarningAgain}
-													onChange={(e) =>
+												 onChange={(e) =>
 														setDontShowPublicWarningAgain(e.target.checked)
 													}
 												 className="mt-1 h-4 w-4 rounded border-white/30 bg-black/20 text-hc-red focus:ring-hc-red/40"
