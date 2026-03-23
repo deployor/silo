@@ -1195,7 +1195,16 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									return (
 										<tr
 											key={bucket.name}
-											className={`transition-colors group ${deepFreezeState === "frozen" ? "bg-sky-500/[0.09] hover:bg-sky-500/[0.13]" : deepFreezeState === "freezing" || deepFreezeState === "unfreezing" ? "bg-cyan-500/[0.07] hover:bg-cyan-500/[0.11]" : isCollaborative ? "bg-yellow-400/[0.04] hover:bg-yellow-400/[0.08]" : "hover:bg-white/5"}`}
+											className={`transition-colors group ${
+												deepFreezeState === "frozen"
+													? "bg-sky-500/[0.09] hover:bg-sky-500/[0.13]"
+													: deepFreezeState === "freezing" ||
+													  deepFreezeState === "unfreezing"
+														? "bg-cyan-500/[0.07] hover:bg-cyan-500/[0.11]"
+														: isCollaborative
+															? "bg-yellow-400/[0.04] hover:bg-yellow-400/[0.08]"
+															: "hover:bg-white/5"
+											}`}
 										>
 											<td className="px-6 py-4 font-medium text-white font-mono">
 												{bucket.name}
@@ -1216,7 +1225,11 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												) : null}
 												{deepFreezeState !== "active" ? (
 													<span
-														className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${deepFreezeState === "frozen" ? "bg-sky-500/20 text-sky-300 border-sky-400/30" : "bg-cyan-500/20 text-cyan-200 border-cyan-400/30"}`}
+													 className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${
+															deepFreezeState === "frozen"
+																	? "bg-sky-500/20 text-sky-300 border-sky-400/30"
+																	: "bg-cyan-500/20 text-cyan-200 border-cyan-400/30"
+														}`}
 													>
 														{deepFreezeState === "frozen"
 															? "DEEP FREEZE"
@@ -1239,8 +1252,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													<button
 														type="button"
 														onClick={() => setActiveBucket(bucket)}
-														disabled={bucketBusy || isDeepFrozen}
-														className={`${buttonBase} ${buttonNeutral} text-xs px-3 py-1.5 rounded-lg`}
+														disabled={bucketBusy}
+													 className={`${buttonBase} ${buttonNeutral} text-xs px-3 py-1.5 rounded-lg`}
 													>
 														<MdKey className="text-sm mr-1" />{" "}
 														{bucket.keys.length} Keys
@@ -1273,13 +1286,28 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														onClick={() =>
 															togglePublic(bucket.name, !bucket.isPublic)
 														}
-														className={`inline-flex items-center gap-2 px-1 py-1 transition-colors ${bucket.isPaused || bucket.isCdn || isDeepFrozen || visibilityBusy ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}
+													 className={`inline-flex items-center gap-2 px-1 py-1 transition-colors ${
+															(bucket.isPaused ||
+																bucket.isCdn ||
+																isDeepFrozen ||
+																visibilityBusy)
+																	? "opacity-50 cursor-not-allowed"
+																	: "hover:opacity-90"
+														}`}
 													>
 														<span
-															className={`relative h-6 w-11 rounded-full border transition-colors ${bucket.isPublic ? "bg-hc-blue/80 border-hc-blue" : "bg-white/10 border-white/20"}`}
+														 className={`relative h-6 w-11 rounded-full border transition-colors ${
+																bucket.isPublic
+																	? "bg-hc-blue/80 border-hc-blue"
+																	: "bg-white/10 border-white/20"
+															}`}
 														>
 															<span
-																className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform ${bucket.isPublic ? "translate-x-5" : "translate-x-0"}`}
+															 className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+																	bucket.isPublic
+																		? "translate-x-5"
+																		: "translate-x-0"
+																}`}
 															/>
 														</span>
 														<span className="text-xs font-semibold text-text-muted min-w-12 text-left">
@@ -1302,7 +1330,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														onClick={() => openCorsModal(bucket)}
 														aria-label="Configure CORS"
 														title="Configure CORS"
-														className={`${iconActionBase} group text-text-muted hover:text-white hover:bg-white/10`}
+													 className={`${iconActionBase} group text-text-muted hover:text-white hover:bg-white/10`}
 													>
 														<MdCode className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1315,7 +1343,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														href={`/dashboard/buckets/${bucket.name}`}
 														aria-label="Open bucket files"
 														title="Open bucket files"
-														className={`${iconActionBase} group text-hc-blue hover:text-blue-300 hover:bg-hc-blue/10`}
+													 className={`${iconActionBase} group text-hc-blue hover:text-blue-300 hover:bg-hc-blue/10`}
 													>
 														<MdFolderOpen className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1333,13 +1361,17 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																error: null,
 															})
 														}
-														disabled={bucketBusy || isDeepFrozen}
+														disabled={bucketBusy}
 														aria-label="Deep Freeze"
 														title="Deep Freeze"
-														className={`${iconActionBase} group ${deepFreezeState === "active" ? "text-sky-300 hover:text-sky-200 hover:bg-sky-500/10" : "text-cyan-200 hover:text-cyan-100 hover:bg-cyan-500/10"}`}
+													 className={`${iconActionBase} group ${
+															deepFreezeState === "active"
+																	? "text-sky-300 hover:text-sky-200 hover:bg-sky-500/10"
+																	: "text-cyan-200 hover:text-cyan-100 hover:bg-cyan-500/10"
+														}`}
 													>
 														<MdSevereCold
-															className={`text-base ${deepFreezeState === "freezing" || deepFreezeState === "unfreezing" ? "animate-pulse" : ""}`}
+														 className={`text-base ${deepFreezeState === "freezing" || deepFreezeState === "unfreezing" ? "animate-pulse" : ""}`}
 														/>
 														<span className={iconActionTooltip}>
 															{deepFreezeState === "active"
@@ -1355,7 +1387,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													href={`/dashboard/buckets/${bucket.name}/analytics`}
 													aria-label="Open bucket analytics"
 													title="Open bucket analytics"
-													className={analyticsIconAction}
+												 className={analyticsIconAction}
 												>
 													<PhIcon className="ph ph-heartbeat text-base" />
 													<span className={iconActionTooltip}>
@@ -1365,11 +1397,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												{!bucket.isCdn && !isCollaborative ? (
 													<button
 														type="button"
-														onClick={() => deleteBucket(bucket.name, true)}
+														onClick={() =>
+															deleteBucket(bucket.name, true)
+														}
 														disabled={bucketBusy || isDeepFrozen}
 														aria-label="Empty bucket"
 														title="Empty bucket"
-														className={`${iconActionBase} group text-yellow-300 hover:text-yellow-200 hover:bg-yellow-500/10`}
+													 className={`${iconActionBase} group text-yellow-300 hover:text-yellow-200 hover:bg-yellow-500/10`}
 													>
 														<MdDeleteOutline className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1380,11 +1414,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												{!bucket.isCdn && !isCollaborative ? (
 													<button
 														type="button"
-														onClick={() => deleteBucket(bucket.name, false)}
+														onClick={() =>
+															deleteBucket(bucket.name, false)
+														}
 														disabled={bucketBusy || isDeepFrozen}
 														aria-label="Delete bucket"
 														title="Delete bucket"
-														className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10`}
+													 className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10`}
 													>
 														<MdDeleteForever className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1398,7 +1434,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														onClick={() => openCollaborationModal(bucket)}
 														aria-label="Manage collaborators"
 														title="Manage collaborators"
-														className={`${iconActionBase} group text-yellow-200 hover:text-yellow-100 hover:bg-yellow-400/10`}
+													 className={`${iconActionBase} group text-yellow-200 hover:text-yellow-100 hover:bg-yellow-400/10`}
 													>
 														<MdGroups className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1443,14 +1479,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										)
 									}
 									placeholder="Search people"
-									className="w-full md:w-64 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-300"
+								 className="w-full md:w-64 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-300"
 								/>
 								<button
 									type="button"
 									onClick={() =>
 										openInviteModal(collaborationModal.bucket.name)
 									}
-									className={`${buttonBase} bg-yellow-400 hover:bg-yellow-300 border-yellow-400 text-black px-4 py-3`}
+									 className={`${buttonBase} bg-yellow-400 hover:bg-yellow-300 border-yellow-400 text-black px-4 py-3`}
 								>
 									Invite
 								</button>
@@ -1509,7 +1545,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											return (
 												<div
 													key={collaborator.id}
-													className="rounded-2xl border border-white/10 bg-black/20 p-4"
+												 className="rounded-2xl border border-white/10 bg-black/20 p-4"
 												>
 													<div className="flex items-start justify-between gap-4">
 														<div className="flex items-center gap-3 min-w-0">
@@ -1517,7 +1553,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																<img
 																	src={avatarUrl}
 																	alt={collaborator.user.id}
-																	className="w-10 h-10 rounded-full"
+																 className="w-10 h-10 rounded-full"
 																/>
 															) : (
 																<div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-sm font-black text-white">
@@ -1554,7 +1590,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																collaborationModal.deletingId ===
 																collaborator.id
 															}
-															className="text-hc-red hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold uppercase tracking-wider"
+														 className="text-hc-red hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold uppercase tracking-wider"
 														>
 															{collaborationModal.deletingId === collaborator.id
 																? "Removing..."
@@ -1570,7 +1606,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														].map(([key, label]) => (
 															<label
 																key={String(key)}
-																className="rounded-xl border border-white/10 bg-black/20 px-3 py-3 flex items-center gap-3"
+															 className="rounded-xl border border-white/10 bg-black/20 px-3 py-3 flex items-center gap-3"
 															>
 																<input
 																	type="checkbox"
@@ -1616,8 +1652,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div className="flex justify-end gap-3">
 							<button
 								type="button"
-								onClick={() => setCollaborationModal(null)}
-								className={`${buttonBase} ${buttonSubtle}`}
+							 onClick={() => setCollaborationModal(null)}
+							 className={`${buttonBase} ${buttonSubtle}`}
 							>
 								Close
 							</button>
@@ -1641,7 +1677,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<input
 								type="text"
 								value={inviteModal.inviteeUserId}
-								onChange={(event) =>
+							 onChange={(event) =>
 									setInviteModal((prev) =>
 										prev
 											? {
@@ -1654,13 +1690,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									)
 								}
 								placeholder="Enter user ID"
-								className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-300"
+							 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-300"
 							/>
 							<button
 								type="button"
-								onClick={() => void lookupCollaborator()}
-								disabled={inviteModal.lookup.loading}
-								className={`${buttonBase} ${buttonNeutral}`}
+							 onClick={() => void lookupCollaborator()}
+							 disabled={inviteModal.lookup.loading}
+							 className={`${buttonBase} ${buttonNeutral}`}
 							>
 								{inviteModal.lookup.loading ? "Checking..." : "Check user"}
 							</button>
@@ -1674,7 +1710,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<img
 										src={inviteModal.lookup.user.avatarUrl}
 										alt={inviteModal.lookup.user.id}
-										className="w-10 h-10 rounded-full"
+									 className="w-10 h-10 rounded-full"
 									/>
 								) : null}
 								<div>
@@ -1711,7 +1747,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								].map(([key, label, hint]) => (
 									<label
 										key={String(key)}
-										className="rounded-2xl border border-white/10 bg-black/20 p-4 flex items-start gap-3"
+									 className="rounded-2xl border border-white/10 bg-black/20 p-4 flex items-start gap-3"
 									>
 										<input
 											type="checkbox"
@@ -1750,16 +1786,16 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div className="flex justify-end gap-3">
 							<button
 								type="button"
-								onClick={() => setInviteModal(null)}
-								className={`${buttonBase} ${buttonSubtle}`}
+							 onClick={() => setInviteModal(null)}
+							 className={`${buttonBase} ${buttonSubtle}`}
 							>
 								Cancel
 							</button>
 							<button
 								type="button"
-								onClick={() => void saveCollaborationInvite()}
+							 onClick={() => void saveCollaborationInvite()}
 								disabled={inviteModal.saving || !inviteModal.lookup.user}
-								className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
+							 className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
 							>
 								{inviteModal.saving ? "Sending..." : "Send invite"}
 							</button>
@@ -1772,7 +1808,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!bucketCreateModal}
 				onClose={() => setBucketCreateModal(null)}
 				title={undefined}
-				className="max-w-md p-8"
+			 className="max-w-md p-8"
 			>
 				{bucketCreateModal ? (
 					<div className="space-y-5">
@@ -1780,7 +1816,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div>
 							<label
 								htmlFor="create-bucket-name"
-								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
+							 className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
 							>
 								Bucket Name
 							</label>
@@ -1788,7 +1824,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								id="create-bucket-name"
 								type="text"
 								value={bucketCreateModal.name}
-								onChange={(e) =>
+							 onChange={(e) =>
 									setBucketCreateModal((prev) =>
 										prev
 											? { ...prev, name: e.target.value, error: null }
@@ -1796,7 +1832,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									)
 								}
 								placeholder="my-awesome-project"
-								className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red font-mono placeholder-white/20 transition-colors"
+							 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red font-mono placeholder-white/20 transition-colors"
 							/>
 							<p className="text-xs text-text-muted mt-2">
 								Only lowercase letters, numbers, and hyphens. Minimum 3
@@ -1809,14 +1845,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div>
 							<label
 								htmlFor="create-bucket-note"
-								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
+							 className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
 							>
 								Default Key Note
 							</label>
 							<textarea
 								id="create-bucket-note"
 								value={bucketCreateModal.note}
-								onChange={(e) =>
+							 onChange={(e) =>
 									setBucketCreateModal((prev) =>
 										prev
 											? { ...prev, note: e.target.value, error: null }
@@ -1824,7 +1860,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									)
 								}
 								placeholder="Optional note for the first key"
-								className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red transition-colors resize-y"
+							 className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red transition-colors resize-y"
 							/>
 						</div>
 						{bucketCreateModal.error ? (
@@ -1834,7 +1870,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<button
 								type="button"
 								onClick={() => setBucketCreateModal(null)}
-								className={`${buttonBase} ${buttonSubtle}`}
+							 className={`${buttonBase} ${buttonSubtle}`}
 							>
 								Cancel
 							</button>
@@ -1842,7 +1878,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								type="button"
 								onClick={submitCreateBucket}
 								disabled={bucketCreateModal.loading}
-								className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
+							 className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
 							>
 								{bucketCreateModal.loading ? "Creating..." : "Create Bucket"}
 							</button>
@@ -1855,7 +1891,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!activeBucket}
 				onClose={() => setActiveBucket(null)}
 				title="Manage Keys"
-				className="max-w-4xl p-8"
+			 className="max-w-4xl p-8"
 			>
 				{activeBucket ? (
 					<>
@@ -1877,7 +1913,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										activeBucket.keys.map((k) => (
 											<tr
 												key={k.id}
-												className="hover:bg-white/5 transition-colors"
+											 className="hover:bg-white/5 transition-colors"
 											>
 												<td className="px-4 py-3 font-mono text-white">
 													{k.accessKey}
@@ -1888,14 +1924,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 															<input
 																type="text"
 																value={editingKeyNote.value}
-																onChange={(e) =>
+															 onChange={(e) =>
 																	setEditingKeyNote((prev) =>
 																		prev
 																			? { ...prev, value: e.target.value }
 																			: prev,
 																	)
 																}
-																onKeyDown={(e) => {
+															 onKeyDown={(e) => {
 																	if (e.key === "Enter") {
 																		e.preventDefault();
 																		void saveInlineKeyNote(activeBucket.name);
@@ -1904,71 +1940,71 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																		setEditingKeyNote(null);
 																	}
 																}}
-																className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-hc-blue"
+															 className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-hc-blue"
 															/>
 															<button
-																type="button"
-																onClick={() =>
+															 type="button"
+															 onClick={() =>
 																	void saveInlineKeyNote(activeBucket.name)
 																}
-																disabled={editingKeyNote.saving}
-																className="text-emerald-400 hover:text-emerald-300"
+															 disabled={editingKeyNote.saving}
+															 className="text-emerald-400 hover:text-emerald-300"
 															>
 																<MdCheck className="text-base" />
 															</button>
 														</div>
-													) : k.note ? (
+												 ) : k.note ? (
 														<div className="flex items-center gap-2">
 															<span className="text-white/80" title={k.note}>
 																{k.note}
 															</span>
 															<button
-																type="button"
-																onClick={() => startEditingKeyNote(k)}
-																className="text-text-muted hover:text-white"
-																title="Edit note"
+															 type="button"
+															 onClick={() => startEditingKeyNote(k)}
+															 className="text-text-muted hover:text-white"
+															 title="Edit note"
 															>
 																<MdEdit className="text-sm" />
 															</button>
 														</div>
-													) : (
+												 ) : (
 														<button
 															type="button"
 															onClick={() => startEditingKeyNote(k)}
-															className="inline-flex items-center gap-2 italic hover:not-italic text-text-muted hover:text-white"
+														 className="inline-flex items-center gap-2 italic hover:not-italic text-text-muted hover:text-white"
 														>
 															No note <MdEdit className="text-sm" />
 														</button>
-													)}
+												 )}
 												</td>
 												<td className="px-4 py-3">
 													{k.isPaused ? (
 														<div className="inline-flex items-center gap-2 text-red-300">
 															<span
-																className="inline-flex h-3 w-3 rounded-full bg-red-400 ring-2 ring-red-400/20 shrink-0"
-																title={k.pauseReason || k.note || "Deactivated"}
+															 className="inline-flex h-3 w-3 rounded-full bg-red-400 ring-2 ring-red-400/20 shrink-0"
+															 title={k.pauseReason || k.note || "Deactivated"}
 															/>
 															<span className="text-xs font-bold uppercase tracking-wider">
 																Off
 															</span>
 														</div>
-													) : (
+												 ) : (
 														<div className="inline-flex items-center gap-2 text-emerald-300">
 															<span
-																className="inline-flex h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-emerald-400/20 shrink-0"
-																title="Active"
+															 className="inline-flex h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-emerald-400/20 shrink-0"
+															 title="Active"
 															/>
 															<span className="text-xs font-bold uppercase tracking-wider">
 																On
 															</span>
 														</div>
-													)}
+												 )}
 												</td>
 												<td className="px-4 py-3 text-right">
 													<div className="flex justify-end gap-2">
 														<button
-															type="button"
-															onClick={() =>
+														 type="button"
+														 onClick={() =>
 																k.isPaused
 																	? void setKeyPaused(
 																			activeBucket.name,
@@ -1976,13 +2012,16 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																			null,
 																			false,
 																		)
-																	: openDeactivateKeyModal(activeBucket.name, k)
+																	: openDeactivateKeyModal(
+																			activeBucket.name,
+																			k,
+																		)
 															}
 															disabled={
 																pendingActionKey ===
 																`dashboard-key-toggle:${activeBucket.name}:${k.id}`
 															}
-															className={`text-xs font-bold uppercase tracking-wider ${k.isPaused ? "text-emerald-400 hover:text-emerald-300" : "text-yellow-300 hover:text-yellow-200"}`}
+														 className={`text-xs font-bold uppercase tracking-wider ${k.isPaused ? "text-emerald-400 hover:text-emerald-300" : "text-yellow-300 hover:text-yellow-200"}`}
 														>
 															{pendingActionKey ===
 															`dashboard-key-toggle:${activeBucket.name}:${k.id}`
@@ -1992,11 +2031,11 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																	: "Deactivate"}
 														</button>
 														<button
-															type="button"
-															onClick={() => deleteKey(activeBucket.name, k.id)}
-															aria-label="Delete key"
-															title="Delete key"
-															className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10 ml-auto`}
+														 type="button"
+														 onClick={() => deleteKey(activeBucket.name, k.id)}
+														 aria-label="Delete key"
+														 title="Delete key"
+														 className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10 ml-auto`}
 														>
 															<MdDeleteForever className="text-base" />
 															<span className={iconActionTooltip}>
@@ -2011,7 +2050,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<tr>
 											<td
 												colSpan={4}
-												className="px-4 py-8 text-center text-text-muted italic"
+											 className="px-4 py-8 text-center text-text-muted italic"
 											>
 												No keys found for this bucket.
 											</td>
@@ -2031,8 +2070,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</div>
 							<button
 								type="button"
-								onClick={() => openGenerateKeyModal(activeBucket.name)}
-								className={`${buttonBase} ${buttonPrimaryBlue}`}
+							 onClick={() => openGenerateKeyModal(activeBucket.name)}
+							 className={`${buttonBase} ${buttonPrimaryBlue}`}
 							>
 								+ Generate New Key
 							</button>
@@ -2045,7 +2084,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!keyDeactivateModal}
 				onClose={() => setKeyDeactivateModal(null)}
 				title="Deactivate Key"
-				className="max-w-md p-8"
+			 className="max-w-md p-8"
 			>
 				{keyDeactivateModal ? (
 					<div className="space-y-5">
@@ -2055,14 +2094,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div>
 							<label
 								htmlFor="deactivate-key-note"
-								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
+							 className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
 							>
 								Deactivate Note
 							</label>
 							<textarea
 								id="deactivate-key-note"
 								value={keyDeactivateModal.note}
-								onChange={(e) =>
+							 onChange={(e) =>
 									setKeyDeactivateModal((prev) =>
 										prev
 											? { ...prev, note: e.target.value, error: null }
@@ -2070,7 +2109,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									)
 								}
 								placeholder="Optional note shown when hovering the red status dot"
-								className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red transition-colors resize-y"
+							 className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red transition-colors resize-y"
 							/>
 						</div>
 						{keyDeactivateModal.error ? (
@@ -2079,17 +2118,17 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div className="flex justify-end gap-3">
 							<button
 								type="button"
-								onClick={() => setKeyDeactivateModal(null)}
-								disabled={keyDeactivateModal.loading}
-								className={`${buttonBase} ${buttonSubtle}`}
+							 onClick={() => setKeyDeactivateModal(null)}
+							 disabled={keyDeactivateModal.loading}
+							 className={`${buttonBase} ${buttonSubtle}`}
 							>
 								Cancel
 							</button>
 							<button
 								type="button"
-								onClick={submitDeactivateKey}
-								disabled={keyDeactivateModal.loading}
-								className={`${buttonBase} ${buttonPrimaryRed} disabled:opacity-50`}
+							 onClick={submitDeactivateKey}
+							 disabled={keyDeactivateModal.loading}
+							 className={`${buttonBase} ${buttonPrimaryRed} disabled:opacity-50`}
 							>
 								{keyDeactivateModal.loading
 									? "Deactivating..."
@@ -2104,7 +2143,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!keyCreateModal}
 				onClose={() => setKeyCreateModal(null)}
 				title={undefined}
-				className="max-w-md p-8"
+			 className="max-w-md p-8"
 			>
 				{keyCreateModal ? (
 					<div className="space-y-5">
@@ -2119,14 +2158,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div>
 							<label
 								htmlFor="generate-key-note"
-								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
+							 className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
 							>
 								Key Note
 							</label>
 							<textarea
 								id="generate-key-note"
 								value={keyCreateModal.note}
-								onChange={(e) =>
+							 onChange={(e) =>
 									setKeyCreateModal((prev) =>
 										prev
 											? { ...prev, note: e.target.value, error: null }
@@ -2134,7 +2173,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									)
 								}
 								placeholder="Optional note for this key"
-								className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-blue focus:ring-1 focus:ring-hc-blue transition-colors resize-y"
+							 className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-blue focus:ring-1 focus:ring-hc-blue transition-colors resize-y"
 							/>
 						</div>
 						{keyCreateModal.error ? (
@@ -2143,16 +2182,16 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div className="flex justify-end gap-3">
 							<button
 								type="button"
-								onClick={() => setKeyCreateModal(null)}
-								className={`${buttonBase} ${buttonSubtle}`}
+							 onClick={() => setKeyCreateModal(null)}
+							 className={`${buttonBase} ${buttonSubtle}`}
 							>
 								Cancel
 							</button>
 							<button
 								type="button"
-								onClick={submitGenerateKey}
-								disabled={keyCreateModal.loading}
-								className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
+							 onClick={submitGenerateKey}
+							 disabled={keyCreateModal.loading}
+							 className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
 							>
 								{keyCreateModal.loading ? "Generating..." : "Generate Key"}
 							</button>
@@ -2165,7 +2204,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!corsBucket}
 				onClose={() => setCorsBucket(null)}
 				title="CORS Configuration"
-				className="max-w-3xl p-8"
+			 className="max-w-3xl p-8"
 			>
 				{corsBucket ? (
 					<>
@@ -2189,7 +2228,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									setCorsEditor(e.target.value);
 									setCorsError(null);
 								}}
-								className="w-full h-64 bg-black/40 p-4 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-hc-blue/40 resize-none"
+							 className="w-full h-64 bg-black/40 p-4 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-hc-blue/40 resize-none"
 							/>
 						</div>
 
@@ -2203,7 +2242,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<button
 								type="button"
 								onClick={resetCors}
-								className={`${buttonBase} bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300 px-4 py-2.5`}
+							 className={`${buttonBase} bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300 px-4 py-2.5`}
 							>
 								Reset CORS
 							</button>
@@ -2211,14 +2250,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<button
 									type="button"
 									onClick={() => setCorsBucket(null)}
-									className={`${buttonBase} ${buttonSubtle}`}
+								 className={`${buttonBase} ${buttonSubtle}`}
 								>
 									Cancel
 								</button>
 								<button
 									type="button"
 									onClick={saveCors}
-									className={`${buttonBase} ${buttonPrimaryBlue}`}
+								 className={`${buttonBase} ${buttonPrimaryBlue}`}
 								>
 									Save Configuration
 								</button>
@@ -2232,7 +2271,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!credentialModal}
 				onClose={() => setCredentialModal(null)}
 				title={undefined}
-				className="max-w-md p-8"
+			 className="max-w-md p-8"
 			>
 				{credentialModal ? (
 					<>
@@ -2262,9 +2301,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</div>
 									<button
 										type="button"
-										onClick={() => copyText(credentialModal.accessKey)}
-										className="text-text-muted hover:text-white transition-colors p-1"
-										title="Copy"
+									 onClick={() => copyText(credentialModal.accessKey)}
+									 className="text-text-muted hover:text-white transition-colors p-1"
+									 title="Copy"
 									>
 										<MdContentCopy className="text-lg" />
 									</button>
@@ -2281,9 +2320,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</div>
 									<button
 										type="button"
-										onClick={() => copyText(credentialModal.secretKey)}
-										className="text-text-muted hover:text-white transition-colors p-1"
-										title="Copy"
+									 onClick={() => copyText(credentialModal.secretKey)}
+									 className="text-text-muted hover:text-white transition-colors p-1"
+									 title="Copy"
 									>
 										<MdContentCopy className="text-lg" />
 									</button>
@@ -2306,7 +2345,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</div>
 									<button
 										type="button"
-										onClick={() =>
+									 onClick={() =>
 											copyText(
 												(() => {
 													try {
@@ -2317,8 +2356,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												})(),
 											)
 										}
-										className="text-text-muted hover:text-white transition-colors p-1"
-										title="Copy"
+									 className="text-text-muted hover:text-white transition-colors p-1"
+									 title="Copy"
 									>
 										<MdContentCopy className="text-lg" />
 									</button>
@@ -2335,9 +2374,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</div>
 									<button
 										type="button"
-										onClick={() => copyText(credentialModal.publicUrl)}
-										className="text-text-muted hover:text-white transition-colors p-1"
-										title="Copy"
+									 onClick={() => copyText(credentialModal.publicUrl)}
+									 className="text-text-muted hover:text-white transition-colors p-1"
+									 title="Copy"
 									>
 										<MdContentCopy className="text-lg" />
 									</button>
@@ -2347,8 +2386,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 						<button
 							type="button"
-							onClick={() => setCredentialModal(null)}
-							className="w-full bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors border border-white/5 hover:border-white/20"
+						 onClick={() => setCredentialModal(null)}
+						 className="w-full bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors border border-white/5 hover:border-white/20"
 						>
 							I have saved my keys
 						</button>
@@ -2364,7 +2403,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						: () => setDeepFreezeModal(null)
 				}
 				title="Deep Freeze"
-				className="max-w-3xl p-8"
+			 className="max-w-3xl p-8"
 			>
 				{deepFreezeModalBucket ? (
 					<div className="space-y-6">
@@ -2374,7 +2413,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div className="rounded-3xl border border-sky-400/20 bg-sky-500/10 p-6">
 							<div className="flex items-center gap-3 mb-3">
 								<MdSevereCold
-									className={`text-2xl text-sky-300 ${deepFreezeSnapshot?.state === "freezing" || deepFreezeSnapshot?.state === "unfreezing" ? "animate-pulse" : ""}`}
+								 className={`text-2xl text-sky-300 ${deepFreezeSnapshot?.state === "freezing" || deepFreezeSnapshot?.state === "unfreezing" ? "animate-pulse" : ""}`}
 								/>
 								<h3 className="text-2xl font-black text-white">
 									{deepFreezeSnapshot?.statusLabel || "Deep Freeze"}
@@ -2432,8 +2471,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</div>
 								<div className="h-3 rounded-full bg-white/5 overflow-hidden">
 									<div
-										className={`h-3 rounded-full ${deepFreezeSnapshot?.state === "frozen" ? "bg-sky-400" : deepFreezeSnapshot?.state === "active" ? "bg-white/20" : "bg-cyan-400 animate-pulse"}`}
-										style={{
+									 className={`h-3 rounded-full ${
+											deepFreezeSnapshot?.state === "active"
+												? "bg-white/20"
+												: deepFreezeSnapshot?.state === "frozen"
+													? "bg-sky-400"
+													: "bg-cyan-400 animate-pulse"
+										}`}
+									 style={{
 											width: `${Math.max(0, Math.round(deepFreezeSnapshot?.progressPercent || 0))}%`,
 										}}
 									/>
@@ -2446,18 +2491,18 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div className="flex justify-end gap-3">
 							<button
 								type="button"
-								onClick={() => setDeepFreezeModal(null)}
-								disabled={deepFreezeModal?.submitting}
-								className={`${buttonBase} ${buttonSubtle} disabled:opacity-50`}
+							 onClick={() => setDeepFreezeModal(null)}
+							 disabled={deepFreezeModal?.submitting}
+							 className={`${buttonBase} ${buttonSubtle} disabled:opacity-50`}
 							>
 								Close
 							</button>
 							{deepFreezeSnapshot?.state === "active" ? (
 								<button
 									type="button"
-									onClick={() => void submitDeepFreezeAction("freeze")}
-									disabled={deepFreezeModal?.submitting}
-									className={`${buttonBase} bg-sky-500 hover:bg-sky-400 border-sky-500 text-black px-6 py-3 disabled:opacity-50`}
+								 onClick={() => void submitDeepFreezeAction("freeze")}
+								 disabled={deepFreezeModal?.submitting}
+								 className={`${buttonBase} bg-sky-500 hover:bg-sky-400 border-sky-500 text-black px-6 py-3 disabled:opacity-50`}
 								>
 									{deepFreezeModal?.submitting ? (
 										<>
@@ -2472,9 +2517,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							) : deepFreezeSnapshot?.state === "frozen" ? (
 								<button
 									type="button"
-									onClick={() => void submitDeepFreezeAction("unfreeze")}
-									disabled={deepFreezeModal?.submitting}
-									className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
+								 onClick={() => void submitDeepFreezeAction("unfreeze")}
+								 disabled={deepFreezeModal?.submitting}
+								 className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
 								>
 									{deepFreezeModal?.submitting ? (
 										<>
@@ -2501,7 +2546,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!confirmDialog}
 				onClose={confirmLoading ? undefined : () => setConfirmDialog(null)}
 				title={confirmDialog?.title}
-				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "!max-w-2xl bg-[#16090a]" : ""}`}
+			 className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "!max-w-2xl bg-[#16090a]" : ""}`}
 			>
 				{confirmDialog ? (
 					<>
@@ -2526,8 +2571,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										const complete = publicWarningStep > idx;
 										return (
 											<div
-												key={step.label}
-												className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${active ? "border-hc-red bg-hc-red/20 text-red-200" : complete ? "border-hc-red/40 bg-hc-red/10 text-red-200" : "border-white/20 bg-white/[0.03] text-white/60"}`}
+											 key={step.label}
+											 className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
+													active
+														? "border-hc-red bg-hc-red/20 text-red-200"
+														: complete
+															? "border-hc-red/40 bg-hc-red/10 text-red-200"
+															: "border-white/20 bg-white/[0.03] text-white/60"
+												}`}
 											>
 												{step.icon}
 											</div>
@@ -2642,7 +2693,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													onChange={(e) =>
 														setDontShowPublicWarningAgain(e.target.checked)
 													}
-													className="mt-1 h-4 w-4 rounded border-white/30 bg-black/20 text-hc-red focus:ring-hc-red/40"
+												 className="mt-1 h-4 w-4 rounded border-white/30 bg-black/20 text-hc-red focus:ring-hc-red/40"
 												/>
 												<span className="text-sm text-white/90 leading-relaxed">
 													Don&apos;t show this 3-step warning again on this
@@ -2662,7 +2713,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								type="button"
 								disabled={confirmLoading}
 								onClick={() => setConfirmDialog(null)}
-								className={`${buttonBase} ${buttonSubtle} disabled:opacity-50`}
+							 className={`${buttonBase} ${buttonSubtle} disabled:opacity-50`}
 							>
 								Cancel
 							</button>
@@ -2675,7 +2726,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											onClick={() =>
 												setPublicWarningStep((s) => Math.max(0, s - 1))
 											}
-											className={`${buttonBase} ${buttonSubtle}`}
+										 className={`${buttonBase} ${buttonSubtle}`}
 										>
 											Back
 										</button>
@@ -2688,7 +2739,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											onClick={() =>
 												setPublicWarningStep((s) => Math.min(2, s + 1))
 											}
-											className={`${buttonBase} ${buttonPrimaryRed} disabled:opacity-50`}
+										 className={`${buttonBase} ${buttonPrimaryRed} disabled:opacity-50`}
 										>
 											{confirmDelayRemaining > 0
 												? `Next (${confirmDelayRemaining}s)`
@@ -2698,7 +2749,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<button
 											type="button"
 											disabled={confirmLoading || confirmDelayRemaining > 0}
-											onClick={() => {
+										 onClick={() => {
 												if (
 													dontShowPublicWarningAgain &&
 													typeof window !== "undefined"
@@ -2710,7 +2761,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												}
 												runConfirmDialog();
 											}}
-											className={`${buttonBase} px-6 py-3 ${confirmDialog.confirmClassName || buttonPrimaryRed} disabled:opacity-50`}
+										 className={`${buttonBase} px-6 py-3 ${confirmDialog.confirmClassName || buttonPrimaryRed} disabled:opacity-50`}
 										>
 											{confirmLoading
 												? "Working..."
@@ -2725,7 +2776,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									type="button"
 									disabled={confirmLoading || confirmDelayRemaining > 0}
 									onClick={runConfirmDialog}
-									className={`${buttonBase} px-6 py-3 ${confirmDialog.confirmClassName || buttonPrimaryRed} disabled:opacity-50`}
+								 className={`${buttonBase} px-6 py-3 ${confirmDialog.confirmClassName || buttonPrimaryRed} disabled:opacity-50`}
 								>
 									{confirmLoading
 										? "Working..."
