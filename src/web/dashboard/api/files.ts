@@ -618,13 +618,9 @@ export async function handleFiles(req: Request): Promise<Response> {
 		try {
 			const stat = await headObject(internalKey);
 
-			let publicUrl: string | null = null;
-			if (bucketData.bucket.publicAccess) {
-				publicUrl = `https://${config.s3Domain}/${bucketData.bucket.name}/${safeKey}`;
-				if (bucketData.bucket.customDomain) {
-					publicUrl = `https://${bucketData.bucket.customDomain}/${safeKey}`;
-				}
-			}
+			const publicUrl = bucketData.bucket.isPublic
+				? `https://${config.s3Domain}/${bucketName}/${safeKey}`
+				: null;
 
 			return jsonResponse({
 				file: {
@@ -633,6 +629,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 					contentType: stat.contentType,
 				},
 				publicUrl,
+				isPublic: bucketData.bucket.isPublic,
 			});
 		} catch (error) {
 			console.error("Info File Error:", error);
