@@ -2512,7 +2512,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</div>
 							) : deepFreezeSnapshot?.state === "freezing" ? (
 								<div className="space-y-8">
-									<div className="grid gap-4 sm:grid-cols-3">
+									<div className="grid gap-4 sm:grid-cols-2">
 										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
 											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Size</div>
 											<div className="mt-2 text-3xl font-black">{formatBytes(deepFreezeModalBucket.totalBytes)}</div>
@@ -2577,7 +2577,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</div>
 							) : (
 								<div className="space-y-8">
-									<div className="grid gap-4 sm:grid-cols-3">
+									<div className="grid gap-4 sm:grid-cols-2">
 										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
 											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Size</div>
 											<div className="mt-2 text-3xl font-black">{formatBytes((deepFreezeSnapshot?.archiveBytes || 0) || deepFreezeModalBucket.totalBytes)}</div>
