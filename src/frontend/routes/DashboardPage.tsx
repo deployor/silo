@@ -2427,17 +2427,17 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						: () => setDeepFreezeModal(null)
 				}
 				title={undefined}
-				className="max-w-4xl p-0 overflow-hidden"
+				className="max-w-4xl overflow-hidden border border-white/10 bg-hc-dark p-0"
 			>
 				{deepFreezeModalBucket ? (
-					<div className="bg-[#07131a] text-white">
-						<div className="border-b border-white/10 bg-[linear-gradient(135deg,rgba(56,189,248,0.18),rgba(8,47,73,0.9))] px-8 py-7">
+					<div className="bg-hc-dark text-white">
+						<div className="border-b border-white/10 px-8 py-7">
 							<div className="flex items-start justify-between gap-4">
 								<div>
-									<p className="text-[11px] font-black uppercase tracking-[0.28em] text-cyan-200/80">
+									<p className="text-[11px] font-black uppercase tracking-[0.28em] text-text-muted">
 										Deep Freeze
 									</p>
-									<h3 className="mt-2 text-3xl font-black tracking-tight">
+									<h3 className="mt-2 text-3xl font-black tracking-tight text-white">
 										{deepFreezeSnapshot?.state === "active"
 											? "Freeze this bucket"
 											: deepFreezeSnapshot?.state === "freezing"
@@ -2446,12 +2446,12 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													? "Bucket is frozen"
 													: "Unfreezing in progress"}
 									</h3>
-									<p className="mt-2 font-mono text-sm text-cyan-50/75">
+									<p className="mt-2 font-mono text-sm text-text-muted">
 										{deepFreezeModalBucket.name}
 									</p>
 								</div>
 								<div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-black/20">
-									<MdSevereCold className={`text-3xl text-cyan-200 ${deepFreezeSnapshot?.state === "freezing" || deepFreezeSnapshot?.state === "unfreezing" ? "animate-pulse" : ""}`} />
+									<MdSevereCold className={`text-3xl text-white ${deepFreezeSnapshot?.state === "freezing" || deepFreezeSnapshot?.state === "unfreezing" ? "animate-pulse" : ""}`} />
 								</div>
 							</div>
 						</div>
@@ -2460,37 +2460,31 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							{deepFreezeSnapshot?.state === "active" ? (
 								<div className="space-y-8">
 									<div className="grid gap-6 lg:grid-cols-[1.25fr_0.95fr]">
-										<div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6">
-											<p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-200/70">
+										<div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
+											<p className="text-xs font-black uppercase tracking-[0.22em] text-text-muted">
 												What happens
 											</p>
-											<div className="mt-4 space-y-4 text-sm leading-7 text-white/78">
-												<p>
-													1. The whole bucket is packed into one archive.
-												</p>
-												<p>
-													2. Files become unavailable while frozen.
-												</p>
-												<p>
-													3. You can restore it later by unfreezing the bucket.
-												</p>
+											<div className="mt-4 space-y-4 text-sm leading-7 text-white/80">
+												<p>1. The whole bucket is packed into one archive.</p>
+												<p>2. Files become unavailable while frozen.</p>
+												<p>3. You can restore it later by unfreezing the bucket.</p>
 											</div>
 										</div>
-										<div className="rounded-[28px] border border-cyan-400/20 bg-cyan-500/10 p-6">
-											<p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-100/70">
+										<div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
+											<p className="text-xs font-black uppercase tracking-[0.22em] text-text-muted">
 												Freeze summary
 											</p>
 											<div className="mt-5 space-y-4">
-												<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+												<div className="rounded-2xl border border-white/10 bg-hc-dark p-4">
 													<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Bucket size</div>
 													<div className="mt-2 text-3xl font-black">{formatBytes(deepFreezeModalBucket.totalBytes)}</div>
 												</div>
 												<div className="grid gap-4 sm:grid-cols-2">
-													<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+													<div className="rounded-2xl border border-white/10 bg-hc-dark p-4">
 														<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Freeze ETA</div>
 														<div className="mt-2 text-2xl font-black">{formatDurationEstimate(deepFreezeSnapshot?.estimatedFreezeSeconds)}</div>
 													</div>
-													<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+													<div className="rounded-2xl border border-white/10 bg-hc-dark p-4">
 														<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Unfreeze ETA</div>
 														<div className="mt-2 text-2xl font-black">{formatDurationEstimate(deepFreezeSnapshot?.estimatedUnfreezeSeconds)}</div>
 													</div>
@@ -2510,7 +2504,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											type="button"
 											onClick={() => void submitDeepFreezeAction("freeze")}
 											disabled={deepFreezeModal?.submitting}
-											className={`${buttonBase} rounded-2xl border-cyan-300 bg-cyan-300 px-6 py-3 text-black hover:bg-cyan-200 disabled:opacity-50`}
+											className={`${buttonBase} rounded-2xl border-white bg-white px-6 py-3 text-black hover:bg-white/90 disabled:opacity-50`}
 										>
 											{deepFreezeModal?.submitting ? <><MdSync className="animate-spin" /> Starting…</> : <>Confirm freeze</>}
 										</button>
@@ -2519,45 +2513,48 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							) : deepFreezeSnapshot?.state === "freezing" ? (
 								<div className="space-y-8">
 									<div className="grid gap-4 sm:grid-cols-3">
-										<div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
+										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
 											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Size</div>
 											<div className="mt-2 text-3xl font-black">{formatBytes(deepFreezeModalBucket.totalBytes)}</div>
 										</div>
-										<div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
+										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
 											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Progress</div>
 											<div className="mt-2 text-3xl font-black">{Math.max(0, Math.round(deepFreezeSnapshot.progressPercent || 0))}%</div>
 										</div>
-										<div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
+										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
 											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">ETA</div>
 											<div className="mt-2 text-3xl font-black">{deepFreezeSnapshot.etaSeconds !== null ? formatDurationEstimate(deepFreezeSnapshot.etaSeconds) : "Calculating"}</div>
 										</div>
 									</div>
-									<div className="rounded-[28px] border border-cyan-400/20 bg-cyan-500/10 p-6">
-										<div className="mb-3 flex items-center justify-between text-xs font-black uppercase tracking-[0.18em] text-cyan-100/70">
+									<div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
+										<div className="mb-3 flex items-center justify-between text-xs font-black uppercase tracking-[0.18em] text-text-muted">
 											<span>Real-time progress</span>
-											<span>{Math.max(0, Math.round(deepFreezeSnapshot.progressPercent || 0))}%</span>
+											<span className="rounded-full border border-white/10 px-3 py-1 text-white">{Math.max(0, Math.round(deepFreezeSnapshot.progressPercent || 0))}%</span>
 										</div>
-										<div className="h-6 overflow-hidden rounded-full bg-black/25 p-1">
-											<div className="h-full rounded-full bg-cyan-300 transition-all duration-500" style={{ width: `${Math.max(3, Math.round(deepFreezeSnapshot.progressPercent || 0))}%` }} />
+										<div className="flex items-center gap-4">
+											<div className="h-6 flex-1 overflow-hidden rounded-full bg-white/10 p-1">
+												<div className="h-full rounded-full bg-white transition-all duration-500" style={{ width: `${Math.max(3, Math.round(deepFreezeSnapshot.progressPercent || 0))}%` }} />
+											</div>
+											<div className="w-16 text-right text-sm font-black text-white">{Math.max(0, Math.round(deepFreezeSnapshot.progressPercent || 0))}%</div>
 										</div>
 									</div>
 								</div>
 							) : deepFreezeSnapshot?.state === "frozen" ? (
 								<div className="space-y-8">
 									<div className="grid gap-6 lg:grid-cols-[1.15fr_1fr]">
-										<div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-6">
-											<p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-200/70">Frozen state</p>
-											<p className="mt-4 text-sm leading-7 text-white/78">
+										<div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
+											<p className="text-xs font-black uppercase tracking-[0.22em] text-text-muted">Frozen state</p>
+											<p className="mt-4 text-sm leading-7 text-white/80">
 												This bucket is archived in colder storage. It stays locked until you unfreeze it, then the files are restored back into normal access.
 											</p>
 										</div>
-										<div className="rounded-[28px] border border-sky-400/20 bg-sky-500/10 p-6">
+										<div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
 											<div className="space-y-4">
-												<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+												<div className="rounded-2xl border border-white/10 bg-hc-dark p-4">
 													<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Archived size</div>
 													<div className="mt-2 text-3xl font-black">{formatBytes((deepFreezeSnapshot?.archiveBytes || 0) || deepFreezeModalBucket.totalBytes)}</div>
 												</div>
-												<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+												<div className="rounded-2xl border border-white/10 bg-hc-dark p-4">
 													<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Estimated unfreeze time</div>
 													<div className="mt-2 text-3xl font-black">{formatDurationEstimate(deepFreezeSnapshot?.estimatedUnfreezeSeconds)}</div>
 												</div>
@@ -2576,7 +2573,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											type="button"
 											onClick={() => void submitDeepFreezeAction("unfreeze")}
 											disabled={deepFreezeModal?.submitting}
-											className={`${buttonBase} ${buttonPrimaryBlue} rounded-2xl disabled:opacity-50`}
+											className={`${buttonBase} rounded-2xl border-white bg-white px-6 py-3 text-black hover:bg-white/90 disabled:opacity-50`}
 										>
 											{deepFreezeModal?.submitting ? <><MdSync className="animate-spin" /> Starting…</> : <>Unfreeze bucket</>}
 										</button>
@@ -2585,26 +2582,29 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							) : (
 								<div className="space-y-8">
 									<div className="grid gap-4 sm:grid-cols-3">
-										<div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
+										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
 											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Size</div>
 											<div className="mt-2 text-3xl font-black">{formatBytes((deepFreezeSnapshot?.archiveBytes || 0) || deepFreezeModalBucket.totalBytes)}</div>
 										</div>
-										<div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
+										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
 											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Progress</div>
 											<div className="mt-2 text-3xl font-black">{Math.max(0, Math.round(deepFreezeSnapshot?.progressPercent || 0))}%</div>
 										</div>
-										<div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
+										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
 											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">ETA</div>
 											<div className="mt-2 text-3xl font-black">{deepFreezeSnapshot?.etaSeconds !== null && deepFreezeSnapshot?.etaSeconds !== undefined ? formatDurationEstimate(deepFreezeSnapshot.etaSeconds) : "Calculating"}</div>
 										</div>
 									</div>
-									<div className="rounded-[28px] border border-cyan-400/20 bg-cyan-500/10 p-6">
-										<div className="mb-3 flex items-center justify-between text-xs font-black uppercase tracking-[0.18em] text-cyan-100/70">
+									<div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
+										<div className="mb-3 flex items-center justify-between text-xs font-black uppercase tracking-[0.18em] text-text-muted">
 											<span>Real-time progress</span>
-											<span>{Math.max(0, Math.round(deepFreezeSnapshot?.progressPercent || 0))}%</span>
+											<span className="rounded-full border border-white/10 px-3 py-1 text-white">{Math.max(0, Math.round(deepFreezeSnapshot?.progressPercent || 0))}%</span>
 										</div>
-										<div className="h-6 overflow-hidden rounded-full bg-black/25 p-1">
-											<div className="h-full rounded-full bg-cyan-300 transition-all duration-500" style={{ width: `${Math.max(3, Math.round(deepFreezeSnapshot?.progressPercent || 0))}%` }} />
+										<div className="flex items-center gap-4">
+											<div className="h-6 flex-1 overflow-hidden rounded-full bg-white/10 p-1">
+												<div className="h-full rounded-full bg-white transition-all duration-500" style={{ width: `${Math.max(3, Math.round(deepFreezeSnapshot?.progressPercent || 0))}%` }} />
+											</div>
+											<div className="w-16 text-right text-sm font-black text-white">{Math.max(0, Math.round(deepFreezeSnapshot?.progressPercent || 0))}%</div>
 										</div>
 									</div>
 								</div>
