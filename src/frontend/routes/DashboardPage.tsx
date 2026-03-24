@@ -2450,9 +2450,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										{deepFreezeModalBucket.name}
 									</p>
 								</div>
-								<div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-black/20">
-									<MdSevereCold className={`text-3xl text-white ${deepFreezeSnapshot?.state === "freezing" || deepFreezeSnapshot?.state === "unfreezing" ? "animate-pulse" : ""}`} />
-								</div>
+								<MdSevereCold
+									className={`text-3xl text-white ${deepFreezeSnapshot?.state === "freezing" || deepFreezeSnapshot?.state === "unfreezing" ? "animate-pulse" : ""}`}
+								/>
 							</div>
 						</div>
 
@@ -2518,10 +2518,6 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<div className="mt-2 text-3xl font-black">{formatBytes(deepFreezeModalBucket.totalBytes)}</div>
 										</div>
 										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
-											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Progress</div>
-											<div className="mt-2 text-3xl font-black">{Math.max(0, Math.round(deepFreezeSnapshot.progressPercent || 0))}%</div>
-										</div>
-										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
 											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">ETA</div>
 											<div className="mt-2 text-3xl font-black">{deepFreezeSnapshot.etaSeconds !== null ? formatDurationEstimate(deepFreezeSnapshot.etaSeconds) : "Calculating"}</div>
 										</div>
@@ -2585,10 +2581,6 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
 											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Size</div>
 											<div className="mt-2 text-3xl font-black">{formatBytes((deepFreezeSnapshot?.archiveBytes || 0) || deepFreezeModalBucket.totalBytes)}</div>
-										</div>
-										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
-											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Progress</div>
-											<div className="mt-2 text-3xl font-black">{Math.max(0, Math.round(deepFreezeSnapshot?.progressPercent || 0))}%</div>
 										</div>
 										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
 											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">ETA</div>
