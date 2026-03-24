@@ -2527,11 +2527,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<span>Real-time progress</span>
 											<span className="rounded-full border border-white/10 px-3 py-1 text-white">{Math.max(0, Math.round(deepFreezeSnapshot.progressPercent || 0))}%</span>
 										</div>
-										<div className="flex items-center gap-4">
-											<div className="h-6 flex-1 overflow-hidden rounded-full bg-white/10 p-1">
-												<div className="h-full rounded-full bg-white transition-all duration-500" style={{ width: `${Math.max(3, Math.round(deepFreezeSnapshot.progressPercent || 0))}%` }} />
-											</div>
-											<div className="w-16 text-right text-sm font-black text-white">{Math.max(0, Math.round(deepFreezeSnapshot.progressPercent || 0))}%</div>
+										<div className="h-6 overflow-hidden rounded-full bg-white/10 p-1">
+											<div className="h-full rounded-full bg-white transition-all duration-500" style={{ width: `${Math.max(3, Math.round(deepFreezeSnapshot.progressPercent || 0))}%` }} />
 										</div>
 									</div>
 								</div>
