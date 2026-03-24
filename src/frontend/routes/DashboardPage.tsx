@@ -1394,9 +1394,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																	: "text-cyan-200 hover:text-cyan-100 hover:bg-cyan-500/10"
 														}`}
 													>
-														<MdSevereCold
-														 className={`text-base ${deepFreezeState === "freezing" || deepFreezeState === "unfreezing" ? "animate-pulse" : ""}`}
-														/>
+														<MdSevereCold className="text-base" />
 														<span className={iconActionTooltip}>
 															{deepFreezeState === "active"
 																? "Move bucket into Deep Freeze"
@@ -2450,9 +2448,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										{deepFreezeModalBucket.name}
 									</p>
 								</div>
-								<MdSevereCold
-									className={`text-3xl text-white ${deepFreezeSnapshot?.state === "freezing" || deepFreezeSnapshot?.state === "unfreezing" ? "animate-pulse" : ""}`}
-								/>
+								<MdSevereCold className="text-3xl text-white" />
 							</div>
 						</div>
 
