@@ -66,7 +66,10 @@ type OperationState = {
 type FileInfoState = {
 	file: FileItem;
 	publicUrl: string | null;
+	isPublic: boolean;
+	contentType: string;
 	previewUrl: string;
+	downloadUrl: string;
 	previewText: string;
 	loading: boolean;
 	error: string | null;
@@ -211,10 +214,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [totals, setTotals] = useState({ files: 0, folders: 0 });
 
 	const [infoOpen, setInfoOpen] = useState(false);
-	const [infoLoading, setInfoLoading] = useState(false);
-	const [infoError, setInfoError] = useState<string | null>(null);
-	const [infoFile, setInfoFile] = useState<FileItem | null>(null);
-	const [infoDetails, setInfoDetails] = useState<any>(null);
+	const [infoState, setInfoState] = useState<FileInfoState | null>(null);
 
 	const [previewOpen, setPreviewOpen] = useState(false);
 	const [previewLoading, setPreviewLoading] = useState(false);
@@ -551,23 +551,78 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	};
 
 	const openInfo = async (file: FileItem) => {
+		if (previewObjectUrlRef.current) {
+			URL.revokeObjectURL(previewObjectUrlRef.current);
+			previewObjectUrlRef.current = null;
+		}
+
 		setInfoOpen(true);
-		setInfoLoading(true);
-		setInfoError(null);
-		setInfoFile(file);
-		setInfoDetails(null);
+		setInfoState({
+			file,
+			publicUrl: null,
+			isPublic: false,
+			contentType: "application/octet-stream",
+			previewUrl: "",
+			downloadUrl: "",
+			previewText: "",
+			loading: true,
+			error: null,
+		});
 
 		try {
-			const res = await fetchJson<{ file: any; publicUrl: string | null }>(
-				`/api/dashboard/buckets/${bucketName}/files/info?key=${encodeURIComponent(file.key)}`,
-			);
-			setInfoDetails(res);
+			const [info, signed] = await Promise.all([
+				fetchJson<{
+					file: { key: string; size: number; contentType: string };
+					publicUrl: string | null;
+					isPublic: boolean;
+				}>(
+					`/api/dashboard/buckets/${bucketName}/files/info?key=${encodeURIComponent(file.key)}`,
+				),
+				fetchJson<{ url: string }>(
+					`/api/dashboard/buckets/${bucketName}/files/sign`,
+					{
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ key: file.key }),
+					},
+				),
+			]);
+
+			const isTextPreview = TEXT_EXTS.includes(file.extension);
+			let previewText = "";
+			if (isTextPreview) {
+				const response = await fetch(signed.url, {
+					credentials: "same-origin",
+				});
+				if (!response.ok) {
+					throw new Error(`Preview failed (${response.status})`);
+				}
+				previewText = await response.text();
+			}
+
+			setInfoState({
+				file,
+				publicUrl: info.publicUrl,
+				isPublic: info.isPublic,
+				contentType: info.file.contentType,
+				previewUrl: isTextPreview ? "" : signed.url,
+				downloadUrl: signed.url,
+				previewText,
+				loading: false,
+				error: null,
+			});
 		} catch (cause) {
-			setInfoError(
-				cause instanceof Error ? cause.message : "Failed to load file info",
-			);
-		} finally {
-			setInfoLoading(false);
+			setInfoState({
+				file,
+				publicUrl: null,
+				isPublic: false,
+				contentType: "application/octet-stream",
+				previewUrl: "",
+				downloadUrl: "",
+				previewText: "",
+				loading: false,
+				error: cause instanceof Error ? cause.message : "Failed to load file info",
+			});
 		}
 	};
 
@@ -877,7 +932,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							{collaborationPermissions.map((permission) => (
 								<span
 									key={permission}
-									className="rounded-full border border-yellow-300/30 bg-black/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider"
+								 className="rounded-full border border-yellow-300/30 bg-black/20 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider"
 								>
 									{permission.replace(/_/g, " ")}
 								</span>
@@ -907,7 +962,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									openUploadModal(currentPrefix);
 								}}
 								disabled={!canWriteFiles}
-								className="bg-hc-red hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
+							 className="bg-hc-red hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
 							>
 								Upload
 							</button>
@@ -919,7 +974,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									selectedFolderPrefixes.length > 0
 								}
 								onClick={() => openMove()}
-								className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
+							 className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
 							>
 								Move
 							</button>
@@ -931,7 +986,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										selectedFolderPrefixes.length === 0)
 								}
 								onClick={startDeleteSelection}
-								className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
+							 className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
 							>
 								Delete
 							</button>
@@ -939,8 +994,8 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								ref={fileInputRef}
 								type="file"
 								multiple
-								className="hidden"
-								onChange={(event) => {
+							 className="hidden"
+							 onChange={(event) => {
 									if (event.target.files) ingestFiles(event.target.files);
 									event.target.value = "";
 								}}
@@ -949,9 +1004,9 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								ref={folderInputRef}
 								type="file"
 								multiple
-								className="hidden"
-								{...folderInputAttributes}
-								onChange={onFolderInputChange}
+							 className="hidden"
+							 {...folderInputAttributes}
+							 onChange={onFolderInputChange}
 							/>
 						</div>
 					</div>
@@ -972,7 +1027,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												query: "",
 											})
 										}
-										className={
+									 className={
 											index === crumbs.length - 1
 												? "text-white font-bold"
 												: "text-text-muted hover:text-white"
@@ -988,7 +1043,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<input
 									type="text"
 									value={search}
-									onChange={(event) => setSearch(event.target.value)}
+								 onChange={(event) => setSearch(event.target.value)}
 									onKeyDown={(event) => {
 										if (event.key === "Enter") void handleSearch();
 									}}
@@ -997,7 +1052,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											? "Search inside this folder"
 											: "Search entire bucket"
 									}
-									className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue flex-1"
+								 className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue flex-1"
 								/>
 								<div className="inline-flex rounded-xl border border-white/10 overflow-hidden bg-black/20">
 									<button
@@ -1172,8 +1227,8 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<td className="px-4 py-3.5 text-right">
 												<button
 													type="button"
-													onClick={() => startDeleteFolder(folder)}
-													disabled={!canWriteFiles}
+												 onClick={() => startDeleteFolder(folder)}
+												 disabled={!canWriteFiles}
 												 className="text-hc-red hover:text-red-400 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium"
 												>
 													Delete
@@ -1193,7 +1248,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													<input
 														type="checkbox"
 														checked={selected}
-														onChange={(event) =>
+													 onChange={(event) =>
 															handleRowSelection(
 																file.key,
 																(event.nativeEvent as MouseEvent).shiftKey,
@@ -1318,7 +1373,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					setPreviewDownloadUrl("");
 					setPreviewText("");
 				}}
-				className="max-w-4xl p-8"
+				className="max-w-5xl p-8"
 			>
 				<div className="w-full max-h-[75vh] overflow-auto rounded-lg border border-white/10 bg-hc-dark">
 					{previewLoading ? (
@@ -1372,125 +1427,193 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				</div>
 			</Modal>
 
-			{infoOpen && infoFile && (
+			{infoOpen && infoState && (
 				<Modal
 					open={infoOpen}
 					onClose={() => {
 						setInfoOpen(false);
-						setInfoFile(null);
-						setInfoDetails(null);
+						setInfoState(null);
 					}}
-					title="Object Details"
-					className="max-w-4xl p-8"
+					className="max-w-5xl p-8"
 				>
 					<div className="space-y-8">
-						<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-							<div>
-								<div className="text-xs text-text-muted mb-1">Date Created</div>
-								<div className="text-white text-sm">{formatRelativeTime(infoFile.lastModified)}</div>
+						<div className="flex items-start justify-between gap-4 border-b border-white/10 pb-5">
+							<div className="min-w-0">
+								<p className="text-xs font-bold uppercase tracking-[0.22em] text-text-muted">
+									Object details
+								</p>
+								<h2 className="mt-2 break-all font-mono text-xl text-white">
+									{infoState.file.key}
+								</h2>
 							</div>
-							<div>
-								<div className="text-xs text-text-muted mb-1">Type</div>
-								<div className="text-white text-sm">{infoFile.extension || "unknown"}</div>
-							</div>
-							<div>
-								<div className="text-xs text-text-muted mb-1">Storage Class</div>
-								<div className="text-white text-sm">Standard</div>
-							</div>
-							<div>
-								<div className="text-xs text-text-muted mb-1">Size</div>
-								<div className="text-white text-sm">{formatBytes(infoFile.size)}</div>
-							</div>
-						</div>
-
-						<div className="border-t border-white/10 pt-6">
-							<h3 className="text-lg font-bold text-white mb-4">URLs</h3>
-							{infoLoading ? (
-								<div className="text-text-muted">Loading...</div>
-							) : infoError ? (
-								<div className="text-hc-red">{infoError}</div>
-							) : infoDetails?.publicUrl ? (
-								<div>
-									<div className="text-xs text-text-muted mb-2">Custom Domains</div>
-									<div className="flex items-center gap-2">
-										<input 
-											type="text" 
-											readOnly 
-											value={infoDetails.publicUrl} 
-										 className="flex-1 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-mono focus:outline-none"
-										/>
-										<button 
-										 onClick={() => {
-												navigator.clipboard.writeText(infoDetails.publicUrl);
-											}}
-										 className="bg-white/10 hover:bg-white/20 p-3 rounded-xl transition-colors"
-										 title="Copy to clipboard"
-										>
-											<PhIcon className="ph ph-copy text-white" />
-										</button>
-									</div>
-								</div>
-							) : (
-								<div className="text-text-muted">No public URL available</div>
-							)}
-						</div>
-
-						<div className="border-t border-white/10 pt-6">
-							<h3 className="text-lg font-bold text-white mb-4">Custom Metadata</h3>
-							<div className="text-text-muted">No custom metadata set</div>
-						</div>
-
-						<div className="border-t border-white/10 pt-6">
-							<div className="flex items-center justify-between mb-4">
-								<h3 className="text-lg font-bold text-white">Object Preview</h3>
+							<div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
 								<button
 									type="button"
 									onClick={() => {
 										setInfoOpen(false);
-										openPreview(infoFile);
+										void openPreview(infoState.file);
 									}}
-								 className="text-hc-blue hover:text-blue-400 text-sm font-medium"
+								 className="rounded-xl bg-white/10 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-white/20"
 								>
-									Open full preview
+									Preview
 								</button>
+								{infoState.downloadUrl ? (
+									<a
+										href={infoState.downloadUrl}
+										download={infoState.file.name}
+									 className="rounded-xl bg-hc-red px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-red-500"
+									>
+										Download
+									</a>
+								) : null}
 							</div>
-							
-							{IMAGE_EXTS.includes(infoFile.extension.toLowerCase()) ? (
-								<div className="bg-hc-dark rounded-xl border border-white/10 overflow-hidden flex items-center justify-center p-4">
-									{infoDetails?.publicUrl ? (
-										<img 
-											src={infoDetails.publicUrl} 
-											alt="Preview" 
-										 className="max-h-[300px] object-contain rounded"
-										/>
+						</div>
+
+						<div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+							<div>
+								<div className="mb-1 text-xs text-text-muted">Date Created</div>
+								<div className="text-sm text-white">
+									{formatRelativeTime(infoState.file.lastModified)}
+								</div>
+							</div>
+							<div>
+								<div className="mb-1 text-xs text-text-muted">Type</div>
+								<div className="break-all text-sm text-white">
+									{infoState.contentType}
+								</div>
+							</div>
+							<div>
+								<div className="mb-1 text-xs text-text-muted">Visibility</div>
+								<div className="text-sm text-white">
+									{infoState.isPublic ? "Public" : "Private"}
+								</div>
+							</div>
+							<div>
+								<div className="mb-1 text-xs text-text-muted">Size</div>
+								<div className="text-sm text-white">
+									{formatBytes(infoState.file.size)}
+								</div>
+							</div>
+						</div>
+
+						{infoState.error ? (
+							<div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+								{infoState.error}
+							</div>
+						) : null}
+
+						<div className="grid gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(320px,1.1fr)]">
+							<div className="space-y-8">
+								<div className="border-t border-white/10 pt-6">
+									<h3 className="mb-4 text-lg font-bold text-white">URLs</h3>
+									{infoState.isPublic && infoState.publicUrl ? (
+										<div>
+											<div className="mb-2 text-xs text-text-muted">Public object URL</div>
+											<div className="flex items-center gap-2">
+												<input
+													type="text"
+													readOnly
+													value={infoState.publicUrl}
+												 className="flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white focus:outline-none"
+												/>
+												<button
+													type="button"
+													onClick={() => {
+														void navigator.clipboard.writeText(infoState.publicUrl || "");
+													}}
+												 className="rounded-xl bg-white/10 p-3 transition-colors hover:bg-white/20"
+												 title="Copy to clipboard"
+												>
+													<PhIcon className="ph ph-copy text-white" />
+												</button>
+											</div>
+										</div>
 									) : (
-										<div className="text-text-muted text-sm p-8 text-center">
-											Loading preview image...
-											<br />
-											<span className="text-xs opacity-70">Requires public access</span>
+										<div className="text-sm text-text-muted">
+											This object does not have a public URL because this bucket is private.
 										</div>
 									)}
 								</div>
-							) : (
-								<div className="bg-hc-dark rounded-xl border border-white/10 p-8 text-center flex flex-col items-center justify-center">
-									<PhIcon className="ph ph-file-x text-4xl text-text-muted mb-2" />
-									<p className="text-text-muted text-sm">Preview not supported in info view for this file type.</p>
+
+								<div className="border-t border-white/10 pt-6">
+									<h3 className="mb-4 text-lg font-bold text-white">Object info</h3>
+									<div className="space-y-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm">
+										<div className="flex items-start justify-between gap-4">
+											<span className="text-text-muted">Filename</span>
+											<span className="max-w-[70%] break-all font-mono text-white">
+												{infoState.file.name}
+											</span>
+										</div>
+										<div className="flex items-start justify-between gap-4">
+											<span className="text-text-muted">Path</span>
+											<span className="max-w-[70%] break-all font-mono text-white">
+												{infoState.file.relativePath}
+											</span>
+										</div>
+										<div className="flex items-start justify-between gap-4">
+											<span className="text-text-muted">Extension</span>
+											<span className="font-mono text-white">
+												{infoState.file.extension || "—"}
+											</span>
+										</div>
+									</div>
 								</div>
-							)}
-						</div>
-						
-						<div className="flex justify-end gap-3 pt-4 border-t border-white/10">
-							<button
-								type="button"
-								onClick={() => {
-									setInfoOpen(false);
-									startDelete([infoFile.key]);
-								}}
-							 className="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all card-shadow flex items-center gap-2"
-							>
-								<PhIcon className="ph ph-trash" />
-								Delete
-							</button>
+							</div>
+
+							<div className="border-t border-white/10 pt-6 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+								<h3 className="mb-4 text-lg font-bold text-white">Inline preview</h3>
+								<div className="overflow-hidden rounded-2xl border border-white/10 bg-black/20">
+									{infoState.loading ? (
+										<div className="flex min-h-[320px] items-center justify-center text-text-muted">
+											Loading preview...
+										</div>
+									) : infoState.error ? (
+										<div className="flex min-h-[320px] items-center justify-center px-6 text-center text-hc-red">
+											{infoState.error}
+										</div>
+									) : infoState.previewUrl ? (
+										IMAGE_EXTS.includes(infoState.file.extension) ? (
+											<div className="flex min-h-[320px] items-center justify-center p-4">
+												<img
+													src={infoState.previewUrl}
+													alt={infoState.file.key}
+												 className="max-h-[420px] max-w-full rounded object-contain"
+												/>
+											</div>
+										) : VIDEO_EXTS.includes(infoState.file.extension) ? (
+											<div className="p-4">
+												<video
+													src={infoState.previewUrl}
+													controls
+												 className="max-h-[420px] w-full rounded"
+												>
+													<track kind="captions" />
+												</video>
+											</div>
+										) : AUDIO_EXTS.includes(infoState.file.extension) ? (
+											<div className="flex min-h-[320px] items-center justify-center p-6">
+												<audio src={infoState.previewUrl} controls className="w-full">
+													<track kind="captions" />
+												</audio>
+											</div>
+										) : (
+											<div className="flex min-h-[320px] flex-col items-center justify-center px-6 text-center text-text-muted">
+												<PhIcon className="ph ph-file text-4xl mb-3" />
+												<p>No inline preview available.</p>
+											</div>
+										)
+									) : infoState.previewText ? (
+										<pre className="max-h-[420px] overflow-auto p-4 whitespace-pre-wrap break-words font-mono text-sm text-white">
+											{infoState.previewText}
+										</pre>
+									) : (
+										<div className="flex min-h-[320px] flex-col items-center justify-center px-6 text-center text-text-muted">
+											<PhIcon className="ph ph-file text-4xl mb-3" />
+											<p>No inline preview available.</p>
+										</div>
+									)}
+								</div>
+							</div>
 						</div>
 					</div>
 				</Modal>
@@ -1500,7 +1623,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={deleteTargets.length > 0}
 				onClose={() => (operation.busy ? null : setDeleteTargets([]))}
 				title={deleteTargets.length === 1 ? "Delete file" : "Delete files"}
-				className="max-w-lg p-8"
+			 className="max-w-lg p-8"
 			>
 				<div className="space-y-4">
 					<p className="text-text-muted">
@@ -1547,7 +1670,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					setDeleteFolderTarget(null);
 				}}
 				title="Delete folder"
-				className="max-w-lg p-8"
+			 className="max-w-lg p-8"
 			>
 				<div className="space-y-4">
 					<p className="text-text-muted">
@@ -1593,7 +1716,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!renameTarget}
 				onClose={() => (operation.busy ? null : setRenameTarget(null))}
 				title="Rename file"
-				className="max-w-lg p-8"
+			 className="max-w-lg p-8"
 			>
 				<div className="space-y-4">
 					<p className="text-text-muted text-sm">
@@ -1640,7 +1763,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={moveOpen}
 				onClose={() => (operation.busy ? null : setMoveOpen(false))}
 				title="Move files"
-				className="max-w-lg p-8"
+			 className="max-w-lg p-8"
 			>
 				<div className="space-y-4">
 					<p className="text-text-muted text-sm">
@@ -1670,7 +1793,8 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										type="button"
 										onClick={() => setMoveTargetPrefix(crumb.prefix)}
 									 className={
-											index === moveCrumbs.length - 1
+											normalizePrefix(moveTargetPrefix) ===
+											normalizePrefix(crumb.prefix)
 												? "text-white font-bold"
 												: "text-text-muted hover:text-white"
 										}
@@ -1736,7 +1860,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={uploadOpen}
 				onClose={() => (operation.busy ? null : setUploadOpen(false))}
 				title="Upload files"
-				className="max-w-2xl p-8"
+			 className="max-w-2xl p-8"
 			>
 				<div className="space-y-5">
 					<div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
