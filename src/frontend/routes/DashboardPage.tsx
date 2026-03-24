@@ -985,8 +985,20 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					body: JSON.stringify({ action }),
 				},
 			);
-			await load();
-			setDeepFreezeModal(null);
+			const nextStats = await load();
+			const nextBucket = nextStats?.buckets.find(
+				(bucket) => bucket.name === deepFreezeModalBucket.name,
+			);
+			setDeepFreezeModal((prev) =>
+				prev
+					? {
+							...prev,
+							submitting: false,
+							error: null,
+							bucket: nextBucket || prev.bucket,
+						}
+					: prev,
+			);
 		} catch (e) {
 			setDeepFreezeModal((prev) =>
 				prev
@@ -2415,7 +2427,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						: () => setDeepFreezeModal(null)
 				}
 				title="Deep Freeze"
-			 className="max-w-3xl p-8"
+				className="max-w-3xl p-8"
 			>
 				{deepFreezeModalBucket ? (
 					<div className="space-y-6">
@@ -2423,79 +2435,149 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							{deepFreezeModalBucket.name}
 						</p>
 						<div className="rounded-3xl border border-sky-400/20 bg-sky-500/10 p-6">
-							<div className="flex items-center gap-3 mb-3">
+							<div className="mb-4 flex items-center gap-3">
 								<MdSevereCold
-								 className={`text-2xl text-sky-300 ${deepFreezeSnapshot?.state === "freezing" || deepFreezeSnapshot?.state === "unfreezing" ? "animate-pulse" : ""}`}
+									className={`text-2xl text-sky-300 ${deepFreezeSnapshot?.state === "freezing" || deepFreezeSnapshot?.state === "unfreezing" ? "animate-pulse" : ""}`}
 								/>
 								<h3 className="text-2xl font-black text-white">
-									{deepFreezeSnapshot?.statusLabel || "Deep Freeze"}
+									{deepFreezeSnapshot?.state === "active"
+										? "Archive this bucket"
+										: deepFreezeSnapshot?.state === "freezing"
+											? "Freezing bucket"
+											: deepFreezeSnapshot?.state === "frozen"
+												? "Bucket is frozen"
+												: "Unfreezing bucket"}
 								</h3>
 							</div>
-							<p className="text-text-muted text-sm leading-relaxed">
-								Deep Freeze compresses this entire bucket into a single
-								Zstandard archive and moves it to colder S3 storage for
-								long-term retention. While freezing, frozen, or unfreezing, the
-								bucket is completely locked: no reads, writes, previews, or file
-								access are allowed.
-							</p>
-							<div className="grid gap-4 md:grid-cols-3 mt-5">
-								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-									<p className="text-xs uppercase tracking-[0.18em] text-text-muted font-bold">
-										Current size
+
+							{deepFreezeSnapshot?.state === "active" ? (
+								<div className="space-y-5">
+									<p className="text-sm leading-relaxed text-text-muted">
+										Deep Freeze compresses this entire bucket into a single archive and
+										moves it into colder storage. While frozen, the bucket stays locked:
+										no reads, uploads, previews, deletes, or file explorer access.
 									</p>
-									<p className="text-white text-2xl font-black mt-2">
-										{formatBytes(deepFreezeModalBucket.totalBytes)}
-									</p>
+									<div className="grid gap-4 md:grid-cols-3">
+										<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+											<p className="text-xs font-bold uppercase tracking-[0.18em] text-text-muted">
+												Current size
+											</p>
+											<p className="mt-2 text-2xl font-black text-white">
+												{formatBytes(deepFreezeModalBucket.totalBytes)}
+											</p>
+										</div>
+										<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+											<p className="text-xs font-bold uppercase tracking-[0.18em] text-text-muted">
+												Estimated freeze time
+											</p>
+											<p className="mt-2 text-2xl font-black text-white">
+												{formatDurationEstimate(
+													deepFreezeSnapshot?.estimatedFreezeSeconds,
+												)}
+											</p>
+										</div>
+										<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+											<p className="text-xs font-bold uppercase tracking-[0.18em] text-text-muted">
+												Estimated unfreeze time
+											</p>
+											<p className="mt-2 text-2xl font-black text-white">
+												{formatDurationEstimate(
+													deepFreezeSnapshot?.estimatedUnfreezeSeconds,
+												)}
+											</p>
+										</div>
+									</div>
+									<div className="rounded-2xl border border-yellow-400/20 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-100">
+										If you continue, the next step starts freezing immediately and the modal will switch to live progress.
+									</div>
 								</div>
-								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-									<p className="text-xs uppercase tracking-[0.18em] text-text-muted font-bold">
-										Freeze estimate
+							) : deepFreezeSnapshot?.state === "freezing" ||
+							  deepFreezeSnapshot?.state === "unfreezing" ? (
+								<div className="space-y-5">
+									<p className="text-sm leading-relaxed text-text-muted">
+										{deepFreezeSnapshot.state === "freezing"
+											? "Your bucket is being archived now. The UI will keep updating with live progress and the current ETA."
+											: "Your bucket is being restored now. The UI will keep updating with live progress and the current ETA."}
 									</p>
-									<p className="text-white text-2xl font-black mt-2">
-										{formatDurationEstimate(
-											deepFreezeSnapshot?.estimatedFreezeSeconds,
-										)}
+									<div className="grid gap-4 md:grid-cols-3">
+										<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+											<p className="text-xs font-bold uppercase tracking-[0.18em] text-text-muted">
+												Current size
+											</p>
+											<p className="mt-2 text-2xl font-black text-white">
+												{formatBytes(deepFreezeModalBucket.totalBytes)}
+											</p>
+										</div>
+										<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+											<p className="text-xs font-bold uppercase tracking-[0.18em] text-text-muted">
+												Progress
+											</p>
+											<p className="mt-2 text-2xl font-black text-white">
+												{Math.max(0, Math.round(deepFreezeSnapshot.progressPercent || 0))}%
+											</p>
+										</div>
+										<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+											<p className="text-xs font-bold uppercase tracking-[0.18em] text-text-muted">
+												ETA remaining
+											</p>
+											<p className="mt-2 text-2xl font-black text-white">
+												{deepFreezeSnapshot.etaSeconds !== null
+													? formatDurationEstimate(deepFreezeSnapshot.etaSeconds)
+													: "Calculating"}
+											</p>
+										</div>
+									</div>
+									<div>
+										<div className="mb-2 flex justify-between text-xs font-bold uppercase tracking-[0.18em] text-text-muted">
+											<span>Status</span>
+											<span>{deepFreezeSnapshot.statusLabel}</span>
+										</div>
+										<div className="h-3 overflow-hidden rounded-full bg-white/5">
+											<div
+												className="h-3 rounded-full bg-cyan-400 animate-pulse"
+												style={{
+													width: `${Math.max(2, Math.round(deepFreezeSnapshot.progressPercent || 0))}%`,
+												}}
+											/>
+										</div>
+									</div>
+								</div>
+							) : (
+								<div className="space-y-5">
+									<p className="text-sm leading-relaxed text-text-muted">
+										This bucket is fully frozen. It stays locked until you unfreeze it and restore the archived objects back into normal access.
 									</p>
+									<div className="grid gap-4 md:grid-cols-3">
+										<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+											<p className="text-xs font-bold uppercase tracking-[0.18em] text-text-muted">
+												Archive size
+											</p>
+											<p className="mt-2 text-2xl font-black text-white">
+												{formatBytes((deepFreezeSnapshot?.archiveBytes || 0) || deepFreezeModalBucket.totalBytes)}
+											</p>
+										</div>
+										<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+											<p className="text-xs font-bold uppercase tracking-[0.18em] text-text-muted">
+												Freeze completed
+											</p>
+											<p className="mt-2 text-2xl font-black text-sky-300">100%</p>
+										</div>
+										<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+											<p className="text-xs font-bold uppercase tracking-[0.18em] text-text-muted">
+												Estimated unfreeze time
+											</p>
+											<p className="mt-2 text-2xl font-black text-white">
+												{formatDurationEstimate(
+													deepFreezeSnapshot?.estimatedUnfreezeSeconds,
+												)}
+											</p>
+										</div>
+									</div>
+									<div className="rounded-2xl border border-sky-400/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
+										This bucket is frozen and unavailable until you restore it.
+									</div>
 								</div>
-								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-									<p className="text-xs uppercase tracking-[0.18em] text-text-muted font-bold">
-										Unfreeze estimate
-									</p>
-									<p className="text-white text-2xl font-black mt-2">
-										{formatDurationEstimate(
-											deepFreezeSnapshot?.estimatedUnfreezeSeconds,
-										)}
-									</p>
-								</div>
-							</div>
-							<div className="mt-5">
-								<div className="flex justify-between text-xs uppercase tracking-[0.18em] text-text-muted mb-2">
-									<span>Progress</span>
-									<span>
-										{typeof deepFreezeSnapshot?.progressPercent === "number"
-											? `${Math.round(deepFreezeSnapshot.progressPercent)}%`
-											: ""}
-										{deepFreezeSnapshot?.etaSeconds !== null &&
-										deepFreezeSnapshot?.etaSeconds !== undefined
-											? ` · ETA ${formatDurationEstimate(deepFreezeSnapshot.etaSeconds)}`
-											: ""}
-									</span>
-								</div>
-								<div className="h-3 rounded-full bg-white/5 overflow-hidden">
-									<div
-									 className={`h-3 rounded-full ${
-											deepFreezeSnapshot?.state === "active"
-												? "bg-white/20"
-												: deepFreezeSnapshot?.state === "frozen"
-													? "bg-sky-400"
-													: "bg-cyan-400 animate-pulse"
-										}`}
-									 style={{
-											width: `${Math.max(0, Math.round(deepFreezeSnapshot?.progressPercent || 0))}%`,
-										}}
-									/>
-								</div>
-							</div>
+							)}
 						</div>
 						{deepFreezeModal?.error ? (
 							<p className="text-sm text-red-400">{deepFreezeModal.error}</p>
@@ -2503,50 +2585,49 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div className="flex justify-end gap-3">
 							<button
 								type="button"
-							 onClick={() => setDeepFreezeModal(null)}
-							 disabled={deepFreezeModal?.submitting}
-							 className={`${buttonBase} ${buttonSubtle} disabled:opacity-50`}
+								onClick={() => setDeepFreezeModal(null)}
+								disabled={deepFreezeModal?.submitting}
+								className={`${buttonBase} ${buttonSubtle} disabled:opacity-50`}
 							>
 								Close
 							</button>
 							{deepFreezeSnapshot?.state === "active" ? (
 								<button
 									type="button"
-								 onClick={() => void submitDeepFreezeAction("freeze")}
-								 disabled={deepFreezeModal?.submitting}
-								 className={`${buttonBase} bg-sky-500 hover:bg-sky-400 border-sky-500 text-black px-6 py-3 disabled:opacity-50`}
+									onClick={() => void submitDeepFreezeAction("freeze")}
+									disabled={deepFreezeModal?.submitting}
+									className={`${buttonBase} bg-sky-500 hover:bg-sky-400 border-sky-500 text-black px-6 py-3 disabled:opacity-50`}
 								>
 									{deepFreezeModal?.submitting ? (
 										<>
-											<MdSync className="animate-spin" /> Starting...
+											<MdSync className="animate-spin" /> Starting freeze...
 										</>
 									) : (
 										<>
-											<MdSevereCold /> Start Deep Freeze
+											<MdSevereCold /> Freeze bucket
 										</>
 									)}
 								</button>
 							) : deepFreezeSnapshot?.state === "frozen" ? (
 								<button
 									type="button"
-								 onClick={() => void submitDeepFreezeAction("unfreeze")}
-								 disabled={deepFreezeModal?.submitting}
-								 className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
+									onClick={() => void submitDeepFreezeAction("unfreeze")}
+									disabled={deepFreezeModal?.submitting}
+									className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
 								>
 									{deepFreezeModal?.submitting ? (
 										<>
-											<MdSync className="animate-spin" /> Starting restore...
+											<MdSync className="animate-spin" /> Starting unfreeze...
 										</>
 									) : (
 										<>
-											<MdSevereCold /> Unfreeze Bucket
+											<MdSevereCold /> Unfreeze bucket
 										</>
 									)}
 								</button>
 							) : (
-								<div className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-cyan-100 text-sm font-medium">
-									This bucket is locked while archive work continues in the
-									background.
+								<div className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-sm font-medium text-cyan-100">
+									This modal is live and will keep updating progress + ETA while work continues.
 								</div>
 							)}
 						</div>
