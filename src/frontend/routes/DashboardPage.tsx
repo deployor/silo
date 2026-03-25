@@ -244,10 +244,6 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [domainModal, setDomainModal] =
 		useState<BucketDomainModalState | null>(null);
 
-	const verifiedDomainCount = domainModal?.bucket.customDomains?.filter(
-		(domain) => domain.verified,
-	).length || 0;
-
 	const buttonBase =
 		"inline-flex items-center justify-center gap-2 rounded-xl border text-sm font-bold transition-colors";
 	const buttonPrimaryBlue =
@@ -1856,46 +1852,33 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!domainModal}
 				onClose={() => setDomainModal(null)}
 				title="Custom Domains"
-				className="max-w-4xl p-8"
+				className="max-w-3xl p-8"
 			>
 				{domainModal ? (
 					<div className="space-y-6">
-						<div className="rounded-[28px] border border-violet-400/20 bg-violet-500/5 p-6">
-							<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-								<div>
-									<div className="inline-flex items-center gap-2 rounded-full border border-violet-300/20 bg-black/20 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-violet-100">
-										<PhIcon className="ph ph-globe text-sm" />
-										Custom Domains
-									</div>
-									<h3 className="mt-4 text-3xl font-black tracking-tight text-white">
-										{domainModal.bucket.name}
-									</h3>
-									<p className="mt-3 max-w-2xl text-sm leading-7 text-text-muted">
-										Use your own hostname for public object delivery and private share links. DNS stays yours, so apps can migrate providers later without URL changes.
-									</p>
-								</div>
-								<div className="grid grid-cols-2 gap-3 lg:min-w-[260px]">
-									<div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-center">
-										<div className="text-[11px] uppercase tracking-[0.18em] text-text-muted">Total</div>
-										<div className="mt-2 text-3xl font-black text-white">{domainModal.bucket.customDomains?.length || 0}</div>
-									</div>
-									<div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-center">
-										<div className="text-[11px] uppercase tracking-[0.18em] text-text-muted">Verified</div>
-										<div className="mt-2 text-3xl font-black text-white">{verifiedDomainCount}</div>
-									</div>
-								</div>
+						<div className="flex items-start gap-4 rounded-[28px] border border-violet-400/20 bg-violet-500/5 p-6">
+							<div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-violet-300/20 bg-black/20 text-violet-100">
+								<PhIcon className="ph ph-globe text-2xl" />
+							</div>
+							<div>
+								<p className="text-sm font-mono text-text-muted">
+									{domainModal.bucket.name}
+								</p>
+								<h3 className="mt-2 text-2xl font-black text-white">
+									Use your own domain
+								</h3>
+								<p className="mt-2 text-sm leading-7 text-text-muted">
+									Point your hostname at Silo, publish the TXT record, then verify it here. Once one domain is primary, we use it automatically for public links and private share links.
+								</p>
 							</div>
 						</div>
 
-						<div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
-							<div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
-								<p className="text-[11px] font-black uppercase tracking-[0.22em] text-text-muted">
-									Add hostname
-								</p>
-								<p className="mt-3 text-sm text-text-muted">
-									Add the domain first, then publish the DNS records shown below. Verification is strict and will only pass once DNS is actually live.
-								</p>
-							<div className="mt-3 flex flex-col gap-3 lg:flex-row">
+						<div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
+							<div className="flex items-center gap-2 text-sm font-bold text-white">
+								<PhIcon className="ph ph-plus-circle text-base text-violet-200" />
+								Add domain
+							</div>
+							<div className="mt-4 flex flex-col gap-3 lg:flex-row">
 								<input
 									type="text"
 									value={domainModal.newDomain}
@@ -1936,24 +1919,36 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									{domainModal.loading ? "Saving..." : "Add domain"}
 								</button>
 							</div>
-							</div>
-
-							<div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
-								<p className="text-[11px] font-black uppercase tracking-[0.22em] text-text-muted">
-									Security lifecycle
-								</p>
-								<div className="mt-4 space-y-4 text-sm text-text-muted">
-									<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-										<p className="font-bold text-white">Required DNS</p>
-										<p className="mt-2">Point the hostname to <span className="font-mono text-white">silo.deployor.dev</span> and publish the TXT ownership record.</p>
+							<div className="mt-4 grid gap-3 md:grid-cols-3">
+								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+									<div className="flex items-center gap-2 text-sm font-bold text-white">
+										<PhIcon className="ph ph-link text-base text-violet-200" />
+										Point DNS
 									</div>
-									<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-										<p className="font-bold text-white">Ongoing revalidation</p>
-										<p className="mt-2">Verified domains are rechecked on a recurring background interval. If DNS is removed or changed, verification is revoked automatically.</p>
+									<p className="mt-2 text-xs leading-6 text-text-muted">
+										Use CNAME or ALIAS to <span className="font-mono text-white">silo.deployor.dev</span>
+									</p>
+								</div>
+								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+									<div className="flex items-center gap-2 text-sm font-bold text-white">
+										<PhIcon className="ph ph-seal-check text-base text-violet-200" />
+										Publish TXT
 									</div>
+									<p className="mt-2 text-xs leading-6 text-text-muted">
+										Publish the ownership TXT record shown on each domain card.
+									</p>
+								</div>
+								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+									<div className="flex items-center gap-2 text-sm font-bold text-white">
+										<PhIcon className="ph ph-sparkle text-base text-violet-200" />
+										Verify + set primary
+									</div>
+									<p className="mt-2 text-xs leading-6 text-text-muted">
+										After verification, make one domain primary for default links.
+									</p>
 								</div>
 							</div>
-						</div>
+							</div>
 
 						{domainModal.error ? (
 							<p className="text-sm text-red-400">{domainModal.error}</p>
@@ -1968,11 +1963,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								{(domainModal.bucket.customDomains || []).map((domain) => (
 									<div
 										key={domain.domain}
-										className="rounded-2xl border border-white/10 bg-black/20 p-5"
+										className="rounded-[28px] border border-white/10 bg-black/20 p-5"
 									>
 										<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
 											<div className="min-w-0">
 												<div className="flex flex-wrap items-center gap-2">
+													<div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-black/20 text-violet-100">
+														<PhIcon className="ph ph-globe text-lg" />
+													</div>
 													<p className="break-all font-mono text-white">{domain.domain}</p>
 													{domain.primary ? (
 														<span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
@@ -1984,14 +1982,10 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													</span>
 												</div>
 												<div className="mt-3 space-y-2 text-xs text-text-muted">
-													<p>
-														CNAME / ALIAS target: <span className="font-mono text-white">silo.deployor.dev</span>
-													</p>
-													<p>
-														TXT host: <span className="font-mono text-white">_silo-domain-verification.{domain.domain}</span>
-													</p>
+													<p>Point to <span className="font-mono text-white">silo.deployor.dev</span></p>
+													<p>TXT host: <span className="font-mono text-white">_silo-domain-verification.{domain.domain}</span></p>
 													<div className="flex items-center gap-2">
-														<span>TXT value:</span>
+														<span>TXT value</span>
 														<span className="break-all font-mono text-white">{domain.verificationToken}</span>
 														<button
 															type="button"
@@ -2002,9 +1996,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 															<MdContentCopy className="text-sm" />
 														</button>
 													</div>
-													<p>
-														Example object URL: <span className="font-mono text-white">https://{domain.domain}/file.png</span>
-													</p>
+													<p className="font-mono text-white/80">https://{domain.domain}/file.png</p>
 												</div>
 											</div>
 											<div className="flex flex-wrap gap-2">
@@ -2042,24 +2034,6 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								))}
 							</div>
 						)}
-
-						<div className="rounded-[28px] border border-violet-400/20 bg-violet-500/5 p-5 text-sm text-violet-100">
-							<p className="font-bold text-white">Production behavior</p>
-							<div className="mt-3 grid gap-3 md:grid-cols-3">
-								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-									<p className="font-bold text-white">Primary domain</p>
-									<p className="mt-2 text-text-muted">Used by bucket examples, public object URLs, and generated private share links.</p>
-								</div>
-								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-									<p className="font-bold text-white">DNS ownership</p>
-									<p className="mt-2 text-text-muted">TXT validation proves domain control before the platform trusts it.</p>
-								</div>
-								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-									<p className="font-bold text-white">Provider portability</p>
-									<p className="mt-2 text-text-muted">You can move to another provider later by repointing DNS instead of rewriting URLs.</p>
-								</div>
-							</div>
-						</div>
 					</div>
 				) : null}
 			</Modal>
