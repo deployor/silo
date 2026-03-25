@@ -1604,7 +1604,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														title="Manage custom domains"
 														className={`${iconActionBase} group text-violet-200 hover:text-violet-100 hover:bg-violet-400/10`}
 													>
-														<PhIcon className="ph ph-globe text-base" />
+														<MdPublic className="text-base" />
 														<span className={iconActionTooltip}>Custom domains</span>
 													</button>
 												) : null}
