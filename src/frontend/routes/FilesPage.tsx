@@ -66,6 +66,7 @@ type OperationState = {
 type FileInfoState = {
 	file: FileItem;
 	publicUrl: string | null;
+	publicUrlOrigin: string | null;
 	isPublic: boolean;
 	contentType: string;
 	previewUrl: string;
@@ -572,6 +573,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		setInfoState({
 			file,
 			publicUrl: null,
+			publicUrlOrigin: null,
 			isPublic: false,
 			contentType: "application/octet-stream",
 			previewUrl: "",
@@ -619,6 +621,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			setInfoState({
 				file,
 				publicUrl: info.publicUrl,
+				publicUrlOrigin: info.publicUrl ? new URL(info.publicUrl).origin : null,
 				isPublic: info.isPublic,
 				contentType: info.file.contentType,
 				previewUrl: isTextPreview ? "" : signed.url,
@@ -635,6 +638,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			setInfoState({
 				file,
 				publicUrl: null,
+				publicUrlOrigin: null,
 				isPublic: false,
 				contentType: "application/octet-stream",
 				previewUrl: "",
@@ -673,6 +677,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				body: JSON.stringify({
 					key: infoState.file.key,
 					expiresSeconds: infoState.temporaryUrlDurationSeconds,
+					share: true,
 				}),
 			});
 
@@ -1593,6 +1598,11 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<h3 className="mb-4 text-lg font-bold text-white">URLs</h3>
 									{infoState.isPublic && infoState.publicUrl ? (
 										<div>
+											{infoState.publicUrlOrigin ? (
+												<div className="mb-3 text-xs text-text-muted">
+													Primary domain: <span className="font-mono text-white">{infoState.publicUrlOrigin}</span>
+												</div>
+											) : null}
 											<div className="mb-2 text-xs text-text-muted">Public object URL</div>
 											<div className="flex items-center gap-2">
 												<input
@@ -1653,9 +1663,18 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												{infoState.temporaryUrlLoading ? "Generating..." : "Generate link"}
 											</button>
 										</div>
-										{infoState.temporaryUrl ? (
-											<>
-												<div className="flex items-center gap-2">
+												{infoState.temporaryUrl ? (
+													<>
+														<p className="mb-2 text-xs text-text-muted">
+															Shared link host: <span className="font-mono text-white">{(() => {
+																try {
+																	return new URL(infoState.temporaryUrl).origin;
+																} catch {
+																	return "—";
+																}
+															})()}</span>
+														</p>
+														<div className="flex items-center gap-2">
 													<input
 														type="text"
 														readOnly

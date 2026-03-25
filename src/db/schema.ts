@@ -100,6 +100,7 @@ export const buckets = pgTable(
 			.default(0),
 		deepFreezeLastUpdatedAt: timestamp("deep_freeze_last_updated_at"),
 		corsConfig: text("cors_config"), // JSON string of CORS rules
+		customDomains: text("custom_domains"), // JSON string of verified custom domain config
 		totalBytes: bigint("total_bytes", { mode: "number" }).notNull().default(0),
 		totalRequests: bigint("total_requests", { mode: "number" })
 			.notNull()

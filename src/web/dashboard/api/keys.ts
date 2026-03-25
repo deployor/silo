@@ -5,6 +5,7 @@ import { bucketKeys, buckets } from "../../../db/schema";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import { getCurrentUser } from "../../../lib/session";
 import { bucketNameSchema } from "../../../lib/validation";
+import { buildBucketUrlExample, parseBucketCustomDomains } from "../../../lib/bucket-domains";
 import {
 	assertCanManageKeys,
 	getBucketAccessForUser,
@@ -75,7 +76,10 @@ export async function handleKeys(req: Request): Promise<Response> {
 			const body = (await req.json().catch(() => ({}))) as { note?: unknown };
 			const note = typeof body.note === "string" ? body.note : null;
 			const keys = await createKey(access.bucket.id, "dashboard", note);
-			const publicUrl = `https://${config.s3Domain}/${bucketName}/file.png`;
+			const publicUrl = buildBucketUrlExample({
+				bucketName,
+				customDomains: parseBucketCustomDomains(access.bucket.customDomains),
+			});
 			return jsonResponse({ ...keys, publicUrl });
 		} catch (e) {
 			const message = e instanceof Error ? e.message : "Unknown error";

@@ -69,6 +69,14 @@ type CredentialModalState = {
 type DashboardBucket = {
 	name: string;
 	keys: BucketKey[];
+	customDomains?: Array<{
+		domain: string;
+		verified: boolean;
+		primary: boolean;
+		verificationToken: string;
+		createdAt: string;
+		verifiedAt: string | null;
+	}>;
 	createdAt: string;
 	totalBytes: number;
 	totalRequests: number;
@@ -170,6 +178,14 @@ type DeepFreezeModalState = {
 	error: string | null;
 };
 
+type BucketDomainModalState = {
+	bucket: DashboardBucket;
+	newDomain: string;
+	makePrimary: boolean;
+	loading: boolean;
+	error: string | null;
+};
+
 function formatDurationEstimate(totalSeconds: number | null | undefined) {
 	const seconds = Math.max(0, Math.round(totalSeconds || 0));
 	if (seconds < 60) return `${seconds}s`;
@@ -225,6 +241,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [inviteModal, setInviteModal] = useState<InviteModalState | null>(null);
 	const [deepFreezeModal, setDeepFreezeModal] =
 		useState<DeepFreezeModalState | null>(null);
+	const [domainModal, setDomainModal] =
+		useState<BucketDomainModalState | null>(null);
 
 	const buttonBase =
 		"inline-flex items-center justify-center gap-2 rounded-xl border text-sm font-bold transition-colors";
@@ -537,6 +555,161 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			await navigator.clipboard.writeText(value);
 		} catch {
 			window.alert("Failed to copy to clipboard");
+		}
+	};
+
+	const refreshBucketInDomainModal = useCallback(
+		async (bucketName: string) => {
+			const latestStats = await load();
+			setDomainModal((prev) => {
+				if (!prev || prev.bucket.name !== bucketName) return prev;
+				const refreshedBucket = latestStats?.buckets.find(
+					(bucket) => bucket.name === bucketName,
+				);
+				return refreshedBucket ? { ...prev, bucket: refreshedBucket } : prev;
+			});
+		},
+		[load],
+	);
+
+	const openDomainModal = (bucket: DashboardBucket) => {
+		setDomainModal({
+			bucket,
+			newDomain: "",
+			makePrimary: true,
+			loading: false,
+			error: null,
+		});
+	};
+
+	const addCustomDomain = async () => {
+		if (!domainModal) return;
+		setDomainModal((prev) =>
+			prev ? { ...prev, loading: true, error: null } : prev,
+		);
+		try {
+			await fetchJson(`/api/dashboard/buckets/${domainModal.bucket.name}/domains`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					domain: domainModal.newDomain,
+					makePrimary: domainModal.makePrimary,
+				}),
+			});
+			setDomainModal((prev) =>
+				prev
+					? {
+						...prev,
+						newDomain: "",
+						makePrimary: false,
+						loading: false,
+					}
+					: prev,
+			);
+			await refreshBucketInDomainModal(domainModal.bucket.name);
+		} catch (error) {
+			setDomainModal((prev) =>
+				prev
+					? {
+						...prev,
+						loading: false,
+						error:
+							error instanceof Error
+								? error.message
+								: "Failed to add custom domain",
+					}
+					: prev,
+			);
+		}
+	};
+
+	const verifyCustomDomain = async (bucketName: string, domain: string) => {
+		setDomainModal((prev) =>
+			prev ? { ...prev, loading: true, error: null } : prev,
+		);
+		try {
+			await fetchJson(`/api/dashboard/buckets/${bucketName}/domains`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ action: "verify", domain }),
+			});
+			setDomainModal((prev) =>
+				prev ? { ...prev, loading: false } : prev,
+			);
+			await refreshBucketInDomainModal(bucketName);
+		} catch (error) {
+			setDomainModal((prev) =>
+				prev
+					? {
+						...prev,
+						loading: false,
+						error:
+							error instanceof Error
+								? error.message
+								: "Failed to verify custom domain",
+					}
+					: prev,
+			);
+		}
+	};
+
+	const setPrimaryCustomDomain = async (bucketName: string, domain: string) => {
+		setDomainModal((prev) =>
+			prev ? { ...prev, loading: true, error: null } : prev,
+		);
+		try {
+			await fetchJson(`/api/dashboard/buckets/${bucketName}/domains`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ action: "set-primary", domain }),
+			});
+			setDomainModal((prev) =>
+				prev ? { ...prev, loading: false } : prev,
+			);
+			await refreshBucketInDomainModal(bucketName);
+		} catch (error) {
+			setDomainModal((prev) =>
+				prev
+					? {
+						...prev,
+						loading: false,
+						error:
+							error instanceof Error
+								? error.message
+								: "Failed to set primary custom domain",
+					}
+					: prev,
+			);
+		}
+	};
+
+	const deleteCustomDomain = async (bucketName: string, domain: string) => {
+		setDomainModal((prev) =>
+			prev ? { ...prev, loading: true, error: null } : prev,
+		);
+		try {
+			await fetchJson(`/api/dashboard/buckets/${bucketName}/domains`, {
+				method: "DELETE",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ domain }),
+			});
+			setDomainModal((prev) =>
+				prev ? { ...prev, loading: false } : prev,
+			);
+			await refreshBucketInDomainModal(bucketName);
+		} catch (error) {
+			setDomainModal((prev) =>
+				prev
+					? {
+						...prev,
+						loading: false,
+						error:
+							error instanceof Error
+								? error.message
+								: "Failed to delete custom domain",
+					}
+					: prev,
+			);
 		}
 	};
 
@@ -1426,6 +1599,18 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												{!isCollaborative ? (
 													<button
 														type="button"
+														onClick={() => openDomainModal(bucket)}
+														aria-label="Manage custom domains"
+														title="Manage custom domains"
+														className={`${iconActionBase} group text-violet-200 hover:text-violet-100 hover:bg-violet-400/10`}
+													>
+														<PhIcon className="ph ph-globe-hemisphere-east text-base" />
+														<span className={iconActionTooltip}>Custom domains</span>
+													</button>
+												) : null}
+												{!isCollaborative ? (
+													<button
+														type="button"
 														onClick={() =>
 															deleteBucket(bucket.name, true)
 														}
@@ -1658,6 +1843,169 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							>
 								Close
 							</button>
+						</div>
+					</div>
+				) : null}
+			</Modal>
+
+			<Modal
+				open={!!domainModal}
+				onClose={() => setDomainModal(null)}
+				title="Custom Domains"
+				className="max-w-4xl p-8"
+			>
+				{domainModal ? (
+					<div className="space-y-6">
+						<div>
+							<p className="text-sm font-mono text-text-muted">
+								{domainModal.bucket.name}
+							</p>
+							<p className="mt-2 text-sm text-text-muted">
+								Publish this bucket on your own hostname so public URLs and shared temporary links stay stable even if you later move to a different S3 provider.
+							</p>
+						</div>
+
+						<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+							<p className="text-sm font-bold text-white">Add a domain</p>
+							<div className="mt-3 flex flex-col gap-3 lg:flex-row">
+								<input
+									type="text"
+									value={domainModal.newDomain}
+									onChange={(event) =>
+										setDomainModal((prev) =>
+											prev
+												? {
+													...prev,
+													newDomain: event.target.value,
+													error: null,
+												}
+												: prev,
+										)
+									}
+									placeholder="assets.example.com"
+									className="flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-white focus:outline-none focus:border-violet-300"
+								/>
+								<label className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white">
+									<input
+										type="checkbox"
+										checked={domainModal.makePrimary}
+										onChange={(event) =>
+											setDomainModal((prev) =>
+												prev
+													? { ...prev, makePrimary: event.target.checked }
+													: prev,
+											)
+										}
+									/>
+									Make primary after verify
+								</label>
+								<button
+									type="button"
+									onClick={() => void addCustomDomain()}
+									disabled={domainModal.loading}
+									className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
+								>
+									{domainModal.loading ? "Saving..." : "Add domain"}
+								</button>
+							</div>
+							<p className="mt-3 text-xs text-text-muted">
+								Create a CNAME or ALIAS to <span className="font-mono text-white">silo.deployor.dev</span>, then publish the TXT verification record shown below.
+							</p>
+						</div>
+
+						{domainModal.error ? (
+							<p className="text-sm text-red-400">{domainModal.error}</p>
+						) : null}
+
+						{(domainModal.bucket.customDomains || []).length === 0 ? (
+							<div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-sm text-text-muted">
+								No custom domains configured yet.
+							</div>
+						) : (
+							<div className="space-y-3">
+								{(domainModal.bucket.customDomains || []).map((domain) => (
+									<div
+										key={domain.domain}
+										className="rounded-2xl border border-white/10 bg-black/20 p-5"
+									>
+										<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+											<div className="min-w-0">
+												<div className="flex flex-wrap items-center gap-2">
+													<p className="break-all font-mono text-white">{domain.domain}</p>
+													{domain.primary ? (
+														<span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
+															Primary
+														</span>
+													) : null}
+													<span className={`rounded-full border px-2 py-1 text-[11px] font-bold uppercase tracking-wider ${domain.verified ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300" : "border-yellow-400/30 bg-yellow-400/10 text-yellow-100"}`}>
+														{domain.verified ? "Verified" : "Pending"}
+													</span>
+												</div>
+												<div className="mt-3 space-y-2 text-xs text-text-muted">
+													<p>
+														CNAME / ALIAS target: <span className="font-mono text-white">silo.deployor.dev</span>
+													</p>
+													<p>
+														TXT host: <span className="font-mono text-white">_silo-domain-verification.{domain.domain}</span>
+													</p>
+													<div className="flex items-center gap-2">
+														<span>TXT value:</span>
+														<span className="break-all font-mono text-white">{domain.verificationToken}</span>
+														<button
+															type="button"
+															onClick={() => copyText(domain.verificationToken)}
+															className="text-text-muted hover:text-white"
+															title="Copy token"
+														>
+															<MdContentCopy className="text-sm" />
+														</button>
+													</div>
+													<p>
+														Example object URL: <span className="font-mono text-white">https://{domain.domain}/file.png</span>
+													</p>
+												</div>
+											</div>
+											<div className="flex flex-wrap gap-2">
+												{!domain.verified ? (
+													<button
+														type="button"
+														onClick={() => void verifyCustomDomain(domainModal.bucket.name, domain.domain)}
+														disabled={domainModal.loading}
+														className={`${buttonBase} ${buttonNeutral}`}
+													>
+														Verify
+													</button>
+												) : null}
+												{domain.verified && !domain.primary ? (
+													<button
+														type="button"
+														onClick={() => void setPrimaryCustomDomain(domainModal.bucket.name, domain.domain)}
+														disabled={domainModal.loading}
+														className={`${buttonBase} ${buttonNeutral}`}
+													>
+														Set primary
+													</button>
+												) : null}
+												<button
+													type="button"
+													onClick={() => void deleteCustomDomain(domainModal.bucket.name, domain.domain)}
+													disabled={domainModal.loading}
+													className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-bold text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+												>
+													Remove
+												</button>
+											</div>
+										</div>
+									</div>
+								))}
+							</div>
+						)}
+
+						<div className="rounded-2xl border border-violet-400/20 bg-violet-500/5 p-5 text-sm text-violet-100">
+							<p className="font-bold text-white">Migration-friendly by default</p>
+							<p className="mt-2 text-text-muted">
+								Once a primary domain is verified, that hostname becomes the default for bucket examples, public object links, and private share links. Later, you can repoint DNS to another provider without changing the URLs in your app.
+							</p>
 						</div>
 					</div>
 				) : null}

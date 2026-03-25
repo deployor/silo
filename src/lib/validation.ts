@@ -36,6 +36,15 @@ export const updateBucketVisibilitySchema = z.object({
 	isPublic: z.boolean(),
 });
 
+export const customDomainInputSchema = z.object({
+	domain: z.string().min(1, "Custom domain is required").max(253),
+	makePrimary: z.boolean().optional(),
+});
+
+export const setPrimaryCustomDomainSchema = z.object({
+	domain: z.string().min(1, "Custom domain is required").max(253),
+});
+
 export const deepFreezeActionSchema = z.object({
 	action: z.enum(["freeze", "unfreeze"]),
 });

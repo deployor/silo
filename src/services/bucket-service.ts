@@ -6,6 +6,15 @@ import {
 } from "../core/s3/utils";
 import { db } from "../db";
 import { bucketKeys, buckets, users } from "../db/schema";
+import {
+	createCustomDomainRecord,
+	type BucketCustomDomain,
+	invalidateBucketCustomDomainCache,
+	parseBucketCustomDomains,
+	sanitizeBucketCustomDomains,
+	serializeBucketCustomDomains,
+	normalizeCustomDomain,
+} from "../lib/bucket-domains";
 import { redis } from "../lib/redis";
 import {
 	assertBucketCollaborationAllowed,
@@ -103,6 +112,7 @@ export async function getBucketsForUser(userId: string) {
 	return [
 		...bucketsWithKeys.map((bucket) => ({
 			...bucket,
+			customDomains: parseBucketCustomDomains(bucket.customDomains),
 			isCollaborative: false,
 			collaborationPermissions: null,
 			collaborationPermissionSet: null,
@@ -126,6 +136,21 @@ export async function getBucketsForUser(userId: string) {
 		})),
 		...sharedKeys,
 	];
+}
+
+async function getOwnedBucketOrThrow(name: string, userId: string, isAdmin = false) {
+	const bucket = await db
+		.select()
+		.from(buckets)
+		.where(eq(buckets.name, name))
+		.limit(1);
+
+	if (bucket.length === 0) throw new Error("Bucket not found");
+	if (bucket[0].userId !== userId && !isAdmin) throw new Error("Unauthorized");
+	if (bucket[0].isPaused && !isAdmin) throw new Error("Bucket is paused");
+	const deepFreezeMessage = getBucketDeepFreezeMessage(bucket[0]);
+	if (deepFreezeMessage && !isAdmin) throw new Error(deepFreezeMessage);
+	return bucket[0];
 }
 
 export async function createBucket(userId: string, name: string) {
@@ -307,6 +332,141 @@ export async function updateCorsConfig(
 		.where(eq(buckets.id, access.bucket.id));
 }
 
+export async function addBucketCustomDomain(params: {
+	bucketName: string;
+	userId: string;
+	domain: string;
+	makePrimary?: boolean;
+	isAdmin?: boolean;
+}) {
+	const bucket = await getOwnedBucketOrThrow(
+		params.bucketName,
+		params.userId,
+		params.isAdmin,
+	);
+	const current = parseBucketCustomDomains(bucket.customDomains);
+	const normalizedDomain = normalizeCustomDomain(params.domain);
+	if (current.some((entry) => entry.domain === normalizedDomain)) {
+		throw new Error("Custom domain already exists for this bucket");
+	}
+	const next = [...current, createCustomDomainRecord(normalizedDomain)].map((entry) => ({
+		...entry,
+		primary: params.makePrimary ? entry.domain === normalizedDomain : entry.primary,
+	}));
+	const sanitized = sanitizeBucketCustomDomains(next);
+	await db
+		.update(buckets)
+		.set({ customDomains: serializeBucketCustomDomains(sanitized) })
+		.where(eq(buckets.id, bucket.id));
+	await invalidateBucketCustomDomainCache(current);
+	return sanitized;
+}
+
+export async function removeBucketCustomDomain(params: {
+	bucketName: string;
+	userId: string;
+	domain: string;
+	isAdmin?: boolean;
+}) {
+	const bucket = await getOwnedBucketOrThrow(
+		params.bucketName,
+		params.userId,
+		params.isAdmin,
+	);
+	const current = parseBucketCustomDomains(bucket.customDomains);
+	const normalizedDomain = normalizeCustomDomain(params.domain);
+	const next = current.filter((entry) => entry.domain !== normalizedDomain);
+	const sanitized = sanitizeBucketCustomDomains(next);
+	await db
+		.update(buckets)
+		.set({ customDomains: sanitized.length ? serializeBucketCustomDomains(sanitized) : null })
+		.where(eq(buckets.id, bucket.id));
+	await invalidateBucketCustomDomainCache(current);
+	return sanitized;
+}
+
+export async function setPrimaryBucketCustomDomain(params: {
+	bucketName: string;
+	userId: string;
+	domain: string;
+	isAdmin?: boolean;
+}) {
+	const bucket = await getOwnedBucketOrThrow(
+		params.bucketName,
+		params.userId,
+		params.isAdmin,
+	);
+	const current = parseBucketCustomDomains(bucket.customDomains);
+	const normalizedDomain = normalizeCustomDomain(params.domain);
+	const exists = current.find((entry) => entry.domain === normalizedDomain);
+	if (!exists) {
+		throw new Error("Custom domain not found");
+	}
+	if (!exists.verified) {
+		throw new Error("Only verified custom domains can be primary");
+	}
+	const next = current.map((entry) => ({
+		...entry,
+		primary: entry.domain === normalizedDomain,
+	}));
+	const sanitized = sanitizeBucketCustomDomains(next);
+	await db
+		.update(buckets)
+		.set({ customDomains: serializeBucketCustomDomains(sanitized) })
+		.where(eq(buckets.id, bucket.id));
+	await invalidateBucketCustomDomainCache(current);
+	return sanitized;
+}
+
+export async function verifyBucketCustomDomain(params: {
+	bucketName: string;
+	userId: string;
+	domain: string;
+	isAdmin?: boolean;
+}) {
+	const bucket = await getOwnedBucketOrThrow(
+		params.bucketName,
+		params.userId,
+		params.isAdmin,
+	);
+	const current = parseBucketCustomDomains(bucket.customDomains);
+	const normalizedDomain = normalizeCustomDomain(params.domain);
+	const target = current.find((entry) => entry.domain === normalizedDomain);
+	if (!target) {
+		throw new Error("Custom domain not found");
+	}
+	const next = current.map((entry) =>
+		entry.domain === normalizedDomain
+			? {
+					...entry,
+					verified: true,
+					verifiedAt: new Date().toISOString(),
+					primary: entry.primary || !current.some((item) => item.primary && item.verified),
+				}
+			: entry,
+	);
+	const sanitized = sanitizeBucketCustomDomains(next);
+	await db
+		.update(buckets)
+		.set({ customDomains: serializeBucketCustomDomains(sanitized) })
+		.where(eq(buckets.id, bucket.id));
+	await invalidateBucketCustomDomainCache(current);
+	return sanitized;
+}
+
+export async function listBucketCustomDomains(params: {
+	bucketName: string;
+	userId: string;
+	isAdmin?: boolean;
+}): Promise<BucketCustomDomain[]> {
+	const bucket = await getOwnedBucketOrThrow(
+		params.bucketName,
+		params.userId,
+		params.isAdmin,
+	);
+	return parseBucketCustomDomains(bucket.customDomains);
+}
+
 export async function deleteCorsConfig(
 	name: string,
 	userId: string,
@@ -337,4 +497,9 @@ export const BucketService = {
 	updateBucketVisibility,
 	updateCorsConfig,
 	deleteCorsConfig,
+	listBucketCustomDomains,
+	addBucketCustomDomain,
+	removeBucketCustomDomain,
+	setPrimaryBucketCustomDomain,
+	verifyBucketCustomDomain,
 };
