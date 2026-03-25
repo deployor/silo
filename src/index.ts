@@ -72,6 +72,8 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 		"/dashboard",
 		"/dashboard/",
 		"/docs",
+		"/account",
+		"/account/",
 		"/api/slack/",
 		"/assets/",
 		"/admin",

@@ -21,6 +21,7 @@ type DeleteState = {
 	stage: string;
 	error: string | null;
 	confirmText: string;
+	confirmDelayRemaining: number;
 };
 
 export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
@@ -35,12 +36,32 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		stage: "",
 		error: null,
 		confirmText: "",
+		confirmDelayRemaining: 10,
 	});
 
 	const currentSession = useMemo(
 		() => sessions.find((session) => session.isCurrent) || null,
 		[sessions],
 	);
+
+	useEffect(() => {
+		if (!deleteState.open || deleteState.busy) return;
+		setDeleteState((prev) => ({ ...prev, confirmDelayRemaining: 10 }));
+		const timer = window.setInterval(() => {
+			setDeleteState((prev) => {
+				if (!prev.open || prev.busy) return prev;
+				if (prev.confirmDelayRemaining <= 1) {
+					window.clearInterval(timer);
+					return { ...prev, confirmDelayRemaining: 0 };
+				}
+				return {
+					...prev,
+					confirmDelayRemaining: prev.confirmDelayRemaining - 1,
+				};
+			});
+		}, 1000);
+		return () => window.clearInterval(timer);
+	}, [deleteState.open, deleteState.busy]);
 
 	const loadSessions = async () => {
 		setLoading(true);
@@ -100,6 +121,7 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	};
 
 	const deleteAccount = async () => {
+		if (deleteState.confirmDelayRemaining > 0) return;
 		if (deleteState.confirmText.trim().toUpperCase() !== "DELETE") {
 			setDeleteState((prev) => ({
 				...prev,
@@ -117,7 +139,7 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			await fetchJson("/api/dashboard/account/delete", { method: "POST" });
 			setDeleteState((prev) => ({
 				...prev,
-				stage: "Finalizing account removal...",
+				stage: "Thanks for being here with us. Finishing account deletion...",
 			}));
 			window.location.href = "/account/deleted";
 		} catch (cause) {
@@ -143,6 +165,11 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</p>
 						</div>
 					</div>
+					{currentSession ? (
+						<p className="mt-4 text-sm text-text-muted">
+							Current session: {currentSession.userAgent}
+						</p>
+					) : null}
 				</div>
 
 				<div className="rounded-[28px] border border-white/10 bg-hc-dark p-8 card-shadow">
@@ -237,6 +264,7 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									stage: "",
 									error: null,
 									confirmText: "",
+									confirmDelayRemaining: 10,
 								})
 							}
 							className="inline-flex items-center gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-bold text-red-300 transition-colors hover:bg-red-500/20"
@@ -259,6 +287,9 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<p className="text-sm text-text-muted">
 							This permanently deletes your account, all sessions, all buckets, and all stored files.
 						</p>
+						<p className="text-sm text-text-muted">
+							Wait 10 seconds, type DELETE, then confirm.
+						</p>
 						<input
 							type="text"
 							value={deleteState.confirmText}
@@ -275,6 +306,11 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						{deleteState.stage ? (
 							<div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white">
 								{deleteState.stage}
+							</div>
+						) : null}
+						{!deleteState.busy && deleteState.confirmDelayRemaining > 0 ? (
+							<div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-text-muted">
+								Confirm available in {deleteState.confirmDelayRemaining}s
 							</div>
 						) : null}
 						{deleteState.error ? (
@@ -294,11 +330,15 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<button
 								type="button"
 								onClick={() => void deleteAccount()}
-								disabled={deleteState.busy}
+								disabled={deleteState.busy || deleteState.confirmDelayRemaining > 0}
 								className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-3 text-sm font-bold text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50"
 							>
 								<MdDeleteForever className="text-base" />
-								{deleteState.busy ? "Deleting..." : "Delete account"}
+								{deleteState.busy
+									? "Deleting..."
+									: deleteState.confirmDelayRemaining > 0
+										? `Delete account (${deleteState.confirmDelayRemaining}s)`
+										: "Delete account"}
 							</button>
 						</div>
 					</div>
