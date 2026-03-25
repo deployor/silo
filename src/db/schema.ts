@@ -70,7 +70,6 @@ export const buckets = pgTable(
 		region: text("region").default("auto"),
 		isPublic: boolean("is_public").default(false).notNull(),
 		isSystem: boolean("is_system").default(false).notNull(),
-		isCdn: boolean("is_cdn").default(false).notNull(),
 		isPaused: boolean("is_paused").default(false).notNull(),
 		pauseReason: text("pause_reason"),
 		deepFreezeState: text("deep_freeze_state").default("active").notNull(),
@@ -363,9 +362,6 @@ export const appSettings = pgTable("app_settings", {
 		.notNull()
 		.default(1073741824), // 1GB
 	yswsBonusTiers: text("ysws_bonus_tiers"), // JSON string: [{ hours: 20, percent: 5 }, ...]
-	cdnForceSlackUpload: boolean("cdn_force_slack_upload")
-		.default(true)
-		.notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

@@ -71,9 +71,21 @@ type FileInfoState = {
 	previewUrl: string;
 	downloadUrl: string;
 	previewText: string;
+	temporaryUrl: string;
+	temporaryUrlExpiresAt: string | null;
+	temporaryUrlDurationSeconds: number;
+	temporaryUrlLoading: boolean;
 	loading: boolean;
 	error: string | null;
 };
+
+const PRESIGN_DURATION_PRESETS = [
+	{ label: "1 hour", seconds: 60 * 60 },
+	{ label: "6 hours", seconds: 6 * 60 * 60 },
+	{ label: "1 day", seconds: 24 * 60 * 60 },
+	{ label: "7 days", seconds: 7 * 24 * 60 * 60 },
+	{ label: "30 days", seconds: 30 * 24 * 60 * 60 },
+] as const;
 
 const IMAGE_EXTS = ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif"];
 const VIDEO_EXTS = ["mp4", "webm", "ogg", "mov", "mkv", "avi", "m4v"];
@@ -565,6 +577,10 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			previewUrl: "",
 			downloadUrl: "",
 			previewText: "",
+			temporaryUrl: "",
+			temporaryUrlExpiresAt: null,
+			temporaryUrlDurationSeconds: PRESIGN_DURATION_PRESETS[0].seconds,
+			temporaryUrlLoading: false,
 			loading: true,
 			error: null,
 		});
@@ -608,6 +624,10 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				previewUrl: isTextPreview ? "" : signed.url,
 				downloadUrl: signed.url,
 				previewText,
+				temporaryUrl: "",
+				temporaryUrlExpiresAt: null,
+				temporaryUrlDurationSeconds: PRESIGN_DURATION_PRESETS[0].seconds,
+				temporaryUrlLoading: false,
 				loading: false,
 				error: null,
 			});
@@ -620,9 +640,66 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				previewUrl: "",
 				downloadUrl: "",
 				previewText: "",
+				temporaryUrl: "",
+				temporaryUrlExpiresAt: null,
+				temporaryUrlDurationSeconds: PRESIGN_DURATION_PRESETS[0].seconds,
+				temporaryUrlLoading: false,
 				loading: false,
 				error: cause instanceof Error ? cause.message : "Failed to load file info",
 			});
+		}
+	};
+
+	const generateTemporaryUrl = async () => {
+		if (!infoState) return;
+		setInfoState((prev) =>
+			prev
+				? {
+						...prev,
+						temporaryUrlLoading: true,
+						error: null,
+					}
+				: prev,
+		);
+
+		try {
+			const result = await fetchJson<{
+				url: string;
+				expiresAt: string;
+				expiresSeconds: number;
+			}>(`/api/dashboard/buckets/${bucketName}/files/sign`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					key: infoState.file.key,
+					expiresSeconds: infoState.temporaryUrlDurationSeconds,
+				}),
+			});
+
+			setInfoState((prev) =>
+				prev
+					? {
+							...prev,
+							temporaryUrl: result.url,
+							temporaryUrlExpiresAt: result.expiresAt,
+							temporaryUrlDurationSeconds: result.expiresSeconds,
+							temporaryUrlLoading: false,
+						}
+					: prev,
+			);
+		} catch (cause) {
+			setInfoState((prev) =>
+				prev
+					? {
+							...prev,
+							temporaryUrlLoading: false,
+							error:
+								cause instanceof Error
+									? cause.message
+									: "Failed to create temporary link",
+						}
+					: prev,
+			);
 		}
 	};
 
@@ -752,6 +829,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	};
 
 	const openUploadModal = (prefix?: string) => {
+		if (!canWriteFiles) return;
 		clearOperationError();
 		setUploadPrefix(prefix ?? currentPrefix);
 		setUploadMode("files");
@@ -790,6 +868,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 	const ingestFiles = useCallback(
 		(incoming: FileList | File[]) => {
+			if (!canWriteFiles) return;
 			const nextFiles = Array.from(incoming);
 			if (nextFiles.length === 0) return;
 			clearOperationError();
@@ -805,7 +884,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				),
 			);
 		},
-		[clearOperationError, currentPrefix],
+		[canWriteFiles, clearOperationError, currentPrefix],
 	);
 
 	const onFolderInputChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -815,6 +894,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	};
 
 	const openSystemPicker = (mode: "files" | "folder") => {
+		if (!canWriteFiles) return;
 		setUploadMode(mode);
 		if (mode === "folder") {
 			folderInputRef.current?.click();
@@ -909,6 +989,11 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			breadcrumbs={p.breadcrumbs}
 		>
 			<div className="max-w-[1400px] mx-auto w-full min-h-[72vh] flex flex-col">
+				{!canWriteFiles ? (
+					<div className="mb-4 rounded-3xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-text-muted">
+						This bucket is currently read-only. Uploads and other write actions are disabled.
+					</div>
+				) : null}
 				{bucketAccess?.isCollaborative ? (
 					<div className="mb-4 rounded-3xl border border-yellow-400/30 bg-yellow-400/10 px-5 py-4 text-sm text-yellow-100">
 						<div className="flex flex-wrap items-center gap-3">
@@ -1528,12 +1613,80 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												</button>
 											</div>
 										</div>
-									) : (
-										<div className="text-sm text-text-muted">
-											This object does not have a public URL because this bucket is private.
+								) : (
+									<div className="text-sm text-text-muted">
+										This object does not have a public URL because this bucket is private.
+									</div>
+								)}
+								{!infoState.isPublic ? (
+									<div className="mt-6">
+										<div className="mb-2 text-xs text-text-muted">
+											Temporary presigned URL
 										</div>
-									)}
-								</div>
+										<div className="flex flex-wrap gap-2 mb-3">
+											<select
+												value={infoState.temporaryUrlDurationSeconds}
+												onChange={(event) =>
+													setInfoState((prev) =>
+														prev
+															? {
+																...prev,
+																temporaryUrlDurationSeconds: Number(event.target.value),
+															}
+															: prev,
+													)
+												}
+												className="rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white"
+											>
+												{PRESIGN_DURATION_PRESETS.map((preset) => (
+													<option key={preset.seconds} value={preset.seconds}>
+														{preset.label}
+													</option>
+												))}
+											</select>
+											<button
+												type="button"
+												onClick={() => void generateTemporaryUrl()}
+												disabled={infoState.temporaryUrlLoading}
+												className="rounded-xl bg-white/10 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-white/20 disabled:opacity-50"
+											>
+												{infoState.temporaryUrlLoading ? "Generating..." : "Generate link"}
+											</button>
+										</div>
+										{infoState.temporaryUrl ? (
+											<>
+												<div className="flex items-center gap-2">
+													<input
+														type="text"
+														readOnly
+														value={infoState.temporaryUrl}
+														className="flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-sm text-white focus:outline-none"
+													/>
+													<button
+														type="button"
+														onClick={() => {
+															void navigator.clipboard.writeText(infoState.temporaryUrl);
+														}}
+														className="rounded-xl bg-white/10 p-3 transition-colors hover:bg-white/20"
+														title="Copy temporary link"
+													>
+														<PhIcon className="ph ph-copy text-white" />
+													</button>
+												</div>
+												{infoState.temporaryUrlExpiresAt ? (
+													<p className="mt-2 text-xs text-text-muted">
+														Expires {new Date(infoState.temporaryUrlExpiresAt).toLocaleString()}
+													</p>
+												) : null}
+											</>
+										) : (
+											<p className="text-sm text-text-muted">
+												Generate a temporary private link for up to 30 days.
+											</p>
+										)}
+									</div>
+								) : null}
+							</div>
 
 								<div className="border-t border-white/10 pt-6">
 									<h3 className="mb-4 text-lg font-bold text-white">Object info</h3>

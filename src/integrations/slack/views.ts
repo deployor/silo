@@ -81,38 +81,28 @@ export const homeView = (
 			Divider(),
 			...displayBuckets.flatMap((bucket) => {
 				const options = [];
-
-				if (!bucket.isCdn) {
-					options.push(
-						Option({
-							text: ":ms-wrench: Manage Keys",
-							value: `manage_keys:${bucket.id}`,
-						}),
-						Option({
-							text: bucket.isPublic
-								? ":ms-shush: Make Private"
-								: ":ms-globe: Make Public",
-							value: `toggle_public:${bucket.id}`,
-						}),
-						Option({
-							text: ":angry-dino: Delete Bucket",
-							value: `delete_bucket:${bucket.id}`,
-						}),
-					);
-				} else {
-					options.push(
-						Option({
-							text: ":ms-info: CDN Bucket (Managed)",
-							value: "noop",
-						}),
-					);
-				}
+				options.push(
+					Option({
+						text: ":ms-wrench: Manage Keys",
+						value: `manage_keys:${bucket.id}`,
+					}),
+					Option({
+						text: bucket.isPublic
+							? ":ms-shush: Make Private"
+							: ":ms-globe: Make Public",
+						value: `toggle_public:${bucket.id}`,
+					}),
+					Option({
+						text: ":angry-dino: Delete Bucket",
+						value: `delete_bucket:${bucket.id}`,
+					}),
+				);
 
 				const bucketSection = Section({
-					text: `*${bucket.name}*${bucket.isCdn ? " (CDN)" : ""}`,
+					text: `*${bucket.name}*`,
 				});
 
-				if (options.length > 0 && !bucket.isCdn) {
+				if (options.length > 0) {
 					bucketSection.accessory(
 						OverflowMenu({
 							actionId: "bucket_overflow_action",

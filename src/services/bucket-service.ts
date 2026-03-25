@@ -128,11 +128,7 @@ export async function getBucketsForUser(userId: string) {
 	];
 }
 
-export async function createBucket(
-	userId: string,
-	name: string,
-	isCdn = false,
-) {
+export async function createBucket(userId: string, name: string) {
 	if (!name || !/^[a-z0-9-]+$/.test(name)) {
 		throw new Error("Invalid bucket name");
 	}
@@ -174,8 +170,6 @@ export async function createBucket(
 		.values({
 			name,
 			userId,
-			isPublic: isCdn,
-			isCdn,
 		})
 		.returning();
 
@@ -281,7 +275,6 @@ export async function updateBucketVisibility(
 	const visibilityDeepFreezeMessage = getBucketDeepFreezeMessage(bucket[0]);
 	if (visibilityDeepFreezeMessage && !isAdmin)
 		throw new Error(visibilityDeepFreezeMessage);
-	if (bucket[0].isCdn) throw new Error("Cannot modify CDN bucket");
 
 	await db.update(buckets).set({ isPublic }).where(eq(buckets.name, name));
 	await invalidateBucketAuthCache(name);

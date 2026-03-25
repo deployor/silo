@@ -27,11 +27,8 @@ export function SlackSuccessPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					.
 					<br />
 					<br />
-					You can now go back to Slack to upload files, or use the{" "}
-					<a href="/cdn" className="text-hc-red hover:underline font-bold">
-						Web CDN
-					</a>
-					.
+					You can now head back to Slack for bucket management, or open your
+					dashboard to manage buckets on the web.
 				</p>
 
 				<div className="flex items-center justify-center gap-6 text-sm font-bold uppercase tracking-wider">

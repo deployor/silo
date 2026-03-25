@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { db } from "../db";
 import { bucketCollaborators, buckets, users } from "../db/schema";
 
@@ -246,7 +246,15 @@ export async function listCollaborationsForBuckets(bucketIds: string[]) {
 		})
 		.from(bucketCollaborators)
 		.innerJoin(users, eq(bucketCollaborators.inviteeUserId, users.id))
-		.where(inArray(bucketCollaborators.bucketId, bucketIds));
+		.where(
+			and(
+				inArray(bucketCollaborators.bucketId, bucketIds),
+				or(
+					eq(bucketCollaborators.status, "pending"),
+					eq(bucketCollaborators.status, "accepted"),
+				),
+			),
+		);
 }
 
 export async function getCollaborationRecordById(
@@ -430,16 +438,7 @@ export async function revokeCollaborationInvite(params: {
 
 	if (!rows[0]) throw new Error("Invite not found");
 
-	const now = new Date();
-	await db
-		.update(bucketCollaborators)
-		.set({
-			status: "revoked",
-			updatedAt: now,
-			respondedAt: now,
-			acceptedAt: null,
-		})
-		.where(eq(bucketCollaborators.id, rows[0].id));
+	await db.delete(bucketCollaborators).where(eq(bucketCollaborators.id, rows[0].id));
 }
 
 export async function respondToCollaborationInvite(params: {
@@ -526,9 +525,6 @@ export async function getBucketAccessForUser(params: {
 export function assertBucketCollaborationAllowed(
 	bucket: typeof buckets.$inferSelect,
 ) {
-	if (bucket.isCdn) {
-		throw new Error("Collaboration is not supported for CDN buckets");
-	}
 	if (bucket.isSystem) {
 		throw new Error("Collaboration is not supported for system buckets");
 	}
@@ -549,9 +545,6 @@ export function assertCanWriteFiles(access: BucketAccessContext) {
 }
 
 export function assertCanManageKeys(access: BucketAccessContext) {
-	if (access.bucket.isCdn) {
-		throw new Error("Cannot modify keys for CDN bucket");
-	}
 	if (access.isOwner || access.isAdmin) return;
 	if (!access.permissionSet.manage_keys) {
 		throw new Error("Unauthorized");
@@ -559,9 +552,6 @@ export function assertCanManageKeys(access: BucketAccessContext) {
 }
 
 export function assertCanManageCors(access: BucketAccessContext) {
-	if (access.bucket.isCdn) {
-		throw new Error("Cannot modify CDN bucket CORS");
-	}
 	if (access.isOwner || access.isAdmin) return;
 	if (!access.permissionSet.manage_cors) {
 		throw new Error("Unauthorized");

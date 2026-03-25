@@ -279,9 +279,6 @@ export async function requestBucketDeepFreezeAction(params: {
 	if (!access.isOwner && !access.isAdmin) {
 		throw new Error("Only the bucket owner can manage Deep Freeze");
 	}
-	if (access.bucket.isCdn) {
-		throw new Error("Deep Freeze is not supported for CDN buckets");
-	}
 	if (access.bucket.isSystem) {
 		throw new Error("Deep Freeze is not supported for system buckets");
 	}

@@ -269,8 +269,6 @@ export async function rewriteCopySourceHeader(
 		sourceBucket = bucketResult[0];
 	}
 
-	if (sourceBucket.isCdn) return null;
-
 	// Security Check:
 	// 1. Same bucket (Self-Copy) -> Allowed
 	// 2. Different bucket -> Allowed only if:

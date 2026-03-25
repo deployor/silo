@@ -1,5 +1,4 @@
 import { handleAppHomeOpened, handleInteraction } from "./handlers";
-import { handleMessage } from "./message-handler";
 import { verifySlackRequest } from "./verify";
 
 export async function handleSlackRequest(req: Request): Promise<Response> {
@@ -27,9 +26,6 @@ export async function handleSlackRequest(req: Request): Promise<Response> {
 			const event = body.event;
 			if (event.type === "app_home_opened") {
 				handleAppHomeOpened(event).catch(console.error);
-			}
-			if (event.type === "message") {
-				handleMessage(event).catch(console.error);
 			}
 		}
 

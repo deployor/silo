@@ -714,7 +714,7 @@ ${rulesXml}
 		// Add Cache-Control if not already set by upstream
 		if (!headers.has("cache-control")) {
 			if (!user) {
-				// Public bucket access — allow browser and CDN caching
+			// Public bucket access — allow browser caching
 				headers.set("Cache-Control", "public, max-age=3600");
 			} else {
 				// Authenticated access — don't cache in shared caches
