@@ -1,10 +1,11 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { config } from "../../../config";
 import { db } from "../../../db";
-import { users } from "../../../db/schema";
-import { errorResponse, jsonResponse } from "../../../lib/api-utils";
+import { buckets, sessions, users } from "../../../db/schema";
+import { errorResponse, jsonResponse, parseCookies } from "../../../lib/api-utils";
 import { getCurrentUser } from "../../../lib/session";
 import { deepFreezeActionSchema } from "../../../lib/validation";
+import { deleteBucket } from "../../../services/bucket-service";
 import { getBucketsForUser } from "../../../services/bucket-service";
 import {
 	getDeepFreezeSnapshot,
@@ -87,7 +88,7 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 					isPublic: b.isPublic,
 					isPaused: b.isPaused,
 					pauseReason: b.pauseReason,
-					deepFreeze: getDeepFreezeSnapshot(b),
+					deepFreeze: getDeepFreezeSnapshot(b as never),
 					corsConfig: b.corsConfig,
 					isCollaborative: (b as { isCollaborative?: boolean }).isCollaborative,
 					collaborationPermissions: (
@@ -101,6 +102,72 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 			};
 
 			return jsonResponse(responseData);
+		}
+
+		if (path === "/api/dashboard/account/sessions") {
+			if (req.method === "GET") {
+				const cookieSessionId = parseCookies(req.headers.get("Cookie")).silo_session;
+				const rows = await db
+					.select()
+					.from(sessions)
+					.where(eq(sessions.userId, user.id));
+				const sorted = rows.sort(
+					(a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+				);
+				return jsonResponse({
+					sessions: sorted.map((session) => ({
+						id: session.id,
+						createdAt: session.createdAt?.toISOString() || new Date().toISOString(),
+						expiresAt: session.expiresAt.toISOString(),
+						isCurrent: session.id === cookieSessionId,
+						userAgent: session.userAgent || "Unknown device",
+						ipAddress: session.ipAddress || null,
+						lastActiveLabel: session.createdAt
+							? new Date(session.createdAt).toLocaleString()
+							: "Unknown",
+					})),
+				});
+			}
+
+			if (req.method === "DELETE") {
+				const body = await req.json().catch(() => null);
+				const sessionId = typeof body?.sessionId === "string" ? body.sessionId : null;
+				if (!sessionId) return errorResponse("Session ID is required", 400);
+				await db
+					.delete(sessions)
+					.where(and(eq(sessions.id, sessionId), eq(sessions.userId, user.id)));
+				const currentSessionId = parseCookies(req.headers.get("Cookie")).silo_session;
+				return jsonResponse({ signedOutCurrent: currentSessionId === sessionId });
+			}
+		}
+
+		if (path === "/api/dashboard/account/sign-out-everywhere") {
+			if (req.method !== "POST") return errorResponse("Method not allowed", 405);
+			await db.delete(sessions).where(eq(sessions.userId, user.id));
+			return jsonResponse({ ok: true });
+		}
+
+		if (path === "/api/dashboard/account/delete") {
+			if (req.method !== "POST") return errorResponse("Method not allowed", 405);
+			const ownedBuckets = await db
+				.select({ name: buckets.name })
+				.from(buckets)
+				.where(eq(buckets.userId, user.id));
+			for (const bucket of ownedBuckets) {
+				await deleteBucket(bucket.name, user.id, user.isAdmin);
+			}
+			await db.delete(sessions).where(eq(sessions.userId, user.id));
+			await db.delete(users).where(eq(users.id, user.id));
+			const response = jsonResponse({ ok: true }, 200);
+			response.headers.append(
+				"Set-Cookie",
+				`silo_session=; Path=/; HttpOnly; SameSite=Lax${config.isProduction ? "; Secure" : ""}; Max-Age=0`,
+			);
+			response.headers.append(
+				"Set-Cookie",
+				`silo_impersonating=; Path=/; SameSite=Lax${config.isProduction ? "; Secure" : ""}; Max-Age=0`,
+			);
+			return response;
 		}
 
 		if (path === "/api/dashboard/buckets") {

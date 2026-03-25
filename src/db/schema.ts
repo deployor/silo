@@ -52,6 +52,8 @@ export const sessions = pgTable("sessions", {
 	refreshToken: text("refresh_token"),
 	tokenExpiresAt: timestamp("token_expires_at"),
 	scope: text("scope"),
+	userAgent: text("user_agent"),
+	ipAddress: text("ip_address"),
 	impersonatorUserId: text("impersonator_user_id").references(() => users.id, {
 		onDelete: "set null",
 	}),

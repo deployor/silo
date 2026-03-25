@@ -4,6 +4,8 @@ export const REACT_PAGE_IDS = [
 	"bucket-analytics",
 	"files",
 	"docs",
+	"account",
+	"account-deleted",
 	"offboarding",
 	"admin-users",
 	"admin-buckets",

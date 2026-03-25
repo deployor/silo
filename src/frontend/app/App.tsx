@@ -12,6 +12,8 @@ import { AdminYswsListPage } from "../routes/AdminYswsListPage";
 import { AdminYswsReviewPage } from "../routes/AdminYswsReviewPage";
 import { AgedOutPage } from "../routes/AgedOutPage";
 import { BucketAnalyticsPage } from "../routes/BucketAnalyticsPage";
+import { AccountPage } from "../routes/AccountPage";
+import { AccountDeletedPage } from "../routes/AccountDeletedPage";
 import { DashboardPage } from "../routes/DashboardPage";
 import { DocsPage } from "../routes/DocsPage";
 import { FilesPage } from "../routes/FilesPage";
@@ -44,6 +46,10 @@ export function App({ bootstrap }: Props) {
 			return <FilesPage bootstrap={bootstrap} />;
 		case "docs":
 			return <DocsPage bootstrap={bootstrap} />;
+		case "account":
+			return <AccountPage bootstrap={bootstrap} />;
+		case "account-deleted":
+			return <AccountDeletedPage bootstrap={bootstrap} />;
 		case "offboarding":
 			return <OffboardingPage bootstrap={bootstrap} />;
 		case "admin-users":

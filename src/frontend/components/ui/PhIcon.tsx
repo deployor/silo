@@ -21,6 +21,7 @@ import {
 	MdContentCopy,
 	MdDataset,
 	MdDescription,
+	MdDeleteOutline,
 	MdErrorOutline,
 	MdFilePresent,
 	MdFolder,
