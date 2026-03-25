@@ -147,6 +147,7 @@ export async function handlePutRequest(
 	const copySource = req.headers.get("x-amz-copy-source");
 	let storageQuotaReserved = false;
 	let actualSize = 0;
+	let existingSize = 0;
 
 	if (copySource && user) {
 		const rewrittenSource = await rewriteCopySourceHeader(
@@ -162,6 +163,19 @@ export async function handlePutRequest(
 	}
 
 	try {
+		if (!copySource) {
+			try {
+				const existingObject = await s3Client.fetch(internalPath, { method: "HEAD" });
+				if (existingObject.ok) {
+					existingSize = Number(
+						existingObject.headers.get("content-length") || 0,
+					);
+				}
+			} catch {
+				existingSize = 0;
+			}
+		}
+
 		const cleanUrl = stripAuthQueryParams(url);
 		const queryStr = cleanUrl.searchParams.toString();
 		const pathWithQuery = queryStr
@@ -377,7 +391,9 @@ export async function handlePutRequest(
 			}
 		}
 
-		if (!copySource && actualSize > 0 && user && !user.isImmortal) {
+		const sizeDelta = Math.max(0, actualSize - existingSize);
+
+		if (!copySource && sizeDelta > 0 && user && !user.isImmortal) {
 			storageQuotaReserved = await consumeStorageQuota(
 				{
 					id: user.id,
@@ -386,7 +402,7 @@ export async function handlePutRequest(
 					egressLimitBytes: user.egressLimitBytes,
 				},
 				Number(user.storageUsageBytes) || 0,
-				actualSize,
+				sizeDelta,
 			);
 
 			if (!storageQuotaReserved) {
@@ -462,7 +478,7 @@ export async function handlePutRequest(
 			!copySource &&
 			actualSize > 0
 		) {
-			await releaseStorageQuota(user.id, actualSize);
+			await releaseStorageQuota(user.id, sizeDelta);
 		}
 
 		if (response.ok) {
@@ -501,10 +517,14 @@ export async function handlePutRequest(
 			}
 
 			if (!copySource && actualSize > 0) {
+				const bucketDelta = actualSize - existingSize;
 				await db
 					.update(buckets)
 					.set({
-						totalBytes: sql`${buckets.totalBytes} + ${actualSize}`,
+						totalBytes:
+							bucketDelta >= 0
+								? sql`${buckets.totalBytes} + ${bucketDelta}`
+								: sql`GREATEST(0, ${buckets.totalBytes} - ${Math.abs(bucketDelta)})`,
 					})
 					.where(eq(buckets.id, bucket.id));
 			}
@@ -548,8 +568,9 @@ export async function handlePutRequest(
 			headers: resHeaders,
 		});
 	} catch (e: unknown) {
-		if (storageQuotaReserved && user && !copySource && actualSize > 0) {
-			await releaseStorageQuota(user.id, actualSize);
+		const sizeDelta = Math.max(0, actualSize - existingSize);
+		if (storageQuotaReserved && user && !copySource && sizeDelta > 0) {
+			await releaseStorageQuota(user.id, sizeDelta);
 		}
 
 		console.error("PUT Error:", e);
