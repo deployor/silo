@@ -70,8 +70,6 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 		"/assets/",
 		"/admin",
 		"/api/admin",
-		"/cdn",
-		"/api/cdn/",
 		"/onboarding",
 		"/api/onboarding/",
 		"/ysws",
@@ -318,7 +316,7 @@ const server = Bun.serve({
 
 					if (!response) response = S3Errors.InternalError().toResponse();
 
-					// Compress compressible S3 GET responses (CDN-like behaviour)
+					// Compress compressible S3 GET responses
 					if (req.method === "GET" && response.ok) {
 						response = await compressResponse(req, response);
 					}

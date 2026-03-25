@@ -412,7 +412,6 @@ async function listAdminBuckets(url: URL) {
 			ownerSlackId: users.slackId,
 			isPaused: buckets.isPaused,
 			pauseReason: buckets.pauseReason,
-			isCdn: buckets.isCdn,
 			totalBytes: buckets.totalBytes,
 			totalRequests: buckets.totalRequests,
 			getRequests:
@@ -1441,10 +1440,6 @@ async function resetBucketCors(bucketName: string) {
 		.where(eq(buckets.name, bucketName))
 		.limit(1);
 
-	if (bucket.length > 0 && bucket[0].isCdn) {
-		return new Response("Cannot change CORS of CDN bucket", { status: 403 });
-	}
-
 	await db
 		.update(buckets)
 		.set({ corsConfig: null })
@@ -1472,33 +1467,6 @@ async function deleteBucket(bucketName: string, url: URL) {
 		}
 
 		if (owner.length > 0) {
-			// CDN Bucket Handling
-			if (bucket[0].isCdn) {
-				if (!isReset) {
-					return new Response(
-						"Cannot delete CDN bucket. Use reset to empty it.",
-						{ status: 403 },
-					);
-				}
-
-				// Reset: Empty bucket but don't delete it
-				const internalPrefix = getInternalPath("", owner[0], bucket[0]);
-				try {
-					await deleteBucketContents(internalPrefix);
-
-					// Reset usage stats
-					await db
-						.update(buckets)
-						.set({ totalBytes: 0, totalRequests: 0 })
-						.where(eq(buckets.id, bucket[0].id));
-
-					return new Response("Reset", { status: 200 });
-				} catch (e) {
-					console.error("Failed to reset CDN bucket:", e);
-					return new Response("Failed to reset bucket", { status: 500 });
-				}
-			}
-
 			// Normal Bucket Deletion or Emptying
 			if (isReset) {
 				// Just empty, don't delete
@@ -2069,7 +2037,6 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 						}),
 					)
 					.optional(),
-				cdnForceSlackUpload: z.boolean().optional(),
 			});
 
 			const body = await req.json().catch(() => null);

@@ -20,7 +20,6 @@ type SettingsPayload = {
 	defaultMaxKeysPerBucket: number;
 	yswsQuotaPerHourBytes: number;
 	yswsBonusTiers?: BonusTier[];
-	cdnForceSlackUpload?: boolean;
 };
 
 const UNITS = [
@@ -69,7 +68,6 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 	const [yswsAmount, setYswsAmount] = useState(100);
 	const [yswsUnit, setYswsUnit] = useState(1024 ** 2);
-	const [cdnForceSlackUpload, setCdnForceSlackUpload] = useState(true);
 
 	const [tiers, setTiers] = useState<BonusTierRow[]>([]);
 
@@ -96,7 +94,6 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			setYswsAmount(ysws.amount);
 			setYswsUnit(ysws.unit);
 
-			setCdnForceSlackUpload(data.cdnForceSlackUpload ?? true);
 			setTiers(
 				(data.yswsBonusTiers || []).map((tier) => ({
 					id: crypto.randomUUID(),
@@ -130,7 +127,6 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				defaultMaxKeysPerBucket: maxKeys,
 				yswsQuotaPerHourBytes: toBytes(yswsAmount, yswsUnit),
 				yswsBonusTiers: tiers.map(({ id: _id, ...tier }) => tier),
-				cdnForceSlackUpload,
 			};
 
 			await fetchText("/api/admin/settings", {
@@ -319,9 +315,9 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</div>
 
 						<div className="bg-black/30 p-6 rounded-xl border border-white/10">
-							<h4 className="text-white font-bold mb-1">YSWS + CDN</h4>
+							<h4 className="text-white font-bold mb-1">YSWS</h4>
 							<p className="text-xs text-text-muted mb-4">
-								Storage reward per shipped hour and CDN notification behavior.
+								Storage reward per shipped hour.
 							</p>
 							<div className="flex gap-2 items-center mt-3 mb-3">
 								<input
@@ -344,20 +340,6 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									))}
 								</select>
 							</div>
-							<label className="inline-flex items-center gap-2 cursor-pointer">
-								<input
-									type="checkbox"
-									checked={cdnForceSlackUpload}
-									onChange={(e) => setCdnForceSlackUpload(e.target.checked)}
-								/>
-								<span className="text-white text-sm">
-									Force Slack Upload Notification
-								</span>
-							</label>
-							<p className="text-[11px] text-text-muted mt-2">
-								If enabled, all CDN uploads are posted to the configured Slack
-								channel.
-							</p>
 						</div>
 
 						<div className="bg-black/30 p-6 rounded-xl border border-white/10 md:col-span-2">

@@ -199,12 +199,6 @@ export function AppShell({
 									YSWS
 								</a>
 								<a
-									href="/cdn"
-									className="text-text-muted hover:text-white transition-colors"
-								>
-									CDN
-								</a>
-								<a
 									href="/docs"
 									className="text-text-muted hover:text-white transition-colors"
 								>

@@ -32,11 +32,11 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						className="w-full"
 					>
 						{step === 1 && (
-							<Panel
-								icon="ph-hand-waving text-hc-red"
-								title="Welcome to Cargo!"
-								content="Cargo is an S3 Gateway and the new Hack Club CDN."
-								right={
+						<Panel
+							icon="ph-hand-waving text-hc-red"
+							title="Welcome to Cargo!"
+							content="Cargo is Hack Club's S3 gateway for bucket storage and file serving."
+							right={
 									<button
 										type="button"
 										onClick={() => setStep(2)}

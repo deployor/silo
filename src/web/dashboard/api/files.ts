@@ -4,14 +4,11 @@ import { XMLParser } from "fast-xml-parser";
 import { config } from "../../../config";
 import { getCorsHeaders } from "../../../core/s3/cors";
 import { handleGetRequest } from "../../../core/s3/get";
+import { handlePutRequest } from "../../../core/s3/put";
 import { getInternalPath } from "../../../core/s3/utils";
 import { db } from "../../../db";
 import { buckets, type users } from "../../../db/schema";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
-import {
-	consumeStorageQuota,
-	releaseStorageQuota,
-} from "../../../lib/quota-cache";
 import { s3Client } from "../../../lib/s3-client";
 import { getCurrentUser } from "../../../lib/session";
 import {
@@ -557,8 +554,18 @@ export async function handleFiles(req: Request): Promise<Response> {
 			const body = await req.json();
 			const key = normalizeUserKey(String(body.key || ""));
 			getInternalPath(key, bucketData.owner, bucketData.bucket);
+			const requestedExpiresSeconds = Number(body.expiresSeconds || 5 * 60);
+			const expiresSeconds = Math.max(
+				60,
+				Math.min(
+					Number.isFinite(requestedExpiresSeconds)
+						? Math.floor(requestedExpiresSeconds)
+						: 5 * 60,
+					30 * 24 * 60 * 60,
+				),
+			);
 
-			const expires = Date.now() + 5 * 60 * 1000;
+			const expires = Date.now() + expiresSeconds * 1000;
 			const dataToSign = `${bucketName}:${key}:${expires}`;
 			const signature = createHmac("sha256", config.hcAuth.clientSecret)
 				.update(dataToSign)
@@ -568,7 +575,11 @@ export async function handleFiles(req: Request): Promise<Response> {
 				key,
 			)}&expires=${expires}&signature=${signature}`;
 
-			return jsonResponse({ url: signedUrl });
+			return jsonResponse({
+				url: signedUrl,
+				expiresAt: new Date(expires).toISOString(),
+				expiresSeconds,
+			});
 		} catch (_error) {
 			return errorResponse("Internal Error", 500);
 		}
@@ -1008,7 +1019,6 @@ export async function handleFiles(req: Request): Promise<Response> {
 					size: number;
 					status: "uploaded";
 				}> = [];
-				let reservedBytes = 0;
 
 				for (const [, file] of entries) {
 					const relativePathValue = formData.get(
@@ -1026,46 +1036,46 @@ export async function handleFiles(req: Request): Promise<Response> {
 					);
 
 					const size = file.size;
-					if (!user.isImmortal && size > 0) {
-						const reserved = await consumeStorageQuota(
-							{
-								id: user.id,
-								isImmortal: user.isImmortal,
-								storageLimitBytes: user.storageLimitBytes,
-								egressLimitBytes: user.egressLimitBytes,
-							},
-							Number(user.storageUsageBytes) + reservedBytes,
-							size,
-						);
-
-						if (!reserved) {
-							if (reservedBytes > 0)
-								await releaseStorageQuota(user.id, reservedBytes);
-							return errorResponse("Quota exceeded", 403);
-						}
-						reservedBytes += size;
-					}
-
 					const internalKey = getInternalPath(
 						destinationKey,
 						bucketData.owner,
 						bucketData.bucket,
 					);
-					const uploadRes = await s3Client.fetch(internalKey, {
-						method: "PUT",
-						body: file.stream(),
-						headers: {
-							"Content-Type": file.type || "application/octet-stream",
-							"Content-Length": String(size),
-						},
-						duplex: "half",
-					} as RequestInit);
+					const uploadReq = new Request(
+						`https://${config.s3Domain}/${bucketName}/${destinationKey}`,
+						{
+							method: "PUT",
+							headers: {
+								"Content-Type": file.type || "application/octet-stream",
+								"Content-Length": String(size),
+							},
+							body: file.stream(),
+							duplex: "half",
+						} as RequestInit,
+					);
+					const uploadRes = await handlePutRequest(
+						uploadReq,
+						bucketData.owner,
+						bucketData.bucket,
+						destinationKey,
+						internalKey,
+						new URL(uploadReq.url),
+					);
 
 					if (!uploadRes.ok) {
-						if (reservedBytes > 0)
-							await releaseStorageQuota(user.id, reservedBytes);
-						return errorResponse(`Upload failed for ${destinationKey}`, 500);
+						const message = await uploadRes.text();
+						return errorResponse(
+							message || `Upload failed for ${destinationKey}`,
+							uploadRes.status >= 400 ? uploadRes.status : 500,
+						);
 					}
+
+					await db
+						.update(buckets)
+						.set({
+							totalRequests: sql`${buckets.totalRequests} + 1`,
+						})
+						.where(eq(buckets.id, bucketData.bucket.id));
 
 					uploads.push({
 						key: destinationKey,
@@ -1079,15 +1089,6 @@ export async function handleFiles(req: Request): Promise<Response> {
 					(sum, item) => sum + item.size,
 					0,
 				);
-				if (totalUploadedBytes > 0) {
-					await db
-						.update(buckets)
-						.set({
-							totalBytes: sql`${buckets.totalBytes} + ${totalUploadedBytes}`,
-							totalRequests: sql`${buckets.totalRequests} + ${uploads.length}`,
-						})
-						.where(eq(buckets.id, bucketData.bucket.id));
-				}
 
 				return jsonResponse({
 					message: "Uploaded files",

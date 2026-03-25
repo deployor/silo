@@ -88,7 +88,6 @@ type DashboardBucket = {
 		reason?: string | null;
 	};
 	corsConfig?: string | null;
-	isCdn?: boolean;
 	isCollaborative?: boolean;
 	collaborationPermissions?: string[] | null;
 	collaborators?: Array<{
@@ -300,6 +299,12 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
 		);
 	}, [stats?.buckets]);
+
+	const ownedBucketCount = useMemo(
+		() =>
+			stats?.buckets.filter((bucket) => !bucket.isCollaborative).length || 0,
+		[stats?.buckets],
+	);
 
 	const deepFreezeModalBucket = deepFreezeModal?.bucket || null;
 	const deepFreezeSnapshot = deepFreezeModalBucket?.deepFreeze;
@@ -927,6 +932,22 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		}
 	};
 
+	const collaborationEntries = useMemo(() => {
+		if (!collaborationModal?.bucket.collaborators) return [];
+		const query = collaborationModal.search.trim().toLowerCase();
+		return collaborationModal.bucket.collaborators.filter((collaborator) => {
+			if (!query) return true;
+			return [
+				collaborator.user.id,
+				collaborator.user.email || "",
+				collaborator.status,
+			]
+				.join(" ")
+				.toLowerCase()
+				.includes(query);
+		});
+	}, [collaborationModal]);
+
 	const saveCors = async () => {
 		if (!corsBucket) return;
 		try {
@@ -1165,11 +1186,11 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							Your Storage Inventory
 						</h2>
 						<p className="text-text-muted text-sm mt-1">
-							{stats?.buckets.length || 0} /{" "}
+							{ownedBucketCount} /{" "}
 							{stats?.limits.maxBucketsPerUser === -1
 								? "∞"
 								: stats?.limits.maxBucketsPerUser || 0}{" "}
-							buckets utilized
+							owned buckets utilized
 						</p>
 					</div>
 					<button
@@ -1242,11 +1263,6 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														PAUSED
 													</span>
 												) : null}
-												{bucket.isCdn ? (
-													<span className="ml-2 bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-blue-500/30">
-														CDN
-													</span>
-												) : null}
 												{deepFreezeState !== "active" ? (
 													<span
 													 className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${
@@ -1264,11 +1280,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												) : null}
 											</td>
 											<td className="px-6 py-4">
-												{bucket.isCdn ? (
-													<span className="text-text-muted italic">
-														Managed
-													</span>
-												) : !canManageKeys ? (
+												{!canManageKeys ? (
 													<span className="text-text-muted italic">
 														No access
 													</span>
@@ -1300,23 +1312,18 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												) : (
 													<button
 													 type="button"
-														role="switch"
-														aria-checked={bucket.isPublic}
-														disabled={
-															!!bucket.isPaused ||
-															!!bucket.isCdn ||
-															visibilityBusy
-														}
+													role="switch"
+													aria-checked={bucket.isPublic}
+													disabled={!!bucket.isPaused || visibilityBusy}
 													 onClick={() =>
 															togglePublic(bucket.name, !bucket.isPublic)
 														}
 													 className={`inline-flex items-center gap-2 px-1 py-1 transition-colors ${
-															(bucket.isPaused ||
-																bucket.isCdn ||
-																isDeepFrozen ||
-																visibilityBusy)
-																	? "opacity-50 cursor-not-allowed"
-																	: "hover:opacity-90"
+														(bucket.isPaused ||
+															isDeepFrozen ||
+															visibilityBusy)
+																? "opacity-50 cursor-not-allowed"
+																: "hover:opacity-90"
 														}`}
 													>
 														<span
@@ -1348,7 +1355,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												{new Date(bucket.createdAt).toLocaleDateString()}
 											</td>
 											<td className="px-6 py-4 text-right flex justify-end items-center gap-1.5">
-												{!bucket.isCdn && !isCollaborative && canManageCors ? (
+												{!isCollaborative && canManageCors ? (
 													<button
 														type="button"
 														onClick={() => openCorsModal(bucket)}
@@ -1375,7 +1382,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														</span>
 													</a>
 												) : null}
-												{!bucket.isCdn && !isCollaborative ? (
+												{!isCollaborative ? (
 													<button
 														type="button"
 														onClick={() =>
@@ -1416,7 +1423,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														View analytics
 													</span>
 												</a>
-												{!bucket.isCdn && !isCollaborative ? (
+												{!isCollaborative ? (
 													<button
 														type="button"
 														onClick={() =>
@@ -1433,7 +1440,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														</span>
 													</button>
 												) : null}
-												{!bucket.isCdn && !isCollaborative ? (
+												{!isCollaborative ? (
 													<button
 														type="button"
 														onClick={() =>
@@ -1450,7 +1457,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														</span>
 													</button>
 												) : null}
-												{!isCollaborative && !bucket.isCdn ? (
+												{!isCollaborative ? (
 													<button
 														type="button"
 														onClick={() => openCollaborationModal(bucket)}
@@ -1522,42 +1529,12 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								People with access
 							</p>
 							<div className="space-y-3 max-h-[28rem] overflow-auto">
-								{(collaborationModal.bucket.collaborators || []).filter(
-									(collaborator) => {
-										const query = collaborationModal.search
-											.trim()
-											.toLowerCase();
-										if (!query) return true;
-										return [
-											collaborator.user.id,
-											collaborator.user.email || "",
-											collaborator.status,
-										]
-											.join(" ")
-											.toLowerCase()
-											.includes(query);
-									},
-								).length === 0 ? (
+								{collaborationEntries.length === 0 ? (
 									<p className="text-text-muted text-sm">
 										No matching invites or collaborators.
 									</p>
 								) : (
-									(collaborationModal.bucket.collaborators || [])
-										.filter((collaborator) => {
-											const query = collaborationModal.search
-												.trim()
-												.toLowerCase();
-											if (!query) return true;
-											return [
-												collaborator.user.id,
-												collaborator.user.email || "",
-												collaborator.status,
-											]
-												.join(" ")
-												.toLowerCase()
-												.includes(query);
-										})
-										.map((collaborator) => {
+									collaborationEntries.map((collaborator) => {
 											const permissionState = collaborationPermissionState(
 												collaborator.permissions,
 											);
@@ -1600,24 +1577,26 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																</p>
 															</div>
 														</div>
-														<button
-															type="button"
-															onClick={() =>
-																void removeCollaborator(
-																	collaborationModal.bucket.name,
-																	collaborator.id,
-																)
-															}
+													<button
+														type="button"
+														onClick={() =>
+															void removeCollaborator(
+															collaborationModal.bucket.name,
+															collaborator.id,
+														)
+													}
 															disabled={
 																collaborationModal.deletingId ===
 																collaborator.id
 															}
-														 className="text-hc-red hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold uppercase tracking-wider"
-														>
-															{collaborationModal.deletingId === collaborator.id
-																? "Removing..."
+													 className="text-hc-red hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold uppercase tracking-wider"
+													>
+														{collaborationModal.deletingId === collaborator.id
+															? "Removing..."
+															: collaborator.status === "pending"
+																? "Cancel invite"
 																: "Remove"}
-														</button>
+													</button>
 													</div>
 													<div className="mt-4 grid sm:grid-cols-2 gap-3">
 														{[

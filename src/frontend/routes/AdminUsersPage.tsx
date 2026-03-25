@@ -33,7 +33,6 @@ type BucketRow = {
 	totalBytes: number;
 	isPaused?: boolean;
 	pauseReason?: string | null;
-	isCdn?: boolean;
 };
 
 type KeyRow = {
@@ -79,7 +78,6 @@ type BucketDetails = {
 	userId: string;
 	isPaused?: boolean;
 	pauseReason?: string | null;
-	isCdn?: boolean;
 	keys: KeyRow[];
 	files: FileRow[];
 };
@@ -627,9 +625,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const deleteBucketAdmin = async (reset = false) => {
 		if (!selectedBucketDetails) return;
 		const message = reset
-			? selectedBucketDetails.isCdn
-				? "Empty this CDN bucket? This will delete ALL files in it."
-				: "Empty this bucket? This will delete ALL files in it."
+			? "Empty this bucket? This will delete ALL files in it."
 			: "Delete this bucket and ALL data?";
 		setConfirmAction({
 			title: reset ? "Empty Bucket" : "Delete Bucket",
@@ -1229,11 +1225,6 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<tr key={b.id} className="hover:bg-white/5">
 											<td className="px-4 py-3 font-mono text-white">
 												{b.name}
-												{b.isCdn ? (
-													<span className="ml-2 bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-purple-500/30">
-														CDN
-													</span>
-												) : null}
 											</td>
 											<td className="px-4 py-3 font-mono text-xs text-text-muted">
 												{formatBytes(b.totalBytes)}
@@ -1290,18 +1281,6 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</p>
 
 						<div className="mb-6 flex gap-3 flex-wrap items-center">
-							{selectedBucketDetails.isCdn ? (
-								<button
-									type="button"
-									onClick={() => deleteBucketAdmin(true)}
-									disabled={!!bucketActionLoading}
-									className="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold"
-								>
-									{bucketActionLoading === "bucket-empty"
-										? "Emptying..."
-										: "Empty Bucket"}
-								</button>
-							) : (
 								<>
 									<button
 										type="button"
@@ -1334,7 +1313,6 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											: "Reset CORS"}
 									</button>
 								</>
-							)}
 
 							<label className="inline-flex items-center cursor-pointer bg-black/30 px-4 py-2 rounded-lg border border-white/10">
 								<input
@@ -1348,9 +1326,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<span className="ms-2 text-xs font-medium text-text-muted peer-checked:text-white">
 									{bucketActionLoading === "pause"
 										? "Updating..."
-										: selectedBucketDetails.isCdn
-											? "Suspend CDN"
-											: "Pause Bucket"}
+										: "Pause Bucket"}
 								</span>
 							</label>
 						</div>

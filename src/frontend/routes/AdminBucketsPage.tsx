@@ -13,7 +13,6 @@ type BucketRow = {
 	ownerSlackId: string | null;
 	isPaused: boolean;
 	pauseReason: string | null;
-	isCdn: boolean;
 	totalBytes: number;
 	totalRequests: number;
 	getRequests: number;
@@ -244,14 +243,9 @@ export function AdminBucketsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							{rows.map((row) => (
 								<tr key={row.id} className="hover:bg-white/5 transition-colors">
 									<td className="px-6 py-4">
-										<div className="font-mono text-white flex items-center gap-2">
-											{row.name}
-											{row.isCdn ? (
-												<span className="bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-purple-500/30">
-													CDN
-												</span>
-											) : null}
-										</div>
+									<div className="font-mono text-white flex items-center gap-2">
+										{row.name}
+									</div>
 										<div className="text-[11px] text-text-muted font-mono">
 											{row.id}
 										</div>
