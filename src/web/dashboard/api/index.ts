@@ -96,6 +96,7 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 						}
 					).collaborationPermissions,
 					collaborators: (b as { collaborators?: unknown[] }).collaborators,
+					customDomains: (b as { customDomains?: unknown[] }).customDomains || [],
 				})),
 			};
 
@@ -104,6 +105,10 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 
 		if (path === "/api/dashboard/buckets") {
 			return handleBuckets(req);
+		}
+
+		if (path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+\/domains$/)) {
+			return handleBucketOperations(req);
 		}
 
 		if (path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+$/)) {

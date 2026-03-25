@@ -57,6 +57,10 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 		url.searchParams.has("x-amz-algorithm");
 	const isBrowserNavigation =
 		req.method === "GET" && accept.includes("text/html");
+	const isDashboardHost =
+		host === S3_DOMAIN ||
+		host.startsWith("dashboard.") ||
+		(S3_DOMAIN === "localhost:3000" && host.startsWith("localhost"));
 
 	const path = url.pathname;
 	const dashboardPaths = [
@@ -110,7 +114,7 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 
 	// 3. Local/dev fallback: treat normal browser navigation to known dashboard
 	// routes as dashboard even when host doesn't match configured S3 domain.
-	if (!hasAuthHeader && !hasAmzParams && isBrowserNavigation) {
+	if (!hasAuthHeader && !hasAmzParams && isBrowserNavigation && isDashboardHost) {
 		if (path === "/") return true;
 		if (dashboardPaths.some((p) => p !== "/" && path.startsWith(p))) {
 			return true;

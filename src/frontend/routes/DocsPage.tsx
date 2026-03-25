@@ -37,6 +37,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			{ id: "intro", label: "Introduction", group: "Basics" },
 			{ id: "ysws", label: "YSWS Program", group: "Basics" },
 			{ id: "auth", label: "Authentication", group: "Basics" },
+			{ id: "custom-domains", label: "Custom Domains", group: "Basics" },
 			{
 				id: "public-buckets",
 				label: "Public Buckets",
@@ -296,8 +297,8 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</div>
 						) : null}
 
-						{activeSection === "auth" ? (
-							<div id="auth" className="section-content active">
+				{activeSection === "auth" ? (
+					<div id="auth" className="section-content active">
 								<h1 className="text-4xl font-bold mb-6 text-white">
 									Authentication
 								</h1>
@@ -323,10 +324,38 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										once. Make sure to save it securely.
 									</p>
 								</div>
-							</div>
-						) : null}
+					</div>
+				) : null}
 
-						{activeSection === "public-buckets" ? (
+				{activeSection === "custom-domains" ? (
+					<div id="custom-domains" className="section-content active">
+						<h1 className="text-4xl font-bold mb-6 text-white">
+							Custom Domains
+						</h1>
+						<p className="text-lg mb-6 text-text-muted leading-relaxed">
+							Every bucket can publish through your own hostname. This keeps your app portable and lets you repoint DNS to another S3-compatible provider later without changing object URLs.
+						</p>
+						<div className="rounded-3xl border border-white/10 p-8 bg-hc-darker/50 mb-8">
+							<h3 className="text-2xl font-bold mb-4 text-white">Setup flow</h3>
+							<ol className="list-decimal list-inside space-y-3 text-text-muted">
+								<li>Add a hostname in the bucket custom-domain modal.</li>
+								<li>Create a CNAME or ALIAS to <code>silo.deployor.dev</code>.</li>
+								<li>Publish the TXT token at <code>_silo-domain-verification.your-domain.com</code>.</li>
+								<li>Verify the domain and set it as primary.</li>
+								<li>Public URLs and temporary private links will now default to that domain.</li>
+							</ol>
+						</div>
+						<h3 className="text-2xl font-bold mb-4 text-white">Example URLs</h3>
+						<CodeBlock
+							code={`# Public object URL\nhttps://assets.example.com/images/logo.png\n\n# Temporary private link\nhttps://assets.example.com/private/report.pdf?expires=1742873000000&signature=...`}
+						/>
+						<p className="text-text-muted">
+							When you ever need to leave Silo, migrate the objects to another S3-compatible provider and repoint the same DNS records. Your application URLs stay the same.
+						</p>
+					</div>
+				) : null}
+
+				{activeSection === "public-buckets" ? (
 							<div id="public-buckets" className="section-content active">
 								<h1 className="text-4xl font-bold mb-6 text-white">
 									Public Buckets

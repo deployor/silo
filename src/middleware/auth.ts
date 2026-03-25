@@ -3,9 +3,12 @@ import { config } from "../config";
 import { db } from "../db";
 import { bucketKeys, buckets, users } from "../db/schema";
 import { verifyAwsV4Signature } from "../lib/auth-v4";
+import { resolveBucketByHostname } from "../lib/bucket-domains";
 import { context } from "../lib/context";
 import { redis } from "../lib/redis";
 import { S3Errors } from "../lib/s3-errors";
+import { getKeyFromRequest } from "../core/s3/utils";
+import { createHmac } from "node:crypto";
 import { getBucketDeepFreezeMessage } from "../services/deep-freeze-service";
 
 const S3_DOMAIN = config.s3Domain;
@@ -23,7 +26,7 @@ type CachedKeyAuth = {
 	userId: string;
 };
 
-function getBucketFromRequest(req: Request): string | null {
+async function getBucketFromRequest(req: Request): Promise<string | null> {
 	const url = new URL(req.url);
 	const host = url.host;
 
@@ -41,7 +44,16 @@ function getBucketFromRequest(req: Request): string | null {
 		}
 	}
 
+	const bucket = await resolveBucketByHostname(host).catch(() => null);
+	if (bucket) {
+		return bucket.name;
+	}
+
 	return null;
+}
+
+function hasDashboardSignedPreview(url: URL) {
+	return url.searchParams.has("signature") && url.searchParams.has("expires");
 }
 
 function getCredential(req: Request) {
@@ -228,7 +240,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 
 	if (!credential) {
 		if (req.method === "OPTIONS") {
-			const requestedBucket = getBucketFromRequest(req);
+			const requestedBucket = await getBucketFromRequest(req);
 			if (!requestedBucket) {
 				return new Response(null, { status: 400 });
 			}
@@ -260,7 +272,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 			return S3Errors.AccessDenied().toResponse();
 		}
 
-		const requestedBucket = getBucketFromRequest(req);
+		const requestedBucket = await getBucketFromRequest(req);
 		if (!requestedBucket) {
 			return S3Errors.AccessDenied().toResponse();
 		}
@@ -336,7 +348,45 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 		}
 
 		if (!bucket.isPublic) {
-			return S3Errors.AccessDenied().toResponse();
+			if (!hasDashboardSignedPreview(new URL(req.url))) {
+				return S3Errors.AccessDenied().toResponse();
+			}
+			if (req.method !== "GET" && req.method !== "HEAD") {
+				return S3Errors.AccessDenied().toResponse();
+			}
+			let key = "";
+			try {
+				key = getKeyFromRequest(req, bucket.name);
+			} catch {
+				return S3Errors.AccessDenied().toResponse();
+			}
+			if (!key) {
+				return S3Errors.AccessDenied().toResponse();
+			}
+			const url = new URL(req.url);
+			const expires = url.searchParams.get("expires");
+			const signature = url.searchParams.get("signature");
+			if (!expires || !signature) {
+				return S3Errors.AccessDenied().toResponse();
+			}
+			if (Date.now() > Number(expires)) {
+				return S3Errors.AccessDenied("Signed URL expired.").toResponse();
+			}
+			const expectedSignature = createHmac("sha256", config.hcAuth.clientSecret)
+				.update(`${bucket.name}:${key}:${expires}`)
+				.digest("hex");
+			if (signature !== expectedSignature) {
+				return S3Errors.AccessDenied("Invalid signed URL.").toResponse();
+			}
+		} else {
+			const ctx = context.getStore();
+			if (ctx) {
+				ctx.user = user;
+				ctx.bucket = bucket;
+				ctx.mode = "public";
+			}
+
+			return { user, bucket, mode: "public" };
 		}
 
 		const ctx = context.getStore();
@@ -404,7 +454,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 		).toResponse();
 	}
 
-	const requestedBucket = getBucketFromRequest(req);
+	const requestedBucket = await getBucketFromRequest(req);
 
 	if (requestedBucket && requestedBucket !== bucket.name) {
 		return S3Errors.AccessDenied().toResponse();

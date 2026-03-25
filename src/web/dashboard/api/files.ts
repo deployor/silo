@@ -9,6 +9,10 @@ import { getInternalPath } from "../../../core/s3/utils";
 import { db } from "../../../db";
 import { buckets, type users } from "../../../db/schema";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
+import {
+	buildBucketObjectUrl,
+	parseBucketCustomDomains,
+} from "../../../lib/bucket-domains";
 import { s3Client } from "../../../lib/s3-client";
 import { getCurrentUser } from "../../../lib/session";
 import {
@@ -554,6 +558,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 			const body = await req.json();
 			const key = normalizeUserKey(String(body.key || ""));
 			getInternalPath(key, bucketData.owner, bucketData.bucket);
+			const share = Boolean(body.share);
 			const requestedExpiresSeconds = Number(body.expiresSeconds || 5 * 60);
 			const expiresSeconds = Math.max(
 				60,
@@ -571,9 +576,15 @@ export async function handleFiles(req: Request): Promise<Response> {
 				.update(dataToSign)
 				.digest("hex");
 
-			const signedUrl = `/api/dashboard/buckets/${bucketName}/files/preview?key=${encodeURIComponent(
-				key,
-			)}&expires=${expires}&signature=${signature}`;
+			const signedUrl = share
+				? `${buildBucketObjectUrl({
+					bucketName,
+					key,
+					customDomains: parseBucketCustomDomains(bucketData.bucket.customDomains),
+				})}?expires=${expires}&signature=${signature}`
+				: `/api/dashboard/buckets/${bucketName}/files/preview?key=${encodeURIComponent(
+						key,
+				  )}&expires=${expires}&signature=${signature}`;
 
 			return jsonResponse({
 				url: signedUrl,
@@ -630,7 +641,11 @@ export async function handleFiles(req: Request): Promise<Response> {
 			const stat = await headObject(internalKey);
 
 			const publicUrl = bucketData.bucket.isPublic
-				? `https://${config.s3Domain}/${bucketName}/${safeKey}`
+				? buildBucketObjectUrl({
+					bucketName,
+					key: safeKey,
+					customDomains: parseBucketCustomDomains(bucketData.bucket.customDomains),
+				})
 				: null;
 
 			return jsonResponse({
