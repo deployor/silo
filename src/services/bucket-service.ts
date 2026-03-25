@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { resolveCname, resolveTxt } from "node:dns/promises";
+import { config } from "../config";
 import {
 	deleteBucketContents,
 	getInternalPath,
@@ -47,6 +48,40 @@ export type CorsRule = {
 	ExposeHeaders?: string[];
 	MaxAgeSeconds?: number;
 };
+
+async function validateBucketCustomDomainDns(domain: string, verificationToken: string) {
+	const normalizedDomain = normalizeCustomDomain(domain);
+	const verificationHostname = `_silo-domain-verification.${normalizedDomain}`;
+	let txtMatches = false;
+	try {
+		const txtRecords = await resolveTxt(verificationHostname);
+		txtMatches = txtRecords.some((recordParts) =>
+			recordParts.join("").trim() === verificationToken,
+		);
+	} catch {
+		txtMatches = false;
+	}
+
+	if (!txtMatches) {
+		throw new Error(
+			`Verification TXT record missing or incorrect at ${verificationHostname}`,
+		);
+	}
+
+	try {
+		const cnameRecords = await resolveCname(normalizedDomain);
+		const pointsAtSilo = cnameRecords.some(
+			(record) => record.replace(/\.+$/, "") === config.s3Domain,
+		);
+		if (!pointsAtSilo) {
+			throw new Error(`Custom domain CNAME must point to ${config.s3Domain}`);
+		}
+	} catch (error) {
+		if (error instanceof Error && error.message.includes("must point to")) {
+			throw error;
+		}
+	}
+}
 
 export async function getBucketsForUser(userId: string) {
 	const rawUserBuckets = await db
@@ -437,40 +472,7 @@ export async function verifyBucketCustomDomain(params: {
 		throw new Error("Custom domain not found");
 	}
 
-	const verificationHostname = `_silo-domain-verification.${normalizedDomain}`;
-	let txtMatches = false;
-	try {
-		const txtRecords = await resolveTxt(verificationHostname);
-		txtMatches = txtRecords.some((recordParts) =>
-			recordParts.join("").trim() === target.verificationToken,
-		);
-	} catch {
-		txtMatches = false;
-	}
-
-	if (!txtMatches) {
-		throw new Error(
-			`Verification TXT record missing or incorrect at ${verificationHostname}`,
-		);
-	}
-
-	try {
-		const cnameRecords = await resolveCname(normalizedDomain);
-		const pointsAtSilo = cnameRecords.some(
-			(record) => record.replace(/\.+$/, "") === config.s3Domain,
-		);
-		if (!pointsAtSilo) {
-			throw new Error(
-				`Custom domain CNAME must point to ${config.s3Domain}`,
-			);
-		}
-	} catch (error) {
-		if (error instanceof Error && error.message.includes("must point to")) {
-			throw error;
-		}
-		// Apex/ALIAS setups may not expose CNAMEs via DNS resolution.
-		// TXT ownership verification remains the hard requirement.
-	}
+	await validateBucketCustomDomainDns(normalizedDomain, target.verificationToken);
 
 	const next = current.map((entry) =>
 		entry.domain === normalizedDomain
@@ -502,6 +504,54 @@ export async function listBucketCustomDomains(params: {
 		params.isAdmin,
 	);
 	return parseBucketCustomDomains(bucket.customDomains);
+}
+
+export async function revalidateVerifiedCustomDomainsForBucket(bucketId: string) {
+	const rows = await db
+		.select()
+		.from(buckets)
+		.where(eq(buckets.id, bucketId))
+		.limit(1);
+	const bucket = rows[0];
+	if (!bucket) return;
+
+	const current = parseBucketCustomDomains(bucket.customDomains);
+	if (current.length === 0) return;
+
+	let changed = false;
+	const next = await Promise.all(
+		current.map(async (domain) => {
+			if (!domain.verified) return domain;
+			try {
+				await validateBucketCustomDomainDns(domain.domain, domain.verificationToken);
+				return domain;
+			} catch {
+				changed = true;
+				return {
+					...domain,
+					verified: false,
+					primary: false,
+					verifiedAt: null,
+				};
+			}
+		}),
+	);
+
+	if (!changed) return;
+
+	const sanitized = sanitizeBucketCustomDomains(next);
+	await db
+		.update(buckets)
+		.set({
+			customDomains: sanitized.length
+				? serializeBucketCustomDomains(sanitized)
+				: null,
+		})
+		.where(eq(buckets.id, bucket.id));
+	await invalidateBucketCustomDomainCache(current);
+	console.log(
+		`[custom-domain-revalidation] revoked invalid verified domain(s) for ${bucket.name}`,
+	);
 }
 
 export async function deleteCorsConfig(
@@ -539,4 +589,5 @@ export const BucketService = {
 	removeBucketCustomDomain,
 	setPrimaryBucketCustomDomain,
 	verifyBucketCustomDomain,
+	revalidateVerifiedCustomDomainsForBucket,
 };

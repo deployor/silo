@@ -244,6 +244,10 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [domainModal, setDomainModal] =
 		useState<BucketDomainModalState | null>(null);
 
+	const verifiedDomainCount = domainModal?.bucket.customDomains?.filter(
+		(domain) => domain.verified,
+	).length || 0;
+
 	const buttonBase =
 		"inline-flex items-center justify-center gap-2 rounded-xl border text-sm font-bold transition-colors";
 	const buttonPrimaryBlue =
@@ -1856,17 +1860,41 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			>
 				{domainModal ? (
 					<div className="space-y-6">
-						<div>
-							<p className="text-sm font-mono text-text-muted">
-								{domainModal.bucket.name}
-							</p>
-							<p className="mt-2 text-sm text-text-muted">
-								Publish this bucket on your own hostname so public URLs and shared temporary links stay stable even if you later move to a different S3 provider.
-							</p>
+						<div className="rounded-[28px] border border-violet-400/20 bg-violet-500/5 p-6">
+							<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+								<div>
+									<div className="inline-flex items-center gap-2 rounded-full border border-violet-300/20 bg-black/20 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-violet-100">
+										<PhIcon className="ph ph-globe text-sm" />
+										Custom Domains
+									</div>
+									<h3 className="mt-4 text-3xl font-black tracking-tight text-white">
+										{domainModal.bucket.name}
+									</h3>
+									<p className="mt-3 max-w-2xl text-sm leading-7 text-text-muted">
+										Use your own hostname for public object delivery and private share links. DNS stays yours, so apps can migrate providers later without URL changes.
+									</p>
+								</div>
+								<div className="grid grid-cols-2 gap-3 lg:min-w-[260px]">
+									<div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-center">
+										<div className="text-[11px] uppercase tracking-[0.18em] text-text-muted">Total</div>
+										<div className="mt-2 text-3xl font-black text-white">{domainModal.bucket.customDomains?.length || 0}</div>
+									</div>
+									<div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-center">
+										<div className="text-[11px] uppercase tracking-[0.18em] text-text-muted">Verified</div>
+										<div className="mt-2 text-3xl font-black text-white">{verifiedDomainCount}</div>
+									</div>
+								</div>
+							</div>
 						</div>
 
-						<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-							<p className="text-sm font-bold text-white">Add a domain</p>
+						<div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
+							<div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
+								<p className="text-[11px] font-black uppercase tracking-[0.22em] text-text-muted">
+									Add hostname
+								</p>
+								<p className="mt-3 text-sm text-text-muted">
+									Add the domain first, then publish the DNS records shown below. Verification is strict and will only pass once DNS is actually live.
+								</p>
 							<div className="mt-3 flex flex-col gap-3 lg:flex-row">
 								<input
 									type="text"
@@ -1908,9 +1936,23 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									{domainModal.loading ? "Saving..." : "Add domain"}
 								</button>
 							</div>
-							<p className="mt-3 text-xs text-text-muted">
-								Create a CNAME or ALIAS to <span className="font-mono text-white">silo.deployor.dev</span>, then publish the TXT verification record shown below.
-							</p>
+							</div>
+
+							<div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
+								<p className="text-[11px] font-black uppercase tracking-[0.22em] text-text-muted">
+									Security lifecycle
+								</p>
+								<div className="mt-4 space-y-4 text-sm text-text-muted">
+									<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+										<p className="font-bold text-white">Required DNS</p>
+										<p className="mt-2">Point the hostname to <span className="font-mono text-white">silo.deployor.dev</span> and publish the TXT ownership record.</p>
+									</div>
+									<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+										<p className="font-bold text-white">Ongoing revalidation</p>
+										<p className="mt-2">Verified domains are rechecked on a recurring background interval. If DNS is removed or changed, verification is revoked automatically.</p>
+									</div>
+								</div>
+							</div>
 						</div>
 
 						{domainModal.error ? (
@@ -2001,11 +2043,22 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</div>
 						)}
 
-						<div className="rounded-2xl border border-violet-400/20 bg-violet-500/5 p-5 text-sm text-violet-100">
-							<p className="font-bold text-white">Migration-friendly by default</p>
-							<p className="mt-2 text-text-muted">
-								Once a primary domain is verified, that hostname becomes the default for bucket examples, public object links, and private share links. Later, you can repoint DNS to another provider without changing the URLs in your app.
-							</p>
+						<div className="rounded-[28px] border border-violet-400/20 bg-violet-500/5 p-5 text-sm text-violet-100">
+							<p className="font-bold text-white">Production behavior</p>
+							<div className="mt-3 grid gap-3 md:grid-cols-3">
+								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+									<p className="font-bold text-white">Primary domain</p>
+									<p className="mt-2 text-text-muted">Used by bucket examples, public object URLs, and generated private share links.</p>
+								</div>
+								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+									<p className="font-bold text-white">DNS ownership</p>
+									<p className="mt-2 text-text-muted">TXT validation proves domain control before the platform trusts it.</p>
+								</div>
+								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+									<p className="font-bold text-white">Provider portability</p>
+									<p className="mt-2 text-text-muted">You can move to another provider later by repointing DNS instead of rewriting URLs.</p>
+								</div>
+							</div>
 						</div>
 					</div>
 				) : null}
