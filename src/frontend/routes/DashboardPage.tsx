@@ -1852,32 +1852,21 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!domainModal}
 				onClose={() => setDomainModal(null)}
 				title="Custom Domains"
-				className="max-w-3xl p-8"
+				className="max-w-2xl p-8"
 			>
 				{domainModal ? (
 					<div className="space-y-6">
-						<div className="flex items-start gap-4 rounded-[28px] border border-violet-400/20 bg-violet-500/5 p-6">
-							<div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-violet-300/20 bg-black/20 text-violet-100">
-								<PhIcon className="ph ph-globe text-2xl" />
-							</div>
-							<div>
-								<p className="text-sm font-mono text-text-muted">
-									{domainModal.bucket.name}
-								</p>
-								<h3 className="mt-2 text-2xl font-black text-white">
-									Use your own domain
-								</h3>
-								<p className="mt-2 text-sm leading-7 text-text-muted">
-									Point your hostname at Silo, publish the TXT record, then verify it here. Once one domain is primary, we use it automatically for public links and private share links.
-								</p>
-							</div>
+						<div>
+							<p className="text-sm font-mono text-text-muted">
+								{domainModal.bucket.name}
+							</p>
+							<p className="mt-2 text-sm text-text-muted">
+								Limit 10 custom domains per bucket.
+							</p>
 						</div>
 
 						<div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
-							<div className="flex items-center gap-2 text-sm font-bold text-white">
-								<PhIcon className="ph ph-plus-circle text-base text-violet-200" />
-								Add domain
-							</div>
+							<p className="text-sm font-bold text-white">Enter domain</p>
 							<div className="mt-4 flex flex-col gap-3 lg:flex-row">
 								<input
 									type="text"
@@ -1919,35 +1908,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									{domainModal.loading ? "Saving..." : "Add domain"}
 								</button>
 							</div>
-							<div className="mt-4 grid gap-3 md:grid-cols-3">
-								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-									<div className="flex items-center gap-2 text-sm font-bold text-white">
-										<PhIcon className="ph ph-link text-base text-violet-200" />
-										Point DNS
-									</div>
-									<p className="mt-2 text-xs leading-6 text-text-muted">
-										Use CNAME or ALIAS to <span className="font-mono text-white">silo.deployor.dev</span>
-									</p>
-								</div>
-								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-									<div className="flex items-center gap-2 text-sm font-bold text-white">
-										<PhIcon className="ph ph-seal-check text-base text-violet-200" />
-										Publish TXT
-									</div>
-									<p className="mt-2 text-xs leading-6 text-text-muted">
-										Publish the ownership TXT record shown on each domain card.
-									</p>
-								</div>
-								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-									<div className="flex items-center gap-2 text-sm font-bold text-white">
-										<PhIcon className="ph ph-sparkle text-base text-violet-200" />
-										Verify + set primary
-									</div>
-									<p className="mt-2 text-xs leading-6 text-text-muted">
-										After verification, make one domain primary for default links.
-									</p>
-								</div>
-							</div>
+							<p className="mt-4 text-xs text-text-muted">
+								After adding a domain, make these DNS records and then press verify.
+							</p>
 							</div>
 
 						{domainModal.error ? (
@@ -1968,9 +1931,6 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
 											<div className="min-w-0">
 												<div className="flex flex-wrap items-center gap-2">
-													<div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-black/20 text-violet-100">
-														<PhIcon className="ph ph-globe text-lg" />
-													</div>
 													<p className="break-all font-mono text-white">{domain.domain}</p>
 													{domain.primary ? (
 														<span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
@@ -1982,19 +1942,31 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													</span>
 												</div>
 												<div className="mt-3 space-y-2 text-xs text-text-muted">
-													<p>Point to <span className="font-mono text-white">silo.deployor.dev</span></p>
-													<p>TXT host: <span className="font-mono text-white">_silo-domain-verification.{domain.domain}</span></p>
-													<div className="flex items-center gap-2">
-														<span>TXT value</span>
-														<span className="break-all font-mono text-white">{domain.verificationToken}</span>
-														<button
-															type="button"
-															onClick={() => copyText(domain.verificationToken)}
-															className="text-text-muted hover:text-white"
-															title="Copy token"
-														>
-															<MdContentCopy className="text-sm" />
-														</button>
+													<div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)]">
+														<span>Type</span>
+														<span className="font-mono text-white">CNAME / ALIAS</span>
+														<span>Name</span>
+														<span className="font-mono text-white">{domain.domain}</span>
+														<span>Value</span>
+														<span className="font-mono text-white">silo.deployor.dev</span>
+													</div>
+													<div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)] pt-2">
+														<span>Type</span>
+														<span className="font-mono text-white">TXT</span>
+														<span>Name</span>
+														<span className="font-mono text-white">_silo-domain-verification.{domain.domain}</span>
+														<span>Value</span>
+														<div className="flex items-center gap-2 min-w-0">
+															<span className="break-all font-mono text-white">{domain.verificationToken}</span>
+															<button
+																type="button"
+																onClick={() => copyText(domain.verificationToken)}
+																className="text-text-muted hover:text-white"
+																title="Copy token"
+															>
+																<MdContentCopy className="text-sm" />
+															</button>
+														</div>
 													</div>
 													<p className="font-mono text-white/80">https://{domain.domain}/file.png</p>
 												</div>
