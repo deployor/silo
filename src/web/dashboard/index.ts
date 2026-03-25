@@ -88,6 +88,17 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		return Response.redirect("/");
 	}
 
+	if (path === "/account/deleted") {
+		const html = await render("account-deleted", {
+			title: "Account Deleted - Silo",
+			layout: "main",
+			hideNavLinks: true,
+		});
+		return new Response(html, {
+			headers: { "Content-Type": "text/html" },
+		});
+	}
+
 	const user = await getCurrentUser(req);
 	if (!user) {
 		const settings = await getAppSettings();
@@ -143,6 +154,17 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 	if (user.dataExported) {
 		return Response.redirect("/dashboard/offboarding");
+	}
+
+	if (path === "/account" || path === "/account/") {
+		const html = await render("account", {
+			title: "Account - Silo",
+			layout: "main",
+			user: viewUser,
+		});
+		return new Response(html, {
+			headers: { "Content-Type": "text/html" },
+		});
 	}
 
 	const fileExplorerMatch = path.match(/^\/dashboard\/buckets\/([a-z0-9-]+)$/);

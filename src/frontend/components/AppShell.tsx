@@ -240,6 +240,20 @@ export function AppShell({
 									</a>
 								) : null}
 								<a
+									href="/account"
+									className="text-text-muted hover:text-white transition-colors inline-flex items-center gap-2"
+								>
+									<i className="ph ph-gear text-base" />
+									Account
+								</a>
+								<a
+									href="/account"
+									className="text-hc-red hover:text-white transition-colors inline-flex items-center gap-2"
+								>
+									<i className="ph ph-trash text-base" />
+									Delete account
+								</a>
+								<a
 									href="/auth/logout"
 									className="text-hc-red hover:text-white transition-colors"
 								>

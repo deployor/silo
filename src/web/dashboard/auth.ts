@@ -138,6 +138,11 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 				refreshToken: tokenData.refresh_token,
 				tokenExpiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
 				scope: tokenData.scope,
+				userAgent: req.headers.get("user-agent"),
+				ipAddress:
+					req.headers.get("x-forwarded-for") ||
+					req.headers.get("cf-connecting-ip") ||
+					null,
 			});
 
 			const headers = new Headers();
