@@ -24,6 +24,7 @@ const envSchema = z.object({
 		.default("development"),
 	GIT_COMMIT_SHA: z.string().optional(),
 	GIT_COMMIT_DATE: z.string().optional(),
+	BUCKET_USAGE_RECONCILE_INTERVAL_MS: z.string().optional(),
 });
 
 const env = envSchema.parse(process.env);
@@ -105,4 +106,7 @@ export const config = {
 	},
 	revocationSecret: env.REVOCATION_SECRET,
 	devAccessCode: env.DEV_ACCESS_CODE,
+	bucketUsageReconcileIntervalMs: Number(
+		env.BUCKET_USAGE_RECONCILE_INTERVAL_MS || 10 * 60 * 1000,
+	),
 };

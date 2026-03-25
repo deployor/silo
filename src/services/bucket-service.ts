@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { resolveCname, resolveTxt } from "node:dns/promises";
 import {
 	deleteBucketContents,
 	getInternalPath,
@@ -435,6 +436,42 @@ export async function verifyBucketCustomDomain(params: {
 	if (!target) {
 		throw new Error("Custom domain not found");
 	}
+
+	const verificationHostname = `_silo-domain-verification.${normalizedDomain}`;
+	let txtMatches = false;
+	try {
+		const txtRecords = await resolveTxt(verificationHostname);
+		txtMatches = txtRecords.some((recordParts) =>
+			recordParts.join("").trim() === target.verificationToken,
+		);
+	} catch {
+		txtMatches = false;
+	}
+
+	if (!txtMatches) {
+		throw new Error(
+			`Verification TXT record missing or incorrect at ${verificationHostname}`,
+		);
+	}
+
+	try {
+		const cnameRecords = await resolveCname(normalizedDomain);
+		const pointsAtSilo = cnameRecords.some(
+			(record) => record.replace(/\.+$/, "") === config.s3Domain,
+		);
+		if (!pointsAtSilo) {
+			throw new Error(
+				`Custom domain CNAME must point to ${config.s3Domain}`,
+			);
+		}
+	} catch (error) {
+		if (error instanceof Error && error.message.includes("must point to")) {
+			throw error;
+		}
+		// Apex/ALIAS setups may not expose CNAMEs via DNS resolution.
+		// TXT ownership verification remains the hard requirement.
+	}
+
 	const next = current.map((entry) =>
 		entry.domain === normalizedDomain
 			? {

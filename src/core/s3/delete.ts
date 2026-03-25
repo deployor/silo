@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { buckets } from "../../db/schema";
 import { diskCacheInvalidate } from "../../lib/disk-cache";
@@ -24,6 +24,16 @@ export async function handleDeleteRequest(
 	}
 
 	try {
+		let existingSize = 0;
+		try {
+			const headResponse = await s3Client.fetch(internalPath, { method: "HEAD" });
+			if (headResponse.ok) {
+				existingSize = Number(headResponse.headers.get("content-length") || 0);
+			}
+		} catch {
+			existingSize = 0;
+		}
+
 		const cleanUrl = stripAuthQueryParams(url);
 		const queryStr = cleanUrl.searchParams.toString();
 		const pathWithQuery = queryStr
@@ -36,6 +46,15 @@ export async function handleDeleteRequest(
 		});
 
 		if (response.ok || response.status === 204 || response.status === 404) {
+			if (existingSize > 0 && response.status !== 404) {
+				await db
+					.update(buckets)
+					.set({
+						totalBytes: sql`GREATEST(0, ${buckets.totalBytes} - ${existingSize})`,
+					})
+					.where(eq(buckets.id, bucket.id));
+			}
+
 			// Invalidate all cache layers (Redis L1 + Disk L2)
 			// Fire-and-forget background invalidation
 			(async () => {
