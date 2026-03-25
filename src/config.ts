@@ -25,6 +25,7 @@ const envSchema = z.object({
 	GIT_COMMIT_SHA: z.string().optional(),
 	GIT_COMMIT_DATE: z.string().optional(),
 	BUCKET_USAGE_RECONCILE_INTERVAL_MS: z.string().optional(),
+	CUSTOM_DOMAIN_REVALIDATE_INTERVAL_MS: z.string().optional(),
 });
 
 const env = envSchema.parse(process.env);
@@ -108,5 +109,8 @@ export const config = {
 	devAccessCode: env.DEV_ACCESS_CODE,
 	bucketUsageReconcileIntervalMs: Number(
 		env.BUCKET_USAGE_RECONCILE_INTERVAL_MS || 10 * 60 * 1000,
+	),
+	customDomainRevalidateIntervalMs: Number(
+		env.CUSTOM_DOMAIN_REVALIDATE_INTERVAL_MS || 10 * 60 * 1000,
 	),
 };
