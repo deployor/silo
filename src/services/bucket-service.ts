@@ -67,6 +67,52 @@ async function syncBucketCustomDomainState(domain: BucketCustomDomain) {
 	return applyCloudflareHostnameState(domain, remote);
 }
 
+async function syncCustomDomainsForBucketRecord(bucket: typeof buckets.$inferSelect) {
+	const current = parseBucketCustomDomains(bucket.customDomains);
+	if (!isCloudflareForSaasConfigured()) {
+		return current;
+	}
+
+	let changed = false;
+	const next = await Promise.all(
+		current.map(async (domain) => {
+			if (!domain.hostnameId) return domain;
+			try {
+				const synced = await syncBucketCustomDomainState(domain);
+				if (JSON.stringify(synced) !== JSON.stringify(domain)) {
+					changed = true;
+				}
+				return synced.verified
+					? synced
+					: {
+						...synced,
+						primary: false,
+						verifiedAt: null,
+					};
+			} catch (error) {
+				console.error("custom domain sync failed", error);
+				return domain;
+			}
+		}),
+	);
+
+	if (changed) {
+		const sanitized = sanitizeBucketCustomDomains(next);
+		await db
+			.update(buckets)
+			.set({
+				customDomains: sanitized.length
+					? serializeBucketCustomDomains(sanitized)
+					: null,
+			})
+			.where(eq(buckets.id, bucket.id));
+		await invalidateBucketCustomDomainCache(current);
+		return sanitized;
+	}
+
+	return next;
+}
+
 export async function getBucketsForUser(userId: string) {
 	const rawUserBuckets = await db
 		.select()
@@ -132,7 +178,7 @@ export async function getBucketsForUser(userId: string) {
 	return [
 		...bucketsWithKeys.map((bucket) => ({
 			...bucket,
-			customDomains: parseBucketCustomDomains(bucket.customDomains),
+			customDomains: await syncCustomDomainsForBucketRecord(bucket),
 			isCollaborative: false,
 			collaborationPermissions: null,
 			collaborationPermissionSet: null,
@@ -502,7 +548,7 @@ export async function listBucketCustomDomains(params: {
 		params.userId,
 		params.isAdmin,
 	);
-	return parseBucketCustomDomains(bucket.customDomains);
+	return syncCustomDomainsForBucketRecord(bucket);
 }
 
 export async function revalidateVerifiedCustomDomainsForBucket(bucketId: string) {
@@ -516,50 +562,7 @@ export async function revalidateVerifiedCustomDomainsForBucket(bucketId: string)
 
 	const current = parseBucketCustomDomains(bucket.customDomains);
 	if (current.length === 0) return;
-
-	let changed = false;
-	const next = await Promise.all(
-		current.map(async (domain) => {
-			if (!domain.hostnameId) return domain;
-			try {
-				const synced = await syncBucketCustomDomainState(domain);
-				if (
-					synced.verified !== domain.verified ||
-					synced.status !== domain.status ||
-					synced.sslStatus !== domain.sslStatus ||
-					JSON.stringify(synced.verificationErrors || []) !==
-						JSON.stringify(domain.verificationErrors || []) ||
-					JSON.stringify(synced.sslValidationRecords || []) !==
-						JSON.stringify(domain.sslValidationRecords || [])
-				) {
-					changed = true;
-				}
-				return synced.verified
-					? synced
-					: {
-						...synced,
-						primary: false,
-						verifiedAt: null,
-					};
-			} catch (error) {
-				console.error("custom domain sync failed", error);
-				return domain;
-			}
-		}),
-	);
-
-	if (!changed) return;
-
-	const sanitized = sanitizeBucketCustomDomains(next);
-	await db
-		.update(buckets)
-		.set({
-			customDomains: sanitized.length
-				? serializeBucketCustomDomains(sanitized)
-				: null,
-		})
-		.where(eq(buckets.id, bucket.id));
-	await invalidateBucketCustomDomainCache(current);
+	await syncCustomDomainsForBucketRecord(bucket);
 	console.log(
 		`[custom-domain-revalidation] revoked invalid verified domain(s) for ${bucket.name}`,
 	);
