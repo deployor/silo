@@ -318,7 +318,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		setDeepFreezeModal((prev) =>
 			prev ? { ...prev, bucket: nextBucket } : prev,
 		);
-	}, [deepFreezeModal?.bucket.name, stats?.buckets]);
+	}, [deepFreezeModal, stats?.buckets]);
 
 	const storagePercent = useMemo(() => {
 		if (!stats) return 0;
@@ -1925,7 +1925,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</button>
 							</div>
 							<p className="mt-4 text-xs text-text-muted">
-								After adding a domain, point the hostname at Cloudflare&apos;s SaaS target, add the TXT verification records Cloudflare gives you, and then press verify.
+								After adding a domain, complete every DNS record shown below. Some hostnames need both the ownership TXT and one or more `_acme-challenge` SSL validation TXT records before HTTPS will issue.
 							</p>
 							</div>
 
@@ -1967,7 +1967,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													<span className="font-mono text-white">{customDomainTargetHostname}</span>
 												</div>
 												<div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)] pt-2">
-													<span>Type</span>
+													<span>Ownership</span>
 													<span className="font-mono text-white">TXT</span>
 													<span>Name</span>
 													<span className="font-mono text-white">{domain.ownershipVerification?.name || `_cf-custom-hostname.${domain.domain}`}</span>
@@ -1986,6 +1986,11 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 															</button>
 														</div>
 													</div>
+													{(domain.sslValidationRecords || []).length > 0 ? (
+														<div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-yellow-100">
+															Cloudflare is also requesting SSL/DCV TXT records. Add every `_acme-challenge` record shown below before expecting HTTPS to work.
+														</div>
+													) : null}
 													{(domain.sslValidationRecords || []).length > 0 ? (
 														<div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)] pt-2">
 															<span>SSL DCV</span>
@@ -2009,6 +2014,11 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														<div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-yellow-100">
 															Cloudflare for SaaS is not fully configured on this deployment yet.
 														</div>
+													) : null}
+													{!domain.verified ? (
+														<p className="text-[11px] text-text-muted">
+															If Cloudflare shows `_acme-challenge.{domain.domain}`, that record is mandatory too. The ownership TXT by itself is not enough to finish SSL issuance.
+														</p>
 													) : null}
 													<p className="font-mono text-white/80">https://{domain.domain}/file.png</p>
 													<p className="text-[11px] uppercase tracking-wider text-text-muted">Hostname status: {domain.status || "pending"} · SSL: {domain.sslStatus || "pending"}</p>
