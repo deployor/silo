@@ -5,6 +5,18 @@ import { db } from "../db";
 import { buckets } from "../db/schema";
 import { redis } from "./redis";
 
+export type DomainVerificationRecord = {
+	type: string;
+	name: string;
+	value: string;
+};
+
+export type DomainSslValidationRecord = {
+	txtName: string;
+	txtValue: string;
+	status: string;
+};
+
 export type BucketCustomDomain = {
 	domain: string;
 	verified: boolean;
@@ -12,6 +24,13 @@ export type BucketCustomDomain = {
 	verificationToken: string;
 	createdAt: string;
 	verifiedAt: string | null;
+	hostnameId?: string | null;
+	status?: string | null;
+	sslStatus?: string | null;
+	verificationErrors?: string[];
+	ownershipVerification?: DomainVerificationRecord | null;
+	sslValidationRecords?: DomainSslValidationRecord[];
+	lastCheckedAt?: string | null;
 };
 
 const CUSTOM_DOMAIN_CACHE_TTL_SECONDS = 300;
@@ -56,9 +75,35 @@ export function parseBucketCustomDomains(raw: string | null | undefined): Bucket
 				domain: normalizeCustomDomain(String(entry?.domain || "")),
 				verified: Boolean(entry?.verified),
 				primary: Boolean(entry?.primary),
-				verificationToken: String(entry?.verificationToken || ""),
+				verificationToken: String(
+					entry?.verificationToken || entry?.ownershipVerification?.value || "",
+				),
 				createdAt: String(entry?.createdAt || new Date(0).toISOString()),
 				verifiedAt: entry?.verifiedAt ? String(entry.verifiedAt) : null,
+				hostnameId: entry?.hostnameId ? String(entry.hostnameId) : null,
+				status: entry?.status ? String(entry.status) : null,
+				sslStatus: entry?.sslStatus ? String(entry.sslStatus) : null,
+				verificationErrors: Array.isArray(entry?.verificationErrors)
+					? entry.verificationErrors.map((value: unknown) => String(value))
+					: [],
+				ownershipVerification: entry?.ownershipVerification
+					? {
+						type: String(entry.ownershipVerification.type || "txt"),
+						name: String(entry.ownershipVerification.name || ""),
+						value: String(entry.ownershipVerification.value || ""),
+					}
+					: null,
+				sslValidationRecords: Array.isArray(entry?.sslValidationRecords)
+					? entry.sslValidationRecords.map((record: unknown) => {
+						const typed = record as Record<string, unknown>;
+						return {
+							txtName: String(typed.txtName || typed.txt_name || ""),
+							txtValue: String(typed.txtValue || typed.txt_value || ""),
+							status: String(typed.status || "pending"),
+						};
+					})
+					: [],
+				lastCheckedAt: entry?.lastCheckedAt ? String(entry.lastCheckedAt) : null,
 			}))
 			.filter((entry) => Boolean(entry.domain) && entry.verificationToken.length >= 16);
 	} catch {
@@ -71,13 +116,25 @@ export function serializeBucketCustomDomains(domains: BucketCustomDomain[]): str
 }
 
 export function createCustomDomainRecord(domain: string): BucketCustomDomain {
+	const verificationToken = randomBytes(18).toString("hex");
 	return {
 		domain: normalizeCustomDomain(domain),
 		verified: false,
 		primary: false,
-		verificationToken: randomBytes(18).toString("hex"),
+		verificationToken,
 		createdAt: new Date().toISOString(),
 		verifiedAt: null,
+		hostnameId: null,
+		status: "pending",
+		sslStatus: "initializing",
+		verificationErrors: [],
+		ownershipVerification: {
+			type: "txt",
+			name: `_cf-custom-hostname.${normalizeCustomDomain(domain)}`,
+			value: verificationToken,
+		},
+		sslValidationRecords: [],
+		lastCheckedAt: null,
 	};
 }
 
@@ -91,6 +148,9 @@ export function sanitizeBucketCustomDomains(domains: BucketCustomDomain[]): Buck
 		unique.set(hostname, {
 			...domain,
 			domain: hostname,
+			verificationErrors: domain.verificationErrors || [],
+			ownershipVerification: domain.ownershipVerification || null,
+			sslValidationRecords: domain.sslValidationRecords || [],
 		});
 	}
 	if (unique.size > MAX_CUSTOM_DOMAINS_PER_BUCKET) {

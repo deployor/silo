@@ -1,6 +1,4 @@
 import { eq } from "drizzle-orm";
-import { resolveCname, resolveTxt } from "node:dns/promises";
-import { config } from "../config";
 import {
 	deleteBucketContents,
 	getInternalPath,
@@ -17,6 +15,13 @@ import {
 	serializeBucketCustomDomains,
 	normalizeCustomDomain,
 } from "../lib/bucket-domains";
+import {
+	applyCloudflareHostnameState,
+	createCloudflareCustomHostname,
+	deleteCloudflareCustomHostname,
+	getCloudflareCustomHostname,
+	isCloudflareForSaasConfigured,
+} from "../lib/cloudflare-for-saas";
 import { redis } from "../lib/redis";
 import {
 	assertBucketCollaborationAllowed,
@@ -49,38 +54,17 @@ export type CorsRule = {
 	MaxAgeSeconds?: number;
 };
 
-async function validateBucketCustomDomainDns(domain: string, verificationToken: string) {
-	const normalizedDomain = normalizeCustomDomain(domain);
-	const verificationHostname = `_silo-domain-verification.${normalizedDomain}`;
-	let txtMatches = false;
-	try {
-		const txtRecords = await resolveTxt(verificationHostname);
-		txtMatches = txtRecords.some((recordParts) =>
-			recordParts.join("").trim() === verificationToken,
-		);
-	} catch {
-		txtMatches = false;
-	}
-
-	if (!txtMatches) {
+async function syncBucketCustomDomainState(domain: BucketCustomDomain) {
+	if (!isCloudflareForSaasConfigured()) {
 		throw new Error(
-			`Verification TXT record missing or incorrect at ${verificationHostname}`,
+			"Cloudflare for SaaS is not configured. Set CF_API_TOKEN, CF_ZONE_ID, and CF_SAAS_FALLBACK_ORIGIN.",
 		);
 	}
-
-	try {
-		const cnameRecords = await resolveCname(normalizedDomain);
-		const pointsAtSilo = cnameRecords.some(
-			(record) => record.replace(/\.+$/, "") === config.s3Domain,
-		);
-		if (!pointsAtSilo) {
-			throw new Error(`Custom domain CNAME must point to ${config.s3Domain}`);
-		}
-	} catch (error) {
-		if (error instanceof Error && error.message.includes("must point to")) {
-			throw error;
-		}
+	if (!domain.hostnameId) {
+		throw new Error("Custom domain is missing its Cloudflare hostname ID");
 	}
+	const remote = await getCloudflareCustomHostname(domain.hostnameId);
+	return applyCloudflareHostnameState(domain, remote);
 }
 
 export async function getBucketsForUser(userId: string) {
@@ -385,7 +369,11 @@ export async function addBucketCustomDomain(params: {
 	if (current.some((entry) => entry.domain === normalizedDomain)) {
 		throw new Error("Custom domain already exists for this bucket");
 	}
-	const next = [...current, createCustomDomainRecord(normalizedDomain)].map((entry) => ({
+	const created = createCustomDomainRecord(normalizedDomain);
+	const provisioned = isCloudflareForSaasConfigured()
+		? { ...created, ...(await createCloudflareCustomHostname(created)) }
+		: created;
+	const next = [...current, provisioned].map((entry) => ({
 		...entry,
 		primary: params.makePrimary ? entry.domain === normalizedDomain : entry.primary,
 	}));
@@ -411,6 +399,12 @@ export async function removeBucketCustomDomain(params: {
 	);
 	const current = parseBucketCustomDomains(bucket.customDomains);
 	const normalizedDomain = normalizeCustomDomain(params.domain);
+	const target = current.find((entry) => entry.domain === normalizedDomain);
+	if (target?.hostnameId && isCloudflareForSaasConfigured()) {
+		await deleteCloudflareCustomHostname(target.hostnameId).catch((error) => {
+			console.error("failed to delete Cloudflare custom hostname", error);
+		});
+	}
 	const next = current.filter((entry) => entry.domain !== normalizedDomain);
 	const sanitized = sanitizeBucketCustomDomains(next);
 	await db
@@ -472,15 +466,20 @@ export async function verifyBucketCustomDomain(params: {
 		throw new Error("Custom domain not found");
 	}
 
-	await validateBucketCustomDomainDns(normalizedDomain, target.verificationToken);
+	const synced = await syncBucketCustomDomainState(target);
+	if (!synced.verified) {
+		throw new Error(
+			synced.verificationErrors?.[0] ||
+				`Domain is still pending in Cloudflare (status: ${synced.status || "pending"}, SSL: ${synced.sslStatus || "pending"})`,
+		);
+	}
 
 	const next = current.map((entry) =>
 		entry.domain === normalizedDomain
 			? {
-					...entry,
-					verified: true,
-					verifiedAt: new Date().toISOString(),
-					primary: entry.primary || !current.some((item) => item.primary && item.verified),
+					...synced,
+					primary:
+						target.primary || !current.some((item) => item.primary && item.verified),
 				}
 			: entry,
 	);
@@ -521,18 +520,30 @@ export async function revalidateVerifiedCustomDomainsForBucket(bucketId: string)
 	let changed = false;
 	const next = await Promise.all(
 		current.map(async (domain) => {
-			if (!domain.verified) return domain;
+			if (!domain.hostnameId) return domain;
 			try {
-				await validateBucketCustomDomainDns(domain.domain, domain.verificationToken);
+				const synced = await syncBucketCustomDomainState(domain);
+				if (
+					synced.verified !== domain.verified ||
+					synced.status !== domain.status ||
+					synced.sslStatus !== domain.sslStatus ||
+					JSON.stringify(synced.verificationErrors || []) !==
+						JSON.stringify(domain.verificationErrors || []) ||
+					JSON.stringify(synced.sslValidationRecords || []) !==
+						JSON.stringify(domain.sslValidationRecords || [])
+				) {
+					changed = true;
+				}
+				return synced.verified
+					? synced
+					: {
+						...synced,
+						primary: false,
+						verifiedAt: null,
+					};
+			} catch (error) {
+				console.error("custom domain sync failed", error);
 				return domain;
-			} catch {
-				changed = true;
-				return {
-					...domain,
-					verified: false,
-					primary: false,
-					verifiedAt: null,
-				};
 			}
 		}),
 	);

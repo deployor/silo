@@ -36,6 +36,10 @@ export function renderReactDocument(
 		config: {
 			env: config.env,
 			git: config.git,
+			cloudflareForSaas: {
+				targetHostname: config.cloudflareForSaas.targetHostname,
+				configured: config.cloudflareForSaas.configured,
+			},
 		},
 	};
 

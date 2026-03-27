@@ -76,6 +76,20 @@ type DashboardBucket = {
 		verificationToken: string;
 		createdAt: string;
 		verifiedAt: string | null;
+		hostnameId?: string | null;
+		status?: string | null;
+		sslStatus?: string | null;
+		verificationErrors?: string[];
+		ownershipVerification?: {
+			type: string;
+			name: string;
+			value: string;
+		} | null;
+		sslValidationRecords?: Array<{
+			txtName: string;
+			txtValue: string;
+			status: string;
+		}>;
 	}>;
 	createdAt: string;
 	totalBytes: number;
@@ -206,6 +220,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		latestSubmission?: { status?: string; projectName?: string } | null;
 		yswsQuotaPerHourHuman?: string;
 	};
+ 	const customDomainTargetHostname =
+		bootstrap.config?.cloudflareForSaas?.targetHostname || "silo.deployor.dev";
 
 	const [stats, setStats] = useState<DashboardStats | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -1909,7 +1925,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</button>
 							</div>
 							<p className="mt-4 text-xs text-text-muted">
-								After adding a domain, make these DNS records and then press verify.
+								After adding a domain, point the hostname at Cloudflare&apos;s SaaS target, add the TXT verification records Cloudflare gives you, and then press verify.
 							</p>
 							</div>
 
@@ -1941,34 +1957,61 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														{domain.verified ? "Verified" : "Pending"}
 													</span>
 												</div>
-												<div className="mt-3 space-y-2 text-xs text-text-muted">
-													<div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)]">
-														<span>Type</span>
-														<span className="font-mono text-white">CNAME / ALIAS</span>
-														<span>Name</span>
-														<span className="font-mono text-white">{domain.domain}</span>
-														<span>Value</span>
-														<span className="font-mono text-white">silo.deployor.dev</span>
-													</div>
-													<div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)] pt-2">
-														<span>Type</span>
-														<span className="font-mono text-white">TXT</span>
-														<span>Name</span>
-														<span className="font-mono text-white">_silo-domain-verification.{domain.domain}</span>
-														<span>Value</span>
-														<div className="flex items-center gap-2 min-w-0">
-															<span className="break-all font-mono text-white">{domain.verificationToken}</span>
-															<button
-																type="button"
-																onClick={() => copyText(domain.verificationToken)}
-																className="text-text-muted hover:text-white"
-																title="Copy token"
-															>
+											<div className="mt-3 space-y-2 text-xs text-text-muted">
+												<div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)]">
+													<span>Type</span>
+													<span className="font-mono text-white">CNAME / ALIAS</span>
+													<span>Name</span>
+													<span className="font-mono text-white">{domain.domain}</span>
+													<span>Value</span>
+													<span className="font-mono text-white">{customDomainTargetHostname}</span>
+												</div>
+												<div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)] pt-2">
+													<span>Type</span>
+													<span className="font-mono text-white">TXT</span>
+													<span>Name</span>
+													<span className="font-mono text-white">{domain.ownershipVerification?.name || `_cf-custom-hostname.${domain.domain}`}</span>
+													<span>Value</span>
+													<div className="flex items-center gap-2 min-w-0">
+														<span className="break-all font-mono text-white">{domain.ownershipVerification?.value || domain.verificationToken}</span>
+														<button
+															type="button"
+															onClick={() =>
+																copyText(domain.ownershipVerification?.value || domain.verificationToken)
+															}
+															className="text-text-muted hover:text-white"
+															title="Copy token"
+														>
 																<MdContentCopy className="text-sm" />
 															</button>
 														</div>
 													</div>
+													{(domain.sslValidationRecords || []).length > 0 ? (
+														<div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)] pt-2">
+															<span>SSL DCV</span>
+															<div className="space-y-2">
+																{(domain.sslValidationRecords || []).map((record) => (
+																	<div key={`${record.txtName}:${record.txtValue}`} className="rounded-xl border border-white/10 bg-black/20 p-3">
+																	<div className="font-mono text-white break-all">{record.txtName}</div>
+																	<div className="mt-1 font-mono text-white/80 break-all">{record.txtValue}</div>
+																	<div className="mt-1 uppercase tracking-wider text-[10px] text-text-muted">{record.status}</div>
+																</div>
+																))}
+															</div>
+														</div>
+													) : null}
+													{(domain.verificationErrors || []).length > 0 ? (
+														<div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-red-200">
+															{domain.verificationErrors?.join(" • ")}
+														</div>
+													) : null}
+													{!bootstrap.config?.cloudflareForSaas?.configured ? (
+														<div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-yellow-100">
+															Cloudflare for SaaS is not fully configured on this deployment yet.
+														</div>
+													) : null}
 													<p className="font-mono text-white/80">https://{domain.domain}/file.png</p>
+													<p className="text-[11px] uppercase tracking-wider text-text-muted">Hostname status: {domain.status || "pending"} · SSL: {domain.sslStatus || "pending"}</p>
 												</div>
 											</div>
 											<div className="flex flex-wrap gap-2">

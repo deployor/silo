@@ -19,6 +19,11 @@ const envSchema = z.object({
 	SLACK_FILE_UPLOAD_CHANNEL_ID: z.string().optional(),
 	REVOCATION_SECRET: z.string().optional(),
 	DEV_ACCESS_CODE: z.string().optional(),
+	CF_API_TOKEN: z.string().optional(),
+	CF_ZONE_ID: z.string().optional(),
+	CF_SAAS_FALLBACK_ORIGIN: z.string().optional(),
+	CF_SAAS_TARGET: z.string().optional(),
+	CF_SAAS_MIN_TLS: z.string().optional(),
 	NODE_ENV: z
 		.enum(["development", "production", "test"])
 		.default("development"),
@@ -107,6 +112,16 @@ export const config = {
 	},
 	revocationSecret: env.REVOCATION_SECRET,
 	devAccessCode: env.DEV_ACCESS_CODE,
+	cloudflareForSaas: {
+		apiToken: env.CF_API_TOKEN,
+		zoneId: env.CF_ZONE_ID,
+		fallbackOrigin: env.CF_SAAS_FALLBACK_ORIGIN,
+		targetHostname: env.CF_SAAS_TARGET || env.S3_DOMAIN,
+		minTlsVersion: env.CF_SAAS_MIN_TLS || "1.2",
+		configured: Boolean(
+			env.CF_API_TOKEN && env.CF_ZONE_ID && env.CF_SAAS_FALLBACK_ORIGIN,
+		),
+	},
 	bucketUsageReconcileIntervalMs: Number(
 		env.BUCKET_USAGE_RECONCILE_INTERVAL_MS || 10 * 60 * 1000,
 	),

@@ -26,12 +26,33 @@ For full documentation on how to use Silo, including SDK examples, configuration
 - **Instant Provisioning**: Log in with Hack Club Auth and get credentials immediately.
 - **Public & Private Buckets**: Host static assets publicly or keep backups private.
 - **CORS Support**: Configurable Cross-Origin Resource Sharing for web applications.
+- **Cloudflare for SaaS custom domains**: Managed SSL/TLS and hostname onboarding for bucket domains.
 
 ## Development
 
 - Start local development (backend + React asset watcher): `bun dev`
 - Build production assets: `bun run build`
 - Start production server: `bun run start`
+
+## Cloudflare for SaaS setup
+
+Custom domains now assume Cloudflare for SaaS is the source of truth for SSL issuance and hostname validation.
+
+Required environment variables:
+
+- `CF_API_TOKEN` — Cloudflare API token with custom hostname permissions for the zone.
+- `CF_ZONE_ID` — Zone ID for the SaaS zone.
+- `CF_SAAS_FALLBACK_ORIGIN` — Origin hostname Cloudflare should send traffic to.
+- `CF_SAAS_TARGET` — Hostname customers should CNAME to. Defaults to `S3_DOMAIN`.
+- `CF_SAAS_MIN_TLS` — Optional minimum TLS version. Defaults to `1.2`.
+
+Expected flow:
+
+1. Add a domain in the dashboard.
+2. The backend creates a Cloudflare custom hostname.
+3. The dashboard shows the ownership TXT record and any SSL DCV records returned by Cloudflare.
+4. The user points their hostname at the Cloudflare SaaS target and adds the TXT records.
+5. Silo verifies by polling Cloudflare hostname status instead of doing direct DNS checks itself.
 
 The frontend is rendered via React and bundled with Vite into [`src/assets/react/app.js`](src/assets/react/app.js) and [`src/assets/react/app.css`](src/assets/react/app.css).
 
