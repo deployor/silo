@@ -11,6 +11,10 @@ export type GitInfo = {
 export type FrontendConfig = {
 	env?: string;
 	git?: GitInfo;
+	cloudflareForSaas?: {
+		targetHostname?: string;
+		configured?: boolean;
+	};
 };
 
 export type FrontendUser = {
