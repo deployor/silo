@@ -175,8 +175,8 @@ export async function getBucketsForUser(userId: string) {
 		collaboratorsByBucket.set(row.collaboration.bucketId, list);
 	}
 
-	return [
-		...bucketsWithKeys.map((bucket) => ({
+	const ownedBucketsWithDomains = await Promise.all(
+		bucketsWithKeys.map(async (bucket) => ({
 			...bucket,
 			customDomains: await syncCustomDomainsForBucketRecord(bucket),
 			isCollaborative: false,
@@ -200,8 +200,9 @@ export async function getBucketsForUser(userId: string) {
 				}),
 			),
 		})),
-		...sharedKeys,
-	];
+	);
+
+	return [...ownedBucketsWithDomains, ...sharedKeys];
 }
 
 async function getOwnedBucketOrThrow(name: string, userId: string, isAdmin = false) {
