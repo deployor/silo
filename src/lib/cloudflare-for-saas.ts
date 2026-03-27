@@ -25,6 +25,15 @@ type CloudflareCustomHostname = {
 	ssl?: {
 		status?: string;
 		validation_records?: Array<{
+			cname?: string;
+			cname_target?: string;
+			status?: string;
+			txt_name?: string;
+			txt_value?: string;
+		}>;
+		dcv_delegation_records?: Array<{
+			cname?: string;
+			cname_target?: string;
 			status?: string;
 			txt_name?: string;
 			txt_value?: string;
@@ -94,6 +103,19 @@ function mapSslValidationRecords(
 	}));
 }
 
+function mergeSslValidationRecords(result: CloudflareCustomHostname) {
+	const direct = mapSslValidationRecords(result.ssl?.validation_records);
+	const delegated = mapSslValidationRecords(result.ssl?.dcv_delegation_records);
+	const all = [...direct, ...delegated].filter(
+		(record) => record.txtName || record.txtValue,
+	);
+	const unique = new Map<string, DomainSslValidationRecord>();
+	for (const record of all) {
+		unique.set(`${record.txtName}:${record.txtValue}`, record);
+	}
+	return Array.from(unique.values());
+}
+
 export function isCloudflareForSaasConfigured() {
 	return config.cloudflareForSaas.configured;
 }
@@ -135,7 +157,7 @@ export async function createCloudflareCustomHostname(
 			domain.domain,
 			domain.verificationToken,
 		),
-		sslValidationRecords: mapSslValidationRecords(result.ssl?.validation_records),
+		sslValidationRecords: mergeSslValidationRecords(result),
 		lastCheckedAt: new Date().toISOString(),
 	};
 }
@@ -175,7 +197,7 @@ export function applyCloudflareHostnameState(
 		verificationToken:
 			result.ownership_verification?.value ||
 			domain.verificationToken,
-		sslValidationRecords: mapSslValidationRecords(result.ssl?.validation_records),
+		sslValidationRecords: mergeSslValidationRecords(result),
 		lastCheckedAt: new Date().toISOString(),
 	};
 }
