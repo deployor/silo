@@ -50,9 +50,11 @@ Expected flow:
 
 1. Add a domain in the dashboard.
 2. The backend creates a Cloudflare custom hostname.
-3. The dashboard shows the ownership TXT record and any SSL DCV records returned by Cloudflare.
+3. The dashboard shows the ownership TXT record and any SSL/DCV records returned by Cloudflare.
 4. The user points their hostname at the Cloudflare SaaS target and adds the TXT records.
 5. Silo verifies by polling Cloudflare hostname status instead of doing direct DNS checks itself.
+
+Important: if Cloudflare returns an `_acme-challenge` TXT record, you must add that too. Ownership TXT alone is not always enough for HTTPS issuance.
 
 The frontend is rendered via React and bundled with Vite into [`src/assets/react/app.js`](src/assets/react/app.js) and [`src/assets/react/app.css`](src/assets/react/app.css).
 
