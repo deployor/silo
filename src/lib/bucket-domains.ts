@@ -174,14 +174,18 @@ export function buildBucketObjectUrl(params: {
 	customDomains?: BucketCustomDomain[];
 }): string {
 	const safeKey = params.key.replace(/^\/+/, "");
+	const encodedKey = safeKey
+		.split("/")
+		.map((segment) => encodeURIComponent(segment))
+		.join("/");
 	if (!config.customDomainsEnabled) {
-		return `https://${config.s3Domain}/${params.bucketName}/${safeKey}`;
+		return `https://${config.s3Domain}/${params.bucketName}/${encodedKey}`;
 	}
 	const primary = getPrimaryVerifiedCustomDomain(params.customDomains || []);
 	if (primary) {
-		return `https://${primary.domain}/${safeKey}`;
+		return `https://${primary.domain}/${encodedKey}`;
 	}
-	return `https://${config.s3Domain}/${params.bucketName}/${safeKey}`;
+	return `https://${config.s3Domain}/${params.bucketName}/${encodedKey}`;
 }
 
 export function buildBucketUrlExample(params: {
