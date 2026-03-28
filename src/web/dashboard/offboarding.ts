@@ -178,6 +178,7 @@ export async function handleOffboardingRequest(
 				accessKey,
 				secretKey,
 				endpoint,
+				bucketNames: userBuckets.map((bucket) => bucket.name),
 				expiresAt: (activeSession[0]?.expiresAt || expiresAt).toISOString(),
 				command,
 			}),
