@@ -677,6 +677,16 @@ ${rulesXml}
 			headers.set(k, v);
 		}
 
+		if (isOffboardingExport && response.ok) {
+			if (!headers.has("cache-control")) {
+				headers.set("Cache-Control", "private, no-store");
+			}
+			return new Response(response.body, {
+				status: response.status,
+				headers,
+			});
+		}
+
 		// Security: Force download for dangerous types to prevent XSS
 		const contentType = headers.get("content-type") || "";
 		const dangerousTypes = [
