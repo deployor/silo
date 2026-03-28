@@ -159,11 +159,17 @@ export async function handleOffboardingRequest(
 			});
 		}
 
+		const userBuckets = await db
+			.select({ name: buckets.name })
+			.from(buckets)
+			.where(eq(buckets.userId, user.id));
+
 		const endpoint = `https://${config.s3Domain}`;
 		const command = buildOffboardingRcloneCommand({
 			endpoint,
 			accessKey,
 			secretKey,
+			bucketNames: userBuckets.map((bucket) => bucket.name),
 			destinationPath: "./silo-export",
 		});
 
