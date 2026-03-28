@@ -88,7 +88,9 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 					isPublic: b.isPublic,
 					isPaused: b.isPaused,
 					pauseReason: b.pauseReason,
-					deepFreeze: getDeepFreezeSnapshot(b as never),
+					deepFreeze: config.deepFreezeEnabled
+						? getDeepFreezeSnapshot(b as never)
+						: null,
 					corsConfig: b.corsConfig,
 					isCollaborative: (b as { isCollaborative?: boolean }).isCollaborative,
 					collaborationPermissions: (
@@ -198,6 +200,9 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 		}
 
 		if (path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+\/deep-freeze$/)) {
+			if (!config.deepFreezeEnabled) {
+				return errorResponse("Deep Freeze is currently disabled", 404);
+			}
 			if (req.method !== "POST") {
 				return errorResponse("Method not allowed", 405);
 			}

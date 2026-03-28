@@ -371,7 +371,9 @@ const server = Bun.serve({
 });
 
 console.log(`Silo S3 Gateway running on port ${process.env.PORT || 3000}`);
-deepFreezeWorkerService.start();
+if (config.deepFreezeEnabled) {
+	deepFreezeWorkerService.start();
+}
 bucketUsageReconciliationService.start();
 customDomainRevalidationService.start();
 
@@ -412,7 +414,9 @@ async function gracefulShutdown(signal: string) {
 	}
 
 	// 4. Stop background timers
-	deepFreezeWorkerService.stop();
+	if (config.deepFreezeEnabled) {
+		deepFreezeWorkerService.stop();
+	}
 	bucketUsageReconciliationService.stop();
 	customDomainRevalidationService.stop();
 	stopPeriodicEviction();
