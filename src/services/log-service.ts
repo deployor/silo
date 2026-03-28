@@ -19,6 +19,24 @@ interface LogEntry {
 	latencyMs: number;
 }
 
+function getObjectKeyFromLogEntry(entry: LogEntry): string | null {
+	const rawPath = entry.path.startsWith("/") ? entry.path.slice(1) : entry.path;
+	if (!rawPath) return null;
+
+	const bucketPrefix = `${entry.bucketName}/`;
+	const withoutBucketPrefix = rawPath.startsWith(bucketPrefix)
+		? rawPath.slice(bucketPrefix.length)
+		: rawPath;
+
+	if (!withoutBucketPrefix) return null;
+
+	try {
+		return decodeURIComponent(withoutBucketPrefix);
+	} catch {
+		return withoutBucketPrefix;
+	}
+}
+
 class LogService {
 	private queue: LogEntry[] = [];
 	private flushTimer: Timer | null = null;
@@ -79,7 +97,8 @@ class LogService {
 			);
 
 			for (const entry of objectEntries) {
-				const objectKey = entry.path.replace(/^\/+/, "");
+				const objectKey = getObjectKeyFromLogEntry(entry);
+				if (!objectKey) continue;
 				const existing = await db
 					.select({ id: objectStats.id })
 					.from(objectStats)
