@@ -24,7 +24,10 @@ type ExportCommandState = {
 	expiresAt: string;
 	secretKey: string;
 	accessKey: string;
+	bucketNames: string[];
 };
+
+type ExportSpeedMode = "safe" | "balanced" | "fast";
 
 export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const p = bootstrap.props as {
@@ -52,8 +55,47 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [downloadError, setDownloadError] = useState<string | null>(null);
 	const [exportCommand, setExportCommand] =
 		useState<ExportCommandState | null>(null);
+	const [exportSpeedMode, setExportSpeedMode] =
+		useState<ExportSpeedMode>("balanced");
+	const [selectedExportBuckets, setSelectedExportBuckets] = useState<string[]>([]);
 
 	const isLargeDownload = (p.totalStorageBytes || 0) > 5 * 1024 * 1024 * 1024;
+
+	const renderedExportCommand = useMemo(() => {
+		if (!exportCommand) return "";
+
+		const shellQuote = (value: string) => `'${value.replace(/'/g, `'"'"'`)}'`;
+		const destinationPath = "./silo-export";
+		const s3Flags = [
+			"--s3-provider Other",
+			`--s3-access-key-id ${shellQuote(exportCommand.accessKey)}`,
+			`--s3-secret-access-key ${shellQuote(exportCommand.secretKey)}`,
+			`--s3-endpoint ${shellQuote(exportCommand.endpoint)}`,
+			"--s3-region auto",
+			"--s3-force-path-style",
+			"--s3-no-check-bucket",
+		].join(" ");
+
+		const modeFlags =
+			exportSpeedMode === "safe"
+				? "--fast-list --transfers 8 --checkers 16 --multi-thread-streams 2 --multi-thread-cutoff 128M --progress"
+				: exportSpeedMode === "fast"
+					? "--fast-list --transfers 64 --checkers 128 --multi-thread-streams 16 --multi-thread-cutoff 32M --progress"
+					: "--fast-list --transfers 32 --checkers 64 --multi-thread-streams 8 --multi-thread-cutoff 64M --progress";
+
+		const bucketCommands = selectedExportBuckets
+			.map(
+				(bucketName) =>
+					`echo "Downloading ${bucketName}" && rclone copy ${shellQuote(`:s3:${bucketName}/`)} "$DEST/${bucketName}" ${s3Flags} ${modeFlags}`,
+			)
+			.join(" \\\n+  && ");
+
+		return [
+			`DEST=${shellQuote(destinationPath)}`,
+			'mkdir -p "$DEST"',
+			bucketCommands || 'echo "No buckets selected"',
+		].join(" \\\n+&& ");
+	}, [exportCommand, exportSpeedMode, selectedExportBuckets]);
 
 	const providerName = useMemo(() => {
 		const map = {
@@ -187,6 +229,7 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				throw new Error(data.error || "Failed to create export command");
 			}
 			setExportCommand(data);
+			setSelectedExportBuckets(data.bucketNames || []);
 		} catch (error) {
 			setDownloadError(
 				error instanceof Error ? error.message : "Failed to create export command",
@@ -691,6 +734,90 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					</div>
 
 					<div>
+						{exportCommand ? (
+							<div className="mb-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+								<div className="mb-3 flex items-center justify-between gap-4">
+									<h4 className="text-sm font-bold text-white">Speed</h4>
+									<div className="text-xs text-text-muted">
+										{exportSpeedMode === "safe"
+											? "safer"
+											: exportSpeedMode === "fast"
+												? "max speed"
+												: "balanced"}
+									</div>
+								</div>
+								<input
+									type="range"
+									min={0}
+									max={2}
+									step={1}
+									value={
+										exportSpeedMode === "safe"
+											? 0
+											: exportSpeedMode === "balanced"
+												? 1
+												: 2
+									}
+									onChange={(event) => {
+										const value = Number(event.target.value);
+										setExportSpeedMode(
+											value === 0 ? "safe" : value === 2 ? "fast" : "balanced",
+										);
+									}}
+									className="w-full"
+								/>
+								<div className="mt-2 flex justify-between text-xs text-text-muted">
+									<span>Safer</span>
+									<span>Balanced</span>
+									<span>Max speed</span>
+								</div>
+							</div>
+						) : null}
+
+						{exportCommand ? (
+							<div className="mb-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+								<div className="mb-3 flex items-center justify-between gap-4">
+									<h4 className="text-sm font-bold text-white">Buckets to download</h4>
+									<button
+										type="button"
+										onClick={() =>
+											setSelectedExportBuckets((prev) =>
+												prev.length === exportCommand.bucketNames.length
+													? []
+													: exportCommand.bucketNames,
+											)
+										}
+										className="text-xs text-text-muted hover:text-white"
+									>
+										{selectedExportBuckets.length === exportCommand.bucketNames.length
+											? "Clear all"
+											: "Select all"}
+									</button>
+								</div>
+								<div className="grid gap-2 sm:grid-cols-2">
+									{exportCommand.bucketNames.map((bucketName) => (
+										<label
+											key={bucketName}
+											className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white"
+										>
+											<input
+												type="checkbox"
+												checked={selectedExportBuckets.includes(bucketName)}
+												onChange={(event) => {
+													setSelectedExportBuckets((prev) =>
+														event.target.checked
+															? [...prev, bucketName]
+															: prev.filter((item) => item !== bucketName),
+													);
+												}}
+											/>
+											<span className="font-mono break-all">{bucketName}</span>
+										</label>
+									))}
+								</div>
+							</div>
+						) : null}
+
 						<div className="flex items-center justify-between gap-3 mb-2">
 							<h3 className="text-lg font-bold text-white">Recommended terminal command</h3>
 							<button
@@ -711,7 +838,7 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<>
 								<textarea
 									readOnly
-									value={exportCommand.command}
+									value={renderedExportCommand}
 									className="min-h-40 w-full rounded-2xl border border-white/10 bg-black/30 p-4 font-mono text-sm text-white focus:outline-none"
 								/>
 								<p className="mt-2 text-xs text-text-muted">
@@ -729,7 +856,7 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						{exportCommand ? (
 							<button
 								type="button"
-								onClick={() => void navigator.clipboard.writeText(exportCommand.command)}
+								onClick={() => void navigator.clipboard.writeText(renderedExportCommand)}
 								className="rounded-xl bg-hc-red px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-red-600"
 							>
 								Copy command
