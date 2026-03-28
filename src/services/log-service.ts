@@ -99,7 +99,7 @@ class LogService {
 							errorCount:
 								entry.statusCode >= 400
 									? sql`${objectStats.errorCount} + 1`
-									: objectStats.errorCount,
+									: sql`${objectStats.errorCount}`,
 							egressBytes: sql`${objectStats.egressBytes} + ${entry.egressBytes}`,
 							lastAccessedAt: new Date(),
 							updatedAt: new Date(),
