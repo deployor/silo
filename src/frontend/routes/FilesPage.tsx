@@ -1642,12 +1642,6 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</div>
 							</div>
 							<div>
-								<div className="mb-1 text-xs text-text-muted">Hits</div>
-								<div className="text-sm text-white">
-									{infoState.analytics.hitCount.toLocaleString()}
-								</div>
-							</div>
-							<div>
 								<div className="mb-1 text-xs text-text-muted">Size</div>
 								<div className="text-sm text-white">
 									{formatBytes(infoState.file.size)}
