@@ -1448,12 +1448,17 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										>
 											<td className="px-6 py-4 font-medium text-white font-mono">
 												{bucket.name}
-												{bucket.isCollaborative ? (
-													<span className="ml-2 bg-yellow-400/15 text-yellow-200 px-1.5 py-0.5 rounded text-[10px] font-bold border border-yellow-400/30 uppercase tracking-wider">
-														Shared
-													</span>
-												) : null}
-												{bucket.isPaused ? (
+													{bucket.isCollaborative ? (
+														<span className="ml-2 bg-yellow-400/15 text-yellow-200 px-1.5 py-0.5 rounded text-[10px] font-bold border border-yellow-400/30 uppercase tracking-wider">
+															Shared
+														</span>
+													) : null}
+													{!bucket.isCollaborative && (bucket.collaborators?.length || 0) > 0 ? (
+														<span className="ml-2 bg-violet-400/15 text-violet-100 px-1.5 py-0.5 rounded text-[10px] font-bold border border-violet-400/30 uppercase tracking-wider">
+															Shared out
+														</span>
+													) : null}
+{bucket.isPaused ? (
 													<span className="ml-2 bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-500/30">
 														PAUSED
 													</span>
@@ -1550,6 +1555,19 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												{new Date(bucket.createdAt).toLocaleDateString()}
 											</td>
 											<td className="px-6 py-4 text-right flex justify-end items-center gap-1.5">
+												{canOpenFiles && !isDeepFrozen ? (
+													<a
+														href={`/dashboard/buckets/${bucket.name}`}
+														aria-label="Open bucket files"
+														title="Open bucket files"
+													 className={`${iconActionBase} group text-hc-blue hover:text-blue-300 hover:bg-hc-blue/10`}
+													>
+														<MdFolderOpen className="text-base" />
+														<span className={iconActionTooltip}>
+															View bucket files
+														</span>
+													</a>
+												) : null}
 												{!isCollaborative && canManageCors ? (
 													<button
 														type="button"
@@ -1564,18 +1582,31 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														</span>
 													</button>
 												) : null}
-												{canOpenFiles && !isDeepFrozen ? (
-													<a
-														href={`/dashboard/buckets/${bucket.name}`}
-														aria-label="Open bucket files"
-														title="Open bucket files"
-													 className={`${iconActionBase} group text-hc-blue hover:text-blue-300 hover:bg-hc-blue/10`}
+												{!isCollaborative ? (
+													<button
+														type="button"
+														onClick={() => openCollaborationModal(bucket)}
+														aria-label="Manage collaborators"
+														title="Manage collaborators"
+													 className={`${iconActionBase} group text-yellow-200 hover:text-yellow-100 hover:bg-yellow-400/10`}
 													>
-														<MdFolderOpen className="text-base" />
+														<MdGroups className="text-base" />
 														<span className={iconActionTooltip}>
-															View bucket files
+															Manage collaboration
 														</span>
-													</a>
+													</button>
+												) : null}
+												{!isCollaborative && customDomainsEnabled ? (
+													<button
+														type="button"
+														onClick={() => openDomainModal(bucket)}
+														aria-label="Manage custom domains"
+														title="Manage custom domains"
+														className={`${iconActionBase} group text-violet-200 hover:text-violet-100 hover:bg-violet-400/10`}
+													>
+														<MdPublic className="text-base" />
+														<span className={iconActionTooltip}>Custom domains</span>
+													</button>
 												) : null}
 												{!isCollaborative && deepFreezeEnabled ? (
 													<button
@@ -1592,8 +1623,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														title="Deep Freeze"
 													 className={`${iconActionBase} group ${
 															deepFreezeState === "active"
-																	? "text-sky-300 hover:text-sky-200 hover:bg-sky-500/10"
-																	: "text-cyan-200 hover:text-cyan-100 hover:bg-cyan-500/10"
+																? "text-sky-300 hover:text-sky-200 hover:bg-sky-500/10"
+																: "text-cyan-200 hover:text-cyan-100 hover:bg-cyan-500/10"
 														}`}
 													>
 														<MdSevereCold className="text-base" />
@@ -1605,18 +1636,6 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																	: bucket.deepFreeze?.statusLabel ||
 																		"Deep Freeze in progress"}
 														</span>
-													</button>
-												) : null}
-												{!isCollaborative && customDomainsEnabled ? (
-													<button
-														type="button"
-														onClick={() => openDomainModal(bucket)}
-														aria-label="Manage custom domains"
-														title="Manage custom domains"
-														className={`${iconActionBase} group text-violet-200 hover:text-violet-100 hover:bg-violet-400/10`}
-													>
-														<MdPublic className="text-base" />
-														<span className={iconActionTooltip}>Custom domains</span>
 													</button>
 												) : null}
 												{!isCollaborative ? (
@@ -1653,21 +1672,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														</span>
 													</button>
 												) : null}
-												{!isCollaborative ? (
-													<button
-														type="button"
-														onClick={() => openCollaborationModal(bucket)}
-														aria-label="Manage collaborators"
-														title="Manage collaborators"
-													 className={`${iconActionBase} group text-yellow-200 hover:text-yellow-100 hover:bg-yellow-400/10`}
-													>
-														<MdGroups className="text-base" />
-														<span className={iconActionTooltip}>
-															Manage collaboration
-														</span>
-													</button>
-												) : null}
-											</td>
+</td>
 										</tr>
 									);
 								})(),
