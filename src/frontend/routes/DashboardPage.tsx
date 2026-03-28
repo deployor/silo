@@ -1415,11 +1415,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</thead>
 						<tbody className="divide-y divide-white/5">
 							{sortedBuckets.map((bucket) =>
-								(() => {
-									const isCollaborative = !!bucket.isCollaborative;
-									const permissions = collaborationPermissionState(
-										bucket.collaborationPermissions,
-									);
+														(() => {
+															const isCollaborative = !!bucket.isCollaborative;
+															const isSharing =
+																!isCollaborative && (bucket.collaborators?.length || 0) > 0;
+															const permissions = collaborationPermissionState(
+																bucket.collaborationPermissions,
+															);
 									const canManageKeys =
 										!isCollaborative || permissions.manageKeys;
 									const canManageCors =
@@ -1441,9 +1443,11 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													: deepFreezeState === "freezing" ||
 													  deepFreezeState === "unfreezing"
 														? "bg-cyan-500/[0.07] hover:bg-cyan-500/[0.11]"
-														: isCollaborative
-															? "bg-yellow-400/[0.04] hover:bg-yellow-400/[0.08]"
-															: "hover:bg-white/5"
+																	: isCollaborative
+																		? "bg-yellow-400/[0.04] hover:bg-yellow-400/[0.08]"
+																		: isSharing
+																			? "bg-violet-400/[0.05] hover:bg-violet-400/[0.09]"
+																		: "hover:bg-white/5"
 											}`}
 										>
 											<td className="px-6 py-4 font-medium text-white font-mono">
@@ -1455,7 +1459,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													) : null}
 													{!bucket.isCollaborative && (bucket.collaborators?.length || 0) > 0 ? (
 														<span className="ml-2 bg-violet-400/15 text-violet-100 px-1.5 py-0.5 rounded text-[10px] font-bold border border-violet-400/30 uppercase tracking-wider">
-															Shared out
+															Sharing
 														</span>
 													) : null}
 {bucket.isPaused ? (
