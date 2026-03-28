@@ -1,7 +1,7 @@
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db";
-import { requestLogs } from "../db/schema";
+import { objectStats, requestLogs } from "../db/schema";
 import { getContext } from "../lib/context";
-import { analyticsService } from "./analytics-service";
 
 interface LogEntry {
 	id: string;
@@ -54,7 +54,6 @@ class LogService {
 			this.scheduleFlush();
 		}
 
-		void analyticsService.recordRequestMetrics(response);
 	}
 
 	private async flush() {
@@ -70,6 +69,54 @@ class LogService {
 
 		try {
 			await db.insert(requestLogs).values(batch);
+
+			const objectEntries = batch.filter(
+				(entry) =>
+					entry.path.startsWith("/") &&
+					!entry.path.startsWith("/api/") &&
+					!entry.path.startsWith("/admin") &&
+					entry.path !== "/",
+			);
+
+			for (const entry of objectEntries) {
+				const objectKey = entry.path.replace(/^\/+/, "");
+				const existing = await db
+					.select({ id: objectStats.id })
+					.from(objectStats)
+					.where(
+						and(
+							eq(objectStats.bucketId, entry.bucketId),
+							eq(objectStats.objectKey, objectKey),
+						),
+					)
+					.limit(1);
+
+				if (existing[0]) {
+					await db
+						.update(objectStats)
+						.set({
+							hitCount: sql`${objectStats.hitCount} + 1`,
+							errorCount:
+								entry.statusCode >= 400
+									? sql`${objectStats.errorCount} + 1`
+									: objectStats.errorCount,
+							egressBytes: sql`${objectStats.egressBytes} + ${entry.egressBytes}`,
+							lastAccessedAt: new Date(),
+							updatedAt: new Date(),
+						})
+						.where(eq(objectStats.id, existing[0].id));
+				} else {
+					await db.insert(objectStats).values({
+						bucketId: entry.bucketId,
+						objectKey,
+						hitCount: 1,
+						errorCount: entry.statusCode >= 400 ? 1 : 0,
+						egressBytes: entry.egressBytes,
+						lastAccessedAt: new Date(),
+						updatedAt: new Date(),
+					});
+				}
+			}
 		} catch (e) {
 			console.error("Failed to flush log batch:", e);
 		}

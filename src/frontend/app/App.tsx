@@ -1,4 +1,3 @@
-import { AdminBucketAnalyticsPage } from "../routes/AdminBucketAnalyticsPage";
 import { AdminBucketsPage } from "../routes/AdminBucketsPage";
 import { AdminCachePage } from "../routes/AdminCachePage";
 import { AdminLogsPage } from "../routes/AdminLogsPage";
@@ -11,7 +10,6 @@ import { AdminUsersPage } from "../routes/AdminUsersPage";
 import { AdminYswsListPage } from "../routes/AdminYswsListPage";
 import { AdminYswsReviewPage } from "../routes/AdminYswsReviewPage";
 import { AgedOutPage } from "../routes/AgedOutPage";
-import { BucketAnalyticsPage } from "../routes/BucketAnalyticsPage";
 import { AccountPage } from "../routes/AccountPage";
 import { AccountDeletedPage } from "../routes/AccountDeletedPage";
 import { DashboardPage } from "../routes/DashboardPage";
@@ -40,8 +38,6 @@ export function App({ bootstrap }: Props) {
 			return <LandingPage bootstrap={bootstrap} />;
 		case "dashboard":
 			return <DashboardPage bootstrap={bootstrap} />;
-		case "bucket-analytics":
-			return <BucketAnalyticsPage bootstrap={bootstrap} />;
 		case "files":
 			return <FilesPage bootstrap={bootstrap} />;
 		case "docs":
@@ -56,8 +52,6 @@ export function App({ bootstrap }: Props) {
 			return <AdminUsersPage bootstrap={bootstrap} />;
 		case "admin-buckets":
 			return <AdminBucketsPage bootstrap={bootstrap} />;
-		case "admin-bucket-analytics":
-			return <AdminBucketAnalyticsPage bootstrap={bootstrap} />;
 		case "admin-speedtest":
 			return <AdminSpeedtestPage bootstrap={bootstrap} />;
 		case "admin-logs":

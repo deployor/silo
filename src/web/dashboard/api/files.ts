@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { config } from "../../../config";
 import { getCorsHeaders } from "../../../core/s3/cors";
@@ -7,7 +7,7 @@ import { handleGetRequest } from "../../../core/s3/get";
 import { handlePutRequest } from "../../../core/s3/put";
 import { getInternalPath } from "../../../core/s3/utils";
 import { db } from "../../../db";
-import { buckets, type users } from "../../../db/schema";
+import { buckets, objectStats, type users } from "../../../db/schema";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import {
 	buildBucketObjectUrl,
@@ -532,6 +532,35 @@ async function headObject(internalKey: string) {
 	};
 }
 
+async function getObjectAnalytics(bucketId: string, objectKey: string) {
+	const rows = await db
+		.select({
+			hitCount: objectStats.hitCount,
+			errorCount: objectStats.errorCount,
+			egressBytes: objectStats.egressBytes,
+			lastAccessedAt: objectStats.lastAccessedAt,
+			updatedAt: objectStats.updatedAt,
+		})
+		.from(objectStats)
+		.where(
+			and(
+				eq(objectStats.bucketId, bucketId),
+				eq(objectStats.objectKey, objectKey),
+			),
+		)
+		.limit(1);
+
+	const row = rows[0];
+	return {
+		hitCount: Number(row?.hitCount || 0),
+		errorCount: Number(row?.errorCount || 0),
+		ingressBytes: Number(row?.ingressBytes || 0),
+		egressBytes: Number(row?.egressBytes || 0),
+		lastAccessedAt: row?.lastAccessedAt?.toISOString() || null,
+		updatedAt: row?.lastAccessedAt?.toISOString() || null,
+	};
+}
+
 export async function handleFiles(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
 	if (!user) return errorResponse("Unauthorized", 401);
@@ -638,7 +667,10 @@ export async function handleFiles(req: Request): Promise<Response> {
 		);
 
 		try {
-			const stat = await headObject(internalKey);
+			const [stat, analytics] = await Promise.all([
+				headObject(internalKey),
+				getObjectAnalytics(bucketData.bucket.id, safeKey),
+			]);
 
 			const publicUrl = bucketData.bucket.isPublic
 				? buildBucketObjectUrl({
@@ -654,6 +686,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 					size: stat.size,
 					contentType: stat.contentType,
 				},
+				analytics,
 				publicUrl,
 				isPublic: bucketData.bucket.isPublic,
 			});

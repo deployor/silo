@@ -19,6 +19,10 @@ type FileItem = {
 	name: string;
 	size: number;
 	lastModified: string;
+	hitCount?: number;
+	errorCount?: number;
+	egressBytes?: number;
+	lastAccessedAt?: string | null;
 	url: string;
 	type: "file";
 	extension: string;
@@ -69,6 +73,14 @@ type FileInfoState = {
 	publicUrlOrigin: string | null;
 	isPublic: boolean;
 	contentType: string;
+	analytics: {
+		hitCount: number;
+		errorCount: number;
+		ingressBytes: number;
+		egressBytes: number;
+		lastAccessedAt: string | null;
+		updatedAt: string | null;
+	};
 	previewUrl: string;
 	downloadUrl: string;
 	previewText: string;
@@ -155,6 +167,14 @@ function getFileIcon(file: FileItem): string {
 function formatRelativeTime(value: string): string {
 	const date = new Date(value);
 	return date.toLocaleString();
+}
+
+function formatFileStatLine(file: FileItem): string {
+	const segments = [`${file.hitCount || 0} hits`, formatBytes(file.size)];
+	if (file.lastAccessedAt) {
+		segments.push(`last hit ${formatRelativeTime(file.lastAccessedAt)}`);
+	}
+	return segments.join(" • ");
 }
 
 export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
@@ -576,6 +596,14 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			publicUrlOrigin: null,
 			isPublic: false,
 			contentType: "application/octet-stream",
+			analytics: {
+				hitCount: file.hitCount || 0,
+				errorCount: file.errorCount || 0,
+				ingressBytes: 0,
+				egressBytes: file.egressBytes || 0,
+				lastAccessedAt: file.lastAccessedAt || null,
+				updatedAt: null,
+			},
 			previewUrl: "",
 			downloadUrl: "",
 			previewText: "",
@@ -591,6 +619,14 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			const [info, signed] = await Promise.all([
 				fetchJson<{
 					file: { key: string; size: number; contentType: string };
+					analytics: {
+						hitCount: number;
+						errorCount: number;
+						ingressBytes: number;
+						egressBytes: number;
+						lastAccessedAt: string | null;
+						updatedAt: string | null;
+					};
 					publicUrl: string | null;
 					isPublic: boolean;
 				}>(
@@ -619,11 +655,18 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			}
 
 			setInfoState({
-				file,
+				file: {
+					...file,
+					hitCount: info.analytics.hitCount,
+					errorCount: info.analytics.errorCount,
+					egressBytes: info.analytics.egressBytes,
+					lastAccessedAt: info.analytics.lastAccessedAt,
+				},
 				publicUrl: info.publicUrl,
 				publicUrlOrigin: info.publicUrl ? new URL(info.publicUrl).origin : null,
 				isPublic: info.isPublic,
 				contentType: info.file.contentType,
+				analytics: info.analytics,
 				previewUrl: isTextPreview ? "" : signed.url,
 				downloadUrl: signed.url,
 				previewText,
@@ -641,6 +684,14 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				publicUrlOrigin: null,
 				isPublic: false,
 				contentType: "application/octet-stream",
+				analytics: {
+					hitCount: file.hitCount || 0,
+					errorCount: file.errorCount || 0,
+					ingressBytes: 0,
+					egressBytes: file.egressBytes || 0,
+					lastAccessedAt: file.lastAccessedAt || null,
+					updatedAt: null,
+				},
 				previewUrl: "",
 				downloadUrl: "",
 				previewText: "",
@@ -1354,8 +1405,8 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												</td>
 												<td className="px-4 py-3.5 font-medium text-white min-w-0">
 													<div className="font-mono break-all">{file.name}</div>
-													<div className="text-[11px] text-text-muted mt-0.5 break-all font-mono">
-														{file.relativePath}
+													<div className="text-[11px] text-text-muted mt-0.5 break-all">
+														{formatFileStatLine(file)}
 													</div>
 												</td>
 												<td className="px-4 py-3.5 text-text-muted text-xs whitespace-nowrap">
@@ -1561,7 +1612,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 						<div className="grid grid-cols-2 gap-4 md:grid-cols-4">
 							<div>
-								<div className="mb-1 text-xs text-text-muted">Date Created</div>
+								<div className="mb-1 text-xs text-text-muted">Modified</div>
 								<div className="text-sm text-white">
 									{formatRelativeTime(infoState.file.lastModified)}
 								</div>
@@ -1576,6 +1627,12 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<div className="mb-1 text-xs text-text-muted">Visibility</div>
 								<div className="text-sm text-white">
 									{infoState.isPublic ? "Public" : "Private"}
+								</div>
+							</div>
+							<div>
+								<div className="mb-1 text-xs text-text-muted">Hits</div>
+								<div className="text-sm text-white">
+									{infoState.analytics.hitCount.toLocaleString()}
 								</div>
 							</div>
 							<div>
@@ -1720,6 +1777,28 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<span className="text-text-muted">Path</span>
 											<span className="max-w-[70%] break-all font-mono text-white">
 												{infoState.file.relativePath}
+											</span>
+										</div>
+										<div className="flex items-start justify-between gap-4">
+											<span className="text-text-muted">Statistics</span>
+											<span className="max-w-[70%] text-right text-white">
+												{infoState.analytics.hitCount.toLocaleString()} hits • {formatBytes(infoState.analytics.egressBytes)} egress • {infoState.analytics.errorCount.toLocaleString()} errors
+											</span>
+										</div>
+										<div className="flex items-start justify-between gap-4">
+											<span className="text-text-muted">Last access</span>
+											<span className="max-w-[70%] text-right text-white">
+												{infoState.analytics.lastAccessedAt
+													? formatRelativeTime(infoState.analytics.lastAccessedAt)
+													: "No hits yet"}
+											</span>
+										</div>
+										<div className="flex items-start justify-between gap-4">
+											<span className="text-text-muted">Analytics updated</span>
+											<span className="max-w-[70%] text-right text-white">
+												{infoState.analytics.updatedAt
+													? formatRelativeTime(infoState.analytics.updatedAt)
+													: "—"}
 											</span>
 										</div>
 										<div className="flex items-start justify-between gap-4">
