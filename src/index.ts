@@ -324,7 +324,12 @@ const server = Bun.serve({
 					if (!response) response = S3Errors.InternalError().toResponse();
 
 					// Compress compressible S3 GET responses
-					if (req.method === "GET" && response.ok) {
+					const currentCtx = context.getStore();
+					if (
+						req.method === "GET" &&
+						response.ok &&
+						!currentCtx?.isOffboardingExport
+					) {
 						response = await compressResponse(req, response);
 					}
 				}
