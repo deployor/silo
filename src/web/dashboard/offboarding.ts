@@ -160,16 +160,24 @@ export async function handleOffboardingRequest(
 		}
 
 		const userBuckets = await db
-			.select({ name: buckets.name })
+			.select({ name: buckets.name, totalBytes: buckets.totalBytes })
 			.from(buckets)
 			.where(eq(buckets.userId, user.id));
+
+		const bucketDetails = await Promise.all(
+			userBuckets.map(async (bucket) => ({
+				name: bucket.name,
+				totalBytes: Number(bucket.totalBytes) || 0,
+				objectCount: await getBucketObjectCount(user, bucket.name),
+			})),
+		);
 
 		const endpoint = `https://${config.s3Domain}`;
 		const command = buildOffboardingRcloneCommand({
 			endpoint,
 			accessKey,
 			secretKey,
-			bucketNames: userBuckets.map((bucket) => bucket.name),
+			bucketNames: bucketDetails.map((bucket) => bucket.name),
 			destinationPath: "./silo-export",
 		});
 
@@ -178,7 +186,8 @@ export async function handleOffboardingRequest(
 				accessKey,
 				secretKey,
 				endpoint,
-				bucketNames: userBuckets.map((bucket) => bucket.name),
+				bucketNames: bucketDetails.map((bucket) => bucket.name),
+				buckets: bucketDetails,
 				expiresAt: (activeSession[0]?.expiresAt || expiresAt).toISOString(),
 				command,
 			}),
@@ -256,6 +265,50 @@ type MigrationParams = {
 	secretAccessKey?: string;
 	bucketMapping?: Record<string, string>;
 };
+
+async function getBucketObjectCount(
+	user: typeof users.$inferSelect,
+	bucketName: string,
+) {
+	const bucketRows = await db
+		.select()
+		.from(buckets)
+		.where(and(eq(buckets.userId, user.id), eq(buckets.name, bucketName)))
+		.limit(1);
+	const bucket = bucketRows[0];
+	if (!bucket) return 0;
+
+	const internalPrefix = getInternalPath("", user, bucket);
+	let continuationToken: string | undefined;
+	let totalObjects = 0;
+
+	do {
+		const query = new URLSearchParams();
+		query.set("list-type", "2");
+		query.set("prefix", internalPrefix);
+		query.set("max-keys", "1000");
+		if (continuationToken) query.set("continuation-token", continuationToken);
+
+		const listRes = await s3Client.fetch(`?${query.toString()}`, {
+			method: "GET",
+		});
+		if (!listRes.ok) break;
+
+		const xml = await listRes.text();
+		const { XMLParser } = await import("fast-xml-parser");
+		const parser = new XMLParser();
+		const result = parser.parse(xml).ListBucketResult;
+		const contents = result.Contents
+			? Array.isArray(result.Contents)
+				? result.Contents
+				: [result.Contents]
+			: [];
+		totalObjects += contents.length;
+		continuationToken = result.NextContinuationToken;
+	} while (continuationToken);
+
+	return totalObjects;
+}
 
 async function analyzeMigration(
 	user: typeof users.$inferSelect,
