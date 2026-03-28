@@ -81,7 +81,18 @@ export function buildOffboardingRcloneCommand(params: {
 	const destinationPath = params.destinationPath || "./silo-export";
 	const s3Flags = buildOffboardingRcloneS3Flags(params);
 	const copyFlags = "--fast-list --transfers 16 --checkers 32 --progress";
-	return `DEST=${shellQuote(destinationPath)}; mkdir -p "$DEST" && rclone lsf :s3: --dirs-only ${s3Flags} | while IFS= read -r bucket; do [ -n "$bucket" ] || continue; bucket=\${bucket%/}; echo Downloading "$bucket"; rclone copy ":s3:\${bucket}/" "$DEST/$bucket" ${s3Flags} ${copyFlags}; done`;
+	const bucketCopies = params.bucketNames
+		.map(
+			(bucketName) =>
+				`echo "Downloading ${bucketName}" && rclone copy ${shellQuote(`:s3:${bucketName}/`)} "$DEST/${bucketName}" ${s3Flags} ${copyFlags}`,
+		)
+		.join(" \\\n+  && ");
+
+	return [
+		`DEST=${shellQuote(destinationPath)}`,
+		'mkdir -p "$DEST"',
+		bucketCopies,
+	].join(" \\\n+&& ");
 }
 
 export async function expireOffboardingExportSessions() {
