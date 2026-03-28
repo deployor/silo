@@ -36,10 +36,13 @@ For full documentation on how to use Silo, including SDK examples, configuration
 
 ## Cloudflare for SaaS setup
 
+Custom-domain support is currently feature-flagged. It is disabled unless [`DOMAINS`](README.md) is explicitly set to `true` in the environment.
+
 Custom domains now assume Cloudflare for SaaS is the source of truth for SSL issuance and hostname validation.
 
 Required environment variables:
 
+- `DOMAINS` — set to `true` to enable all custom-domain UI/API/runtime behavior.
 - `CF_API_TOKEN` — Cloudflare API token with custom hostname permissions for the zone.
 - `CF_ZONE_ID` — Zone ID for the SaaS zone.
 - `CF_SAAS_FALLBACK_ORIGIN` — Origin hostname Cloudflare should send traffic to.

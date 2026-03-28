@@ -174,6 +174,9 @@ export function buildBucketObjectUrl(params: {
 	customDomains?: BucketCustomDomain[];
 }): string {
 	const safeKey = params.key.replace(/^\/+/, "");
+	if (!config.customDomainsEnabled) {
+		return `https://${config.s3Domain}/${params.bucketName}/${safeKey}`;
+	}
 	const primary = getPrimaryVerifiedCustomDomain(params.customDomains || []);
 	if (primary) {
 		return `https://${primary.domain}/${safeKey}`;
@@ -194,6 +197,9 @@ export function buildBucketUrlExample(params: {
 }
 
 export async function resolveBucketByHostname(hostname: string) {
+	if (!config.customDomainsEnabled) {
+		return null;
+	}
 	const normalized = normalizeCustomDomain(hostname);
 	const cacheKey = `bucket:custom-domain:${normalized}`;
 	try {
