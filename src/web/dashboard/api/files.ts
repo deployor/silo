@@ -49,6 +49,16 @@ type DirectoryTotals = {
 	totalFolders: number;
 };
 
+type ObjectAnalyticsMap = Record<
+	string,
+	{
+		hitCount: number;
+		errorCount: number;
+		egressBytes: number;
+		lastAccessedAt: string | null;
+	}
+>;
+
 type BucketContext = {
 	bucket: BucketRecord;
 	owner: typeof users.$inferSelect;
@@ -561,6 +571,41 @@ async function getObjectAnalytics(bucketId: string, objectKey: string) {
 	};
 }
 
+async function getObjectAnalyticsMap(bucketId: string, objectKeys: string[]) {
+	const normalizedKeys = Array.from(new Set(objectKeys.filter(Boolean)));
+	if (normalizedKeys.length === 0) {
+		return {} satisfies ObjectAnalyticsMap;
+	}
+
+	const rows = await db
+		.select({
+			objectKey: objectStats.objectKey,
+			hitCount: objectStats.hitCount,
+			errorCount: objectStats.errorCount,
+			egressBytes: objectStats.egressBytes,
+			lastAccessedAt: objectStats.lastAccessedAt,
+		})
+		.from(objectStats)
+		.where(
+			and(
+				eq(objectStats.bucketId, bucketId),
+				sql`${objectStats.objectKey} = ANY(${normalizedKeys})`,
+			),
+		);
+
+	const map: ObjectAnalyticsMap = {};
+	for (const row of rows) {
+		map[row.objectKey] = {
+			hitCount: Number(row.hitCount || 0),
+			errorCount: Number(row.errorCount || 0),
+			egressBytes: Number(row.egressBytes || 0),
+			lastAccessedAt: row.lastAccessedAt?.toISOString() || null,
+		};
+	}
+
+	return map;
+}
+
 export async function handleFiles(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
 	if (!user) return errorResponse("Unauthorized", 401);
@@ -876,11 +921,21 @@ export async function handleFiles(req: Request): Promise<Response> {
 				owner: bucketData.owner,
 				prefix: currentPrefix,
 			});
+			const analyticsMap = await getObjectAnalyticsMap(
+				bucketData.bucket.id,
+				result.files.map((file) => file.key),
+			);
 
 			return jsonResponse({
 				mode: "directory",
 				currentPrefix,
-				files: result.files,
+				files: result.files.map((file) => ({
+					...file,
+					hitCount: analyticsMap[file.key]?.hitCount || 0,
+					errorCount: analyticsMap[file.key]?.errorCount || 0,
+					egressBytes: analyticsMap[file.key]?.egressBytes || 0,
+					lastAccessedAt: analyticsMap[file.key]?.lastAccessedAt || null,
+				})),
 				folders: result.folders,
 				nextContinuationToken: result.nextContinuationToken,
 				totalFiles: totals.totalFiles,

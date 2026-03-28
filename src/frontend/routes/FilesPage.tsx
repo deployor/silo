@@ -170,7 +170,10 @@ function formatRelativeTime(value: string): string {
 }
 
 function formatFileStatLine(file: FileItem): string {
-	const segments = [`${file.hitCount || 0} hits`, formatBytes(file.size)];
+	const segments = [
+		`${file.hitCount || 0} hits`,
+		formatBytes(file.egressBytes || 0),
+	];
 	if (file.lastAccessedAt) {
 		segments.push(`last hit ${formatRelativeTime(file.lastAccessedAt)}`);
 	}
