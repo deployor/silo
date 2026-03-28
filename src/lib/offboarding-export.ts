@@ -86,13 +86,13 @@ export function buildOffboardingRcloneCommand(params: {
 			(bucketName) =>
 				`echo "Downloading ${bucketName}" && rclone copy ${shellQuote(`:s3:${bucketName}/`)} "$DEST/${bucketName}" ${s3Flags} ${copyFlags}`,
 		)
-		.join(" \\\n+  && ");
+		.join(" \\\n  && ");
 
 	return [
 		`DEST=${shellQuote(destinationPath)}`,
 		'mkdir -p "$DEST"',
 		bucketCopies,
-	].join(" \\\n+&& ");
+	].join(" \\\n&& ");
 }
 
 export async function expireOffboardingExportSessions() {
