@@ -20,6 +20,7 @@ const envSchema = z.object({
 	REVOCATION_SECRET: z.string().optional(),
 	DEV_ACCESS_CODE: z.string().optional(),
 	DOMAINS: z.string().optional(),
+	DEEP_FREEZE: z.string().optional(),
 	CF_API_TOKEN: z.string().optional(),
 	CF_ZONE_ID: z.string().optional(),
 	CF_SAAS_FALLBACK_ORIGIN: z.string().optional(),
@@ -114,6 +115,7 @@ export const config = {
 	revocationSecret: env.REVOCATION_SECRET,
 	devAccessCode: env.DEV_ACCESS_CODE,
 	customDomainsEnabled: env.DOMAINS === "true",
+	deepFreezeEnabled: env.DEEP_FREEZE === "true",
 	cloudflareForSaas: {
 		apiToken: env.CF_API_TOKEN,
 		zoneId: env.CF_ZONE_ID,

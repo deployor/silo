@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { config } from "../config";
 import { db } from "../db";
 import { buckets, deepFreezeJobs } from "../db/schema";
 import { getBucketAccessForUser } from "./collaboration-service";
@@ -84,6 +85,25 @@ export function estimateDeepFreezeDurations(totalBytes: number) {
 export function getDeepFreezeSnapshot(
 	bucket: BucketRecord,
 ): DeepFreezeSnapshot {
+	if (!config.deepFreezeEnabled) {
+		return {
+			state: "active",
+			isLocked: false,
+			progressPercent: 0,
+			archiveBytes: 0,
+			estimatedFreezeSeconds: 0,
+			estimatedUnfreezeSeconds: 0,
+			etaSeconds: null,
+			statusLabel: "Unavailable",
+			statusDescription: "Deep Freeze is disabled for this deployment.",
+			archiveKey: null,
+			requestedAt: null,
+			startedAt: null,
+			completedAt: null,
+			lastUpdatedAt: null,
+			reason: null,
+		};
+	}
 	const state = normalizeState(bucket.deepFreezeState);
 	const estimatedFreezeSeconds = Math.max(
 		0,
@@ -193,6 +213,9 @@ export function getDeepFreezeSnapshot(
 export async function syncBucketDeepFreezeState(
 	bucket: BucketRecord,
 ): Promise<BucketRecord> {
+	if (!config.deepFreezeEnabled) {
+		return bucket;
+	}
 	const state = normalizeState(bucket.deepFreezeState);
 	if (state !== "freezing" && state !== "unfreezing") {
 		return bucket;
@@ -243,6 +266,9 @@ export async function syncBucketDeepFreezeState(
 export async function syncBucketsDeepFreezeState<T extends BucketRecord>(
 	bucketList: T[],
 ): Promise<T[]> {
+	if (!config.deepFreezeEnabled) {
+		return bucketList;
+	}
 	return Promise.all(
 		bucketList.map(
 			async (bucket) => (await syncBucketDeepFreezeState(bucket)) as T,
@@ -253,6 +279,7 @@ export async function syncBucketsDeepFreezeState<T extends BucketRecord>(
 export function getBucketDeepFreezeMessage(
 	bucket: BucketRecord,
 ): string | null {
+	if (!config.deepFreezeEnabled) return null;
 	const snapshot = getDeepFreezeSnapshot(bucket);
 	if (!snapshot.isLocked) return null;
 	if (snapshot.state === "freezing") {
@@ -270,6 +297,9 @@ export async function requestBucketDeepFreezeAction(params: {
 	action: "freeze" | "unfreeze";
 	isAdmin?: boolean;
 }) {
+	if (!config.deepFreezeEnabled) {
+		throw new Error("Deep Freeze is currently disabled");
+	}
 	const access = await getBucketAccessForUser({
 		bucketName: params.bucketName,
 		userId: params.userId,

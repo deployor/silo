@@ -37,6 +37,7 @@ export function renderReactDocument(
 			env: config.env,
 			git: config.git,
 			customDomainsEnabled: config.customDomainsEnabled,
+			deepFreezeEnabled: config.deepFreezeEnabled,
 			cloudflareForSaas: {
 				targetHostname: config.cloudflareForSaas.targetHostname,
 				configured: config.cloudflareForSaas.configured,

@@ -12,6 +12,7 @@ export type FrontendConfig = {
 	env?: string;
 	git?: GitInfo;
 	customDomainsEnabled?: boolean;
+	deepFreezeEnabled?: boolean;
 	cloudflareForSaas?: {
 		targetHostname?: string;
 		configured?: boolean;

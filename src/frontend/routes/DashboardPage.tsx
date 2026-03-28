@@ -222,6 +222,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	};
 	const customDomainsEnabled =
 		bootstrap.config?.customDomainsEnabled === true;
+	const deepFreezeEnabled = bootstrap.config?.deepFreezeEnabled === true;
 	const customDomainTargetHostname =
 		bootstrap.config?.cloudflareForSaas?.targetHostname || "silo.deployor.dev";
 
@@ -299,6 +300,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	}, [load]);
 
 	useEffect(() => {
+		if (!deepFreezeEnabled) {
+			return;
+		}
 		if (
 			!stats?.buckets.some((bucket) => bucket.deepFreeze?.state !== "active")
 		) {
@@ -308,10 +312,11 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			void load();
 		}, 15000);
 		return () => window.clearInterval(interval);
-	}, [stats?.buckets, load]);
+	}, [deepFreezeEnabled, stats?.buckets, load]);
 
 	// prevent race condition in modal render
 	useEffect(() => {
+		if (!deepFreezeEnabled) return;
 		if (!deepFreezeModal || !stats?.buckets) return;
 		const nextBucket = stats.buckets.find(
 			(bucket) => bucket.name === deepFreezeModal.bucket.name,
@@ -320,7 +325,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		setDeepFreezeModal((prev) =>
 			prev ? { ...prev, bucket: nextBucket } : prev,
 		);
-	}, [deepFreezeModal, stats?.buckets]);
+	}, [deepFreezeEnabled, deepFreezeModal, stats?.buckets]);
 
 	const storagePercent = useMemo(() => {
 		if (!stats) return 0;
@@ -342,7 +347,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		[stats?.buckets],
 	);
 
-	const deepFreezeModalBucket = deepFreezeModal?.bucket || null;
+	const deepFreezeModalBucket =
+		deepFreezeEnabled ? deepFreezeModal?.bucket || null : null;
 	const deepFreezeSnapshot = deepFreezeModalBucket?.deepFreeze;
 
 	const collaborationPermissionState = (permissions?: string[] | null) => ({
@@ -1573,7 +1579,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														</span>
 													</a>
 												) : null}
-												{!isCollaborative ? (
+												{!isCollaborative && deepFreezeEnabled ? (
 													<button
 														type="button"
 														onClick={() =>
