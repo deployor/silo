@@ -270,14 +270,18 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 								<div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
 									<div className="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow flex flex-col items-center text-center">
-										<div className="h-20 w-20 bg-white/10 rounded-full flex items-center justify-center mb-6 text-4xl text-white">
-											<PhIcon className="ph-duotone ph-file-zip text-5xl" />
+										<div className={`h-20 w-20 rounded-full flex items-center justify-center mb-6 text-4xl ${isLargeDownload ? "bg-blue-500/10 text-blue-400" : "bg-white/10 text-white"}`}>
+											<PhIcon
+												className={`text-5xl ${isLargeDownload ? "ph-duotone ph-laptop" : "ph-duotone ph-file-zip"}`}
+											/>
 										</div>
 										<h3 className="text-2xl font-bold text-white mb-2">
-											Download ZIP
+											{isLargeDownload ? "Download on device" : "Download ZIP"}
 										</h3>
 										<p className="text-text-muted mb-8 flex-1 text-lg">
-											Get one archive containing all bucket files and metadata.
+											{isLargeDownload
+												? "Download all your buckets and folders directly onto this device with a much more reliable local transfer flow."
+												: "Get one archive containing all bucket files and metadata."}
 										</p>
 										{p.showSuccess ? (
 											<div className="bg-green-500/20 text-green-400 p-4 rounded-xl font-bold w-full">
@@ -291,11 +295,11 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													onClick={() => void handleDownloadArchive()}
 													className="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-4 rounded-xl transition-all"
 												>
-													Download Archive
+													{isLargeDownload ? "Download on this device" : "Download Archive"}
 												</button>
 												{isLargeDownload ? (
 													<p className="mt-3 text-xs text-text-muted">
-														Large export detected — we'll recommend a terminal download tool first.
+														Download everything to this device.
 													</p>
 												) : null}
 											</div>
