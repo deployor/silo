@@ -12,7 +12,6 @@ import {
 	requestBucketDeepFreezeAction,
 } from "../../../services/deep-freeze-service";
 import { getAppSettings } from "../../../services/settings-service";
-import { handleAnalytics } from "./analytics";
 import { handleBucketOperations, handleBuckets } from "./buckets";
 import { handleCollaboration } from "./collaboration";
 import { handleCors } from "./cors";
@@ -243,10 +242,6 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 					error instanceof Error ? error.message : "Internal Error";
 				return errorResponse(message, 500);
 			}
-		}
-
-		if (path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+\/analytics\//)) {
-			return handleAnalytics(req);
 		}
 
 		if (path.match(/^\/api\/dashboard\/buckets\/[a-z0-9-]+\/cors$/)) {

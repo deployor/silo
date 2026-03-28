@@ -14,7 +14,6 @@ import { authenticate } from "./middleware/auth";
 import { compressResponse } from "./middleware/compression";
 import { rateLimit } from "./middleware/rate-limit";
 import { securityHeaders } from "./middleware/security-headers";
-import { analyticsService } from "./services/analytics-service";
 import { bucketUsageReconciliationService } from "./services/bucket-usage-reconciliation-service";
 import { customDomainRevalidationService } from "./services/custom-domain-revalidation-service";
 import { deepFreezeWorkerService } from "./services/deep-freeze-worker-service";
@@ -404,13 +403,6 @@ async function gracefulShutdown(signal: string) {
 		await logService.shutdown();
 	} catch (e) {
 		console.error("Log flush error:", e);
-	}
-
-	try {
-		console.log("Flushing analytics queues...");
-		await analyticsService.shutdown();
-	} catch (e) {
-		console.error("Analytics flush error:", e);
 	}
 
 	// 4. Stop background timers

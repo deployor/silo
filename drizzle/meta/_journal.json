@@ -71,6 +71,13 @@
 			"when": 1769626922668,
 			"tag": "0009_loud_ego",
 			"breakpoints": true
+		},
+		{
+			"idx": 10,
+			"version": "5",
+			"when": 1774707600000,
+			"tag": "0017_object_stats",
+			"breakpoints": true
 		}
 	]
 }

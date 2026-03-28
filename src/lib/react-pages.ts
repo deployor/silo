@@ -1,7 +1,6 @@
 export const REACT_PAGE_IDS = [
 	"landing",
 	"dashboard",
-	"bucket-analytics",
 	"files",
 	"docs",
 	"account",
@@ -9,7 +8,6 @@ export const REACT_PAGE_IDS = [
 	"offboarding",
 	"admin-users",
 	"admin-buckets",
-	"admin-bucket-analytics",
 	"admin-speedtest",
 	"admin-logs",
 	"admin-cache",
