@@ -104,13 +104,13 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				(bucketName) =>
 					`echo "Downloading ${bucketName}" && rclone copy ${shellQuote(`:s3:${bucketName}/`)} "$DEST/${bucketName}" ${s3Flags} ${modeFlags}`,
 			)
-			.join(" \\\n+  && ");
+			.join(" \\\n  && ");
 
 		return [
 			`DEST=${shellQuote(destinationPath)}`,
 			'mkdir -p "$DEST"',
 			bucketCommands || 'echo "No buckets selected"',
-		].join(" \\\n+&& ");
+		].join(" \\\n&& ");
 	}, [exportCommand, exportSpeedMode, selectedExportBuckets]);
 
 	const providerName = useMemo(() => {
@@ -731,7 +731,7 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={downloadModalOpen}
 				onClose={() => setDownloadModalOpen(false)}
 				title="Large export download"
-				className="max-w-3xl p-8"
+				className="max-w-7xl p-8"
 			>
 				<div className="space-y-6">
 					<div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
@@ -749,123 +749,135 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</div>
 					</div>
 
-					<div>
-						{exportCommand ? (
-							<div className="mb-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-								<div className="mb-3 flex items-center justify-between gap-4">
-									<h4 className="text-sm font-bold text-white">Speed</h4>
-									<div className="text-xs text-text-muted">
-										{exportSpeedMode === "safe"
-											? "safer"
-											: exportSpeedMode === "fast"
-												? "max speed"
-												: "balanced"}
+					<div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_340px]">
+						<div>
+							{exportCommand ? (
+								<div className="mb-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+									<div className="mb-3 flex items-center justify-between gap-4">
+										<h4 className="text-sm font-bold text-white">Speed</h4>
+										<div className="text-xs text-text-muted">
+											{exportSpeedMode === "safe"
+												? "safer"
+												: exportSpeedMode === "fast"
+													? "max speed"
+													: "balanced"}
+										</div>
+									</div>
+									<input
+										type="range"
+										min={0}
+										max={2}
+										step={1}
+										value={
+											exportSpeedMode === "safe"
+												? 0
+												: exportSpeedMode === "balanced"
+													? 1
+													: 2
+										}
+										onChange={(event) => {
+											const value = Number(event.target.value);
+											setExportSpeedMode(
+												value === 0 ? "safe" : value === 2 ? "fast" : "balanced",
+											);
+										}}
+										className="w-full"
+									/>
+									<div className="mt-2 flex justify-between text-xs text-text-muted">
+										<span>Safer</span>
+										<span>Balanced</span>
+										<span>Max speed</span>
 									</div>
 								</div>
-								<input
-									type="range"
-									min={0}
-									max={2}
-									step={1}
-									value={
-										exportSpeedMode === "safe"
-											? 0
-											: exportSpeedMode === "balanced"
-												? 1
-												: 2
-									}
-									onChange={(event) => {
-										const value = Number(event.target.value);
-										setExportSpeedMode(
-											value === 0 ? "safe" : value === 2 ? "fast" : "balanced",
-										);
-									}}
-									className="w-full"
-								/>
-								<div className="mt-2 flex justify-between text-xs text-text-muted">
-									<span>Safer</span>
-									<span>Balanced</span>
-									<span>Max speed</span>
-								</div>
-							</div>
-						) : null}
+							) : null}
 
-						{exportCommand ? (
-							<div className="mb-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-								<div className="mb-3 flex items-center justify-between gap-4">
-									<h4 className="text-sm font-bold text-white">Buckets to download</h4>
-									<button
-										type="button"
-										onClick={() =>
-											setSelectedExportBuckets((prev) =>
-												prev.length === exportCommand.bucketNames.length
-													? []
-													: exportCommand.bucketNames,
-											)
-										}
-										className="text-xs text-text-muted hover:text-white"
-									>
-										{selectedExportBuckets.length === exportCommand.bucketNames.length
-											? "Clear all"
-											: "Select all"}
-									</button>
-								</div>
-								<div className="grid gap-2 sm:grid-cols-2">
-									{exportCommand.bucketNames.map((bucketName) => (
-										<label
-											key={bucketName}
-											className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white"
-										>
-											<input
-												type="checkbox"
-												checked={selectedExportBuckets.includes(bucketName)}
-												onChange={(event) => {
-													setSelectedExportBuckets((prev) =>
-														event.target.checked
-															? [...prev, bucketName]
-															: prev.filter((item) => item !== bucketName),
-													);
-												}}
-											/>
-											<span className="font-mono break-all">{bucketName}</span>
-										</label>
-									))}
-								</div>
+							<div className="flex items-center justify-between gap-3 mb-2">
+								<h3 className="text-lg font-bold text-white">Recommended terminal command</h3>
+								<button
+									type="button"
+									onClick={() => void createRcloneExport()}
+									disabled={downloadBusy}
+									className="text-sm text-text-muted hover:text-white disabled:opacity-50"
+								>
+									{downloadBusy ? "Generating..." : exportCommand ? "Refresh" : "Generate"}
+								</button>
 							</div>
-						) : null}
-
-						<div className="flex items-center justify-between gap-3 mb-2">
-							<h3 className="text-lg font-bold text-white">Recommended terminal command</h3>
-							<button
-								type="button"
-								onClick={() => void createRcloneExport()}
-								disabled={downloadBusy}
-								className="text-sm text-text-muted hover:text-white disabled:opacity-50"
-							>
-								{downloadBusy ? "Generating..." : exportCommand ? "Refresh" : "Generate"}
-							</button>
+							{downloadError ? (
+								<div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+									{downloadError}
+								</div>
+							) : null}
+							{exportCommand ? (
+								<>
+									<textarea
+										readOnly
+										value={renderedExportCommand}
+										className="min-h-40 w-full rounded-2xl border border-white/10 bg-black/30 p-4 font-mono text-sm text-white focus:outline-none"
+									/>
+									<p className="mt-2 text-xs text-text-muted">
+										Valid until {new Date(exportCommand.expiresAt).toLocaleString()}. Change the final path from <span className="font-mono text-white">./silo-export</span> to anywhere you want on your machine before you run it.
+									</p>
+								</>
+							) : (
+								<div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-text-muted">
+									Generate the export command, then paste it into your terminal. It will download all buckets and folders directly.
+								</div>
+							)}
 						</div>
-						{downloadError ? (
-							<div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
-								{downloadError}
-							</div>
-						) : null}
-						{exportCommand ? (
-							<>
-								<textarea
-									readOnly
-									value={renderedExportCommand}
-									className="min-h-40 w-full rounded-2xl border border-white/10 bg-black/30 p-4 font-mono text-sm text-white focus:outline-none"
-								/>
-								<p className="mt-2 text-xs text-text-muted">
-									Valid until {new Date(exportCommand.expiresAt).toLocaleString()}. Change the final path from <span className="font-mono text-white">./silo-export</span> to anywhere you want on your machine before you run it.
-								</p>
-							</>
-						) : (
-							<div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-text-muted">
-								Generate the export command, then paste it into your terminal. It will download all buckets and folders directly.
-							</div>
-						)}
+
+						<div>
+							{exportCommand ? (
+								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+									<div className="mb-3 flex items-center justify-between gap-4">
+										<h4 className="text-sm font-bold text-white">Buckets to download</h4>
+										<button
+											type="button"
+											onClick={() =>
+												setSelectedExportBuckets((prev) =>
+													prev.length === exportCommand.bucketNames.length
+														? []
+														: exportCommand.bucketNames,
+												)
+											}
+											className="text-xs text-text-muted hover:text-white"
+										>
+											{selectedExportBuckets.length === exportCommand.bucketNames.length
+												? "Clear all"
+												: "Select all"}
+										</button>
+									</div>
+									<div className="space-y-2 max-h-[420px] overflow-auto pr-1">
+										{exportCommand.buckets.map((bucket) => (
+											<label
+												key={bucket.name}
+												className="block rounded-xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white"
+											>
+												<div className="flex items-start gap-3">
+													<input
+														type="checkbox"
+														checked={selectedExportBuckets.includes(bucket.name)}
+														onChange={(event) => {
+															setSelectedExportBuckets((prev) =>
+																event.target.checked
+																	? [...prev, bucket.name]
+																	: prev.filter((item) => item !== bucket.name),
+															);
+														}}
+														className="mt-1"
+													/>
+													<div className="min-w-0 flex-1">
+														<div className="font-mono break-all text-white">{bucket.name}</div>
+														<div className="mt-1 text-xs text-text-muted">
+															{bucket.objectCount.toLocaleString()} objects • {formatBytes(bucket.totalBytes)}
+														</div>
+													</div>
+												</div>
+											</label>
+										))}
+									</div>
+								</div>
+							) : null}
+						</div>
 					</div>
 
 					<div className="flex flex-wrap justify-end gap-3">
