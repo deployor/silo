@@ -564,7 +564,7 @@ async function getObjectAnalytics(bucketId: string, objectKey: string) {
 	return {
 		hitCount: Number(row?.hitCount || 0),
 		errorCount: Number(row?.errorCount || 0),
-		ingressBytes: Number(row?.ingressBytes || 0),
+		ingressBytes: 0,
 		egressBytes: Number(row?.egressBytes || 0),
 		lastAccessedAt: row?.lastAccessedAt?.toISOString() || null,
 		updatedAt: row?.lastAccessedAt?.toISOString() || null,
@@ -923,13 +923,13 @@ export async function handleFiles(req: Request): Promise<Response> {
 			});
 			const analyticsMap = await getObjectAnalyticsMap(
 				bucketData.bucket.id,
-				result.files.map((file) => file.key),
+				result.files.map((file: FileItem) => file.key),
 			);
 
 			return jsonResponse({
 				mode: "directory",
 				currentPrefix,
-				files: result.files.map((file) => ({
+				files: result.files.map((file: FileItem) => ({
 					...file,
 					hitCount: analyticsMap[file.key]?.hitCount || 0,
 					errorCount: analyticsMap[file.key]?.errorCount || 0,
