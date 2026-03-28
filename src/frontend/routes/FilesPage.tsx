@@ -197,7 +197,10 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const collaborationPermissions = bucketAccess?.permissions || [];
 	const [search, setSearch] = useState("");
 	const [searchScope, setSearchScope] = useState<"current" | "all">("current");
-	const [currentPrefix, setCurrentPrefix] = useState("");
+	const [currentPrefix, setCurrentPrefix] = useState(() => {
+		const params = new URLSearchParams(window.location.search);
+		return normalizePrefix(params.get("prefix") || "");
+	});
 	const [files, setFiles] = useState<FileItem[]>([]);
 	const [folders, setFolders] = useState<FolderItem[]>([]);
 	const [nextToken, setNextToken] = useState<string | null>(null);
@@ -267,16 +270,6 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	} as unknown as Record<string, string>;
 
 	const activePrefix = currentPrefix;
-
-	useEffect(() => {
-		const params = new URLSearchParams(window.location.search);
-		const prefixFromUrl = params.get("prefix");
-		if (prefixFromUrl) {
-			const normalized = normalizePrefix(prefixFromUrl);
-			setCurrentPrefix(normalized);
-			currentPrefixRef.current = normalized;
-		}
-	}, []);
 
 	useEffect(() => {
 		currentPrefixRef.current = currentPrefix;
