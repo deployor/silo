@@ -335,7 +335,11 @@ const server = Bun.serve({
 				// Allow disabling via env (best for perf/bench environments).
 				const ctx = context.getStore();
 				const disableS3Stats = (process.env.DISABLE_S3_STATS ?? "0") === "1";
-				if (ctx?.user && !(ctx.path.startsWith("/") && disableS3Stats)) {
+				if (
+					ctx?.user &&
+					!ctx.isOffboardingExport &&
+					!(ctx.path.startsWith("/") && disableS3Stats)
+				) {
 					const isS3Request = !isDashboardRequest(req, url);
 					if (!(disableS3Stats && isS3Request)) {
 						// For PUT requests, we might have already logged ingress in the handler
