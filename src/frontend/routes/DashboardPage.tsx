@@ -1378,7 +1378,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				<div className="p-6 border-b border-white/10 flex justify-between items-center">
 					<div>
 						<h2 className="text-xl font-bold text-white">
-							Your Storage Inventory
+							Your buckets
 						</h2>
 						<p className="text-text-muted text-sm mt-1">
 							{ownedBucketCount} /{" "}
