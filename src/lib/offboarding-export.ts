@@ -63,8 +63,7 @@ export function buildOffboardingRcloneCommand(params: {
 }) {
 	const endpoint = params.endpoint.replace(/\/+$/, "");
 	const destinationPath = params.destinationPath || "./silo-export";
-	const remote = `:s3,provider=Other,access_key_id=${params.accessKey},secret_access_key=${params.secretKey},endpoint=${endpoint},region=auto:`;
-	return `rclone copy ${shellQuote(remote)} ${shellQuote(destinationPath)} --s3-no-check-bucket --fast-list --transfers 16 --checkers 32 --progress`;
+	return `rclone copy :s3: ${shellQuote(destinationPath)} --s3-provider Other --s3-access-key-id ${shellQuote(params.accessKey)} --s3-secret-access-key ${shellQuote(params.secretKey)} --s3-endpoint ${shellQuote(endpoint)} --s3-region auto --s3-no-check-bucket --fast-list --transfers 16 --checkers 32 --progress`;
 }
 
 export async function expireOffboardingExportSessions() {
