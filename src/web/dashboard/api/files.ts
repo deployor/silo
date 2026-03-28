@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { config } from "../../../config";
 import { getCorsHeaders } from "../../../core/s3/cors";
@@ -589,7 +589,7 @@ async function getObjectAnalyticsMap(bucketId: string, objectKeys: string[]) {
 		.where(
 			and(
 				eq(objectStats.bucketId, bucketId),
-				sql`${objectStats.objectKey} = ANY(${normalizedKeys})`,
+				inArray(objectStats.objectKey, normalizedKeys),
 			),
 		);
 
