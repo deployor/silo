@@ -84,7 +84,8 @@ export async function handleS3Request(
 	// Handle ListBuckets (Service Root)
 	if (
 		(host === S3_DOMAIN && url.pathname === "/") ||
-		(key === "" &&
+		(url.pathname === "/" &&
+			key === "" &&
 			method === "GET" &&
 			!url.searchParams.has("list-type") &&
 			!url.searchParams.has("uploads") &&
