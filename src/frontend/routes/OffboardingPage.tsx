@@ -25,9 +25,25 @@ type ExportCommandState = {
 	secretKey: string;
 	accessKey: string;
 	bucketNames: string[];
+	buckets: Array<{
+		name: string;
+		totalBytes: number;
+		objectCount: number;
+	}>;
 };
 
 type ExportSpeedMode = "safe" | "balanced" | "fast";
+
+function formatBytes(value: number) {
+	const units = ["B", "KB", "MB", "GB", "TB"];
+	let size = value;
+	let unitIndex = 0;
+	while (size >= 1024 && unitIndex < units.length - 1) {
+		size /= 1024;
+		unitIndex += 1;
+	}
+	return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+}
 
 export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const p = bootstrap.props as {
