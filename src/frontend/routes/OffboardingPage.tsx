@@ -272,7 +272,7 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<div className="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow flex flex-col items-center text-center">
 										<div className={`h-20 w-20 rounded-full flex items-center justify-center mb-6 text-4xl ${isLargeDownload ? "bg-blue-500/10 text-blue-400" : "bg-white/10 text-white"}`}>
 											<PhIcon
-												className={`text-5xl ${isLargeDownload ? "ph-duotone ph-laptop" : "ph-duotone ph-file-zip"}`}
+												className={`text-5xl ${isLargeDownload ? "ph-duotone ph-download" : "ph-duotone ph-file-zip"}`}
 											/>
 										</div>
 										<h3 className="text-2xl font-bold text-white mb-2">
