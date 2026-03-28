@@ -23,6 +23,7 @@ import {
 	isCloudflareForSaasConfigured,
 } from "../lib/cloudflare-for-saas";
 import { redis } from "../lib/redis";
+import { config } from "../config";
 import {
 	assertBucketCollaborationAllowed,
 	assertCanManageCors,
@@ -65,6 +66,12 @@ async function syncBucketCustomDomainState(domain: BucketCustomDomain) {
 	}
 	const remote = await getCloudflareCustomHostname(domain.hostnameId);
 	return applyCloudflareHostnameState(domain, remote);
+}
+
+function assertCustomDomainsEnabled() {
+	if (!config.customDomainsEnabled) {
+		throw new Error("Custom domains are currently disabled");
+	}
 }
 
 async function syncCustomDomainsForBucketRecord(bucket: typeof buckets.$inferSelect) {
@@ -406,6 +413,7 @@ export async function addBucketCustomDomain(params: {
 	makePrimary?: boolean;
 	isAdmin?: boolean;
 }) {
+	assertCustomDomainsEnabled();
 	const bucket = await getOwnedBucketOrThrow(
 		params.bucketName,
 		params.userId,
@@ -439,6 +447,7 @@ export async function removeBucketCustomDomain(params: {
 	domain: string;
 	isAdmin?: boolean;
 }) {
+	assertCustomDomainsEnabled();
 	const bucket = await getOwnedBucketOrThrow(
 		params.bucketName,
 		params.userId,
@@ -468,6 +477,7 @@ export async function setPrimaryBucketCustomDomain(params: {
 	domain: string;
 	isAdmin?: boolean;
 }) {
+	assertCustomDomainsEnabled();
 	const bucket = await getOwnedBucketOrThrow(
 		params.bucketName,
 		params.userId,
@@ -501,6 +511,7 @@ export async function verifyBucketCustomDomain(params: {
 	domain: string;
 	isAdmin?: boolean;
 }) {
+	assertCustomDomainsEnabled();
 	const bucket = await getOwnedBucketOrThrow(
 		params.bucketName,
 		params.userId,
@@ -544,6 +555,9 @@ export async function listBucketCustomDomains(params: {
 	userId: string;
 	isAdmin?: boolean;
 }): Promise<BucketCustomDomain[]> {
+	if (!config.customDomainsEnabled) {
+		return [];
+	}
 	const bucket = await getOwnedBucketOrThrow(
 		params.bucketName,
 		params.userId,
@@ -553,6 +567,7 @@ export async function listBucketCustomDomains(params: {
 }
 
 export async function revalidateVerifiedCustomDomainsForBucket(bucketId: string) {
+	if (!config.customDomainsEnabled) return;
 	const rows = await db
 		.select()
 		.from(buckets)

@@ -11,6 +11,7 @@ export type GitInfo = {
 export type FrontendConfig = {
 	env?: string;
 	git?: GitInfo;
+	customDomainsEnabled?: boolean;
 	cloudflareForSaas?: {
 		targetHostname?: string;
 		configured?: boolean;

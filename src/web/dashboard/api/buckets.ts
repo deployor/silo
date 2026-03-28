@@ -82,6 +82,9 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 	if (!bucketName) return errorResponse("Invalid bucket name", 400);
 
 	if (domainRouteMatch) {
+		if (!config.customDomainsEnabled) {
+			return errorResponse("Custom domains are currently disabled", 404);
+		}
 		if (user.dataExported) {
 			return errorResponse(
 				"Account is frozen. Bucket settings cannot be updated.",

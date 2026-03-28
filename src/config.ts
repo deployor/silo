@@ -19,6 +19,7 @@ const envSchema = z.object({
 	SLACK_FILE_UPLOAD_CHANNEL_ID: z.string().optional(),
 	REVOCATION_SECRET: z.string().optional(),
 	DEV_ACCESS_CODE: z.string().optional(),
+	DOMAINS: z.string().optional(),
 	CF_API_TOKEN: z.string().optional(),
 	CF_ZONE_ID: z.string().optional(),
 	CF_SAAS_FALLBACK_ORIGIN: z.string().optional(),
@@ -112,6 +113,7 @@ export const config = {
 	},
 	revocationSecret: env.REVOCATION_SECRET,
 	devAccessCode: env.DEV_ACCESS_CODE,
+	customDomainsEnabled: env.DOMAINS === "true",
 	cloudflareForSaas: {
 		apiToken: env.CF_API_TOKEN,
 		zoneId: env.CF_ZONE_ID,

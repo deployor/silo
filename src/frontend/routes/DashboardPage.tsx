@@ -220,7 +220,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		latestSubmission?: { status?: string; projectName?: string } | null;
 		yswsQuotaPerHourHuman?: string;
 	};
- 	const customDomainTargetHostname =
+	const customDomainsEnabled =
+		bootstrap.config?.customDomainsEnabled === true;
+	const customDomainTargetHostname =
 		bootstrap.config?.cloudflareForSaas?.targetHostname || "silo.deployor.dev";
 
 	const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -1612,7 +1614,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														View analytics
 													</span>
 												</a>
-												{!isCollaborative ? (
+												{!isCollaborative && customDomainsEnabled ? (
 													<button
 														type="button"
 														onClick={() => openDomainModal(bucket)}
@@ -1864,7 +1866,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				) : null}
 			</Modal>
 
-			<Modal
+			{customDomainsEnabled ? <Modal
 				open={!!domainModal}
 				onClose={() => setDomainModal(null)}
 				title="Custom Domains"
@@ -2061,7 +2063,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						)}
 					</div>
 				) : null}
-			</Modal>
+			</Modal> : null}
 
 			<Modal
 				open={!!inviteModal}
