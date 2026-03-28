@@ -28,6 +28,12 @@ export function getKeyFromRequest(req: Request, bucketName: string): string {
 		}
 	}
 
+	try {
+		key = decodeURIComponent(key);
+	} catch {
+		// Keep the raw key if the path is not valid percent-encoding.
+	}
+
 	// Security: reject path traversal.
 	// Important: `url.pathname` may already have normalized away raw ".." segments
 	// in some runtimes, but keys can still contain encoded traversal like "%2e%2e".
