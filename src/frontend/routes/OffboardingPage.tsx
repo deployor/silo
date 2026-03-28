@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { Modal } from "../components/ui/Modal";
 import { PhIcon } from "../components/ui/PhIcon";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 
@@ -17,10 +18,19 @@ type LogRow = {
 	type: "info" | "success" | "error";
 };
 
+type ExportCommandState = {
+	command: string;
+	endpoint: string;
+	expiresAt: string;
+	secretKey: string;
+	accessKey: string;
+};
+
 export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const p = bootstrap.props as {
 		user?: FrontendUser | null;
 		daysRemaining?: number;
+		totalStorageBytes?: number;
 		totalStorageFormatted?: string;
 		gracePeriodEndsAt?: string;
 		showSuccess?: boolean;
@@ -37,6 +47,13 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [secretAccessKey, setSecretAccessKey] = useState("");
 	const [plan, setPlan] = useState<PlanRow[]>([]);
 	const [logs, setLogs] = useState<LogRow[]>([]);
+	const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+	const [downloadBusy, setDownloadBusy] = useState(false);
+	const [downloadError, setDownloadError] = useState<string | null>(null);
+	const [exportCommand, setExportCommand] =
+		useState<ExportCommandState | null>(null);
+
+	const isLargeDownload = (p.totalStorageBytes || 0) > 5 * 1024 * 1024 * 1024;
 
 	const providerName = useMemo(() => {
 		const map = {
@@ -158,6 +175,48 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		window.alert("Logs copied to clipboard");
 	};
 
+	const createRcloneExport = async () => {
+		setDownloadBusy(true);
+		setDownloadError(null);
+		try {
+			const res = await fetch("/dashboard/offboarding/rclone-export", {
+				method: "POST",
+			});
+			const data = await res.json();
+			if (!res.ok) {
+				throw new Error(data.error || "Failed to create export command");
+			}
+			setExportCommand(data);
+		} catch (error) {
+			setDownloadError(
+				error instanceof Error ? error.message : "Failed to create export command",
+			);
+		} finally {
+			setDownloadBusy(false);
+		}
+	};
+
+	const startBrowserDownload = async () => {
+		if (!window.confirm("Download archive and freeze account?")) return;
+		const form = document.createElement("form");
+		form.method = "POST";
+		form.action = "/dashboard/offboarding/download";
+		document.body.appendChild(form);
+		form.submit();
+		form.remove();
+	};
+
+	const handleDownloadArchive = async () => {
+		if (!isLargeDownload) {
+			await startBrowserDownload();
+			return;
+		}
+		setDownloadModalOpen(true);
+		if (!exportCommand && !downloadBusy) {
+			await createRcloneExport();
+		}
+	};
+
 	return (
 		<AppShell
 			title={bootstrap.title}
@@ -226,26 +285,20 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												Archive Created
 											</div>
 										) : (
-											<form
-												action="/dashboard/offboarding/download"
-												method="POST"
-												className="w-full"
-												onSubmit={(e) => {
-													if (
-														!window.confirm(
-															"Download archive and freeze account?",
-														)
-													)
-														e.preventDefault();
-												}}
-											>
+											<div className="w-full">
 												<button
-													type="submit"
+													type="button"
+													onClick={() => void handleDownloadArchive()}
 													className="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-4 rounded-xl transition-all"
 												>
 													Download Archive
 												</button>
-											</form>
+												{isLargeDownload ? (
+													<p className="mt-3 text-xs text-text-muted">
+														Large export detected — we'll recommend a terminal download tool first.
+													</p>
+												) : null}
+											</div>
 										)}
 									</div>
 
@@ -610,6 +663,84 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					</div>
 				) : null}
 			</div>
+
+			<Modal
+				open={downloadModalOpen}
+				onClose={() => setDownloadModalOpen(false)}
+				title="Large export download"
+				className="max-w-3xl p-8"
+			>
+				<div className="space-y-6">
+					<div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
+						Your export is currently <span className="font-bold text-white">{p.totalStorageFormatted}</span>. Downloads this large can fail or be painfully slow in the browser. We strongly recommend using the terminal command below so every object downloads directly and reliably.
+					</div>
+
+					<div className="grid gap-4 md:grid-cols-2">
+						<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+							<div className="text-xs uppercase tracking-wider text-text-muted mb-2">Export size</div>
+							<div className="text-lg font-bold text-white">{p.totalStorageFormatted}</div>
+						</div>
+						<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+							<div className="text-xs uppercase tracking-wider text-text-muted mb-2">Save destination</div>
+							<div className="text-sm text-white font-mono break-all">./silo-export</div>
+						</div>
+					</div>
+
+					<div>
+						<div className="flex items-center justify-between gap-3 mb-2">
+							<h3 className="text-lg font-bold text-white">Recommended terminal command</h3>
+							<button
+								type="button"
+								onClick={() => void createRcloneExport()}
+								disabled={downloadBusy}
+								className="text-sm text-text-muted hover:text-white disabled:opacity-50"
+							>
+								{downloadBusy ? "Generating..." : exportCommand ? "Refresh" : "Generate"}
+							</button>
+						</div>
+						{downloadError ? (
+							<div className="mb-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+								{downloadError}
+							</div>
+						) : null}
+						{exportCommand ? (
+							<>
+								<textarea
+									readOnly
+									value={exportCommand.command}
+									className="min-h-40 w-full rounded-2xl border border-white/10 bg-black/30 p-4 font-mono text-sm text-white focus:outline-none"
+								/>
+								<p className="mt-2 text-xs text-text-muted">
+									Valid until {new Date(exportCommand.expiresAt).toLocaleString()}. Change the final path from <span className="font-mono text-white">./silo-export</span> to anywhere you want on your machine before you run it.
+								</p>
+							</>
+						) : (
+							<div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-text-muted">
+								Generate the export command, then paste it into your terminal. It will download all buckets and folders directly.
+							</div>
+						)}
+					</div>
+
+					<div className="flex flex-wrap justify-end gap-3">
+						{exportCommand ? (
+							<button
+								type="button"
+								onClick={() => void navigator.clipboard.writeText(exportCommand.command)}
+								className="rounded-xl bg-hc-red px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-red-600"
+							>
+								Copy command
+							</button>
+						) : null}
+						<button
+							type="button"
+							onClick={() => void startBrowserDownload()}
+							className="rounded-xl bg-white/10 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-white/20"
+						>
+							Try browser download anyway
+						</button>
+					</div>
+				</div>
+			</Modal>
 		</AppShell>
 	);
 }

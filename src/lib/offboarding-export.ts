@@ -1,0 +1,109 @@
+import { createHash, createHmac, randomBytes } from "node:crypto";
+import { and, eq, isNull, lte } from "drizzle-orm";
+import { config } from "../config";
+import { getInternalPath } from "../core/s3/utils";
+import { db } from "../db";
+import { buckets, offboardingExportSessions, users } from "../db/schema";
+
+export const OFFBOARDING_EXPORT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function createOffboardingExportAccessKey() {
+	return `ox_${randomBytes(16).toString("hex")}`;
+}
+
+export function deriveOffboardingExportSecret(accessKey: string) {
+	return createHmac("sha256", config.hcAuth.clientSecret)
+		.update(`offboarding-export:${accessKey}`)
+		.digest("hex");
+}
+
+export function hashOffboardingExportSecret(secret: string) {
+	return createHash("sha256").update(secret).digest("hex");
+}
+
+export function buildOffboardingAllowedPrefix(user: typeof users.$inferSelect) {
+	return getInternalPath("", user, {
+		id: "",
+		name: "",
+		userId: user.id,
+		region: "auto",
+		isPublic: false,
+		isSystem: false,
+		isPaused: false,
+		pauseReason: null,
+		deepFreezeState: "active",
+		deepFreezeReason: null,
+		deepFreezeRequestedAt: null,
+		deepFreezeStartedAt: null,
+		deepFreezeCompletedAt: null,
+		deepFreezeArchiveKey: null,
+		deepFreezeArchiveBytes: 0,
+		deepFreezeProgress: 0,
+		deepFreezeEstimatedFreezeSeconds: 0,
+		deepFreezeEstimatedUnfreezeSeconds: 0,
+		deepFreezeLastUpdatedAt: null,
+		corsConfig: null,
+		customDomains: null,
+		totalBytes: 0,
+		totalRequests: 0,
+		createdAt: null,
+		updatedAt: null,
+	});
+}
+
+function shellQuote(value: string) {
+	return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+export function buildOffboardingRcloneCommand(params: {
+	endpoint: string;
+	accessKey: string;
+	secretKey: string;
+	destinationPath?: string;
+}) {
+	const endpoint = params.endpoint.replace(/\/+$/, "");
+	const destinationPath = params.destinationPath || "./silo-export";
+	const remote = `:s3,provider=Other,access_key_id=${params.accessKey},secret_access_key=${params.secretKey},endpoint=${endpoint},region=auto:`;
+	return `rclone copy ${shellQuote(remote)} ${shellQuote(destinationPath)} --s3-no-check-bucket --fast-list --transfers 16 --checkers 32 --progress`;
+}
+
+export async function expireOffboardingExportSessions() {
+	const now = new Date();
+	const expired = await db
+		.select({
+			id: offboardingExportSessions.id,
+			userId: offboardingExportSessions.userId,
+		})
+		.from(offboardingExportSessions)
+		.where(
+			and(
+				isNull(offboardingExportSessions.downloadCompletedAt),
+				isNull(offboardingExportSessions.revokedAt),
+				lte(offboardingExportSessions.expiresAt, now),
+			),
+		);
+
+	for (const session of expired) {
+		await db
+			.update(offboardingExportSessions)
+			.set({
+				downloadCompletedAt: now,
+				revokedAt: now,
+				updatedAt: now,
+			})
+			.where(eq(offboardingExportSessions.id, session.id));
+		await db
+			.update(users)
+			.set({ dataExported: true, updatedAt: now })
+			.where(eq(users.id, session.userId));
+	}
+}
+
+export async function getOffboardingExportBucketForUser(userId: string) {
+	const rows = await db
+		.select()
+		.from(buckets)
+		.where(eq(buckets.userId, userId))
+		.limit(1);
+	return rows[0] || null;
+}

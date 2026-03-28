@@ -141,6 +141,39 @@ export const bucketKeys = pgTable(
 	},
 );
 
+export const offboardingExportSessions = pgTable(
+	"offboarding_export_sessions",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		userId: text("user_id")
+			.references(() => users.id, { onDelete: "cascade" })
+			.notNull(),
+		accessKey: text("access_key").notNull().unique(),
+		secretKeyHash: text("secret_key_hash").notNull(),
+		allowedPrefix: text("allowed_prefix").notNull(),
+		expiresAt: timestamp("expires_at").notNull(),
+		lastAccessedAt: timestamp("last_accessed_at"),
+		usedAt: timestamp("used_at"),
+		revokedAt: timestamp("revoked_at"),
+		downloadCompletedAt: timestamp("download_completed_at"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+		updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	},
+	(table) => {
+		return {
+			userIdIdx: index("offboarding_export_sessions_user_id_idx").on(
+				table.userId,
+			),
+			accessKeyIdx: index("offboarding_export_sessions_access_key_idx").on(
+				table.accessKey,
+			),
+			expiresAtIdx: index("offboarding_export_sessions_expires_at_idx").on(
+				table.expiresAt,
+			),
+		};
+	},
+);
+
 export const bucketCollaborators = pgTable(
 	"bucket_collaborators",
 	{

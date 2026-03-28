@@ -7,6 +7,8 @@ export interface RequestContext {
 	user?: typeof users.$inferSelect;
 	bucket?: typeof buckets.$inferSelect;
 	mode?: "authenticated" | "public";
+	isOffboardingExport?: boolean;
+	offboardingExportSessionId?: string;
 	ip: string;
 	userAgent: string | null;
 	method: string;

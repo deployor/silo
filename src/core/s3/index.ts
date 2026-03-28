@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { config } from "../../config";
 import { db } from "../../db";
 import { buckets, type users } from "../../db/schema";
+import { context } from "../../lib/context";
 import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
@@ -39,6 +40,8 @@ export async function handleS3Request(
 
 	// Determine Action
 	const action = determineAction(method, key, url.searchParams, req.headers);
+	const ctx = context.getStore();
+	const isOffboardingExport = Boolean(ctx?.isOffboardingExport);
 
 	// Whitelist Check
 	if (action === S3Action.Unknown) {
@@ -54,6 +57,26 @@ export async function handleS3Request(
 			S3Action.Options,
 		];
 		if (!allowedPublicActions.includes(action)) {
+			return S3Errors.AccessDenied().toResponse();
+		}
+	}
+
+	if (isOffboardingExport) {
+		const allowedExportActions = [
+			S3Action.ListBuckets,
+			S3Action.HeadBucket,
+			S3Action.GetBucketLocation,
+			S3Action.ListObjectsV2,
+			S3Action.GetObject,
+			S3Action.HeadObject,
+			S3Action.Options,
+		];
+		if (!allowedExportActions.includes(action)) {
+			return S3Errors.AccessDenied(
+				"Offboarding export sessions are read-only.",
+			).toResponse();
+		}
+		if (!user || bucket.userId !== user.id) {
 			return S3Errors.AccessDenied().toResponse();
 		}
 	}
@@ -109,7 +132,7 @@ export async function handleS3Request(
 	const internalPath = getInternalPath(key, user, bucket);
 
 	if (user) {
-		if (user.dataExported) {
+		if (user.dataExported && !isOffboardingExport) {
 			return S3Errors.AccessDenied(
 				"Account is frozen due to data export. No new modifications allowed.",
 			).toResponse();
