@@ -21,6 +21,7 @@ import {
 	getInternalPath,
 	stripAuthQueryParams,
 } from "./utils";
+import { getContext } from "../../lib/context";
 
 // Tracks in-flight cache population for object keys so subsequent requests can
 // briefly wait and then hit Redis/Disk instead of immediately re-fetching S3.
@@ -322,12 +323,14 @@ ${rulesXml}
 	}
 
 	try {
+		const ctx = getContext();
+		const isOffboardingExport = Boolean(ctx?.isOffboardingExport);
 		// Redis Cache Check for Object (L1)
 		const cacheKeyBody = `s3:body:${bucket.name}:${key}`;
 		const cacheKeyMeta = `s3:meta:${bucket.name}:${key}`;
 		const cachePopulationId = `${bucket.name}\0${key}`;
 		const rangeHeader = req.headers.get("range");
-		const isCacheable = !url.searchParams.has("uploadId");
+		const isCacheable = !url.searchParams.has("uploadId") && !isOffboardingExport;
 		const isSimpleGet = isCacheable && !rangeHeader;
 		const REDIS_CACHE_LIMIT = 10 * 1024 * 1024; // 10 MB hard ceiling
 		const diskMinSize = getDiskCacheMinSizeBytes();
