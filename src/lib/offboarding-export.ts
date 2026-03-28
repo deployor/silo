@@ -66,6 +66,7 @@ function buildOffboardingRcloneS3Flags(params: {
 		`--s3-secret-access-key ${shellQuote(params.secretKey)}`,
 		`--s3-endpoint ${shellQuote(params.endpoint.replace(/\/+$/, ""))}`,
 		"--s3-region auto",
+		"--s3-force-path-style",
 		"--s3-no-check-bucket",
 	].join(" ");
 }
@@ -74,12 +75,19 @@ export function buildOffboardingRcloneCommand(params: {
 	endpoint: string;
 	accessKey: string;
 	secretKey: string;
+	bucketNames: string[];
 	destinationPath?: string;
 }) {
 	const destinationPath = params.destinationPath || "./silo-export";
 	const s3Flags = buildOffboardingRcloneS3Flags(params);
 	const copyFlags = "--fast-list --transfers 16 --checkers 32 --progress";
-	return `DEST=${shellQuote(destinationPath)}; mkdir -p "$DEST" && rclone lsf :s3: --dirs-only ${s3Flags} | while IFS= read -r bucket; do [ -n "$bucket" ] || continue; bucket=\${bucket%/}; rclone copy ":s3:\${bucket}" "$DEST/$bucket" ${s3Flags} ${copyFlags}; done`;
+	const bucketCopies = params.bucketNames
+		.map(
+			(bucketName) =>
+				`echo Downloading ${shellQuote(bucketName)} && rclone copy ${shellQuote(`:s3:${bucketName}/`)} "$DEST/${bucketName}" ${s3Flags} ${copyFlags}`,
+		)
+		.join(" && ");
+	return `DEST=${shellQuote(destinationPath)}; mkdir -p "$DEST" && ${bucketCopies}`;
 }
 
 export async function expireOffboardingExportSessions() {
