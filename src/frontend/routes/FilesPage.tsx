@@ -269,7 +269,24 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const activePrefix = currentPrefix;
 
 	useEffect(() => {
+		const params = new URLSearchParams(window.location.search);
+		const prefixFromUrl = params.get("prefix");
+		if (prefixFromUrl) {
+			const normalized = normalizePrefix(prefixFromUrl);
+			setCurrentPrefix(normalized);
+			currentPrefixRef.current = normalized;
+		}
+	}, []);
+
+	useEffect(() => {
 		currentPrefixRef.current = currentPrefix;
+		const url = new URL(window.location.href);
+		if (currentPrefix) {
+			url.searchParams.set("prefix", currentPrefix);
+		} else {
+			url.searchParams.delete("prefix");
+		}
+		window.history.replaceState({}, "", url.toString());
 	}, [currentPrefix]);
 
 	useEffect(() => {
