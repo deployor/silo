@@ -393,7 +393,9 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	);
 
 	useEffect(() => {
-		loadFiles({ prefix: "", reset: true, query: "" });
+		const params = new URLSearchParams(window.location.search);
+		const prefixFromUrl = normalizePrefix(params.get("prefix") || "");
+		loadFiles({ prefix: prefixFromUrl, reset: true, query: "" });
 	}, [loadFiles]);
 
 	const rows = useMemo(
