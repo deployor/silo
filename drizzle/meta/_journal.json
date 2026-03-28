@@ -78,6 +78,13 @@
 			"when": 1774707600000,
 			"tag": "0017_object_stats",
 			"breakpoints": true
+		},
+		{
+			"idx": 11,
+			"version": "5",
+			"when": 1774711320000,
+			"tag": "0018_offboarding_export_sessions",
+			"breakpoints": true
 		}
 	]
 }

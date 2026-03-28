@@ -2,11 +2,20 @@ import crypto from "node:crypto";
 import { Readable, Transform } from "node:stream";
 import archiver from "archiver";
 import { AwsClient } from "aws4fetch";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { config } from "../../config";
 import { getInternalPath } from "../../core/s3/utils";
 import { db } from "../../db";
-import { buckets, users } from "../../db/schema";
+import { buckets, offboardingExportSessions, users } from "../../db/schema";
+import {
+	OFFBOARDING_EXPORT_TTL_MS,
+	buildOffboardingAllowedPrefix,
+	buildOffboardingRcloneCommand,
+	createOffboardingExportAccessKey,
+	deriveOffboardingExportSecret,
+	expireOffboardingExportSessions,
+	hashOffboardingExportSecret,
+} from "../../lib/offboarding-export";
 import { s3Client } from "../../lib/s3-client";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
@@ -58,6 +67,7 @@ export async function handleOffboardingRequest(
 	}
 
 	const url = new URL(req.url);
+	await expireOffboardingExportSessions();
 
 	// Ensure user is actually offboarding or has already exported
 	if (!user.markedAsOverAge && !user.dataExported) {
@@ -108,6 +118,7 @@ export async function handleOffboardingRequest(
 			layout: "main",
 			user,
 			daysRemaining,
+			totalStorageBytes: totalBytes,
 			totalStorageFormatted,
 			progressPercentage: progressPercentage.toFixed(1),
 			gracePeriodEndsAt: ends.toLocaleDateString(),
@@ -115,6 +126,57 @@ export async function handleOffboardingRequest(
 			showSuccess: url.searchParams.get("success") === "1",
 		});
 		return new Response(html, { headers: { "Content-Type": "text/html" } });
+	}
+
+	if (
+		req.method === "POST" &&
+		url.pathname === "/dashboard/offboarding/rclone-export"
+	) {
+		const activeSession = await db
+			.select()
+			.from(offboardingExportSessions)
+			.where(
+				and(
+					eq(offboardingExportSessions.userId, user.id),
+					isNull(offboardingExportSessions.revokedAt),
+					gt(offboardingExportSessions.expiresAt, new Date()),
+				),
+			)
+			.limit(1);
+
+		const accessKey =
+			activeSession[0]?.accessKey || createOffboardingExportAccessKey();
+		const secretKey = deriveOffboardingExportSecret(accessKey);
+		const expiresAt = new Date(Date.now() + OFFBOARDING_EXPORT_TTL_MS);
+
+		if (!activeSession[0]) {
+			await db.insert(offboardingExportSessions).values({
+				userId: user.id,
+				accessKey,
+				secretKeyHash: hashOffboardingExportSecret(secretKey),
+				allowedPrefix: buildOffboardingAllowedPrefix(user),
+				expiresAt,
+			});
+		}
+
+		const endpoint = `https://${config.s3Domain}`;
+		const command = buildOffboardingRcloneCommand({
+			endpoint,
+			accessKey,
+			secretKey,
+			destinationPath: "./silo-export",
+		});
+
+		return new Response(
+			JSON.stringify({
+				accessKey,
+				secretKey,
+				endpoint,
+				expiresAt: (activeSession[0]?.expiresAt || expiresAt).toISOString(),
+				command,
+			}),
+			{ headers: { "Content-Type": "application/json" } },
+		);
 	}
 
 	if (

@@ -1,10 +1,15 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, gt } from "drizzle-orm";
 import { config } from "../config";
 import { db } from "../db";
-import { bucketKeys, buckets, users } from "../db/schema";
+import { bucketKeys, buckets, offboardingExportSessions, users } from "../db/schema";
 import { verifyAwsV4Signature } from "../lib/auth-v4";
 import { resolveBucketByHostname } from "../lib/bucket-domains";
 import { context } from "../lib/context";
+import {
+	deriveOffboardingExportSecret,
+	expireOffboardingExportSessions,
+	getOffboardingExportBucketForUser,
+} from "../lib/offboarding-export";
 import { redis } from "../lib/redis";
 import { S3Errors } from "../lib/s3-errors";
 import { getKeyFromRequest } from "../core/s3/utils";
@@ -227,6 +232,27 @@ async function getSignedAuthContext(accessKeyId: string): Promise<{
 	return resolved;
 }
 
+async function getOffboardingExportAuthContext(accessKeyId: string) {
+	await expireOffboardingExportSessions();
+	const rows = await db
+		.select({
+			session: offboardingExportSessions,
+			user: users,
+		})
+		.from(offboardingExportSessions)
+		.innerJoin(users, eq(offboardingExportSessions.userId, users.id))
+		.where(
+			and(
+				eq(offboardingExportSessions.accessKey, accessKeyId),
+				isNull(offboardingExportSessions.revokedAt),
+				gt(offboardingExportSessions.expiresAt, new Date()),
+			),
+		)
+		.limit(1);
+
+	return rows[0] || null;
+}
+
 export type AuthResult =
 	| {
 			user: typeof users.$inferSelect | null;
@@ -408,7 +434,60 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 
 	const authContext = await getSignedAuthContext(accessKeyId);
 	if (!authContext) {
-		return S3Errors.InvalidAccessKeyId().toResponse();
+		const exportAuth = await getOffboardingExportAuthContext(accessKeyId);
+		if (!exportAuth) {
+			return S3Errors.InvalidAccessKeyId().toResponse();
+		}
+
+		const requestedBucket = await getBucketFromRequest(req);
+		const bucket = requestedBucket
+			? (
+				await db
+					.select()
+					.from(buckets)
+					.where(
+						and(
+							eq(buckets.name, requestedBucket),
+							eq(buckets.userId, exportAuth.user.id),
+						),
+					)
+					.limit(1)
+			)[0] || null
+			: await getOffboardingExportBucketForUser(exportAuth.user.id);
+
+		if (!bucket) {
+			return S3Errors.AccessDenied().toResponse();
+		}
+
+		const amzDate = getDate(req);
+		if (!amzDate)
+			return S3Errors.AccessDenied("Missing Date Header").toResponse();
+
+		const derivedSecret = deriveOffboardingExportSecret(exportAuth.session.accessKey);
+		const isValid = await verifyAwsV4Signature(req, derivedSecret);
+		if (!isValid) {
+			return S3Errors.SignatureDoesNotMatch().toResponse();
+		}
+
+		await db
+			.update(offboardingExportSessions)
+			.set({
+				usedAt: exportAuth.session.usedAt || new Date(),
+				lastAccessedAt: new Date(),
+				updatedAt: new Date(),
+			})
+			.where(eq(offboardingExportSessions.id, exportAuth.session.id));
+
+		const ctx = context.getStore();
+		if (ctx) {
+			ctx.user = exportAuth.user;
+			ctx.bucket = bucket;
+			ctx.mode = "authenticated";
+			ctx.isOffboardingExport = true;
+			ctx.offboardingExportSessionId = exportAuth.session.id;
+		}
+
+		return { user: exportAuth.user, bucket, mode: "authenticated" };
 	}
 
 	const bucket = authContext.bucket;
