@@ -499,24 +499,87 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									Privacy & Data
 								</h1>
 								<p className="text-lg mb-6 text-text-muted leading-relaxed">
-									Silo stores account and request metadata to run the service,
-									prevent abuse, and debug incidents. Need a data export? Reach out
-									to us in Slack or email us.
+									This page explains what Silo collects, why we collect it, how long
+									we keep it, and what controls you have. This policy is written in
+									plain language for users.
 								</p>
-								<ul className="list-disc list-inside space-y-3 text-text-muted mb-8">
-									<li>
-										After you age out of Hack Club (high school), we will ask you to
-										export and delete your Silo data during offboarding.
-									</li>
-									<li>
-										You can delete your full account data yourself from the account
-										page at <a href="/account" className="text-hc-red hover:underline">/account</a>.
-									</li>
-									<li>
-										Abuse can lead to permanent suspension and possible exclusion from
-										other Hack Club programs.
-									</li>
-								</ul>
+								<div className="space-y-8">
+									<div>
+										<h3 className="text-2xl font-bold mb-3 text-white">What we collect</h3>
+										<ul className="list-disc list-inside space-y-2 text-text-muted">
+											<li>Account identifiers from login providers.</li>
+											<li>
+												Request metadata such as timestamp, method, path, IP,
+												user-agent, and response status.
+											</li>
+											<li>
+												Storage usage metadata such as bucket names, object keys,
+												size totals, and request counts.
+											</li>
+										</ul>
+									</div>
+
+									<div>
+										<h3 className="text-2xl font-bold mb-3 text-white">What we do not collect</h3>
+										<ul className="list-disc list-inside space-y-2 text-text-muted">
+											<li>We do not sell personal data.</li>
+											<li>
+												We do not inspect file contents for ads or behavioral profiling.
+											</li>
+										</ul>
+									</div>
+
+									<div>
+										<h3 className="text-2xl font-bold mb-3 text-white">Why we process data</h3>
+										<ul className="list-disc list-inside space-y-2 text-text-muted">
+											<li>Provide storage, authentication, and account functionality.</li>
+											<li>Enforce quotas, stop abuse, and protect platform security.</li>
+											<li>Investigate outages and improve reliability.</li>
+										</ul>
+									</div>
+
+									<div>
+										<h3 className="text-2xl font-bold mb-3 text-white">Retention and deletion</h3>
+										<ul className="list-disc list-inside space-y-2 text-text-muted">
+											<li>
+												We retain operational logs and metadata only as long as needed
+												for security, abuse handling, and reliability.
+											</li>
+											<li>
+												After you age out of Hack Club (high school), we will ask you
+												to export and delete your Silo data during offboarding.
+											</li>
+											<li>
+												You can delete your full account data yourself from the
+												account page at <a href="/account" className="text-hc-red hover:underline">/account</a>.
+											</li>
+											<li>
+												Need a data export? Reach out to us in Slack or email us.
+											</li>
+										</ul>
+									</div>
+
+									<div>
+										<h3 className="text-2xl font-bold mb-3 text-white">Safety and abuse</h3>
+										<ul className="list-disc list-inside space-y-2 text-text-muted">
+											<li>
+												Abuse can lead to permanent suspension and possible exclusion
+												from other Hack Club programs.
+											</li>
+											<li>
+												We may retain relevant logs and report details to investigate
+												and enforce policy.
+											</li>
+										</ul>
+									</div>
+
+									<div className="bg-white/5 border border-white/10 rounded-xl p-4">
+										<p className="text-sm text-text-muted">
+											Last updated: March 2026. If something here is unclear, contact
+											the Silo team and we will clarify it.
+										</p>
+									</div>
+								</div>
 							</div>
 						) : null}
 
