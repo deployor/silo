@@ -6,7 +6,12 @@ import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 type Section = {
 	id: string;
 	label: string;
-	group: "Basics" | "API Reference" | "Examples";
+	group:
+		| "Basics"
+		| "Policy & Trust"
+		| "API Reference"
+		| "Examples"
+		| "Operations";
 };
 
 function CodeBlock({ code }: { code: string }) {
@@ -45,6 +50,21 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			},
 			{ id: "cors", label: "CORS Configuration", group: "Basics" },
 			{
+				id: "privacy",
+				label: "Privacy Policy (Basic)",
+				group: "Policy & Trust",
+			},
+			{
+				id: "takedown",
+				label: "Takedown / DMCA",
+				group: "Policy & Trust",
+			},
+			{
+				id: "provider-requirements",
+				label: "What S3 Providers Should Have",
+				group: "Policy & Trust",
+			},
+			{
 				id: "supported-api",
 				label: "Supported Operations",
 				group: "API Reference",
@@ -60,6 +80,11 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			{ id: "python", label: "Python (Boto3)", group: "Examples" },
 			{ id: "go", label: "Go", group: "Examples" },
 			{ id: "rclone", label: "Rclone", group: "Examples" },
+			{
+				id: "automation",
+				label: "Automation & Smooth Ops",
+				group: "Operations",
+			},
 		],
 		[],
 	);
@@ -433,6 +458,136 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
   ]
 }`}
 								/>
+							</div>
+						) : null}
+
+						{activeSection === "privacy" ? (
+							<div id="privacy" className="section-content active">
+								<h1 className="text-4xl font-bold mb-6 text-white">
+									Privacy Policy (Basic)
+								</h1>
+								<p className="text-lg mb-6 text-text-muted leading-relaxed">
+									This is a plain-language baseline policy for Silo. It should be
+									treated as product documentation, not legal advice.
+								</p>
+								<div className="rounded-2xl border border-white/10 bg-hc-darker/40 p-6 space-y-4">
+									<h3 className="text-2xl font-bold text-white">What we collect</h3>
+									<ul className="list-disc list-inside space-y-2 text-text-muted">
+										<li>Account identifiers from login providers (for auth).</li>
+										<li>
+											Request metadata (timestamps, path, IP, user-agent, status,
+											rate-limit events).
+										</li>
+										<li>Storage accounting metadata (object size, key, usage totals).</li>
+									</ul>
+									<h3 className="text-2xl font-bold text-white">What we do not collect</h3>
+									<ul className="list-disc list-inside space-y-2 text-text-muted">
+										<li>We do not inspect file contents for analytics.</li>
+										<li>We do not sell personal data.</li>
+									</ul>
+									<h3 className="text-2xl font-bold text-white">Why we process data</h3>
+									<ul className="list-disc list-inside space-y-2 text-text-muted">
+										<li>Operate storage, auth, billing-like quotas, and abuse prevention.</li>
+										<li>Protect users and infrastructure from fraud and attacks.</li>
+										<li>Debug incidents and improve reliability.</li>
+									</ul>
+									<h3 className="text-2xl font-bold text-white">Retention and deletion</h3>
+									<ul className="list-disc list-inside space-y-2 text-text-muted">
+										<li>
+											Operational logs are retained only as long as needed for
+											security, reliability, and compliance.
+										</li>
+										<li>
+											Users can request account offboarding and export where
+											available.
+										</li>
+									</ul>
+								</div>
+							</div>
+						) : null}
+
+						{activeSection === "takedown" ? (
+							<div id="takedown" className="section-content active">
+								<h1 className="text-4xl font-bold mb-6 text-white">
+									Takedown / DMCA
+								</h1>
+								<p className="text-lg mb-6 text-text-muted leading-relaxed">
+									If content hosted through Silo appears to infringe copyright or
+									violates policy, maintainers can process a takedown report.
+								</p>
+								<h3 className="text-2xl font-bold mb-4 text-white">
+									Required report details
+								</h3>
+								<ul className="list-disc list-inside space-y-2 text-text-muted mb-8">
+									<li>Reporter contact information.</li>
+									<li>Exact URL(s) and bucket/key path(s) in dispute.</li>
+									<li>Description of copyrighted work and claim basis.</li>
+									<li>Good-faith statement and authority statement.</li>
+								</ul>
+								<h3 className="text-2xl font-bold mb-4 text-white">Process</h3>
+								<ol className="list-decimal list-inside space-y-3 text-text-muted mb-8">
+									<li>Intake: create a case ID and timestamp.</li>
+									<li>Validate: verify notice completeness and scope.</li>
+									<li>
+										Action: temporarily disable access or quarantine affected objects.
+									</li>
+									<li>Notify uploader and provide a path for counter-notice.</li>
+									<li>
+										Resolve: restore or permanently remove content based on outcome.
+									</li>
+								</ol>
+								<div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-lg">
+									<p className="text-yellow-200 text-sm">
+										<strong>Operator note:</strong> Add a dedicated abuse contact and
+										published legal notice address before broad public launch.
+									</p>
+								</div>
+							</div>
+						) : null}
+
+						{activeSection === "provider-requirements" ? (
+							<div id="provider-requirements" className="section-content active">
+								<h1 className="text-4xl font-bold mb-6 text-white">
+									What S3 Providers Should Have
+								</h1>
+								<p className="text-lg mb-6 text-text-muted leading-relaxed">
+									If you are choosing or building an S3-compatible service, these are
+									the non-negotiables.
+								</p>
+								<div className="grid gap-4 md:grid-cols-2">
+									<div className="rounded-xl border border-white/10 p-4 bg-black/20">
+										<h3 className="font-bold text-white mb-2">Security baseline</h3>
+										<ul className="list-disc list-inside space-y-1 text-text-muted text-sm">
+											<li>SigV4 auth, key rotation, and scoped credentials.</li>
+											<li>TLS in transit and encryption at rest.</li>
+											<li>DDoS/rate-limiting and abuse detection.</li>
+										</ul>
+									</div>
+									<div className="rounded-xl border border-white/10 p-4 bg-black/20">
+										<h3 className="font-bold text-white mb-2">Data durability</h3>
+										<ul className="list-disc list-inside space-y-1 text-text-muted text-sm">
+											<li>Durability guarantees and incident transparency.</li>
+											<li>Checksums/ETag integrity on upload and download.</li>
+											<li>Reliable multipart handling and resumable transfers.</li>
+										</ul>
+									</div>
+									<div className="rounded-xl border border-white/10 p-4 bg-black/20">
+										<h3 className="font-bold text-white mb-2">Operational maturity</h3>
+										<ul className="list-disc list-inside space-y-1 text-text-muted text-sm">
+											<li>Status page and measurable SLAs/SLOs.</li>
+											<li>Audit logs for admin actions and access attempts.</li>
+											<li>Disaster recovery tests and restore drills.</li>
+										</ul>
+									</div>
+									<div className="rounded-xl border border-white/10 p-4 bg-black/20">
+										<h3 className="font-bold text-white mb-2">User trust</h3>
+										<ul className="list-disc list-inside space-y-1 text-text-muted text-sm">
+											<li>Clear privacy policy and acceptable-use policy.</li>
+											<li>DMCA/takedown and counter-notice workflow.</li>
+											<li>Simple export/migration path to avoid lock-in.</li>
+										</ul>
+									</div>
+								</div>
 							</div>
 						) : null}
 
@@ -1294,6 +1449,47 @@ rclone mount silo:my-bucket ~/mnt/silo --vfs-cache-mode writes`}
 										/>
 									</div>
 								</div>
+							</div>
+						) : null}
+
+						{activeSection === "automation" ? (
+							<div id="automation" className="section-content active">
+								<h1 className="text-4xl font-bold mb-6 text-white">
+									Automation & Smooth Ops
+								</h1>
+								<p className="text-lg mb-6 text-text-muted leading-relaxed">
+									Great trust-and-safety operations should feel boring and fast.
+									Automate the repeatable parts and keep humans for judgment calls.
+								</p>
+								<h3 className="text-2xl font-bold mb-4 text-white">High-leverage automations</h3>
+								<ul className="list-disc list-inside space-y-3 text-text-muted mb-8">
+									<li>
+										Auto-create abuse case IDs with status states: new, investigating,
+										actioned, resolved.
+									</li>
+									<li>
+										One-click object quarantine that temporarily blocks public reads
+										without deleting evidence.
+									</li>
+									<li>
+										SLA timers and reminder alerts for unresolved reports.
+									</li>
+									<li>
+										Template-driven reporter and uploader notifications to reduce
+										manual response time.
+									</li>
+									<li>
+										Auto-redaction for sensitive values in request logs and exported
+										evidence bundles.
+									</li>
+								</ul>
+								<h3 className="text-2xl font-bold mb-4 text-white">Smooth user experience wins</h3>
+								<ul className="list-disc list-inside space-y-3 text-text-muted">
+									<li>Policy pages with anchor links and last-updated timestamps.</li>
+									<li>Self-serve offboarding export and account deletion flow.</li>
+									<li>Simple in-dashboard status indicators for quota and abuse flags.</li>
+									<li>Migration-ready docs for AWS CLI, SDKs, and rclone parity.</li>
+								</ul>
 							</div>
 						) : null}
 					</div>
