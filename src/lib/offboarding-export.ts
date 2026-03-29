@@ -81,7 +81,7 @@ export function buildOffboardingRcloneCommand(params: {
 	const destinationPath = params.destinationPath || "./silo-export";
 	const s3Flags = buildOffboardingRcloneS3Flags(params);
 	const copyFlags =
-		"--fast-list --transfers 32 --checkers 64 --multi-thread-streams 8 --multi-thread-cutoff 64M --progress";
+		"--transfers 32 --checkers 64 --multi-thread-streams 8 --multi-thread-cutoff 64M --progress";
 	const bucketCopies = params.bucketNames
 		.map(
 			(bucketName) =>
