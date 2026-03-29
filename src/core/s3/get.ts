@@ -94,6 +94,8 @@ export async function handleGetRequest(
 	},
 ) {
 	const shouldConsumeQuota = options?.consumeQuota ?? true;
+	const ctx = getContext();
+	const isOffboardingExport = Boolean(ctx?.isOffboardingExport);
 	if (key === "" && url.searchParams.has("cors")) {
 		if (!bucket.corsConfig) {
 			return S3Errors.NoSuchCORSConfiguration().toResponse();
@@ -166,12 +168,12 @@ ${rulesXml}
 		);
 	}
 
-		async function reserveEgressQuota(bytesToSend: number) {
-			if (!shouldConsumeQuota) return true;
-			if (isOffboardingExport) return true;
-			if (!user || user.isImmortal) return true;
-			if (!Number.isFinite(bytesToSend) || bytesToSend <= 0) return true;
-return consumeEgressQuota(
+	async function reserveEgressQuota(bytesToSend: number) {
+		if (!shouldConsumeQuota) return true;
+		if (isOffboardingExport) return true;
+		if (!user || user.isImmortal) return true;
+		if (!Number.isFinite(bytesToSend) || bytesToSend <= 0) return true;
+		return consumeEgressQuota(
 			{
 				id: user.id,
 				isImmortal: user.isImmortal,
@@ -323,8 +325,6 @@ return consumeEgressQuota(
 	}
 
 	try {
-		const ctx = getContext();
-		const isOffboardingExport = Boolean(ctx?.isOffboardingExport);
 		// Redis Cache Check for Object (L1)
 		const cacheKeyBody = `s3:body:${bucket.name}:${key}`;
 		const cacheKeyMeta = `s3:meta:${bucket.name}:${key}`;
