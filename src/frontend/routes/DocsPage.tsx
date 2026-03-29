@@ -31,6 +31,11 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [mobileOpen, setMobileOpen] = useState(false);
 	const [hours, setHours] = useState(10);
 	const [active, setActive] = useState("intro");
+	const [reportSubmitting, setReportSubmitting] = useState(false);
+	const [reportStatus, setReportStatus] = useState<{
+		type: "idle" | "success" | "error";
+		message: string;
+	}>({ type: "idle", message: "" });
 
 	const sections = useMemo<Section[]>(
 		() => [
@@ -44,6 +49,8 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				group: "Basics",
 			},
 			{ id: "cors", label: "CORS Configuration", group: "Basics" },
+			{ id: "privacy", label: "Privacy & Data", group: "Basics" },
+			{ id: "takedown", label: "Takedown Report", group: "Basics" },
 			{
 				id: "supported-api",
 				label: "Supported Operations",
@@ -109,6 +116,56 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		window.history.pushState(null, "", `#${id}`);
 		if (window.innerWidth < 768) {
 			setMobileOpen(false);
+		}
+	};
+
+	const submitTakedownReport = async (event: React.FormEvent<HTMLFormElement>) => {
+		event.preventDefault();
+		if (reportSubmitting) return;
+
+		setReportSubmitting(true);
+		setReportStatus({ type: "idle", message: "" });
+
+		const form = event.currentTarget;
+		const formData = new FormData(form);
+
+		const payload = {
+			url: String(formData.get("url") || "").trim(),
+			title: String(formData.get("title") || "").trim(),
+			description: String(formData.get("description") || "").trim(),
+			email: String(formData.get("email") || "").trim(),
+			website: String(formData.get("website") || "").trim(),
+		};
+
+		try {
+			const res = await fetch("/api/docs/takedown", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(payload),
+			});
+
+			if (!res.ok) {
+				const data = (await res.json().catch(() => null)) as
+					| { error?: string }
+					| null;
+				throw new Error(data?.error || "Failed to submit report");
+			}
+
+			form.reset();
+			setReportStatus({
+				type: "success",
+				message: "Report sent. Thanks for helping us keep Silo safe.",
+			});
+		} catch (error) {
+			setReportStatus({
+				type: "error",
+				message:
+					error instanceof Error
+						? error.message
+						: "Failed to submit report",
+			});
+		} finally {
+			setReportSubmitting(false);
 		}
 	};
 
@@ -433,6 +490,122 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
   ]
 }`}
 								/>
+							</div>
+						) : null}
+
+						{activeSection === "privacy" ? (
+							<div id="privacy" className="section-content active">
+								<h1 className="text-4xl font-bold mb-6 text-white">
+									Privacy & Data
+								</h1>
+								<p className="text-lg mb-6 text-text-muted leading-relaxed">
+									Silo stores account and request metadata to run the service,
+									prevent abuse, and debug incidents. Need a data export? Reach out
+									to us in Slack or email us.
+								</p>
+								<ul className="list-disc list-inside space-y-3 text-text-muted mb-8">
+									<li>
+										After you age out of Hack Club (high school), we will ask you to
+										export and delete your Silo data during offboarding.
+									</li>
+									<li>
+										You can delete your full account data yourself from the account
+										page at <a href="/account" className="text-hc-red hover:underline">/account</a>.
+									</li>
+									<li>
+										Abuse can lead to permanent suspension and possible exclusion from
+										other Hack Club programs.
+									</li>
+								</ul>
+							</div>
+						) : null}
+
+						{activeSection === "takedown" ? (
+							<div id="takedown" className="section-content active">
+								<h1 className="text-4xl font-bold mb-6 text-white">
+									Takedown Report
+								</h1>
+								<p className="text-lg mb-6 text-text-muted leading-relaxed">
+									Use this form to report harmful or infringing content. Reports are
+									sent directly to the Silo team for review.
+								</p>
+								<form onSubmit={submitTakedownReport} className="space-y-4 max-w-2xl">
+									<input
+										type="text"
+										name="website"
+										tabIndex={-1}
+										autoComplete="off"
+										className="hidden"
+										aria-hidden="true"
+									/>
+									<div>
+										<label className="block text-sm font-bold text-white mb-2" htmlFor="takedown-url">
+											URL where this happened
+										</label>
+										<input
+											id="takedown-url"
+											name="url"
+											type="url"
+											required
+											placeholder="https://..."
+											className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-white placeholder:text-text-muted"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm font-bold text-white mb-2" htmlFor="takedown-title">
+											Title
+										</label>
+										<input
+											id="takedown-title"
+											name="title"
+											type="text"
+											required
+											maxLength={140}
+											placeholder="Short summary"
+											className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-white placeholder:text-text-muted"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm font-bold text-white mb-2" htmlFor="takedown-description">
+											Description
+										</label>
+										<textarea
+											id="takedown-description"
+											name="description"
+											required
+											rows={6}
+											placeholder="What happened? Include relevant context."
+											className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-white placeholder:text-text-muted"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm font-bold text-white mb-2" htmlFor="takedown-email">
+											Your email
+										</label>
+										<input
+											id="takedown-email"
+											name="email"
+											type="email"
+											required
+											placeholder="you@example.com"
+											className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-white placeholder:text-text-muted"
+										/>
+									</div>
+									<button
+										type="submit"
+										disabled={reportSubmitting}
+										className="bg-hc-red hover:bg-red-600 disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold px-5 py-2 rounded-lg"
+									>
+										{reportSubmitting ? "Submitting..." : "Submit report"}
+									</button>
+									{reportStatus.type !== "idle" ? (
+										<p
+											className={`text-sm ${reportStatus.type === "success" ? "text-green-300" : "text-red-300"}`}
+										>
+											{reportStatus.message}
+										</p>
+									) : null}
+								</form>
 							</div>
 						) : null}
 
