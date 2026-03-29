@@ -17,10 +17,15 @@ import { handleCollaboration } from "./collaboration";
 import { handleCors } from "./cors";
 import { handleFiles } from "./files";
 import { handleKeys } from "./keys";
+import { handleTakedownReport } from "./takedown";
 
 export async function handleApiRequest(req: Request): Promise<Response> {
 	const url = new URL(req.url);
 	const path = url.pathname;
+
+	if (path === "/api/docs/takedown") {
+		return handleTakedownReport(req);
+	}
 
 	if (path === "/api/onboarding/complete" && req.method === "POST") {
 		const user = await getCurrentUser(req);

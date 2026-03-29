@@ -101,3 +101,14 @@ export const corsRuleSchema = z.object({
 export const updateCorsSchema = z.object({
 	rules: z.array(corsRuleSchema),
 });
+
+export const takedownReportSchema = z.object({
+	url: z.string().url("Please provide a valid URL"),
+	title: z.string().min(3, "Title must be at least 3 characters").max(140),
+	description: z
+		.string()
+		.min(10, "Description must be at least 10 characters")
+		.max(4000),
+	email: z.string().email("Please provide a valid email address").max(254),
+	website: z.string().max(120).optional(),
+});
