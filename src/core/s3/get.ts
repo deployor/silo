@@ -166,12 +166,12 @@ ${rulesXml}
 		);
 	}
 
-	async function reserveEgressQuota(bytesToSend: number) {
-		if (!shouldConsumeQuota) return true;
-		if (!user || user.isImmortal) return true;
-		if (!Number.isFinite(bytesToSend) || bytesToSend <= 0) return true;
-
-		return consumeEgressQuota(
+		async function reserveEgressQuota(bytesToSend: number) {
+			if (!shouldConsumeQuota) return true;
+			if (isOffboardingExport) return true;
+			if (!user || user.isImmortal) return true;
+			if (!Number.isFinite(bytesToSend) || bytesToSend <= 0) return true;
+return consumeEgressQuota(
 			{
 				id: user.id,
 				isImmortal: user.isImmortal,
