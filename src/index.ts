@@ -219,6 +219,7 @@ const server = Bun.serve({
 						url.pathname.startsWith("/api/") &&
 						!url.pathname.startsWith("/api/slack/") &&
 						!url.pathname.startsWith("/api/revocation") &&
+						url.pathname !== "/api/docs/takedown" &&
 						req.method !== "GET" &&
 						req.method !== "HEAD"
 					) {
