@@ -55,10 +55,7 @@
 
 /* Common Styles */
 body {
-  background:
-    radial-gradient(circle at 12% -5%, rgba(51, 142, 218, 0.2), transparent 45%),
-    radial-gradient(circle at 85% 2%, rgba(236, 55, 80, 0.16), transparent 42%),
-    linear-gradient(180deg, #101218 0%, #11131a 42%, #101217 100%);
+  background-color: #101217;
   color: var(--color-text-main);
   font-family: var(--font-sans);
   text-rendering: optimizeLegibility;
@@ -101,11 +98,7 @@ select {
 
 .silo-glass-nav {
   backdrop-filter: blur(14px);
-  background: linear-gradient(
-    180deg,
-    rgba(19, 19, 22, 0.9) 0%,
-    rgba(19, 19, 22, 0.78) 100%
-  );
+  background: rgba(19, 19, 22, 0.82);
   border-bottom-color: var(--color-line);
 }
 
@@ -135,32 +128,6 @@ select {
   isolation: isolate;
 }
 
-.silo-hero::before,
-.silo-hero::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  pointer-events: none;
-}
-
-.silo-hero::before {
-  width: min(40rem, 75vw);
-  height: min(40rem, 75vw);
-  top: -9rem;
-  left: -12rem;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(51, 142, 218, 0.16), transparent 68%);
-}
-
-.silo-hero::after {
-  width: min(34rem, 70vw);
-  height: min(34rem, 70vw);
-  right: -9rem;
-  bottom: -10rem;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(236, 55, 80, 0.16), transparent 66%);
-}
-
 .silo-cta {
   border-radius: 999px;
   padding: 0.72rem 1.25rem;
@@ -174,9 +141,49 @@ select {
 }
 
 .silo-stat-card {
-  background: linear-gradient(180deg, rgba(21, 24, 32, 0.75), rgba(17, 19, 26, 0.95));
+  background: rgba(18, 21, 28, 0.92);
   border: 1px solid var(--color-line);
   border-radius: 1rem;
+}
+
+.silo-modal-overlay {
+  background: rgba(3, 4, 7, 0.78);
+  backdrop-filter: blur(3px);
+}
+
+.silo-modal-panel {
+  background: rgba(19, 22, 29, 0.98);
+  border: 1px solid var(--color-line);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.silo-modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(19, 22, 29, 0.98);
+  backdrop-filter: blur(3px);
+}
+
+.silo-button-soft {
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.silo-button-soft:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.silo-button-primary {
+  border-radius: 0.75rem;
+  border: 1px solid rgba(250, 204, 21, 0.28);
+  background: #facc15;
+  color: #080a0f;
+}
+
+.silo-button-primary:hover:not(:disabled) {
+  background: #f7dc67;
 }
 
 .silo-range {
