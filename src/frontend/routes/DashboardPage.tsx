@@ -1564,7 +1564,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														href={`/dashboard/buckets/${bucket.name}`}
 														aria-label="Open bucket files"
 														title="Open bucket files"
-													 className={`${iconActionBase} group bg-blue-600/35 text-blue-100 border border-blue-400/60 hover:bg-blue-500/60 hover:text-white`}
+													 className={`${iconActionBase} group text-blue-400 hover:text-blue-300`}
 													>
 														<MdFolderOpen className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1578,7 +1578,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														onClick={() => openCorsModal(bucket)}
 														aria-label="Configure CORS"
 														title="Configure CORS"
-													 className={`${iconActionBase} group bg-green-600/35 text-green-100 border border-green-400/60 hover:bg-green-500/60 hover:text-white`}
+													 className={`${iconActionBase} group text-lime-400 hover:text-lime-300`}
 													>
 														<MdCode className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1592,7 +1592,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														onClick={() => openCollaborationModal(bucket)}
 														aria-label="Manage collaborators"
 														title="Manage collaborators"
-													 className={`${iconActionBase} group bg-purple-600/35 text-purple-100 border border-purple-400/60 hover:bg-purple-500/60 hover:text-white`}
+													 className={`${iconActionBase} group text-fuchsia-400 hover:text-fuchsia-300`}
 													>
 														<MdGroups className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1651,7 +1651,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														disabled={bucketBusy || isDeepFrozen}
 														aria-label="Empty bucket"
 														title="Empty bucket"
-													 className={`${iconActionBase} group bg-yellow-500/35 text-yellow-100 border border-yellow-300/60 hover:bg-yellow-400/60 hover:text-white`}
+													 className={`${iconActionBase} group text-yellow-300 hover:text-yellow-200`}
 													>
 														<MdDeleteOutline className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1668,7 +1668,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														disabled={bucketBusy || isDeepFrozen}
 														aria-label="Delete bucket"
 														title="Delete bucket"
-													 className={`${iconActionBase} group bg-red-600/40 text-red-100 border border-red-400/70 hover:bg-red-500/70 hover:text-white`}
+													 className={`${iconActionBase} group text-red-400 hover:text-red-300`}
 													>
 														<MdDeleteForever className="text-base" />
 														<span className={iconActionTooltip}>
