@@ -1,4 +1,5 @@
 import type React from "react";
+import { useEffect, useId } from "react";
 import { PhIcon } from "./PhIcon";
 
 type ModalProps = {
@@ -16,6 +17,19 @@ export function Modal({
 	className,
 	children,
 }: ModalProps) {
+	const titleId = useId();
+
+	useEffect(() => {
+		if (!open || !onClose) return;
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.key === "Escape") {
+				onClose();
+			}
+		};
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, [open, onClose]);
+
 	if (!open) return null;
 
 	return (
@@ -24,23 +38,27 @@ export function Modal({
 				<button
 					type="button"
 					aria-label="Close modal"
-					className="absolute inset-0 bg-black/80"
+					className="absolute inset-0 silo-modal-overlay"
 					onClick={onClose}
 				/>
 			) : (
-				<div className="absolute inset-0 bg-black/80" />
+				<div className="absolute inset-0 silo-modal-overlay" />
 			)}
 			<div
-				className={`relative z-10 bg-hc-dark rounded-3xl border border-white/10 w-full max-h-[90vh] overflow-y-auto card-shadow ${className ?? "max-w-3xl p-8"}`}
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby={title ? titleId : undefined}
+				className={`relative z-10 w-full max-h-[90vh] overflow-y-auto rounded-3xl silo-modal-panel ${className ?? "max-w-3xl p-8"}`}
 			>
 				{title ? (
-					<div className="flex justify-between items-center mb-6 pb-4 border-b border-white/10">
-						<h3 className="text-2xl font-bold text-white">{title}</h3>
+					<div className="silo-modal-header flex justify-between items-center mb-6 pb-4 border-b border-white/10">
+						<h3 id={titleId} className="text-2xl font-bold text-white">{title}</h3>
 						{onClose ? (
 							<button
 								type="button"
 								onClick={onClose}
-								className="text-text-muted hover:text-white transition-colors rounded-lg p-1 hover:bg-white/5"
+								className="text-text-muted hover:text-white transition-colors rounded-lg p-2 hover:bg-white/5 min-h-11 min-w-11 inline-flex items-center justify-center"
+								aria-label="Close modal"
 							>
 								<PhIcon className="ph ph-x text-2xl" />
 							</button>
