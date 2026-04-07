@@ -1137,7 +1137,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										selectedFolderPrefixes.length === 0)
 								}
 								onClick={startDeleteSelection}
-							 className="bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
+							 className="bg-hc-red/85 hover:bg-hc-red disabled:opacity-40 disabled:cursor-not-allowed text-white px-3.5 py-2 rounded-xl text-sm font-bold transition-colors"
 							>
 								Delete
 							</button>
@@ -1241,7 +1241,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												query: "",
 											});
 										}}
-									 className="text-text-muted hover:text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
+									 className="text-yellow-300 hover:text-yellow-200 hover:bg-yellow-500/10 px-4 py-3 rounded-xl text-sm font-bold transition-colors"
 									>
 										Clear
 									</button>
