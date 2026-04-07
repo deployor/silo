@@ -116,7 +116,7 @@ export function AppShell({
 						SILO
 					</a>
 					{pageTitle ? (
-						<span className="silo-nav-pill text-hc-red px-2.5 py-1 rounded-md text-sm font-mono">
+						<span className="text-[11px] uppercase tracking-wider text-text-muted font-mono border-l border-white/15 pl-3">
 							{pageTitle}
 						</span>
 					) : null}
@@ -273,7 +273,7 @@ export function AppShell({
 				open={inviteOpen}
 				onClose={() => setInviteOpen(false)}
 				title="Collaboration Invites"
-				className="max-w-2xl p-8"
+				className="max-w-2xl p-8 pt-6"
 			>
 				<div className="space-y-4">
 					<p className="text-sm text-text-muted">
@@ -326,7 +326,8 @@ export function AppShell({
 													void respondToInvite(invite.id, "decline")
 												}
 												disabled={inviteBusyId === invite.id}
-												className="px-3 py-2 rounded-xl text-sm font-bold text-text-muted hover:text-white bg-white/5 hover:bg-white/10 disabled:opacity-50"
+												aria-busy={inviteBusyId === invite.id}
+												className="silo-button-soft px-3 py-2 text-sm font-bold text-text-muted hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
 											>
 												Decline
 											</button>
@@ -336,7 +337,8 @@ export function AppShell({
 													void respondToInvite(invite.id, "accept")
 												}
 												disabled={inviteBusyId === invite.id}
-												className="px-4 py-2 rounded-xl text-sm font-bold text-black bg-yellow-400 hover:bg-yellow-300 disabled:opacity-50"
+												aria-busy={inviteBusyId === invite.id}
+												className="silo-button-primary px-4 py-2 text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
 											>
 												{inviteBusyId === invite.id ? "Working..." : "Accept"}
 											</button>
