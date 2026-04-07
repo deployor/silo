@@ -1,0 +1,2049 @@
+{
+  "provider": {
+    "name": "Cloudflare R2",
+    "region": "auto",
+    "endpoint": "https://211d8b16844ebee8eba8cb5c0324806c.r2.cloudflarestorage.com",
+    "bucket": "speedtesting"
+  },
+  "runId": "2026-03-31T16-48-09-805Z",
+  "startedAtUtc": "2026-03-31T17:42:38.819Z",
+  "config": {
+    "repeats": 5,
+    "heavyRepeats": 2,
+    "sizesMiB": {
+      "small": 8,
+      "medium": 64,
+      "large": 256
+    },
+    "parallel": {
+      "uploads": 16,
+      "reads": 16,
+      "deletes": 32
+    },
+    "manyObjectsCount": 10000,
+    "manyObjectsSizeBytes": 1024,
+    "listTarget": 10000,
+    "consistency": {
+      "pollMs": 50,
+      "timeoutMs": 15000
+    },
+    "multipart": {
+      "partSizeMiB": 8,
+      "parts": 4
+    },
+    "reliability": {
+      "opTimeoutMs": 120000,
+      "opRetries": 2,
+      "retryBaseDelayMs": 200,
+      "rateLimitBaseCooldownMs": 8000,
+      "rateLimitMaxCooldownMs": 120000,
+      "rateLimitSkipThreshold": 12,
+      "rateLimitTotalSkipThreshold": 40,
+      "rateLimitAutoSkipProvider": false,
+      "batchMinSuccessRate": 0.9,
+      "phaseSoftTimeoutMs": 0
+    },
+    "keepTestData": false
+  },
+  "probes": [
+    {
+      "name": "head_bucket",
+      "ok": true,
+      "ms": 86.54308299999684,
+      "details": {
+        "bucket": "speedtesting"
+      }
+    },
+    {
+      "name": "put_object",
+      "ok": true,
+      "ms": 261.8215419999324,
+      "details": {
+        "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/capability/probe.bin",
+        "bytes": 1024
+      }
+    },
+    {
+      "name": "head_object",
+      "ok": true,
+      "ms": 77.15233299974352,
+      "details": {
+        "contentLength": 1024,
+        "etag": "\"28633bafbb46511663833b1e30597ca0\""
+      }
+    },
+    {
+      "name": "get_object",
+      "ok": true,
+      "ms": 199.46020799968392,
+      "details": {
+        "bytes": 1024,
+        "sha256": "b9518c17f50b2220fc95b72106e26cee8074dd148e81dbe577c004658ed344ff"
+      }
+    },
+    {
+      "name": "get_object_range",
+      "ok": true,
+      "ms": 80.34258299972862,
+      "details": {
+        "bytes": 128
+      }
+    },
+    {
+      "name": "copy_object",
+      "ok": true,
+      "ms": 215.71241699997336,
+      "details": {
+        "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/capability/probe-copy.bin"
+      }
+    },
+    {
+      "name": "list_objects_v2",
+      "ok": true,
+      "ms": 90.36612500017509,
+      "details": {
+        "keyCount": 2,
+        "truncated": false
+      }
+    },
+    {
+      "name": "multipart_upload",
+      "ok": true,
+      "ms": 2855.217457999941,
+      "details": {
+        "bytes": 33554432,
+        "sha256": "6efc0f3f83be5d1fba2f7d95f64f93950a0aae6edd2159acbce2f14a66a72cda"
+      }
+    },
+    {
+      "name": "delete_object",
+      "ok": true,
+      "ms": 98.21004100004211,
+      "details": {
+        "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/capability/probe-copy.bin"
+      }
+    }
+  ],
+  "trials": {
+    "upload_small": [
+      {
+        "operation": "upload_small",
+        "startedAtUtc": "2026-03-31T17:42:43.278Z",
+        "endedAtUtc": "2026-03-31T17:42:44.202Z",
+        "ms": 924.2767079998739,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 8.655416641745656,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-01-2edb0867-e499-4670-beb1-d4b751228380.bin"
+        }
+      },
+      {
+        "operation": "upload_small",
+        "startedAtUtc": "2026-03-31T17:42:45.939Z",
+        "endedAtUtc": "2026-03-31T17:42:46.641Z",
+        "ms": 702.1148749999702,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 11.394146862363996,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-02-e555c7b5-9c25-4ecf-893d-6d423d03976e.bin"
+        }
+      },
+      {
+        "operation": "upload_small",
+        "startedAtUtc": "2026-03-31T17:42:47.598Z",
+        "endedAtUtc": "2026-03-31T17:42:48.332Z",
+        "ms": 733.4069170001894,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 10.907996385856194,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-03-da1190a3-39d5-489c-a390-7abd9de9ac76.bin"
+        }
+      },
+      {
+        "operation": "upload_small",
+        "startedAtUtc": "2026-03-31T17:42:49.177Z",
+        "endedAtUtc": "2026-03-31T17:42:49.878Z",
+        "ms": 700.7627090001479,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 11.416132589895435,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-04-deda1da7-ac48-4291-b6a7-c00549bbff21.bin"
+        }
+      },
+      {
+        "operation": "upload_small",
+        "startedAtUtc": "2026-03-31T17:42:50.826Z",
+        "endedAtUtc": "2026-03-31T17:42:51.444Z",
+        "ms": 617.9855419998057,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 12.945286671451798,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-05-6b2a3f71-7234-4c85-9329-4ebf5b8eadaf.bin"
+        }
+      }
+    ],
+    "head_object_small": [
+      {
+        "operation": "head_object_small",
+        "startedAtUtc": "2026-03-31T17:42:44.202Z",
+        "endedAtUtc": "2026-03-31T17:42:44.274Z",
+        "ms": 72.00295800017193,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-01-2edb0867-e499-4670-beb1-d4b751228380.bin",
+          "etag": "\"b45baf14f2976ef82a9bf64463050db8\""
+        }
+      },
+      {
+        "operation": "head_object_small",
+        "startedAtUtc": "2026-03-31T17:42:46.641Z",
+        "endedAtUtc": "2026-03-31T17:42:46.734Z",
+        "ms": 92.8134579998441,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-02-e555c7b5-9c25-4ecf-893d-6d423d03976e.bin",
+          "etag": "\"b45baf14f2976ef82a9bf64463050db8\""
+        }
+      },
+      {
+        "operation": "head_object_small",
+        "startedAtUtc": "2026-03-31T17:42:48.332Z",
+        "endedAtUtc": "2026-03-31T17:42:48.413Z",
+        "ms": 81.47079199971631,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-03-da1190a3-39d5-489c-a390-7abd9de9ac76.bin",
+          "etag": "\"b45baf14f2976ef82a9bf64463050db8\""
+        }
+      },
+      {
+        "operation": "head_object_small",
+        "startedAtUtc": "2026-03-31T17:42:49.878Z",
+        "endedAtUtc": "2026-03-31T17:42:49.990Z",
+        "ms": 112.28254199959338,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-04-deda1da7-ac48-4291-b6a7-c00549bbff21.bin",
+          "etag": "\"b45baf14f2976ef82a9bf64463050db8\""
+        }
+      },
+      {
+        "operation": "head_object_small",
+        "startedAtUtc": "2026-03-31T17:42:51.444Z",
+        "endedAtUtc": "2026-03-31T17:42:51.548Z",
+        "ms": 103.42266699997708,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-05-6b2a3f71-7234-4c85-9329-4ebf5b8eadaf.bin",
+          "etag": "\"b45baf14f2976ef82a9bf64463050db8\""
+        }
+      }
+    ],
+    "download_small": [
+      {
+        "operation": "download_small",
+        "startedAtUtc": "2026-03-31T17:42:44.274Z",
+        "endedAtUtc": "2026-03-31T17:42:45.639Z",
+        "ms": 1364.827459000051,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 5.861546781789727,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-01-2edb0867-e499-4670-beb1-d4b751228380.bin",
+          "sha256": "fa0509e12c2ff48f8d0c548126129b96cf0864e16483827e3afaea209c2b27f3"
+        }
+      },
+      {
+        "operation": "download_small",
+        "startedAtUtc": "2026-03-31T17:42:46.734Z",
+        "endedAtUtc": "2026-03-31T17:42:47.395Z",
+        "ms": 660.9094580002129,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 12.104532478936656,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-02-e555c7b5-9c25-4ecf-893d-6d423d03976e.bin",
+          "sha256": "fa0509e12c2ff48f8d0c548126129b96cf0864e16483827e3afaea209c2b27f3"
+        }
+      },
+      {
+        "operation": "download_small",
+        "startedAtUtc": "2026-03-31T17:42:48.413Z",
+        "endedAtUtc": "2026-03-31T17:42:48.954Z",
+        "ms": 541.160666000098,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 14.783040421490188,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-03-da1190a3-39d5-489c-a390-7abd9de9ac76.bin",
+          "sha256": "fa0509e12c2ff48f8d0c548126129b96cf0864e16483827e3afaea209c2b27f3"
+        }
+      },
+      {
+        "operation": "download_small",
+        "startedAtUtc": "2026-03-31T17:42:49.990Z",
+        "endedAtUtc": "2026-03-31T17:42:50.604Z",
+        "ms": 613.3871670002118,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 13.042333505482741,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-04-deda1da7-ac48-4291-b6a7-c00549bbff21.bin",
+          "sha256": "fa0509e12c2ff48f8d0c548126129b96cf0864e16483827e3afaea209c2b27f3"
+        }
+      },
+      {
+        "operation": "download_small",
+        "startedAtUtc": "2026-03-31T17:42:51.548Z",
+        "endedAtUtc": "2026-03-31T17:42:52.151Z",
+        "ms": 603.5254999999888,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 13.25544653871319,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-05-6b2a3f71-7234-4c85-9329-4ebf5b8eadaf.bin",
+          "sha256": "fa0509e12c2ff48f8d0c548126129b96cf0864e16483827e3afaea209c2b27f3"
+        }
+      }
+    ],
+    "range_read_small": [
+      {
+        "operation": "range_read_small",
+        "startedAtUtc": "2026-03-31T17:42:45.639Z",
+        "endedAtUtc": "2026-03-31T17:42:45.759Z",
+        "ms": 119.41883300011978,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.032710502203585276,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-01-2edb0867-e499-4670-beb1-d4b751228380.bin"
+        }
+      },
+      {
+        "operation": "range_read_small",
+        "startedAtUtc": "2026-03-31T17:42:47.395Z",
+        "endedAtUtc": "2026-03-31T17:42:47.454Z",
+        "ms": 58.9595420002006,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.06625305874978998,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-02-e555c7b5-9c25-4ecf-893d-6d423d03976e.bin"
+        }
+      },
+      {
+        "operation": "range_read_small",
+        "startedAtUtc": "2026-03-31T17:42:48.954Z",
+        "endedAtUtc": "2026-03-31T17:42:49.035Z",
+        "ms": 80.8372920001857,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.04832237576675659,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-03-da1190a3-39d5-489c-a390-7abd9de9ac76.bin"
+        }
+      },
+      {
+        "operation": "range_read_small",
+        "startedAtUtc": "2026-03-31T17:42:50.604Z",
+        "endedAtUtc": "2026-03-31T17:42:50.665Z",
+        "ms": 61.67141599999741,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.0633397164093032,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-04-deda1da7-ac48-4291-b6a7-c00549bbff21.bin"
+        }
+      },
+      {
+        "operation": "range_read_small",
+        "startedAtUtc": "2026-03-31T17:42:52.151Z",
+        "endedAtUtc": "2026-03-31T17:42:52.241Z",
+        "ms": 89.21249999990687,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.04378590444168786,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-05-6b2a3f71-7234-4c85-9329-4ebf5b8eadaf.bin"
+        }
+      }
+    ],
+    "delete_small": [
+      {
+        "operation": "delete_small",
+        "startedAtUtc": "2026-03-31T17:42:45.759Z",
+        "endedAtUtc": "2026-03-31T17:42:45.866Z",
+        "ms": 106.69666699972004,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-01-2edb0867-e499-4670-beb1-d4b751228380.bin"
+        }
+      },
+      {
+        "operation": "delete_small",
+        "startedAtUtc": "2026-03-31T17:42:47.454Z",
+        "endedAtUtc": "2026-03-31T17:42:47.538Z",
+        "ms": 84.47412500018254,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-02-e555c7b5-9c25-4ecf-893d-6d423d03976e.bin"
+        }
+      },
+      {
+        "operation": "delete_small",
+        "startedAtUtc": "2026-03-31T17:42:49.035Z",
+        "endedAtUtc": "2026-03-31T17:42:49.121Z",
+        "ms": 85.81458300026134,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-03-da1190a3-39d5-489c-a390-7abd9de9ac76.bin"
+        }
+      },
+      {
+        "operation": "delete_small",
+        "startedAtUtc": "2026-03-31T17:42:50.666Z",
+        "endedAtUtc": "2026-03-31T17:42:50.766Z",
+        "ms": 100.53570799995214,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-04-deda1da7-ac48-4291-b6a7-c00549bbff21.bin"
+        }
+      },
+      {
+        "operation": "delete_small",
+        "startedAtUtc": "2026-03-31T17:42:52.241Z",
+        "endedAtUtc": "2026-03-31T17:42:52.335Z",
+        "ms": 93.76008399995044,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-05-6b2a3f71-7234-4c85-9329-4ebf5b8eadaf.bin"
+        }
+      }
+    ],
+    "post_delete_head_small": [
+      {
+        "operation": "post_delete_head_small",
+        "startedAtUtc": "2026-03-31T17:42:45.866Z",
+        "endedAtUtc": "2026-03-31T17:42:45.939Z",
+        "ms": 72.90691700018942,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-01-2edb0867-e499-4670-beb1-d4b751228380.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_small",
+        "startedAtUtc": "2026-03-31T17:42:47.538Z",
+        "endedAtUtc": "2026-03-31T17:42:47.598Z",
+        "ms": 59.649207999929786,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-02-e555c7b5-9c25-4ecf-893d-6d423d03976e.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_small",
+        "startedAtUtc": "2026-03-31T17:42:49.121Z",
+        "endedAtUtc": "2026-03-31T17:42:49.177Z",
+        "ms": 56.10504199983552,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-03-da1190a3-39d5-489c-a390-7abd9de9ac76.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_small",
+        "startedAtUtc": "2026-03-31T17:42:50.766Z",
+        "endedAtUtc": "2026-03-31T17:42:50.826Z",
+        "ms": 60.00579199986532,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-04-deda1da7-ac48-4291-b6a7-c00549bbff21.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_small",
+        "startedAtUtc": "2026-03-31T17:42:52.335Z",
+        "endedAtUtc": "2026-03-31T17:42:52.414Z",
+        "ms": 79.69045799970627,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/small/trial-05-6b2a3f71-7234-4c85-9329-4ebf5b8eadaf.bin"
+        }
+      }
+    ],
+    "upload_medium": [
+      {
+        "operation": "upload_medium",
+        "startedAtUtc": "2026-03-31T17:42:52.415Z",
+        "endedAtUtc": "2026-03-31T17:43:02.193Z",
+        "ms": 9778.382625000086,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 6.545049672772386,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-01-75721768-953d-45ab-9506-5876e7e46725.bin"
+        }
+      },
+      {
+        "operation": "upload_medium",
+        "startedAtUtc": "2026-03-31T17:43:10.068Z",
+        "endedAtUtc": "2026-03-31T17:43:20.168Z",
+        "ms": 10100.125,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 6.336555240652962,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-02-d30cc657-c7f9-4a79-aee5-18996b72fc25.bin"
+        }
+      },
+      {
+        "operation": "upload_medium",
+        "startedAtUtc": "2026-03-31T17:43:26.000Z",
+        "endedAtUtc": "2026-03-31T17:43:31.930Z",
+        "ms": 5929.354332999792,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 10.793755340916011,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-03-7034e989-22be-4ab7-85e7-675446461936.bin"
+        }
+      },
+      {
+        "operation": "upload_medium",
+        "startedAtUtc": "2026-03-31T17:43:39.954Z",
+        "endedAtUtc": "2026-03-31T17:43:49.592Z",
+        "ms": 9637.799458000343,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 6.640519994102343,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-04-60ac30b8-d509-426f-8d52-75083dad5242.bin"
+        }
+      },
+      {
+        "operation": "upload_medium",
+        "startedAtUtc": "2026-03-31T17:43:58.465Z",
+        "endedAtUtc": "2026-03-31T17:44:05.977Z",
+        "ms": 7511.75458299974,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 8.51998015814333,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-05-f4e9c30a-be6d-404e-b922-f9dc4c45e60a.bin"
+        }
+      }
+    ],
+    "head_object_medium": [
+      {
+        "operation": "head_object_medium",
+        "startedAtUtc": "2026-03-31T17:43:02.193Z",
+        "endedAtUtc": "2026-03-31T17:43:02.293Z",
+        "ms": 99.84012500010431,
+        "ok": true,
+        "bytes": 67108864,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-01-75721768-953d-45ab-9506-5876e7e46725.bin",
+          "etag": "\"fc3f8e2eee29fc3322708b3af9f85af7\""
+        }
+      },
+      {
+        "operation": "head_object_medium",
+        "startedAtUtc": "2026-03-31T17:43:20.168Z",
+        "endedAtUtc": "2026-03-31T17:43:20.262Z",
+        "ms": 93.65945800021291,
+        "ok": true,
+        "bytes": 67108864,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-02-d30cc657-c7f9-4a79-aee5-18996b72fc25.bin",
+          "etag": "\"fc3f8e2eee29fc3322708b3af9f85af7\""
+        }
+      },
+      {
+        "operation": "head_object_medium",
+        "startedAtUtc": "2026-03-31T17:43:31.930Z",
+        "endedAtUtc": "2026-03-31T17:43:32.042Z",
+        "ms": 112.50433300016448,
+        "ok": true,
+        "bytes": 67108864,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-03-7034e989-22be-4ab7-85e7-675446461936.bin",
+          "etag": "\"fc3f8e2eee29fc3322708b3af9f85af7\""
+        }
+      },
+      {
+        "operation": "head_object_medium",
+        "startedAtUtc": "2026-03-31T17:43:49.592Z",
+        "endedAtUtc": "2026-03-31T17:43:49.689Z",
+        "ms": 97.06587499985471,
+        "ok": true,
+        "bytes": 67108864,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-04-60ac30b8-d509-426f-8d52-75083dad5242.bin",
+          "etag": "\"fc3f8e2eee29fc3322708b3af9f85af7\""
+        }
+      },
+      {
+        "operation": "head_object_medium",
+        "startedAtUtc": "2026-03-31T17:44:05.977Z",
+        "endedAtUtc": "2026-03-31T17:44:06.115Z",
+        "ms": 137.540916999802,
+        "ok": true,
+        "bytes": 67108864,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-05-f4e9c30a-be6d-404e-b922-f9dc4c45e60a.bin",
+          "etag": "\"fc3f8e2eee29fc3322708b3af9f85af7\""
+        }
+      }
+    ],
+    "download_medium": [
+      {
+        "operation": "download_medium",
+        "startedAtUtc": "2026-03-31T17:43:02.293Z",
+        "endedAtUtc": "2026-03-31T17:43:09.864Z",
+        "ms": 7570.912000000011,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 8.453406934329696,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-01-75721768-953d-45ab-9506-5876e7e46725.bin",
+          "sha256": "fc786790b08dfe3e25310d8b80bd232e5df86f2e9dab4c61f752f3339d2f81c5"
+        }
+      },
+      {
+        "operation": "download_medium",
+        "startedAtUtc": "2026-03-31T17:43:20.262Z",
+        "endedAtUtc": "2026-03-31T17:43:25.780Z",
+        "ms": 5518.773624999914,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 11.596779347875678,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-02-d30cc657-c7f9-4a79-aee5-18996b72fc25.bin",
+          "sha256": "fc786790b08dfe3e25310d8b80bd232e5df86f2e9dab4c61f752f3339d2f81c5"
+        }
+      },
+      {
+        "operation": "download_medium",
+        "startedAtUtc": "2026-03-31T17:43:32.042Z",
+        "endedAtUtc": "2026-03-31T17:43:39.739Z",
+        "ms": 7696.514332999941,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 8.315452584242006,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-03-7034e989-22be-4ab7-85e7-675446461936.bin",
+          "sha256": "fc786790b08dfe3e25310d8b80bd232e5df86f2e9dab4c61f752f3339d2f81c5"
+        }
+      },
+      {
+        "operation": "download_medium",
+        "startedAtUtc": "2026-03-31T17:43:49.689Z",
+        "endedAtUtc": "2026-03-31T17:43:58.214Z",
+        "ms": 8524.297582999803,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 7.507949995508911,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-04-60ac30b8-d509-426f-8d52-75083dad5242.bin",
+          "sha256": "fc786790b08dfe3e25310d8b80bd232e5df86f2e9dab4c61f752f3339d2f81c5"
+        }
+      },
+      {
+        "operation": "download_medium",
+        "startedAtUtc": "2026-03-31T17:44:06.115Z",
+        "endedAtUtc": "2026-03-31T17:44:13.808Z",
+        "ms": 7693.804624999873,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 8.318381232614295,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-05-f4e9c30a-be6d-404e-b922-f9dc4c45e60a.bin",
+          "sha256": "fc786790b08dfe3e25310d8b80bd232e5df86f2e9dab4c61f752f3339d2f81c5"
+        }
+      }
+    ],
+    "range_read_medium": [
+      {
+        "operation": "range_read_medium",
+        "startedAtUtc": "2026-03-31T17:43:09.864Z",
+        "endedAtUtc": "2026-03-31T17:43:09.930Z",
+        "ms": 66.24245800031349,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.058968977268046334,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-01-75721768-953d-45ab-9506-5876e7e46725.bin"
+        }
+      },
+      {
+        "operation": "range_read_medium",
+        "startedAtUtc": "2026-03-31T17:43:25.781Z",
+        "endedAtUtc": "2026-03-31T17:43:25.853Z",
+        "ms": 72.12329200003296,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.05416072799336745,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-02-d30cc657-c7f9-4a79-aee5-18996b72fc25.bin"
+        }
+      },
+      {
+        "operation": "range_read_medium",
+        "startedAtUtc": "2026-03-31T17:43:39.739Z",
+        "endedAtUtc": "2026-03-31T17:43:39.811Z",
+        "ms": 71.98720900015905,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.05426311221471816,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-03-7034e989-22be-4ab7-85e7-675446461936.bin"
+        }
+      },
+      {
+        "operation": "range_read_medium",
+        "startedAtUtc": "2026-03-31T17:43:58.214Z",
+        "endedAtUtc": "2026-03-31T17:43:58.292Z",
+        "ms": 78.53045800002292,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.04974184666029657,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-04-60ac30b8-d509-426f-8d52-75083dad5242.bin"
+        }
+      },
+      {
+        "operation": "range_read_medium",
+        "startedAtUtc": "2026-03-31T17:44:13.809Z",
+        "endedAtUtc": "2026-03-31T17:44:13.872Z",
+        "ms": 63.32070800010115,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.06168992930391366,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-05-f4e9c30a-be6d-404e-b922-f9dc4c45e60a.bin"
+        }
+      }
+    ],
+    "delete_medium": [
+      {
+        "operation": "delete_medium",
+        "startedAtUtc": "2026-03-31T17:43:09.930Z",
+        "endedAtUtc": "2026-03-31T17:43:10.011Z",
+        "ms": 80.32954100007191,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-01-75721768-953d-45ab-9506-5876e7e46725.bin"
+        }
+      },
+      {
+        "operation": "delete_medium",
+        "startedAtUtc": "2026-03-31T17:43:25.853Z",
+        "endedAtUtc": "2026-03-31T17:43:25.947Z",
+        "ms": 94.53529200004414,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-02-d30cc657-c7f9-4a79-aee5-18996b72fc25.bin"
+        }
+      },
+      {
+        "operation": "delete_medium",
+        "startedAtUtc": "2026-03-31T17:43:39.811Z",
+        "endedAtUtc": "2026-03-31T17:43:39.891Z",
+        "ms": 79.57708400022238,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-03-7034e989-22be-4ab7-85e7-675446461936.bin"
+        }
+      },
+      {
+        "operation": "delete_medium",
+        "startedAtUtc": "2026-03-31T17:43:58.292Z",
+        "endedAtUtc": "2026-03-31T17:43:58.375Z",
+        "ms": 82.53387500019744,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-04-60ac30b8-d509-426f-8d52-75083dad5242.bin"
+        }
+      },
+      {
+        "operation": "delete_medium",
+        "startedAtUtc": "2026-03-31T17:44:13.872Z",
+        "endedAtUtc": "2026-03-31T17:44:14.114Z",
+        "ms": 242.33745900029317,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-05-f4e9c30a-be6d-404e-b922-f9dc4c45e60a.bin"
+        }
+      }
+    ],
+    "post_delete_head_medium": [
+      {
+        "operation": "post_delete_head_medium",
+        "startedAtUtc": "2026-03-31T17:43:10.011Z",
+        "endedAtUtc": "2026-03-31T17:43:10.068Z",
+        "ms": 56.88033300032839,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-01-75721768-953d-45ab-9506-5876e7e46725.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_medium",
+        "startedAtUtc": "2026-03-31T17:43:25.947Z",
+        "endedAtUtc": "2026-03-31T17:43:26.000Z",
+        "ms": 52.950333000160754,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-02-d30cc657-c7f9-4a79-aee5-18996b72fc25.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_medium",
+        "startedAtUtc": "2026-03-31T17:43:39.891Z",
+        "endedAtUtc": "2026-03-31T17:43:39.954Z",
+        "ms": 63.40275000035763,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-03-7034e989-22be-4ab7-85e7-675446461936.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_medium",
+        "startedAtUtc": "2026-03-31T17:43:58.375Z",
+        "endedAtUtc": "2026-03-31T17:43:58.465Z",
+        "ms": 90.1231249999255,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-04-60ac30b8-d509-426f-8d52-75083dad5242.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_medium",
+        "startedAtUtc": "2026-03-31T17:44:14.114Z",
+        "endedAtUtc": "2026-03-31T17:44:14.169Z",
+        "ms": 54.92241600016132,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/medium/trial-05-f4e9c30a-be6d-404e-b922-f9dc4c45e60a.bin"
+        }
+      }
+    ],
+    "upload_large": [
+      {
+        "operation": "upload_large",
+        "startedAtUtc": "2026-03-31T17:44:14.170Z",
+        "endedAtUtc": "2026-03-31T17:44:51.924Z",
+        "ms": 37754.33912499994,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 6.780677557417063,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-01-5fc4446f-002e-45eb-a436-fb9114a4a807.bin"
+        }
+      },
+      {
+        "operation": "upload_large",
+        "startedAtUtc": "2026-03-31T17:45:19.945Z",
+        "endedAtUtc": "2026-03-31T17:46:03.224Z",
+        "ms": 43278.70004200004,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 5.9151499410001565,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-02-81eeeed8-99c5-4d1f-a5d7-1bbebcf6da18.bin"
+        }
+      },
+      {
+        "operation": "upload_large",
+        "startedAtUtc": "2026-03-31T17:46:52.209Z",
+        "endedAtUtc": "2026-03-31T17:47:17.595Z",
+        "ms": 25386.705667000264,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 10.084018121845952,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-03-04f680b1-8d0d-4cac-8cbe-249ac8effd6b.bin"
+        }
+      },
+      {
+        "operation": "upload_large",
+        "startedAtUtc": "2026-03-31T17:47:56.586Z",
+        "endedAtUtc": "2026-03-31T17:48:25.769Z",
+        "ms": 29182.73549999995,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 8.772309915909029,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-04-c1259e07-b7cd-4750-81c6-7396179eb60c.bin"
+        }
+      },
+      {
+        "operation": "upload_large",
+        "startedAtUtc": "2026-03-31T17:48:54.464Z",
+        "endedAtUtc": "2026-03-31T17:49:39.860Z",
+        "ms": 45395.5788329998,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 5.63931569067038,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-05-185af388-fdf2-4106-be4c-b527a05c1e47.bin"
+        }
+      }
+    ],
+    "head_object_large": [
+      {
+        "operation": "head_object_large",
+        "startedAtUtc": "2026-03-31T17:44:51.924Z",
+        "endedAtUtc": "2026-03-31T17:44:52.044Z",
+        "ms": 119.93716700002551,
+        "ok": true,
+        "bytes": 268435456,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-01-5fc4446f-002e-45eb-a436-fb9114a4a807.bin",
+          "etag": "\"804a460434c402728a4f08b7c4d6c122\""
+        }
+      },
+      {
+        "operation": "head_object_large",
+        "startedAtUtc": "2026-03-31T17:46:03.224Z",
+        "endedAtUtc": "2026-03-31T17:46:03.350Z",
+        "ms": 125.75887499982491,
+        "ok": true,
+        "bytes": 268435456,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-02-81eeeed8-99c5-4d1f-a5d7-1bbebcf6da18.bin",
+          "etag": "\"804a460434c402728a4f08b7c4d6c122\""
+        }
+      },
+      {
+        "operation": "head_object_large",
+        "startedAtUtc": "2026-03-31T17:47:17.595Z",
+        "endedAtUtc": "2026-03-31T17:47:17.683Z",
+        "ms": 87.93137499969453,
+        "ok": true,
+        "bytes": 268435456,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-03-04f680b1-8d0d-4cac-8cbe-249ac8effd6b.bin",
+          "etag": "\"804a460434c402728a4f08b7c4d6c122\""
+        }
+      },
+      {
+        "operation": "head_object_large",
+        "startedAtUtc": "2026-03-31T17:48:25.769Z",
+        "endedAtUtc": "2026-03-31T17:48:25.880Z",
+        "ms": 110.21633400022984,
+        "ok": true,
+        "bytes": 268435456,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-04-c1259e07-b7cd-4750-81c6-7396179eb60c.bin",
+          "etag": "\"804a460434c402728a4f08b7c4d6c122\""
+        }
+      },
+      {
+        "operation": "head_object_large",
+        "startedAtUtc": "2026-03-31T17:49:39.860Z",
+        "endedAtUtc": "2026-03-31T17:49:39.968Z",
+        "ms": 107.83404200011864,
+        "ok": true,
+        "bytes": 268435456,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-05-185af388-fdf2-4106-be4c-b527a05c1e47.bin",
+          "etag": "\"804a460434c402728a4f08b7c4d6c122\""
+        }
+      }
+    ],
+    "download_large": [
+      {
+        "operation": "download_large",
+        "startedAtUtc": "2026-03-31T17:44:52.044Z",
+        "endedAtUtc": "2026-03-31T17:45:19.680Z",
+        "ms": 27635.75612499984,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 9.26336152490568,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-01-5fc4446f-002e-45eb-a436-fb9114a4a807.bin",
+          "sha256": "e160e95bbc8f1df20b222a2439b79baa9ee5b78524350de03d631d2fddbbdea9"
+        }
+      },
+      {
+        "operation": "download_large",
+        "startedAtUtc": "2026-03-31T17:46:03.350Z",
+        "endedAtUtc": "2026-03-31T17:46:52.045Z",
+        "ms": 48694.87479100004,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 5.257226784107367,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-02-81eeeed8-99c5-4d1f-a5d7-1bbebcf6da18.bin",
+          "sha256": "e160e95bbc8f1df20b222a2439b79baa9ee5b78524350de03d631d2fddbbdea9"
+        }
+      },
+      {
+        "operation": "download_large",
+        "startedAtUtc": "2026-03-31T17:47:17.683Z",
+        "endedAtUtc": "2026-03-31T17:47:56.437Z",
+        "ms": 38753.21637499984,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 6.605903301619852,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-03-04f680b1-8d0d-4cac-8cbe-249ac8effd6b.bin",
+          "sha256": "e160e95bbc8f1df20b222a2439b79baa9ee5b78524350de03d631d2fddbbdea9"
+        }
+      },
+      {
+        "operation": "download_large",
+        "startedAtUtc": "2026-03-31T17:48:25.880Z",
+        "endedAtUtc": "2026-03-31T17:48:54.251Z",
+        "ms": 28371.22970899986,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 9.023225380984886,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-04-c1259e07-b7cd-4750-81c6-7396179eb60c.bin",
+          "sha256": "e160e95bbc8f1df20b222a2439b79baa9ee5b78524350de03d631d2fddbbdea9"
+        }
+      },
+      {
+        "operation": "download_large",
+        "startedAtUtc": "2026-03-31T17:49:39.968Z",
+        "endedAtUtc": "2026-03-31T17:50:14.077Z",
+        "ms": 34108.40270800004,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 7.505481924545117,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-05-185af388-fdf2-4106-be4c-b527a05c1e47.bin",
+          "sha256": "e160e95bbc8f1df20b222a2439b79baa9ee5b78524350de03d631d2fddbbdea9"
+        }
+      }
+    ],
+    "delete_large": [
+      {
+        "operation": "delete_large",
+        "startedAtUtc": "2026-03-31T17:45:19.680Z",
+        "endedAtUtc": "2026-03-31T17:45:19.840Z",
+        "ms": 160.20166700007394,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-01-5fc4446f-002e-45eb-a436-fb9114a4a807.bin"
+        }
+      },
+      {
+        "operation": "delete_large",
+        "startedAtUtc": "2026-03-31T17:46:52.045Z",
+        "endedAtUtc": "2026-03-31T17:46:52.145Z",
+        "ms": 100.11379199987277,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-02-81eeeed8-99c5-4d1f-a5d7-1bbebcf6da18.bin"
+        }
+      },
+      {
+        "operation": "delete_large",
+        "startedAtUtc": "2026-03-31T17:47:56.437Z",
+        "endedAtUtc": "2026-03-31T17:47:56.526Z",
+        "ms": 89.0238749999553,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-03-04f680b1-8d0d-4cac-8cbe-249ac8effd6b.bin"
+        }
+      },
+      {
+        "operation": "delete_large",
+        "startedAtUtc": "2026-03-31T17:48:54.251Z",
+        "endedAtUtc": "2026-03-31T17:48:54.390Z",
+        "ms": 139.00474999984726,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-04-c1259e07-b7cd-4750-81c6-7396179eb60c.bin"
+        }
+      },
+      {
+        "operation": "delete_large",
+        "startedAtUtc": "2026-03-31T17:50:14.077Z",
+        "endedAtUtc": "2026-03-31T17:50:14.167Z",
+        "ms": 90.62899999972433,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-05-185af388-fdf2-4106-be4c-b527a05c1e47.bin"
+        }
+      }
+    ],
+    "post_delete_head_large": [
+      {
+        "operation": "post_delete_head_large",
+        "startedAtUtc": "2026-03-31T17:45:19.841Z",
+        "endedAtUtc": "2026-03-31T17:45:19.945Z",
+        "ms": 104.32908400008455,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-01-5fc4446f-002e-45eb-a436-fb9114a4a807.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_large",
+        "startedAtUtc": "2026-03-31T17:46:52.146Z",
+        "endedAtUtc": "2026-03-31T17:46:52.208Z",
+        "ms": 62.943457999732345,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-02-81eeeed8-99c5-4d1f-a5d7-1bbebcf6da18.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_large",
+        "startedAtUtc": "2026-03-31T17:47:56.526Z",
+        "endedAtUtc": "2026-03-31T17:47:56.586Z",
+        "ms": 60.256415999960154,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-03-04f680b1-8d0d-4cac-8cbe-249ac8effd6b.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_large",
+        "startedAtUtc": "2026-03-31T17:48:54.390Z",
+        "endedAtUtc": "2026-03-31T17:48:54.464Z",
+        "ms": 73.92112500034273,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-04-c1259e07-b7cd-4750-81c6-7396179eb60c.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_large",
+        "startedAtUtc": "2026-03-31T17:50:14.167Z",
+        "endedAtUtc": "2026-03-31T17:50:14.227Z",
+        "ms": 60.04758300026879,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/single/large/trial-05-185af388-fdf2-4106-be4c-b527a05c1e47.bin"
+        }
+      }
+    ],
+    "read_after_write_visibility": [
+      {
+        "operation": "read_after_write_visibility",
+        "startedAtUtc": "2026-03-31T17:50:15.027Z",
+        "endedAtUtc": "2026-03-31T17:50:15.131Z",
+        "ms": 103.80895800003782,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/consistency/read-after-write-01-2d15ac4f-1e6e-43d7-baca-bd468b8b0de0.bin",
+          "elapsedMs": 103.67179200006649
+        }
+      },
+      {
+        "operation": "read_after_write_visibility",
+        "startedAtUtc": "2026-03-31T17:50:15.959Z",
+        "endedAtUtc": "2026-03-31T17:50:16.067Z",
+        "ms": 107.51487499987707,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/consistency/read-after-write-02-939c3ecd-1430-43c3-b38b-00e2913acbd5.bin",
+          "elapsedMs": 107.35187500016764
+        }
+      },
+      {
+        "operation": "read_after_write_visibility",
+        "startedAtUtc": "2026-03-31T17:50:16.976Z",
+        "endedAtUtc": "2026-03-31T17:50:17.075Z",
+        "ms": 98.90141700021923,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/consistency/read-after-write-03-265ed109-d5bd-46c0-8361-4ac32d57ae72.bin",
+          "elapsedMs": 98.86320800008252
+        }
+      },
+      {
+        "operation": "read_after_write_visibility",
+        "startedAtUtc": "2026-03-31T17:50:17.956Z",
+        "endedAtUtc": "2026-03-31T17:50:18.074Z",
+        "ms": 117.56812499975786,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/consistency/read-after-write-04-71a94c1b-1700-4a2f-ac4f-d497dabca717.bin",
+          "elapsedMs": 117.47945900028571
+        }
+      },
+      {
+        "operation": "read_after_write_visibility",
+        "startedAtUtc": "2026-03-31T17:50:19.114Z",
+        "endedAtUtc": "2026-03-31T17:50:19.241Z",
+        "ms": 127.20695800008252,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/consistency/read-after-write-05-1b0e49fb-1f7b-4048-9373-a8ab358841a7.bin",
+          "elapsedMs": 127.14662500005215
+        }
+      }
+    ],
+    "delete_propagation": [
+      {
+        "operation": "delete_propagation",
+        "startedAtUtc": "2026-03-31T17:50:15.131Z",
+        "endedAtUtc": "2026-03-31T17:50:15.279Z",
+        "ms": 148.4054159997031,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/consistency/read-after-write-01-2d15ac4f-1e6e-43d7-baca-bd468b8b0de0.bin",
+          "elapsedMs": 60.48154200008139
+        }
+      },
+      {
+        "operation": "delete_propagation",
+        "startedAtUtc": "2026-03-31T17:50:16.067Z",
+        "endedAtUtc": "2026-03-31T17:50:16.203Z",
+        "ms": 136.4186669997871,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/consistency/read-after-write-02-939c3ecd-1430-43c3-b38b-00e2913acbd5.bin",
+          "elapsedMs": 58.79062499990687
+        }
+      },
+      {
+        "operation": "delete_propagation",
+        "startedAtUtc": "2026-03-31T17:50:17.075Z",
+        "endedAtUtc": "2026-03-31T17:50:17.228Z",
+        "ms": 152.67250000033528,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/consistency/read-after-write-03-265ed109-d5bd-46c0-8361-4ac32d57ae72.bin",
+          "elapsedMs": 70.65591700002551
+        }
+      },
+      {
+        "operation": "delete_propagation",
+        "startedAtUtc": "2026-03-31T17:50:18.074Z",
+        "endedAtUtc": "2026-03-31T17:50:18.231Z",
+        "ms": 156.56516599981114,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/consistency/read-after-write-04-71a94c1b-1700-4a2f-ac4f-d497dabca717.bin",
+          "elapsedMs": 63.63775000022724
+        }
+      },
+      {
+        "operation": "delete_propagation",
+        "startedAtUtc": "2026-03-31T17:50:19.241Z",
+        "endedAtUtc": "2026-03-31T17:50:19.499Z",
+        "ms": 257.8445410002023,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/consistency/read-after-write-05-1b0e49fb-1f7b-4048-9373-a8ab358841a7.bin",
+          "elapsedMs": 133.55624999990687
+        }
+      }
+    ],
+    "missing_read": [
+      {
+        "operation": "missing_read",
+        "startedAtUtc": "2026-03-31T17:50:19.499Z",
+        "endedAtUtc": "2026-03-31T17:50:20.377Z",
+        "ms": 877.8020830000751,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/missing/1-b43df933-f56d-4a4a-a35e-7a1f700c82e2.bin"
+        }
+      },
+      {
+        "operation": "missing_read",
+        "startedAtUtc": "2026-03-31T17:50:20.494Z",
+        "endedAtUtc": "2026-03-31T17:50:21.324Z",
+        "ms": 829.0507919997908,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/missing/2-1a3bb59f-3d24-4467-b842-4660f7e71c2a.bin"
+        }
+      },
+      {
+        "operation": "missing_read",
+        "startedAtUtc": "2026-03-31T17:50:21.390Z",
+        "endedAtUtc": "2026-03-31T17:50:22.211Z",
+        "ms": 820.6854170002043,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/missing/3-aedede6b-8150-4c7f-a5c9-43a32f26097a.bin"
+        }
+      }
+    ],
+    "missing_head": [
+      {
+        "operation": "missing_head",
+        "startedAtUtc": "2026-03-31T17:50:20.377Z",
+        "endedAtUtc": "2026-03-31T17:50:20.494Z",
+        "ms": 117.25633400026709,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/missing/1-b43df933-f56d-4a4a-a35e-7a1f700c82e2.bin"
+        }
+      },
+      {
+        "operation": "missing_head",
+        "startedAtUtc": "2026-03-31T17:50:21.324Z",
+        "endedAtUtc": "2026-03-31T17:50:21.390Z",
+        "ms": 66.44795800000429,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/missing/2-1a3bb59f-3d24-4467-b842-4660f7e71c2a.bin"
+        }
+      },
+      {
+        "operation": "missing_head",
+        "startedAtUtc": "2026-03-31T17:50:22.211Z",
+        "endedAtUtc": "2026-03-31T17:50:22.285Z",
+        "ms": 74.67695799982175,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/cloudflare-r2/missing/3-aedede6b-8150-4c7f-a5c9-43a32f26097a.bin"
+        }
+      }
+    ],
+    "parallel_upload_batch": [
+      {
+        "operation": "parallel_upload_batch",
+        "startedAtUtc": "2026-03-31T17:50:22.286Z",
+        "endedAtUtc": "2026-03-31T17:50:33.396Z",
+        "ms": 11109.763750000391,
+        "ok": true,
+        "bytes": 134217728,
+        "throughputMiBs": 11.52139711341706,
+        "details": {
+          "requested": 16,
+          "completed": 16,
+          "failed": 0,
+          "successRate": 1,
+          "cycle": 1,
+          "sampleErrors": []
+        }
+      },
+      {
+        "operation": "parallel_upload_batch",
+        "startedAtUtc": "2026-03-31T17:53:21.392Z",
+        "endedAtUtc": "2026-03-31T17:53:36.559Z",
+        "ms": 15166.755333000328,
+        "ok": true,
+        "bytes": 134217728,
+        "throughputMiBs": 8.439511101065458,
+        "details": {
+          "requested": 16,
+          "completed": 16,
+          "failed": 0,
+          "successRate": 1,
+          "cycle": 2,
+          "sampleErrors": []
+        }
+      }
+    ],
+    "parallel_read_batch": [
+      {
+        "operation": "parallel_read_batch",
+        "startedAtUtc": "2026-03-31T17:50:33.396Z",
+        "endedAtUtc": "2026-03-31T17:50:56.836Z",
+        "ms": 23439.71787500009,
+        "ok": true,
+        "bytes": 134217728,
+        "throughputMiBs": 5.460816579900901,
+        "details": {
+          "requested": 16,
+          "completed": 16,
+          "failed": 0,
+          "successRate": 1,
+          "cycle": 1,
+          "sampleErrors": []
+        }
+      },
+      {
+        "operation": "parallel_read_batch",
+        "startedAtUtc": "2026-03-31T17:53:36.559Z",
+        "endedAtUtc": "2026-03-31T17:53:56.020Z",
+        "ms": 19460.621875000186,
+        "ok": true,
+        "bytes": 134217728,
+        "throughputMiBs": 6.577384876093472,
+        "details": {
+          "requested": 16,
+          "completed": 16,
+          "failed": 0,
+          "successRate": 1,
+          "cycle": 2,
+          "sampleErrors": []
+        }
+      }
+    ],
+    "parallel_delete_batch": [
+      {
+        "operation": "parallel_delete_batch",
+        "startedAtUtc": "2026-03-31T17:50:56.836Z",
+        "endedAtUtc": "2026-03-31T17:50:57.109Z",
+        "ms": 273.22920900024474,
+        "ok": true,
+        "details": {
+          "requested": 16,
+          "completed": 16,
+          "failed": 0,
+          "successRate": 1,
+          "cycle": 1,
+          "sampleErrors": []
+        }
+      },
+      {
+        "operation": "parallel_delete_batch",
+        "startedAtUtc": "2026-03-31T17:53:56.020Z",
+        "endedAtUtc": "2026-03-31T17:53:56.158Z",
+        "ms": 137.55083400011063,
+        "ok": true,
+        "details": {
+          "requested": 16,
+          "completed": 16,
+          "failed": 0,
+          "successRate": 1,
+          "cycle": 2,
+          "sampleErrors": []
+        }
+      }
+    ],
+    "seed_many_objects": [
+      {
+        "operation": "seed_many_objects",
+        "startedAtUtc": "2026-03-31T17:50:57.113Z",
+        "endedAtUtc": "2026-03-31T17:52:48.136Z",
+        "ms": 111022.51520799985,
+        "ok": true,
+        "bytes": 10240000,
+        "throughputMiBs": 0.08796076166806503,
+        "details": {
+          "requested": 10000,
+          "completed": 10000,
+          "failed": 0,
+          "successRate": 1,
+          "count": 10000,
+          "cycle": 1,
+          "sampleErrors": []
+        }
+      },
+      {
+        "operation": "seed_many_objects",
+        "startedAtUtc": "2026-03-31T17:53:56.161Z",
+        "endedAtUtc": "2026-03-31T17:55:45.317Z",
+        "ms": 109156.07416700013,
+        "ok": true,
+        "bytes": 10240000,
+        "throughputMiBs": 0.08946478768611052,
+        "details": {
+          "requested": 10000,
+          "completed": 10000,
+          "failed": 0,
+          "successRate": 1,
+          "count": 10000,
+          "cycle": 2,
+          "sampleErrors": []
+        }
+      }
+    ],
+    "list_single_page": [
+      {
+        "operation": "list_single_page",
+        "startedAtUtc": "2026-03-31T17:52:48.136Z",
+        "endedAtUtc": "2026-03-31T17:52:48.708Z",
+        "ms": 572.1819170000963,
+        "ok": true,
+        "details": {
+          "count": 1000,
+          "truncated": true,
+          "cycle": 1
+        }
+      },
+      {
+        "operation": "list_single_page",
+        "startedAtUtc": "2026-03-31T17:55:45.318Z",
+        "endedAtUtc": "2026-03-31T17:55:45.779Z",
+        "ms": 461.52345799980685,
+        "ok": true,
+        "details": {
+          "count": 1000,
+          "truncated": true,
+          "cycle": 2
+        }
+      }
+    ],
+    "list_deep_scan": [
+      {
+        "operation": "list_deep_scan",
+        "startedAtUtc": "2026-03-31T17:52:48.708Z",
+        "endedAtUtc": "2026-03-31T17:52:53.890Z",
+        "ms": 5181.926915999968,
+        "ok": true,
+        "details": {
+          "listed": 10000,
+          "cycle": 1
+        }
+      },
+      {
+        "operation": "list_deep_scan",
+        "startedAtUtc": "2026-03-31T17:55:45.779Z",
+        "endedAtUtc": "2026-03-31T17:57:50.634Z",
+        "ms": 124854.168083,
+        "ok": true,
+        "details": {
+          "listed": 10000,
+          "cycle": 2
+        }
+      }
+    ],
+    "parallel_delete_many_objects": [
+      {
+        "operation": "parallel_delete_many_objects",
+        "startedAtUtc": "2026-03-31T17:52:53.890Z",
+        "endedAtUtc": "2026-03-31T17:53:21.392Z",
+        "ms": 27502.128083999734,
+        "ok": true,
+        "details": {
+          "requested": 10000,
+          "completed": 10000,
+          "failed": 0,
+          "successRate": 1,
+          "count": 10000,
+          "cycle": 1,
+          "sampleErrors": []
+        }
+      },
+      {
+        "operation": "parallel_delete_many_objects",
+        "startedAtUtc": "2026-03-31T17:57:50.634Z",
+        "endedAtUtc": "2026-03-31T17:58:18.539Z",
+        "ms": 27904.940833,
+        "ok": true,
+        "details": {
+          "requested": 10000,
+          "completed": 10000,
+          "failed": 0,
+          "successRate": 1,
+          "count": 10000,
+          "cycle": 2,
+          "sampleErrors": []
+        }
+      }
+    ]
+  },
+  "phaseTimingsMs": {
+    "bucket verification": 199.96,
+    "capability probes": 3965.51,
+    "single object baseline": 450948.43,
+    "consistency checks": 5271.41,
+    "missing key behavior": 2786.54,
+    "heavy stress cycles": 476251.53,
+    "cleanup": 52436.91
+  },
+  "notes": [],
+  "completedAtUtc": "2026-03-31T17:59:10.976Z",
+  "aggregates": {
+    "upload_small": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 617.9855419998057,
+      "maxMs": 924.2767079998739,
+      "meanMs": 735.7093501999974,
+      "medianMs": 702.1148749999702,
+      "p95Ms": 924.2767079998739,
+      "stdevMs": 101.75627856652189,
+      "cv": 0.13831043269853802,
+      "totalBytes": 41943040,
+      "meanThroughputMiBs": 11.063795830262617,
+      "medianThroughputMiBs": 11.394146862363996
+    },
+    "head_object_small": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 72.00295800017193,
+      "maxMs": 112.28254199959338,
+      "meanMs": 92.39848339986057,
+      "medianMs": 92.8134579998441,
+      "p95Ms": 112.28254199959338,
+      "stdevMs": 14.508428653933883,
+      "cv": 0.15702020336359523,
+      "totalBytes": 41943040,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "download_small": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 541.160666000098,
+      "maxMs": 1364.827459000051,
+      "meanMs": 756.7620500001125,
+      "medianMs": 613.3871670002118,
+      "p95Ms": 1364.827459000051,
+      "stdevMs": 306.41573560418175,
+      "cv": 0.40490367560600615,
+      "totalBytes": 41943040,
+      "meanThroughputMiBs": 11.809379945282501,
+      "medianThroughputMiBs": 13.042333505482741
+    },
+    "range_read_small": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 58.9595420002006,
+      "maxMs": 119.41883300011978,
+      "meanMs": 82.01991660008207,
+      "medianMs": 80.8372920001857,
+      "p95Ms": 119.41883300011978,
+      "stdevMs": 21.898187861844775,
+      "cv": 0.26698622443884396,
+      "totalBytes": 20480,
+      "meanThroughputMiBs": 0.05088231151422458,
+      "medianThroughputMiBs": 0.04832237576675659
+    },
+    "delete_small": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 84.47412500018254,
+      "maxMs": 106.69666699972004,
+      "meanMs": 94.2562334000133,
+      "medianMs": 93.76008399995044,
+      "p95Ms": 106.69666699972004,
+      "stdevMs": 8.501687595352397,
+      "cv": 0.09019761652549971,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "post_delete_head_small": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 56.10504199983552,
+      "maxMs": 79.69045799970627,
+      "meanMs": 65.67148339990527,
+      "medianMs": 60.00579199986532,
+      "p95Ms": 79.69045799970627,
+      "stdevMs": 9.04176762927019,
+      "cv": 0.13768179369743355,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "upload_medium": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 5929.354332999792,
+      "maxMs": 10100.125,
+      "meanMs": 8591.483199799992,
+      "medianMs": 9637.799458000343,
+      "p95Ms": 10100.125,
+      "stdevMs": 1614.4504965104206,
+      "cv": 0.18791289687303409,
+      "totalBytes": 335544320,
+      "meanThroughputMiBs": 7.7671720813174066,
+      "medianThroughputMiBs": 6.640519994102343
+    },
+    "head_object_medium": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 93.65945800021291,
+      "maxMs": 137.540916999802,
+      "meanMs": 108.12214160002767,
+      "medianMs": 99.84012500010431,
+      "p95Ms": 137.540916999802,
+      "stdevMs": 16.029160891909825,
+      "cv": 0.14825049388316705,
+      "totalBytes": 335544320,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "download_medium": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 5518.773624999914,
+      "maxMs": 8524.297582999803,
+      "meanMs": 7400.860433199909,
+      "medianMs": 7693.804624999873,
+      "p95Ms": 8524.297582999803,
+      "stdevMs": 1000.6504730922206,
+      "cv": 0.1352073157066103,
+      "totalBytes": 335544320,
+      "meanThroughputMiBs": 8.838394018914117,
+      "medianThroughputMiBs": 8.318381232614295
+    },
+    "range_read_medium": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 63.32070800010115,
+      "maxMs": 78.53045800002292,
+      "meanMs": 70.44082500012591,
+      "medianMs": 71.98720900015905,
+      "p95Ms": 78.53045800002292,
+      "stdevMs": 5.272314715824786,
+      "cv": 0.07484742996430496,
+      "totalBytes": 20480,
+      "meanThroughputMiBs": 0.05576491868806843,
+      "medianThroughputMiBs": 0.05426311221471816
+    },
+    "delete_medium": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 79.57708400022238,
+      "maxMs": 242.33745900029317,
+      "meanMs": 115.8626502001658,
+      "medianMs": 82.53387500019744,
+      "p95Ms": 242.33745900029317,
+      "stdevMs": 63.46776329607239,
+      "cv": 0.5477844947135653,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "post_delete_head_medium": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 52.950333000160754,
+      "maxMs": 90.1231249999255,
+      "meanMs": 63.655791400186715,
+      "medianMs": 56.88033300032839,
+      "p95Ms": 90.1231249999255,
+      "stdevMs": 13.692109404986178,
+      "cv": 0.21509605180945118,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "upload_large": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 25386.705667000264,
+      "maxMs": 45395.5788329998,
+      "meanMs": 36199.6118334,
+      "medianMs": 37754.33912499994,
+      "p95Ms": 45395.5788329998,
+      "stdevMs": 7787.836273519232,
+      "cv": 0.21513590558265858,
+      "totalBytes": 1342177280,
+      "meanThroughputMiBs": 7.438294245368516,
+      "medianThroughputMiBs": 6.780677557417063
+    },
+    "head_object_large": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 87.93137499969453,
+      "maxMs": 125.75887499982491,
+      "meanMs": 110.33555859997868,
+      "medianMs": 110.21633400022984,
+      "p95Ms": 125.75887499982491,
+      "stdevMs": 12.948272589325711,
+      "cv": 0.11735357806334805,
+      "totalBytes": 1342177280,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "download_large": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 27635.75612499984,
+      "maxMs": 48694.87479100004,
+      "meanMs": 35512.69594159992,
+      "medianMs": 34108.40270800004,
+      "p95Ms": 48694.87479100004,
+      "stdevMs": 7736.789672835824,
+      "cv": 0.21785982358418673,
+      "totalBytes": 1342177280,
+      "meanThroughputMiBs": 7.531039783232581,
+      "medianThroughputMiBs": 7.505481924545117
+    },
+    "delete_large": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 89.0238749999553,
+      "maxMs": 160.20166700007394,
+      "meanMs": 115.79461679989473,
+      "medianMs": 100.11379199987277,
+      "p95Ms": 160.20166700007394,
+      "stdevMs": 28.65856082395556,
+      "cv": 0.24749475939352664,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "post_delete_head_large": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 60.04758300026879,
+      "maxMs": 104.32908400008455,
+      "meanMs": 72.29953320007772,
+      "medianMs": 62.943457999732345,
+      "p95Ms": 104.32908400008455,
+      "stdevMs": 16.800028471200807,
+      "cv": 0.23236703928238844,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "read_after_write_visibility": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 98.90141700021923,
+      "maxMs": 127.20695800008252,
+      "meanMs": 111.0000665999949,
+      "medianMs": 107.51487499987707,
+      "p95Ms": 127.20695800008252,
+      "stdevMs": 10.159120488713494,
+      "cv": 0.09152355309230023,
+      "totalBytes": 41943040,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "delete_propagation": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 136.4186669997871,
+      "maxMs": 257.8445410002023,
+      "meanMs": 170.38125799996777,
+      "medianMs": 152.67250000033528,
+      "p95Ms": 257.8445410002023,
+      "stdevMs": 44.25088835332372,
+      "cv": 0.2597168777409314,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "missing_read": {
+      "count": 3,
+      "okCount": 3,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 820.6854170002043,
+      "maxMs": 877.8020830000751,
+      "meanMs": 842.5127640000234,
+      "medianMs": 829.0507919997908,
+      "p95Ms": 877.8020830000751,
+      "stdevMs": 25.18593392268103,
+      "cv": 0.02989383069178087,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "missing_head": {
+      "count": 3,
+      "okCount": 3,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 66.44795800000429,
+      "maxMs": 117.25633400026709,
+      "meanMs": 86.12708333336438,
+      "medianMs": 74.67695799982175,
+      "p95Ms": 117.25633400026709,
+      "stdevMs": 22.26659374580968,
+      "cv": 0.2585318448509904,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "parallel_upload_batch": {
+      "count": 2,
+      "okCount": 2,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 11109.763750000391,
+      "maxMs": 15166.755333000328,
+      "meanMs": 13138.25954150036,
+      "medianMs": 13138.25954150036,
+      "p95Ms": 15166.755333000328,
+      "stdevMs": 2028.4957914999686,
+      "cv": 0.15439608154280068,
+      "totalBytes": 268435456,
+      "meanThroughputMiBs": 9.980454107241258,
+      "medianThroughputMiBs": 9.980454107241258
+    },
+    "parallel_read_batch": {
+      "count": 2,
+      "okCount": 2,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 19460.621875000186,
+      "maxMs": 23439.71787500009,
+      "meanMs": 21450.169875000138,
+      "medianMs": 21450.169875000138,
+      "p95Ms": 23439.71787500009,
+      "stdevMs": 1989.5479999999516,
+      "cv": 0.09275208595521385,
+      "totalBytes": 268435456,
+      "meanThroughputMiBs": 6.019100727997186,
+      "medianThroughputMiBs": 6.019100727997186
+    },
+    "parallel_delete_batch": {
+      "count": 2,
+      "okCount": 2,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 137.55083400011063,
+      "maxMs": 273.22920900024474,
+      "meanMs": 205.39002150017768,
+      "medianMs": 205.39002150017768,
+      "p95Ms": 273.22920900024474,
+      "stdevMs": 67.83918750006706,
+      "cv": 0.33029446613115215,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "seed_many_objects": {
+      "count": 2,
+      "okCount": 2,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 109156.07416700013,
+      "maxMs": 111022.51520799985,
+      "meanMs": 110089.29468749999,
+      "medianMs": 110089.29468749999,
+      "p95Ms": 111022.51520799985,
+      "stdevMs": 933.2205204998609,
+      "cv": 0.00847694158772572,
+      "totalBytes": 20480000,
+      "meanThroughputMiBs": 0.08871277467708777,
+      "medianThroughputMiBs": 0.08871277467708777
+    },
+    "list_single_page": {
+      "count": 2,
+      "okCount": 2,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 461.52345799980685,
+      "maxMs": 572.1819170000963,
+      "meanMs": 516.8526874999516,
+      "medianMs": 516.8526874999516,
+      "p95Ms": 572.1819170000963,
+      "stdevMs": 55.32922950014472,
+      "cv": 0.10705028887007559,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "list_deep_scan": {
+      "count": 2,
+      "okCount": 2,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 5181.926915999968,
+      "maxMs": 124854.168083,
+      "meanMs": 65018.04749949998,
+      "medianMs": 65018.04749949998,
+      "p95Ms": 124854.168083,
+      "stdevMs": 59836.120583500015,
+      "cv": 0.9203001764080994,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "parallel_delete_many_objects": {
+      "count": 2,
+      "okCount": 2,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 27502.128083999734,
+      "maxMs": 27904.940833,
+      "meanMs": 27703.534458499867,
+      "medianMs": 27703.534458499867,
+      "p95Ms": 27904.940833,
+      "stdevMs": 201.4063745001331,
+      "cv": 0.007270060605510159,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    }
+  },
+  "derived": {
+    "capabilitySuccessRate": 1,
+    "integritySuccessRate": 1,
+    "deleteValidationSuccessRate": 1,
+    "missingReadExpectedErrorRate": 1,
+    "coreFailureRate": 0,
+    "coreMedianCv": 0.20152440122784632,
+    "visibilityMedianMs": 107.35187500016764,
+    "deletePropagationMedianMs": 63.63775000022724,
+    "parallelUploadAggregateMiBsPerSec": 9.980454107241258,
+    "parallelReadAggregateMiBsPerSec": 6.019100727997186,
+    "listObjectsPerSecond": 153.80344972796829,
+    "seedObjectsPerSecond": 90.83535350449877,
+    "parallelDeletesPerSecond": 360.96477202142154,
+    "skippedPhases": [],
+    "skippedCategoryCount": 0,
+    "skippedCategories": [],
+    "abortedByUser": false
+  },
+  "status": "ok"
+}

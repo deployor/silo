@@ -11,6 +11,7 @@ import {
 import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
+import { getCorsHeaders } from "./cors";
 import {
 	filterUpstreamHeaders,
 	isReservedBucketName,
@@ -26,16 +27,56 @@ export async function handlePutRequest(
 	internalPath: string,
 	url: URL,
 ) {
+	const corsHeaders = getCorsHeaders(req, bucket);
+	const withCors = (response: Response) => {
+		if (!req.headers.get("Origin")) return response;
+
+		const headers = new Headers(response.headers);
+		for (const [headerKey, headerValue] of corsHeaders.entries()) {
+			headers.set(headerKey, headerValue);
+		}
+
+		return new Response(response.body, {
+			status: response.status,
+			statusText: response.statusText,
+			headers,
+		});
+	};
+
+	const partNumber = url.searchParams.get("partNumber");
+	const uploadId = url.searchParams.get("uploadId");
+	const isMultipartPartUpload = Boolean(partNumber && uploadId);
+	const requestStart = Date.now();
+
+	const logPutResult = (message: string, extra?: Record<string, unknown>) => {
+		console.log(
+			JSON.stringify({
+				message,
+				bucket: bucket.name,
+				key,
+				method: req.method,
+				origin: req.headers.get("Origin"),
+				isMultipartPartUpload,
+				partNumber,
+				uploadId,
+				durationMs: Date.now() - requestStart,
+				...extra,
+			}),
+		);
+	};
+
 	if (
 		key === "" &&
 		!url.searchParams.has("cors") &&
 		!url.searchParams.has("uploadId")
 	) {
 		if (isReservedBucketName(bucket.name)) {
-			return S3Errors.AccessDenied(
+			return withCors(
+				S3Errors.AccessDenied(
 				"Bucket name is reserved for system use.",
 				`/${bucket.name}`,
-			).toResponse();
+				).toResponse(),
+			);
 		}
 	}
 
@@ -122,9 +163,9 @@ export async function handlePutRequest(
 				.set({ corsConfig: JSON.stringify(corsConfig) })
 				.where(eq(buckets.id, bucket.id));
 
-			return new Response(null, { status: 200 });
+			return withCors(new Response(null, { status: 200 }));
 		} catch (_e) {
-			return S3Errors.MalformedXML().toResponse();
+			return withCors(S3Errors.MalformedXML().toResponse());
 		}
 	}
 
@@ -157,7 +198,7 @@ export async function handlePutRequest(
 			bucket,
 		);
 		if (!rewrittenSource) {
-			return S3Errors.AccessDenied().toResponse();
+			return withCors(S3Errors.AccessDenied().toResponse());
 		}
 		upstreamHeaders.set("x-amz-copy-source", rewrittenSource);
 	}
@@ -187,7 +228,9 @@ export async function handlePutRequest(
 		if (!copySource) {
 			const body = req.body;
 			if (!body) {
-				return S3Errors.InvalidRequest("Missing request body").toResponse();
+				return withCors(
+					S3Errors.InvalidRequest("Missing request body").toResponse(),
+				);
 			}
 
 			// If input is aws-chunked, we MUST decode it to get the real content.
@@ -262,10 +305,12 @@ export async function handlePutRequest(
 						BigInt(user.storageUsageBytes) + BigInt(actualSize) >
 						BigInt(limit)
 					) {
-						return S3Errors.QuotaExceeded(
+						return withCors(
+							S3Errors.QuotaExceeded(
 							"You have exceeded your storage quota.",
 							key,
-						).toResponse();
+							).toResponse(),
+						);
 					}
 				}
 			} else {
@@ -276,9 +321,11 @@ export async function handlePutRequest(
 					? Number(contentLengthHeader)
 					: null;
 				if (declared !== null && (!Number.isFinite(declared) || declared < 0)) {
-					return S3Errors.InvalidRequest(
+					return withCors(
+						S3Errors.InvalidRequest(
 						"Invalid Content-Length header",
-					).toResponse();
+						).toResponse(),
+					);
 				}
 
 				if (declared !== null) {
@@ -292,10 +339,12 @@ export async function handlePutRequest(
 							BigInt(user.storageUsageBytes) + BigInt(actualSize) >
 							BigInt(limit)
 						) {
-							return S3Errors.QuotaExceeded(
+							return withCors(
+								S3Errors.QuotaExceeded(
 								"You have exceeded your storage quota.",
 								key,
-							).toResponse();
+								).toResponse(),
+							);
 						}
 					}
 				}
@@ -316,10 +365,12 @@ export async function handlePutRequest(
 							BigInt(user.storageUsageBytes) + BigInt(actualSize) >
 							BigInt(limit)
 						) {
-							return S3Errors.QuotaExceeded(
+							return withCors(
+								S3Errors.QuotaExceeded(
 								"You have exceeded your storage quota.",
 								key,
-							).toResponse();
+								).toResponse(),
+							);
 						}
 					}
 				} else {
@@ -349,9 +400,11 @@ export async function handlePutRequest(
 						}
 
 						if (totalLength !== declared) {
-							return S3Errors.InvalidRequest(
+							return withCors(
+								S3Errors.InvalidRequest(
 								`Content-Length mismatch: declared=${declared} actual=${totalLength}`,
-							).toResponse();
+								).toResponse(),
+							);
 						}
 
 						// Update quota check just in case
@@ -360,10 +413,12 @@ export async function handlePutRequest(
 								BigInt(user.storageUsageBytes) + BigInt(totalLength) >
 								BigInt(limit)
 							) {
-								return S3Errors.QuotaExceeded(
+								return withCors(
+									S3Errors.QuotaExceeded(
 									"You have exceeded your storage quota.",
 									key,
-								).toResponse();
+									).toResponse(),
+								);
 							}
 						}
 
@@ -406,10 +461,12 @@ export async function handlePutRequest(
 			);
 
 			if (!storageQuotaReserved) {
-				return S3Errors.QuotaExceeded(
+				return withCors(
+					S3Errors.QuotaExceeded(
 					"You have exceeded your storage quota.",
 					key,
-				).toResponse();
+					).toResponse(),
+				);
 			}
 		}
 
@@ -482,6 +539,12 @@ export async function handlePutRequest(
 		}
 
 		if (response.ok) {
+			logPutResult("s3.put.success", {
+				status: response.status,
+				actualSize,
+				sizeDelta,
+			});
+
 			// Invalidate all cache layers (Redis L1 + Disk L2)
 			try {
 				const redisKeys = [
@@ -532,47 +595,36 @@ export async function handlePutRequest(
 
 		if (copySource && response.ok) {
 			const xml = await response.text();
-			return new Response(xml, {
+			return withCors(new Response(xml, {
 				status: response.status,
 				headers: response.headers,
+			}));
+		}
+
+		const resHeaders = new Headers(response.headers);
+		if (!response.ok) {
+			logPutResult("s3.put.upstream_error", {
+				status: response.status,
+				actualSize,
+				sizeDelta,
 			});
 		}
 
-		// Important: Pass through ETag and other headers from the upstream PUT response
-		// This is critical for clients relying on ETag to verify upload (e.g. Terraform backend)
-		// But note that some upstream S3 implementations might return the ETag in quotes, others not.
-		// AWS usually returns it in quotes.
-		// We should just proxy the headers.
-
-		// Manually copy headers to ensure mutability if needed, though usually fine.
-		// Specifically, we might want to ensure CORS headers are added if we were handling CORS here (but that's done in index.ts for OPTIONS usually, or we should append them?)
-		// Actually, for simple requests (PUT), if there's no preflight, the browser checks Access-Control-Allow-Origin on the response.
-		// We are not adding CORS headers here.
-		// `handleS3Request` doesn't wrap the response with CORS headers for PUT/POST/DELETE, only GET/HEAD/OPTIONS.
-		// We should probably add them if needed?
-		// The standard is usually OPTIONS preflight handles it, but some simple requests need headers on response.
-		// Let's rely on upstream headers being mostly correct, or maybe we need to inject them?
-		// `index.ts` only adds CORS headers for GET.
-		// Let's add them here too if it was a CORS request.
-
-		const resHeaders = new Headers(response.headers);
-
-		// If the request had an Origin, we might need to add CORS headers if configured
-		// But `handlePutRequest` doesn't easily have access to `getCorsHeaders` without importing it or passing it.
-		// Let's just return upstream headers for now, as that's what we did before.
-		// The issue with metadata not being returned on HEAD is fixed in `index.ts` (HEAD) and `utils.ts` (filterUpstreamHeaders).
-		// This PUT response is just the confirmation "200 OK" + ETag.
-
-		return new Response(response.body, {
+		return withCors(new Response(response.body, {
 			status: response.status,
 			headers: resHeaders,
-		});
+		}));
 	} catch (e: unknown) {
 		const sizeDelta = Math.max(0, actualSize - existingSize);
 		if (storageQuotaReserved && user && !copySource && sizeDelta > 0) {
 			await releaseStorageQuota(user.id, sizeDelta);
 		}
 
+		logPutResult("s3.put.exception", {
+			actualSize,
+			sizeDelta,
+			error: e instanceof Error ? e.message : String(e),
+		});
 		console.error("PUT Error:", e);
 		const error = e as Error;
 
@@ -580,12 +632,14 @@ export async function handlePutRequest(
 			error.message === "QuotaExceeded" ||
 			error.toString().includes("QuotaExceeded")
 		) {
-			return S3Errors.QuotaExceeded(
+			return withCors(
+				S3Errors.QuotaExceeded(
 				"You have exceeded your storage quota.",
 				key,
-			).toResponse();
+				).toResponse(),
+			);
 		}
 
-		return S3Errors.InternalError(error.message).toResponse();
+		return withCors(S3Errors.InternalError(error.message).toResponse());
 	}
 }

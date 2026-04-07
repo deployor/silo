@@ -107,21 +107,21 @@ export function AppShell({
 
 	return (
 		<div className="min-h-screen selection:bg-hc-red selection:text-white flex flex-col font-sans">
-			<nav className="w-full bg-hc-darker border-b border-white/10 px-6 py-4 sticky top-0 z-50 flex justify-between items-center">
+			<nav className="w-full border-b px-6 py-4 sticky top-0 z-50 flex justify-between items-center gap-4 flex-wrap silo-glass-nav">
 				<div className="flex items-center gap-4 min-w-0">
 					<a
 						href="/"
-						className="font-bold text-2xl tracking-tighter italic text-white hover:text-hc-red transition-colors"
+						className="silo-brand font-bold text-2xl italic text-white hover:text-hc-red"
 					>
 						SILO
 					</a>
 					{pageTitle ? (
-						<span className="bg-hc-red/20 text-hc-red px-2 py-0.5 rounded text-sm font-mono border border-hc-red/30">
+						<span className="silo-nav-pill text-hc-red px-2.5 py-1 rounded-md text-sm font-mono">
 							{pageTitle}
 						</span>
 					) : null}
 					{breadcrumbs ? (
-						<span className="text-sm text-text-muted">
+						<span className="text-sm text-text-muted/90 line-clamp-1 max-w-[22rem]">
 							{stripTags(breadcrumbs)}
 						</span>
 					) : null}
@@ -170,7 +170,7 @@ export function AppShell({
 						</div>
 					) : null}
 				</div>
-				<div className="flex items-center gap-6 font-bold text-sm">
+				<div className="flex items-center gap-1 sm:gap-2 font-bold text-sm flex-wrap justify-end">
 					{!hideNavLinks ? (
 						user ? (
 							<>
@@ -181,7 +181,7 @@ export function AppShell({
 											setInviteOpen(true);
 											void loadInvites();
 										}}
-										className="relative text-text-muted hover:text-white transition-colors"
+										className="relative text-text-muted hover:text-white rounded-xl"
 										aria-label="Open collaboration invites"
 									>
 										<span className="inline-flex items-center justify-center h-9 w-9 rounded-xl border border-white/10 bg-white/5">
@@ -194,13 +194,13 @@ export function AppShell({
 								) : null}
 								<a
 									href="/ysws"
-									className="text-white hover:text-hc-green transition-colors font-bold border border-white/20 rounded px-3 py-1 bg-white/5 hover:bg-white/10"
+									className="silo-nav-link text-white hover:text-hc-green font-bold border border-white/20 rounded-lg bg-white/5 hover:bg-white/10"
 								>
 									YSWS
 								</a>
 								<a
 									href="/docs"
-									className="text-text-muted hover:text-white transition-colors"
+									className="silo-nav-link"
 								>
 									Docs
 								</a>
@@ -210,6 +210,7 @@ export function AppShell({
 											src={user.avatarUrl}
 											alt="User Avatar"
 											className="w-6 h-6 rounded-full"
+											loading="lazy"
 										/>
 									) : null}
 									<div className="flex items-center gap-2">
@@ -227,28 +228,28 @@ export function AppShell({
 								{user.isAdmin ? (
 									<a
 										href="/admin/users"
-										className="text-text-muted hover:text-white transition-colors"
+										className="silo-nav-link"
 									>
 										Admin
 									</a>
 								) : user.isReviewer ? (
 									<a
 										href="/admin/ysws"
-										className="text-text-muted hover:text-white transition-colors"
+										className="silo-nav-link"
 									>
 										Admin
 									</a>
 								) : null}
 								<a
 									href="/account"
-									className="text-text-muted hover:text-white transition-colors inline-flex items-center gap-2"
+									className="silo-nav-link inline-flex items-center gap-2"
 								>
 									<i className="ph ph-gear text-base" />
 									Account
 								</a>
 								<a
 									href="/auth/logout"
-									className="text-hc-red hover:text-white transition-colors"
+									className="silo-nav-link text-hc-red hover:text-white"
 								>
 									{isImpersonating ? "Stop impersonating" : "Logout"}
 								</a>
@@ -256,7 +257,7 @@ export function AppShell({
 						) : (
 							<a
 								href="/auth/login"
-								className="text-hc-red hover:text-white transition-colors"
+								className="silo-nav-link text-hc-red hover:text-white"
 							>
 								Login
 							</a>

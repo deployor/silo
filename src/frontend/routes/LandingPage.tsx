@@ -37,15 +37,19 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			mainClass={p.mainClass}
 			config={bootstrap.config}
 		>
-			<div className="flex flex-col items-center font-sans w-full min-h-[80vh] justify-center">
-				<div className="w-full max-w-4xl mx-auto text-center px-6">
-					<h1 className="text-6xl md:text-9xl font-bold mb-2 italic tracking-tighter text-white select-none">
+			<div className="silo-hero flex flex-col items-center font-sans w-full min-h-[80vh] justify-center">
+				<div className="w-full max-w-5xl mx-auto text-center px-4 sm:px-6">
+					<p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-text-muted mb-6">
+						<span className="h-1.5 w-1.5 rounded-full bg-hc-red" />
+						S3-compatible storage for Hack Club
+					</p>
+					<h1 className="text-6xl sm:text-7xl md:text-9xl font-bold mb-3 italic tracking-tighter text-white select-none leading-[0.95]">
 						SILO
 					</h1>
 					<h2 className="sr-only">
 						Free S3 Compatible Object Storage for YSWS
 					</h2>
-					<p className="text-2xl md:text-3xl text-gray-400 mb-12 max-w-2xl mx-auto font-light">
+					<p className="text-xl md:text-3xl text-text-muted mb-10 max-w-3xl mx-auto font-light leading-tight md:leading-tight">
 						The YSWS object storage thing.
 						<br />
 						<span className="text-white font-normal">
@@ -53,53 +57,50 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</span>
 					</p>
 
-					<div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+					<div className="flex flex-wrap gap-3 justify-center items-center">
 						<a
 							href="/auth/login"
-							className="text-xl font-bold text-white hover:text-hc-red transition-colors border-b-2 border-transparent hover:border-hc-red pb-1"
+							className="silo-cta text-white bg-hc-red/85 hover:bg-hc-red border-hc-red/70 shadow-[0_8px_28px_rgba(236,55,80,0.3)]"
 						>
 							Start Shipping
 						</a>
-						<span className="text-gray-600 hidden sm:inline">•</span>
 						<a
 							href="/gallery"
-							className="text-xl font-bold text-white hover:text-yellow-500 transition-colors border-b-2 border-transparent hover:border-yellow-500 pb-1"
+							className="silo-cta text-white/90 border-white/20 bg-white/5 hover:bg-white/10 hover:text-white"
 						>
 							Gallery
 						</a>
-						<span className="text-gray-600 hidden sm:inline">•</span>
 						<a
 							href="/docs"
-							className="text-xl font-bold text-white hover:text-hc-blue transition-colors border-b-2 border-transparent hover:border-hc-blue pb-1"
+							className="silo-cta text-white/90 border-white/20 bg-white/5 hover:bg-white/10 hover:text-white"
 						>
 							Docs
 						</a>
-						<span className="text-gray-600 hidden sm:inline">•</span>
 						<a
 							href="https://github.com/hackclub/silo"
 							target="_blank"
 							rel="noreferrer"
-							className="text-xl font-bold text-white hover:text-green-500 transition-colors border-b-2 border-transparent hover:border-green-500 pb-1"
+							className="silo-cta text-white/90 border-white/20 bg-white/5 hover:bg-white/10 hover:text-white"
 						>
 							GitHub
 						</a>
 					</div>
 
-					<div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8 text-left max-w-3xl mx-auto opacity-60 hover:opacity-100 transition-opacity duration-500">
-						<div>
+					<div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-4 text-left max-w-4xl mx-auto">
+						<div className="silo-stat-card p-5">
 							<h3 className="font-mono text-hc-red mb-2">01 / COMPATIBLE</h3>
-							<p className="text-sm text-gray-400">
+							<p className="text-sm text-text-muted">
 								Full S3 API compatibility. Use the AWS SDK, Rclone, or any
 								S3-compatible thing.
 							</p>
 						</div>
-						<div>
+						<div className="silo-stat-card p-5">
 							<h3 className="font-mono text-hc-blue mb-2">02 / FAST</h3>
-							<p className="text-sm text-gray-400">Built on Cloudflare R2.</p>
+							<p className="text-sm text-text-muted">Built on Cloudflare R2.</p>
 						</div>
-						<div>
+						<div className="silo-stat-card p-5">
 							<h3 className="font-mono text-green-500 mb-2">03 / FREE</h3>
-							<p className="text-sm text-gray-400">
+							<p className="text-sm text-text-muted">
 								Start with free object storage. Ship projects to unlock more
 								quota.
 							</p>
@@ -107,11 +108,11 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					</div>
 
 					{p.yswsQuotaPerHour ? (
-						<div className="mt-20 border-t border-white/10 pt-16 max-w-3xl mx-auto">
+						<div className="mt-16 border-t border-white/10 pt-12 max-w-3xl mx-auto">
 							<h3 className="text-text-muted text-sm font-bold uppercase tracking-wider mb-6 text-center">
 								Reward Calculator
 							</h3>
-							<div className="bg-hc-dark rounded-3xl p-8 border border-white/10 card-shadow">
+							<div className="bg-hc-dark/80 rounded-3xl p-6 md:p-8 border border-white/10 card-shadow backdrop-blur-sm">
 								<div className="flex flex-col md:flex-row gap-8 items-center">
 									<div className="flex-1 w-full">
 										<div className="flex justify-between items-end mb-4">
@@ -132,7 +133,7 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											max={100}
 											value={hours}
 											onChange={(e) => setHours(Number(e.target.value))}
-											className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-hc-red hover:accent-red-400 transition-all"
+											className="silo-range w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer"
 										/>
 										<div className="flex justify-between mt-2 text-xs text-text-muted font-mono">
 											<span>1h</span>
@@ -156,14 +157,14 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											Permanent storage added to your account
 										</p>
 										{tier > 0 ? (
-											<p className="text-xs text-hc-green font-bold mt-2">
+											<p className="text-xs text-green-300 font-bold mt-2">
 												+{tier}% Bonus Applied!
 											</p>
 										) : null}
 									</div>
 								</div>
 							</div>
-							<p className="mt-8 text-lg text-text-muted max-w-xl mx-auto">
+							<p className="mt-8 text-base md:text-lg text-text-muted max-w-xl mx-auto">
 								Ship your project to earn storage quota.
 							</p>
 						</div>

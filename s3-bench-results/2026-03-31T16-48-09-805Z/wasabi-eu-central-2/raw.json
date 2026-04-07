@@ -1,0 +1,2049 @@
+{
+  "provider": {
+    "name": "Wasabi EU Central 2",
+    "region": "eu-central-2",
+    "endpoint": "https://s3.eu-central-2.wasabisys.com",
+    "bucket": "speedtestbenchamark"
+  },
+  "runId": "2026-03-31T16-48-09-805Z",
+  "startedAtUtc": "2026-03-31T17:59:10.989Z",
+  "config": {
+    "repeats": 5,
+    "heavyRepeats": 2,
+    "sizesMiB": {
+      "small": 8,
+      "medium": 64,
+      "large": 256
+    },
+    "parallel": {
+      "uploads": 16,
+      "reads": 16,
+      "deletes": 32
+    },
+    "manyObjectsCount": 10000,
+    "manyObjectsSizeBytes": 1024,
+    "listTarget": 10000,
+    "consistency": {
+      "pollMs": 50,
+      "timeoutMs": 15000
+    },
+    "multipart": {
+      "partSizeMiB": 8,
+      "parts": 4
+    },
+    "reliability": {
+      "opTimeoutMs": 120000,
+      "opRetries": 2,
+      "retryBaseDelayMs": 200,
+      "rateLimitBaseCooldownMs": 8000,
+      "rateLimitMaxCooldownMs": 120000,
+      "rateLimitSkipThreshold": 12,
+      "rateLimitTotalSkipThreshold": 40,
+      "rateLimitAutoSkipProvider": false,
+      "batchMinSuccessRate": 0.9,
+      "phaseSoftTimeoutMs": 0
+    },
+    "keepTestData": false
+  },
+  "probes": [
+    {
+      "name": "head_bucket",
+      "ok": true,
+      "ms": 84.37158299982548,
+      "details": {
+        "bucket": "speedtestbenchamark"
+      }
+    },
+    {
+      "name": "put_object",
+      "ok": true,
+      "ms": 107.73916599992663,
+      "details": {
+        "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/capability/probe.bin",
+        "bytes": 1024
+      }
+    },
+    {
+      "name": "head_object",
+      "ok": true,
+      "ms": 13.029707999899983,
+      "details": {
+        "contentLength": 1024,
+        "etag": "\"5f1653d9c9af55de0d56e49965ece1ce\""
+      }
+    },
+    {
+      "name": "get_object",
+      "ok": true,
+      "ms": 18.20883300062269,
+      "details": {
+        "bytes": 1024,
+        "sha256": "525ed975a9ec935908955120c19c4b351f1ea3c3842b50b82908cc6a021ecf02"
+      }
+    },
+    {
+      "name": "get_object_range",
+      "ok": true,
+      "ms": 18.50520799960941,
+      "details": {
+        "bytes": 128
+      }
+    },
+    {
+      "name": "copy_object",
+      "ok": true,
+      "ms": 28.168499999679625,
+      "details": {
+        "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/capability/probe-copy.bin"
+      }
+    },
+    {
+      "name": "list_objects_v2",
+      "ok": true,
+      "ms": 22.69108400028199,
+      "details": {
+        "keyCount": 2,
+        "truncated": false
+      }
+    },
+    {
+      "name": "multipart_upload",
+      "ok": true,
+      "ms": 1914.0839590001851,
+      "details": {
+        "bytes": 33554432,
+        "sha256": "e1f684f874aba382167f38121c44734eb5d87d69fad41158110761cf99c6f733"
+      }
+    },
+    {
+      "name": "delete_object",
+      "ok": true,
+      "ms": 35.68112500011921,
+      "details": {
+        "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/capability/probe-copy.bin"
+      }
+    }
+  ],
+  "trials": {
+    "upload_small": [
+      {
+        "operation": "upload_small",
+        "startedAtUtc": "2026-03-31T17:59:13.963Z",
+        "endedAtUtc": "2026-03-31T17:59:14.452Z",
+        "ms": 489.31837499979883,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 16.34927361966182,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-01-3e3051ae-9a73-4fc0-a023-7f5d4169960d.bin"
+        }
+      },
+      {
+        "operation": "upload_small",
+        "startedAtUtc": "2026-03-31T17:59:15.060Z",
+        "endedAtUtc": "2026-03-31T17:59:15.688Z",
+        "ms": 628.6935000000522,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 12.724801512977843,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-02-2c581679-8da8-451f-a444-23894e4f2407.bin"
+        }
+      },
+      {
+        "operation": "upload_small",
+        "startedAtUtc": "2026-03-31T17:59:16.449Z",
+        "endedAtUtc": "2026-03-31T17:59:17.070Z",
+        "ms": 621.1464590001851,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 12.879410136020136,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-03-626eb4c2-8152-4dde-ad00-088f9166d569.bin"
+        }
+      },
+      {
+        "operation": "upload_small",
+        "startedAtUtc": "2026-03-31T17:59:17.911Z",
+        "endedAtUtc": "2026-03-31T17:59:18.419Z",
+        "ms": 507.2868750002235,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 15.77016949235376,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-04-e80c4d2c-74bc-4045-988b-322cd50caf76.bin"
+        }
+      },
+      {
+        "operation": "upload_small",
+        "startedAtUtc": "2026-03-31T17:59:19.180Z",
+        "endedAtUtc": "2026-03-31T17:59:19.652Z",
+        "ms": 472.3696659998968,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 16.93588851237062,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-05-b6363403-5e8c-4704-8296-06d0a53be98f.bin"
+        }
+      }
+    ],
+    "head_object_small": [
+      {
+        "operation": "head_object_small",
+        "startedAtUtc": "2026-03-31T17:59:14.453Z",
+        "endedAtUtc": "2026-03-31T17:59:14.492Z",
+        "ms": 39.339833000674844,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-01-3e3051ae-9a73-4fc0-a023-7f5d4169960d.bin",
+          "etag": "\"b6b108d2ec9824a0ede9615fb41ee3b5\""
+        }
+      },
+      {
+        "operation": "head_object_small",
+        "startedAtUtc": "2026-03-31T17:59:15.688Z",
+        "endedAtUtc": "2026-03-31T17:59:15.774Z",
+        "ms": 85.888416999951,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-02-2c581679-8da8-451f-a444-23894e4f2407.bin",
+          "etag": "\"b6b108d2ec9824a0ede9615fb41ee3b5\""
+        }
+      },
+      {
+        "operation": "head_object_small",
+        "startedAtUtc": "2026-03-31T17:59:17.070Z",
+        "endedAtUtc": "2026-03-31T17:59:17.142Z",
+        "ms": 72.00862500071526,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-03-626eb4c2-8152-4dde-ad00-088f9166d569.bin",
+          "etag": "\"b6b108d2ec9824a0ede9615fb41ee3b5\""
+        }
+      },
+      {
+        "operation": "head_object_small",
+        "startedAtUtc": "2026-03-31T17:59:18.419Z",
+        "endedAtUtc": "2026-03-31T17:59:18.498Z",
+        "ms": 79.0184999993071,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-04-e80c4d2c-74bc-4045-988b-322cd50caf76.bin",
+          "etag": "\"b6b108d2ec9824a0ede9615fb41ee3b5\""
+        }
+      },
+      {
+        "operation": "head_object_small",
+        "startedAtUtc": "2026-03-31T17:59:19.652Z",
+        "endedAtUtc": "2026-03-31T17:59:19.764Z",
+        "ms": 111.73525000084192,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-05-b6363403-5e8c-4704-8296-06d0a53be98f.bin",
+          "etag": "\"b6b108d2ec9824a0ede9615fb41ee3b5\""
+        }
+      }
+    ],
+    "download_small": [
+      {
+        "operation": "download_small",
+        "startedAtUtc": "2026-03-31T17:59:14.492Z",
+        "endedAtUtc": "2026-03-31T17:59:14.963Z",
+        "ms": 471.51654199976474,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 16.96653094305224,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-01-3e3051ae-9a73-4fc0-a023-7f5d4169960d.bin",
+          "sha256": "0ef559220278381a46269ba2402a2489f73470c228ff58ee325b2eb5cc9d6f6b"
+        }
+      },
+      {
+        "operation": "download_small",
+        "startedAtUtc": "2026-03-31T17:59:15.774Z",
+        "endedAtUtc": "2026-03-31T17:59:16.362Z",
+        "ms": 587.4583749994636,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 13.617986125412385,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-02-2c581679-8da8-451f-a444-23894e4f2407.bin",
+          "sha256": "0ef559220278381a46269ba2402a2489f73470c228ff58ee325b2eb5cc9d6f6b"
+        }
+      },
+      {
+        "operation": "download_small",
+        "startedAtUtc": "2026-03-31T17:59:17.143Z",
+        "endedAtUtc": "2026-03-31T17:59:17.808Z",
+        "ms": 665.5357079999521,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 12.020391849509261,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-03-626eb4c2-8152-4dde-ad00-088f9166d569.bin",
+          "sha256": "0ef559220278381a46269ba2402a2489f73470c228ff58ee325b2eb5cc9d6f6b"
+        }
+      },
+      {
+        "operation": "download_small",
+        "startedAtUtc": "2026-03-31T17:59:18.498Z",
+        "endedAtUtc": "2026-03-31T17:59:19.061Z",
+        "ms": 562.7561250003055,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 14.215749317691847,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-04-e80c4d2c-74bc-4045-988b-322cd50caf76.bin",
+          "sha256": "0ef559220278381a46269ba2402a2489f73470c228ff58ee325b2eb5cc9d6f6b"
+        }
+      },
+      {
+        "operation": "download_small",
+        "startedAtUtc": "2026-03-31T17:59:19.764Z",
+        "endedAtUtc": "2026-03-31T17:59:20.652Z",
+        "ms": 888.5421249996871,
+        "ok": true,
+        "bytes": 8388608,
+        "throughputMiBs": 9.00351235458062,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-05-b6363403-5e8c-4704-8296-06d0a53be98f.bin",
+          "sha256": "0ef559220278381a46269ba2402a2489f73470c228ff58ee325b2eb5cc9d6f6b"
+        }
+      }
+    ],
+    "range_read_small": [
+      {
+        "operation": "range_read_small",
+        "startedAtUtc": "2026-03-31T17:59:14.964Z",
+        "endedAtUtc": "2026-03-31T17:59:14.996Z",
+        "ms": 32.636207999661565,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.11969068220304602,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-01-3e3051ae-9a73-4fc0-a023-7f5d4169960d.bin"
+        }
+      },
+      {
+        "operation": "range_read_small",
+        "startedAtUtc": "2026-03-31T17:59:16.362Z",
+        "endedAtUtc": "2026-03-31T17:59:16.401Z",
+        "ms": 39.37912499997765,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.09919595724897942,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-02-2c581679-8da8-451f-a444-23894e4f2407.bin"
+        }
+      },
+      {
+        "operation": "range_read_small",
+        "startedAtUtc": "2026-03-31T17:59:17.808Z",
+        "endedAtUtc": "2026-03-31T17:59:17.838Z",
+        "ms": 29.538958000019193,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.13224061593497854,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-03-626eb4c2-8152-4dde-ad00-088f9166d569.bin"
+        }
+      },
+      {
+        "operation": "range_read_small",
+        "startedAtUtc": "2026-03-31T17:59:19.061Z",
+        "endedAtUtc": "2026-03-31T17:59:19.120Z",
+        "ms": 59.19812500011176,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.06598604263213785,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-04-e80c4d2c-74bc-4045-988b-322cd50caf76.bin"
+        }
+      },
+      {
+        "operation": "range_read_small",
+        "startedAtUtc": "2026-03-31T17:59:20.653Z",
+        "endedAtUtc": "2026-03-31T17:59:20.696Z",
+        "ms": 43.12391700036824,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.09058198493348005,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-05-b6363403-5e8c-4704-8296-06d0a53be98f.bin"
+        }
+      }
+    ],
+    "delete_small": [
+      {
+        "operation": "delete_small",
+        "startedAtUtc": "2026-03-31T17:59:14.996Z",
+        "endedAtUtc": "2026-03-31T17:59:15.036Z",
+        "ms": 39.941040999256074,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-01-3e3051ae-9a73-4fc0-a023-7f5d4169960d.bin"
+        }
+      },
+      {
+        "operation": "delete_small",
+        "startedAtUtc": "2026-03-31T17:59:16.401Z",
+        "endedAtUtc": "2026-03-31T17:59:16.434Z",
+        "ms": 32.68362500052899,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-02-2c581679-8da8-451f-a444-23894e4f2407.bin"
+        }
+      },
+      {
+        "operation": "delete_small",
+        "startedAtUtc": "2026-03-31T17:59:17.838Z",
+        "endedAtUtc": "2026-03-31T17:59:17.882Z",
+        "ms": 44.230082999914885,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-03-626eb4c2-8152-4dde-ad00-088f9166d569.bin"
+        }
+      },
+      {
+        "operation": "delete_small",
+        "startedAtUtc": "2026-03-31T17:59:19.120Z",
+        "endedAtUtc": "2026-03-31T17:59:19.161Z",
+        "ms": 40.66604200005531,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-04-e80c4d2c-74bc-4045-988b-322cd50caf76.bin"
+        }
+      },
+      {
+        "operation": "delete_small",
+        "startedAtUtc": "2026-03-31T17:59:20.696Z",
+        "endedAtUtc": "2026-03-31T17:59:20.724Z",
+        "ms": 27.875792000442743,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-05-b6363403-5e8c-4704-8296-06d0a53be98f.bin"
+        }
+      }
+    ],
+    "post_delete_head_small": [
+      {
+        "operation": "post_delete_head_small",
+        "startedAtUtc": "2026-03-31T17:59:15.036Z",
+        "endedAtUtc": "2026-03-31T17:59:15.060Z",
+        "ms": 23.314708000048995,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-01-3e3051ae-9a73-4fc0-a023-7f5d4169960d.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_small",
+        "startedAtUtc": "2026-03-31T17:59:16.434Z",
+        "endedAtUtc": "2026-03-31T17:59:16.449Z",
+        "ms": 15.023583000525832,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-02-2c581679-8da8-451f-a444-23894e4f2407.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_small",
+        "startedAtUtc": "2026-03-31T17:59:17.882Z",
+        "endedAtUtc": "2026-03-31T17:59:17.911Z",
+        "ms": 29.25525000039488,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-03-626eb4c2-8152-4dde-ad00-088f9166d569.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_small",
+        "startedAtUtc": "2026-03-31T17:59:19.161Z",
+        "endedAtUtc": "2026-03-31T17:59:19.180Z",
+        "ms": 18.91775000002235,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-04-e80c4d2c-74bc-4045-988b-322cd50caf76.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_small",
+        "startedAtUtc": "2026-03-31T17:59:20.724Z",
+        "endedAtUtc": "2026-03-31T17:59:20.746Z",
+        "ms": 22.346667000092566,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/small/trial-05-b6363403-5e8c-4704-8296-06d0a53be98f.bin"
+        }
+      }
+    ],
+    "upload_medium": [
+      {
+        "operation": "upload_medium",
+        "startedAtUtc": "2026-03-31T17:59:20.746Z",
+        "endedAtUtc": "2026-03-31T17:59:25.435Z",
+        "ms": 4688.6757920002565,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 13.649909449741818,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-01-36a66985-5b8e-43f1-8ada-de7f44a56740.bin"
+        }
+      },
+      {
+        "operation": "upload_medium",
+        "startedAtUtc": "2026-03-31T17:59:31.717Z",
+        "endedAtUtc": "2026-03-31T17:59:38.125Z",
+        "ms": 6407.584042000584,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 9.988163960158973,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-02-c84f4b16-5c7e-4110-8b9a-8fab4cf6491a.bin"
+        }
+      },
+      {
+        "operation": "upload_medium",
+        "startedAtUtc": "2026-03-31T17:59:55.708Z",
+        "endedAtUtc": "2026-03-31T18:00:14.938Z",
+        "ms": 19230.562750000507,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 3.328035733119579,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-03-809d2542-02a4-4903-b643-bc73ecd23334.bin"
+        }
+      },
+      {
+        "operation": "upload_medium",
+        "startedAtUtc": "2026-03-31T18:00:19.527Z",
+        "endedAtUtc": "2026-03-31T18:00:28.707Z",
+        "ms": 9179.7089169994,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 6.971898627578693,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-04-9f611406-6416-4d60-88e2-a68b99dae235.bin"
+        }
+      },
+      {
+        "operation": "upload_medium",
+        "startedAtUtc": "2026-03-31T18:00:33.811Z",
+        "endedAtUtc": "2026-03-31T18:00:45.283Z",
+        "ms": 11471.960332999937,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 5.578819847894635,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-05-9b2201eb-a5c5-45d2-8704-9f6ca75f7c68.bin"
+        }
+      }
+    ],
+    "head_object_medium": [
+      {
+        "operation": "head_object_medium",
+        "startedAtUtc": "2026-03-31T17:59:25.435Z",
+        "endedAtUtc": "2026-03-31T17:59:25.505Z",
+        "ms": 69.96666700020432,
+        "ok": true,
+        "bytes": 67108864,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-01-36a66985-5b8e-43f1-8ada-de7f44a56740.bin",
+          "etag": "\"f30363c25c9c7aeebd32e005f814788b\""
+        }
+      },
+      {
+        "operation": "head_object_medium",
+        "startedAtUtc": "2026-03-31T17:59:38.125Z",
+        "endedAtUtc": "2026-03-31T17:59:38.188Z",
+        "ms": 63.05724999960512,
+        "ok": true,
+        "bytes": 67108864,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-02-c84f4b16-5c7e-4110-8b9a-8fab4cf6491a.bin",
+          "etag": "\"f30363c25c9c7aeebd32e005f814788b\""
+        }
+      },
+      {
+        "operation": "head_object_medium",
+        "startedAtUtc": "2026-03-31T18:00:14.938Z",
+        "endedAtUtc": "2026-03-31T18:00:15.019Z",
+        "ms": 80.22783300001174,
+        "ok": true,
+        "bytes": 67108864,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-03-809d2542-02a4-4903-b643-bc73ecd23334.bin",
+          "etag": "\"f30363c25c9c7aeebd32e005f814788b\""
+        }
+      },
+      {
+        "operation": "head_object_medium",
+        "startedAtUtc": "2026-03-31T18:00:28.707Z",
+        "endedAtUtc": "2026-03-31T18:00:28.779Z",
+        "ms": 71.42087499983609,
+        "ok": true,
+        "bytes": 67108864,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-04-9f611406-6416-4d60-88e2-a68b99dae235.bin",
+          "etag": "\"f30363c25c9c7aeebd32e005f814788b\""
+        }
+      },
+      {
+        "operation": "head_object_medium",
+        "startedAtUtc": "2026-03-31T18:00:45.283Z",
+        "endedAtUtc": "2026-03-31T18:00:45.375Z",
+        "ms": 91.79895900003612,
+        "ok": true,
+        "bytes": 67108864,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-05-9b2201eb-a5c5-45d2-8704-9f6ca75f7c68.bin",
+          "etag": "\"f30363c25c9c7aeebd32e005f814788b\""
+        }
+      }
+    ],
+    "download_medium": [
+      {
+        "operation": "download_medium",
+        "startedAtUtc": "2026-03-31T17:59:25.505Z",
+        "endedAtUtc": "2026-03-31T17:59:31.606Z",
+        "ms": 6100.914290999994,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 10.490230963318425,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-01-36a66985-5b8e-43f1-8ada-de7f44a56740.bin",
+          "sha256": "27ec274c5087c1abae664760f57ea15b699d4ba100f622d03b057cdb565d90c9"
+        }
+      },
+      {
+        "operation": "download_medium",
+        "startedAtUtc": "2026-03-31T17:59:38.188Z",
+        "endedAtUtc": "2026-03-31T17:59:55.584Z",
+        "ms": 17395.432333000004,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 3.679126725616862,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-02-c84f4b16-5c7e-4110-8b9a-8fab4cf6491a.bin",
+          "sha256": "27ec274c5087c1abae664760f57ea15b699d4ba100f622d03b057cdb565d90c9"
+        }
+      },
+      {
+        "operation": "download_medium",
+        "startedAtUtc": "2026-03-31T18:00:15.019Z",
+        "endedAtUtc": "2026-03-31T18:00:19.396Z",
+        "ms": 4376.928499999456,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 14.622125995434457,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-03-809d2542-02a4-4903-b643-bc73ecd23334.bin",
+          "sha256": "27ec274c5087c1abae664760f57ea15b699d4ba100f622d03b057cdb565d90c9"
+        }
+      },
+      {
+        "operation": "download_medium",
+        "startedAtUtc": "2026-03-31T18:00:28.779Z",
+        "endedAtUtc": "2026-03-31T18:00:33.695Z",
+        "ms": 4916.547375000082,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 13.01726498669179,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-04-9f611406-6416-4d60-88e2-a68b99dae235.bin",
+          "sha256": "27ec274c5087c1abae664760f57ea15b699d4ba100f622d03b057cdb565d90c9"
+        }
+      },
+      {
+        "operation": "download_medium",
+        "startedAtUtc": "2026-03-31T18:00:45.375Z",
+        "endedAtUtc": "2026-03-31T18:00:53.482Z",
+        "ms": 8107.436999999918,
+        "ok": true,
+        "bytes": 67108864,
+        "throughputMiBs": 7.893986718614113,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-05-9b2201eb-a5c5-45d2-8704-9f6ca75f7c68.bin",
+          "sha256": "27ec274c5087c1abae664760f57ea15b699d4ba100f622d03b057cdb565d90c9"
+        }
+      }
+    ],
+    "range_read_medium": [
+      {
+        "operation": "range_read_medium",
+        "startedAtUtc": "2026-03-31T17:59:31.606Z",
+        "endedAtUtc": "2026-03-31T17:59:31.649Z",
+        "ms": 42.490375000052154,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.09193258473231185,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-01-36a66985-5b8e-43f1-8ada-de7f44a56740.bin"
+        }
+      },
+      {
+        "operation": "range_read_medium",
+        "startedAtUtc": "2026-03-31T17:59:55.584Z",
+        "endedAtUtc": "2026-03-31T17:59:55.623Z",
+        "ms": 39.54749999940395,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.09877362665298371,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-02-c84f4b16-5c7e-4110-8b9a-8fab4cf6491a.bin"
+        }
+      },
+      {
+        "operation": "range_read_medium",
+        "startedAtUtc": "2026-03-31T18:00:19.396Z",
+        "endedAtUtc": "2026-03-31T18:00:19.448Z",
+        "ms": 52.1860830001533,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.0748523317986622,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-03-809d2542-02a4-4903-b643-bc73ecd23334.bin"
+        }
+      },
+      {
+        "operation": "range_read_medium",
+        "startedAtUtc": "2026-03-31T18:00:33.695Z",
+        "endedAtUtc": "2026-03-31T18:00:33.740Z",
+        "ms": 44.56520800013095,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.0876524574952847,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-04-9f611406-6416-4d60-88e2-a68b99dae235.bin"
+        }
+      },
+      {
+        "operation": "range_read_medium",
+        "startedAtUtc": "2026-03-31T18:00:53.482Z",
+        "endedAtUtc": "2026-03-31T18:00:53.514Z",
+        "ms": 31.965750000439584,
+        "ok": true,
+        "bytes": 4096,
+        "throughputMiBs": 0.1222011058694472,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-05-9b2201eb-a5c5-45d2-8704-9f6ca75f7c68.bin"
+        }
+      }
+    ],
+    "delete_medium": [
+      {
+        "operation": "delete_medium",
+        "startedAtUtc": "2026-03-31T17:59:31.649Z",
+        "endedAtUtc": "2026-03-31T17:59:31.705Z",
+        "ms": 56.215958000160754,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-01-36a66985-5b8e-43f1-8ada-de7f44a56740.bin"
+        }
+      },
+      {
+        "operation": "delete_medium",
+        "startedAtUtc": "2026-03-31T17:59:55.623Z",
+        "endedAtUtc": "2026-03-31T17:59:55.689Z",
+        "ms": 65.83341600000858,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-02-c84f4b16-5c7e-4110-8b9a-8fab4cf6491a.bin"
+        }
+      },
+      {
+        "operation": "delete_medium",
+        "startedAtUtc": "2026-03-31T18:00:19.448Z",
+        "endedAtUtc": "2026-03-31T18:00:19.509Z",
+        "ms": 61.48145900014788,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-03-809d2542-02a4-4903-b643-bc73ecd23334.bin"
+        }
+      },
+      {
+        "operation": "delete_medium",
+        "startedAtUtc": "2026-03-31T18:00:33.740Z",
+        "endedAtUtc": "2026-03-31T18:00:33.797Z",
+        "ms": 57.535542000085115,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-04-9f611406-6416-4d60-88e2-a68b99dae235.bin"
+        }
+      },
+      {
+        "operation": "delete_medium",
+        "startedAtUtc": "2026-03-31T18:00:53.514Z",
+        "endedAtUtc": "2026-03-31T18:00:53.568Z",
+        "ms": 53.0367499999702,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-05-9b2201eb-a5c5-45d2-8704-9f6ca75f7c68.bin"
+        }
+      }
+    ],
+    "post_delete_head_medium": [
+      {
+        "operation": "post_delete_head_medium",
+        "startedAtUtc": "2026-03-31T17:59:31.705Z",
+        "endedAtUtc": "2026-03-31T17:59:31.717Z",
+        "ms": 12.422582999803126,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-01-36a66985-5b8e-43f1-8ada-de7f44a56740.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_medium",
+        "startedAtUtc": "2026-03-31T17:59:55.689Z",
+        "endedAtUtc": "2026-03-31T17:59:55.708Z",
+        "ms": 18.30075000040233,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-02-c84f4b16-5c7e-4110-8b9a-8fab4cf6491a.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_medium",
+        "startedAtUtc": "2026-03-31T18:00:19.509Z",
+        "endedAtUtc": "2026-03-31T18:00:19.527Z",
+        "ms": 17.568292000330985,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-03-809d2542-02a4-4903-b643-bc73ecd23334.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_medium",
+        "startedAtUtc": "2026-03-31T18:00:33.797Z",
+        "endedAtUtc": "2026-03-31T18:00:33.811Z",
+        "ms": 13.466208000667393,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-04-9f611406-6416-4d60-88e2-a68b99dae235.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_medium",
+        "startedAtUtc": "2026-03-31T18:00:53.568Z",
+        "endedAtUtc": "2026-03-31T18:00:53.586Z",
+        "ms": 18.308000000193715,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/medium/trial-05-9b2201eb-a5c5-45d2-8704-9f6ca75f7c68.bin"
+        }
+      }
+    ],
+    "upload_large": [
+      {
+        "operation": "upload_large",
+        "startedAtUtc": "2026-03-31T18:00:53.586Z",
+        "endedAtUtc": "2026-03-31T18:01:08.911Z",
+        "ms": 15325.22733299993,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 16.704483035547096,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-01-d888265b-fb2f-4b49-9807-18c748fd81c2.bin"
+        }
+      },
+      {
+        "operation": "upload_large",
+        "startedAtUtc": "2026-03-31T18:01:30.297Z",
+        "endedAtUtc": "2026-03-31T18:01:43.745Z",
+        "ms": 13447.753124999814,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 19.036637393654082,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-02-49ca65a8-c09b-4153-8c7a-9c8a7e3c0943.bin"
+        }
+      },
+      {
+        "operation": "upload_large",
+        "startedAtUtc": "2026-03-31T18:01:57.546Z",
+        "endedAtUtc": "2026-03-31T18:02:16.466Z",
+        "ms": 18920.178791999817,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 13.530527529065777,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-03-72a8e769-afbb-40c6-ad9a-abfeb136bd3f.bin"
+        }
+      },
+      {
+        "operation": "upload_large",
+        "startedAtUtc": "2026-03-31T18:02:44.485Z",
+        "endedAtUtc": "2026-03-31T18:03:05.417Z",
+        "ms": 20931.88666599989,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 12.230144567705226,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-04-f86edc19-e2aa-4167-a680-6caead58d5f5.bin"
+        }
+      },
+      {
+        "operation": "upload_large",
+        "startedAtUtc": "2026-03-31T18:03:26.625Z",
+        "endedAtUtc": "2026-03-31T18:03:41.350Z",
+        "ms": 14724.352291000076,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 17.386163747010738,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-05-fed57d2d-d63b-4da7-bee5-68c524d2d6c0.bin"
+        }
+      }
+    ],
+    "head_object_large": [
+      {
+        "operation": "head_object_large",
+        "startedAtUtc": "2026-03-31T18:01:08.911Z",
+        "endedAtUtc": "2026-03-31T18:01:08.993Z",
+        "ms": 81.84079100005329,
+        "ok": true,
+        "bytes": 268435456,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-01-d888265b-fb2f-4b49-9807-18c748fd81c2.bin",
+          "etag": "\"47b62242197f0a36310d9ac1f417b1e5\""
+        }
+      },
+      {
+        "operation": "head_object_large",
+        "startedAtUtc": "2026-03-31T18:01:43.745Z",
+        "endedAtUtc": "2026-03-31T18:01:43.916Z",
+        "ms": 171.0835000006482,
+        "ok": true,
+        "bytes": 268435456,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-02-49ca65a8-c09b-4153-8c7a-9c8a7e3c0943.bin",
+          "etag": "\"47b62242197f0a36310d9ac1f417b1e5\""
+        }
+      },
+      {
+        "operation": "head_object_large",
+        "startedAtUtc": "2026-03-31T18:02:16.467Z",
+        "endedAtUtc": "2026-03-31T18:02:16.586Z",
+        "ms": 119.20020900014788,
+        "ok": true,
+        "bytes": 268435456,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-03-72a8e769-afbb-40c6-ad9a-abfeb136bd3f.bin",
+          "etag": "\"47b62242197f0a36310d9ac1f417b1e5\""
+        }
+      },
+      {
+        "operation": "head_object_large",
+        "startedAtUtc": "2026-03-31T18:03:05.417Z",
+        "endedAtUtc": "2026-03-31T18:03:05.511Z",
+        "ms": 93.96254200022668,
+        "ok": true,
+        "bytes": 268435456,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-04-f86edc19-e2aa-4167-a680-6caead58d5f5.bin",
+          "etag": "\"47b62242197f0a36310d9ac1f417b1e5\""
+        }
+      },
+      {
+        "operation": "head_object_large",
+        "startedAtUtc": "2026-03-31T18:03:41.350Z",
+        "endedAtUtc": "2026-03-31T18:03:41.484Z",
+        "ms": 133.95933400001377,
+        "ok": true,
+        "bytes": 268435456,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-05-fed57d2d-d63b-4da7-bee5-68c524d2d6c0.bin",
+          "etag": "\"47b62242197f0a36310d9ac1f417b1e5\""
+        }
+      }
+    ],
+    "download_large": [
+      {
+        "operation": "download_large",
+        "startedAtUtc": "2026-03-31T18:01:08.993Z",
+        "endedAtUtc": "2026-03-31T18:01:25.226Z",
+        "ms": 16232.199000000022,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 15.771122569406625,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-01-d888265b-fb2f-4b49-9807-18c748fd81c2.bin",
+          "sha256": "07d5a89eb5fba64710c39af622e969660d9a764c89e7b4e5e18c6c8fd523b5f8"
+        }
+      },
+      {
+        "operation": "download_large",
+        "startedAtUtc": "2026-03-31T18:01:43.916Z",
+        "endedAtUtc": "2026-03-31T18:01:57.447Z",
+        "ms": 13530.737707999535,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 18.919884896493834,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-02-49ca65a8-c09b-4153-8c7a-9c8a7e3c0943.bin",
+          "sha256": "07d5a89eb5fba64710c39af622e969660d9a764c89e7b4e5e18c6c8fd523b5f8"
+        }
+      },
+      {
+        "operation": "download_large",
+        "startedAtUtc": "2026-03-31T18:02:16.586Z",
+        "endedAtUtc": "2026-03-31T18:02:44.431Z",
+        "ms": 27844.957709000446,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 9.19376508577896,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-03-72a8e769-afbb-40c6-ad9a-abfeb136bd3f.bin",
+          "sha256": "07d5a89eb5fba64710c39af622e969660d9a764c89e7b4e5e18c6c8fd523b5f8"
+        }
+      },
+      {
+        "operation": "download_large",
+        "startedAtUtc": "2026-03-31T18:03:05.511Z",
+        "endedAtUtc": "2026-03-31T18:03:21.576Z",
+        "ms": 16065.044625000097,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 15.935218729589955,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-04-f86edc19-e2aa-4167-a680-6caead58d5f5.bin",
+          "sha256": "07d5a89eb5fba64710c39af622e969660d9a764c89e7b4e5e18c6c8fd523b5f8"
+        }
+      },
+      {
+        "operation": "download_large",
+        "startedAtUtc": "2026-03-31T18:03:41.484Z",
+        "endedAtUtc": "2026-03-31T18:03:56.450Z",
+        "ms": 14966.621542000212,
+        "ok": true,
+        "bytes": 268435456,
+        "throughputMiBs": 17.104728631080686,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-05-fed57d2d-d63b-4da7-bee5-68c524d2d6c0.bin",
+          "sha256": "07d5a89eb5fba64710c39af622e969660d9a764c89e7b4e5e18c6c8fd523b5f8"
+        }
+      }
+    ],
+    "delete_large": [
+      {
+        "operation": "delete_large",
+        "startedAtUtc": "2026-03-31T18:01:25.226Z",
+        "endedAtUtc": "2026-03-31T18:01:30.281Z",
+        "ms": 5055.574292000383,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-01-d888265b-fb2f-4b49-9807-18c748fd81c2.bin"
+        }
+      },
+      {
+        "operation": "delete_large",
+        "startedAtUtc": "2026-03-31T18:01:57.447Z",
+        "endedAtUtc": "2026-03-31T18:01:57.521Z",
+        "ms": 74.59458300005645,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-02-49ca65a8-c09b-4153-8c7a-9c8a7e3c0943.bin"
+        }
+      },
+      {
+        "operation": "delete_large",
+        "startedAtUtc": "2026-03-31T18:02:44.431Z",
+        "endedAtUtc": "2026-03-31T18:02:44.467Z",
+        "ms": 36.24008299969137,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-03-72a8e769-afbb-40c6-ad9a-abfeb136bd3f.bin"
+        }
+      },
+      {
+        "operation": "delete_large",
+        "startedAtUtc": "2026-03-31T18:03:21.577Z",
+        "endedAtUtc": "2026-03-31T18:03:26.607Z",
+        "ms": 5030.791667000391,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-04-f86edc19-e2aa-4167-a680-6caead58d5f5.bin"
+        }
+      },
+      {
+        "operation": "delete_large",
+        "startedAtUtc": "2026-03-31T18:03:56.451Z",
+        "endedAtUtc": "2026-03-31T18:03:56.483Z",
+        "ms": 32.54712500050664,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-05-fed57d2d-d63b-4da7-bee5-68c524d2d6c0.bin"
+        }
+      }
+    ],
+    "post_delete_head_large": [
+      {
+        "operation": "post_delete_head_large",
+        "startedAtUtc": "2026-03-31T18:01:30.281Z",
+        "endedAtUtc": "2026-03-31T18:01:30.297Z",
+        "ms": 15.16150000039488,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-01-d888265b-fb2f-4b49-9807-18c748fd81c2.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_large",
+        "startedAtUtc": "2026-03-31T18:01:57.521Z",
+        "endedAtUtc": "2026-03-31T18:01:57.546Z",
+        "ms": 24.622333000414073,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-02-49ca65a8-c09b-4153-8c7a-9c8a7e3c0943.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_large",
+        "startedAtUtc": "2026-03-31T18:02:44.467Z",
+        "endedAtUtc": "2026-03-31T18:02:44.485Z",
+        "ms": 17.81416600011289,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-03-72a8e769-afbb-40c6-ad9a-abfeb136bd3f.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_large",
+        "startedAtUtc": "2026-03-31T18:03:26.608Z",
+        "endedAtUtc": "2026-03-31T18:03:26.625Z",
+        "ms": 17.46179199963808,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-04-f86edc19-e2aa-4167-a680-6caead58d5f5.bin"
+        }
+      },
+      {
+        "operation": "post_delete_head_large",
+        "startedAtUtc": "2026-03-31T18:03:56.483Z",
+        "endedAtUtc": "2026-03-31T18:03:56.496Z",
+        "ms": 12.600749999284744,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/single/large/trial-05-fed57d2d-d63b-4da7-bee5-68c524d2d6c0.bin"
+        }
+      }
+    ],
+    "read_after_write_visibility": [
+      {
+        "operation": "read_after_write_visibility",
+        "startedAtUtc": "2026-03-31T18:03:57.017Z",
+        "endedAtUtc": "2026-03-31T18:03:57.120Z",
+        "ms": 103.4477499993518,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/consistency/read-after-write-01-fc7daf0a-e723-416c-bcf6-a51478c398d0.bin",
+          "elapsedMs": 103.31850000005215
+        }
+      },
+      {
+        "operation": "read_after_write_visibility",
+        "startedAtUtc": "2026-03-31T18:03:57.684Z",
+        "endedAtUtc": "2026-03-31T18:03:57.753Z",
+        "ms": 68.89387500006706,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/consistency/read-after-write-02-20268fb7-fcef-4d62-b08a-2af19d13e217.bin",
+          "elapsedMs": 68.81408300064504
+        }
+      },
+      {
+        "operation": "read_after_write_visibility",
+        "startedAtUtc": "2026-03-31T18:03:58.300Z",
+        "endedAtUtc": "2026-03-31T18:03:58.366Z",
+        "ms": 65.7664999999106,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/consistency/read-after-write-03-4281bfee-4102-4dc5-bee2-306db54e1d5c.bin",
+          "elapsedMs": 65.64083399996161
+        }
+      },
+      {
+        "operation": "read_after_write_visibility",
+        "startedAtUtc": "2026-03-31T18:03:58.918Z",
+        "endedAtUtc": "2026-03-31T18:03:58.980Z",
+        "ms": 61.443916000425816,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/consistency/read-after-write-04-852ec849-b00a-49f6-a8fc-f23bd66a634d.bin",
+          "elapsedMs": 61.35445799957961
+        }
+      },
+      {
+        "operation": "read_after_write_visibility",
+        "startedAtUtc": "2026-03-31T18:03:59.502Z",
+        "endedAtUtc": "2026-03-31T18:03:59.563Z",
+        "ms": 60.68537500035018,
+        "ok": true,
+        "bytes": 8388608,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/consistency/read-after-write-05-a00c242d-0920-45e9-98ac-c09beb5c0551.bin",
+          "elapsedMs": 60.65595899987966
+        }
+      }
+    ],
+    "delete_propagation": [
+      {
+        "operation": "delete_propagation",
+        "startedAtUtc": "2026-03-31T18:03:57.120Z",
+        "endedAtUtc": "2026-03-31T18:03:57.187Z",
+        "ms": 66.6099169999361,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/consistency/read-after-write-01-fc7daf0a-e723-416c-bcf6-a51478c398d0.bin",
+          "elapsedMs": 26.179541999474168
+        }
+      },
+      {
+        "operation": "delete_propagation",
+        "startedAtUtc": "2026-03-31T18:03:57.753Z",
+        "endedAtUtc": "2026-03-31T18:03:57.805Z",
+        "ms": 51.8464999999851,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/consistency/read-after-write-02-20268fb7-fcef-4d62-b08a-2af19d13e217.bin",
+          "elapsedMs": 22.421709000132978
+        }
+      },
+      {
+        "operation": "delete_propagation",
+        "startedAtUtc": "2026-03-31T18:03:58.366Z",
+        "endedAtUtc": "2026-03-31T18:03:58.413Z",
+        "ms": 46.8832499999553,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/consistency/read-after-write-03-4281bfee-4102-4dc5-bee2-306db54e1d5c.bin",
+          "elapsedMs": 17.874374999664724
+        }
+      },
+      {
+        "operation": "delete_propagation",
+        "startedAtUtc": "2026-03-31T18:03:58.980Z",
+        "endedAtUtc": "2026-03-31T18:03:59.036Z",
+        "ms": 56.06099999975413,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/consistency/read-after-write-04-852ec849-b00a-49f6-a8fc-f23bd66a634d.bin",
+          "elapsedMs": 17.06649999972433
+        }
+      },
+      {
+        "operation": "delete_propagation",
+        "startedAtUtc": "2026-03-31T18:03:59.563Z",
+        "endedAtUtc": "2026-03-31T18:03:59.604Z",
+        "ms": 41.22570800036192,
+        "ok": true,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/consistency/read-after-write-05-a00c242d-0920-45e9-98ac-c09beb5c0551.bin",
+          "elapsedMs": 15.23008400015533
+        }
+      }
+    ],
+    "missing_read": [
+      {
+        "operation": "missing_read",
+        "startedAtUtc": "2026-03-31T18:03:59.604Z",
+        "endedAtUtc": "2026-03-31T18:04:00.316Z",
+        "ms": 711.5104590002447,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/missing/1-dff3648c-3e5b-4fa9-87cb-60c29313f860.bin"
+        }
+      },
+      {
+        "operation": "missing_read",
+        "startedAtUtc": "2026-03-31T18:04:00.331Z",
+        "endedAtUtc": "2026-03-31T18:04:01.062Z",
+        "ms": 731.230000000447,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/missing/2-b6573d55-ef21-4d23-8986-14e2aab7b179.bin"
+        }
+      },
+      {
+        "operation": "missing_read",
+        "startedAtUtc": "2026-03-31T18:04:01.085Z",
+        "endedAtUtc": "2026-03-31T18:04:01.784Z",
+        "ms": 698.9287089994177,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/missing/3-33347243-feb3-4272-9c73-e6f7e3ed65bc.bin"
+        }
+      }
+    ],
+    "missing_head": [
+      {
+        "operation": "missing_head",
+        "startedAtUtc": "2026-03-31T18:04:00.316Z",
+        "endedAtUtc": "2026-03-31T18:04:00.331Z",
+        "ms": 14.547541999258101,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/missing/1-dff3648c-3e5b-4fa9-87cb-60c29313f860.bin"
+        }
+      },
+      {
+        "operation": "missing_head",
+        "startedAtUtc": "2026-03-31T18:04:01.062Z",
+        "endedAtUtc": "2026-03-31T18:04:01.085Z",
+        "ms": 22.97254200000316,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/missing/2-b6573d55-ef21-4d23-8986-14e2aab7b179.bin"
+        }
+      },
+      {
+        "operation": "missing_head",
+        "startedAtUtc": "2026-03-31T18:04:01.784Z",
+        "endedAtUtc": "2026-03-31T18:04:01.799Z",
+        "ms": 15.182707999832928,
+        "ok": true,
+        "statusCode": 404,
+        "details": {
+          "key": "bench/2026-03-31T16-48-09-805Z/wasabi-eu-central-2/missing/3-33347243-feb3-4272-9c73-e6f7e3ed65bc.bin"
+        }
+      }
+    ],
+    "parallel_upload_batch": [
+      {
+        "operation": "parallel_upload_batch",
+        "startedAtUtc": "2026-03-31T18:04:01.800Z",
+        "endedAtUtc": "2026-03-31T18:04:09.201Z",
+        "ms": 7400.9867500001565,
+        "ok": true,
+        "bytes": 134217728,
+        "throughputMiBs": 17.29499110371969,
+        "details": {
+          "requested": 16,
+          "completed": 16,
+          "failed": 0,
+          "successRate": 1,
+          "cycle": 1,
+          "sampleErrors": []
+        }
+      },
+      {
+        "operation": "parallel_upload_batch",
+        "startedAtUtc": "2026-03-31T18:07:39.917Z",
+        "endedAtUtc": "2026-03-31T18:07:47.872Z",
+        "ms": 7955.342042000033,
+        "ok": true,
+        "bytes": 134217728,
+        "throughputMiBs": 16.08981729814094,
+        "details": {
+          "requested": 16,
+          "completed": 16,
+          "failed": 0,
+          "successRate": 1,
+          "cycle": 2,
+          "sampleErrors": []
+        }
+      }
+    ],
+    "parallel_read_batch": [
+      {
+        "operation": "parallel_read_batch",
+        "startedAtUtc": "2026-03-31T18:04:09.201Z",
+        "endedAtUtc": "2026-03-31T18:04:29.765Z",
+        "ms": 20563.97000000067,
+        "ok": true,
+        "bytes": 134217728,
+        "throughputMiBs": 6.224479028125203,
+        "details": {
+          "requested": 16,
+          "completed": 16,
+          "failed": 0,
+          "successRate": 1,
+          "cycle": 1,
+          "sampleErrors": []
+        }
+      },
+      {
+        "operation": "parallel_read_batch",
+        "startedAtUtc": "2026-03-31T18:07:47.872Z",
+        "endedAtUtc": "2026-03-31T18:08:09.421Z",
+        "ms": 21549.458584000356,
+        "ok": true,
+        "bytes": 134217728,
+        "throughputMiBs": 5.9398244044532555,
+        "details": {
+          "requested": 16,
+          "completed": 16,
+          "failed": 0,
+          "successRate": 1,
+          "cycle": 2,
+          "sampleErrors": []
+        }
+      }
+    ],
+    "parallel_delete_batch": [
+      {
+        "operation": "parallel_delete_batch",
+        "startedAtUtc": "2026-03-31T18:04:29.765Z",
+        "endedAtUtc": "2026-03-31T18:04:34.852Z",
+        "ms": 5087.166457999498,
+        "ok": true,
+        "details": {
+          "requested": 16,
+          "completed": 16,
+          "failed": 0,
+          "successRate": 1,
+          "cycle": 1,
+          "sampleErrors": []
+        }
+      },
+      {
+        "operation": "parallel_delete_batch",
+        "startedAtUtc": "2026-03-31T18:08:09.422Z",
+        "endedAtUtc": "2026-03-31T18:08:09.627Z",
+        "ms": 205.61141599994153,
+        "ok": true,
+        "details": {
+          "requested": 16,
+          "completed": 16,
+          "failed": 0,
+          "successRate": 1,
+          "cycle": 2,
+          "sampleErrors": []
+        }
+      }
+    ],
+    "seed_many_objects": [
+      {
+        "operation": "seed_many_objects",
+        "startedAtUtc": "2026-03-31T18:04:34.857Z",
+        "endedAtUtc": "2026-03-31T18:07:00.749Z",
+        "ms": 145891.5609170003,
+        "ok": true,
+        "bytes": 10240000,
+        "throughputMiBs": 0.06693755922973364,
+        "details": {
+          "requested": 10000,
+          "completed": 10000,
+          "failed": 0,
+          "successRate": 1,
+          "count": 10000,
+          "cycle": 1,
+          "sampleErrors": []
+        }
+      },
+      {
+        "operation": "seed_many_objects",
+        "startedAtUtc": "2026-03-31T18:08:09.630Z",
+        "endedAtUtc": "2026-03-31T18:10:32.281Z",
+        "ms": 142651.02958299965,
+        "ok": true,
+        "bytes": 10240000,
+        "throughputMiBs": 0.06845814592819323,
+        "details": {
+          "requested": 10000,
+          "completed": 10000,
+          "failed": 0,
+          "successRate": 1,
+          "count": 10000,
+          "cycle": 2,
+          "sampleErrors": []
+        }
+      }
+    ],
+    "list_single_page": [
+      {
+        "operation": "list_single_page",
+        "startedAtUtc": "2026-03-31T18:07:00.749Z",
+        "endedAtUtc": "2026-03-31T18:07:00.877Z",
+        "ms": 128.2412919998169,
+        "ok": true,
+        "details": {
+          "count": 1000,
+          "truncated": true,
+          "cycle": 1
+        }
+      },
+      {
+        "operation": "list_single_page",
+        "startedAtUtc": "2026-03-31T18:10:32.281Z",
+        "endedAtUtc": "2026-03-31T18:10:32.385Z",
+        "ms": 104.19833299983293,
+        "ok": true,
+        "details": {
+          "count": 1000,
+          "truncated": true,
+          "cycle": 2
+        }
+      }
+    ],
+    "list_deep_scan": [
+      {
+        "operation": "list_deep_scan",
+        "startedAtUtc": "2026-03-31T18:07:00.877Z",
+        "endedAtUtc": "2026-03-31T18:07:01.751Z",
+        "ms": 874.0156669998541,
+        "ok": true,
+        "details": {
+          "listed": 10000,
+          "cycle": 1
+        }
+      },
+      {
+        "operation": "list_deep_scan",
+        "startedAtUtc": "2026-03-31T18:10:32.385Z",
+        "endedAtUtc": "2026-03-31T18:10:33.124Z",
+        "ms": 738.7181670004502,
+        "ok": true,
+        "details": {
+          "listed": 10000,
+          "cycle": 2
+        }
+      }
+    ],
+    "parallel_delete_many_objects": [
+      {
+        "operation": "parallel_delete_many_objects",
+        "startedAtUtc": "2026-03-31T18:07:01.751Z",
+        "endedAtUtc": "2026-03-31T18:07:39.917Z",
+        "ms": 38167.33420800045,
+        "ok": true,
+        "details": {
+          "requested": 10000,
+          "completed": 10000,
+          "failed": 0,
+          "successRate": 1,
+          "count": 10000,
+          "cycle": 1,
+          "sampleErrors": []
+        }
+      },
+      {
+        "operation": "parallel_delete_many_objects",
+        "startedAtUtc": "2026-03-31T18:10:33.124Z",
+        "endedAtUtc": "2026-03-31T18:11:11.221Z",
+        "ms": 38097.05479199998,
+        "ok": true,
+        "details": {
+          "requested": 10000,
+          "completed": 10000,
+          "failed": 0,
+          "successRate": 1,
+          "count": 10000,
+          "cycle": 2,
+          "sampleErrors": []
+        }
+      }
+    ]
+  },
+  "phaseTimingsMs": {
+    "bucket verification": 479.82,
+    "capability probes": 2242.84,
+    "single object baseline": 282532.1,
+    "consistency checks": 3108.29,
+    "missing key behavior": 2194.99,
+    "heavy stress cycles": 429423.26,
+    "cleanup": 13311.17
+  },
+  "notes": [],
+  "completedAtUtc": "2026-03-31T18:11:24.533Z",
+  "aggregates": {
+    "upload_small": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 472.3696659998968,
+      "maxMs": 628.6935000000522,
+      "meanMs": 543.7629750000312,
+      "medianMs": 507.2868750002235,
+      "p95Ms": 628.6935000000522,
+      "stdevMs": 67.22071493691689,
+      "cv": 0.12362135347099171,
+      "totalBytes": 41943040,
+      "meanThroughputMiBs": 14.931908654676835,
+      "medianThroughputMiBs": 15.77016949235376
+    },
+    "head_object_small": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 39.339833000674844,
+      "maxMs": 111.73525000084192,
+      "meanMs": 77.59812500029803,
+      "medianMs": 79.0184999993071,
+      "p95Ms": 111.73525000084192,
+      "stdevMs": 23.371046732458716,
+      "cv": 0.3011805598700865,
+      "totalBytes": 41943040,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "download_small": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 471.51654199976474,
+      "maxMs": 888.5421249996871,
+      "meanMs": 635.1617749998346,
+      "medianMs": 587.4583749994636,
+      "p95Ms": 888.5421249996871,
+      "stdevMs": 141.01215009994013,
+      "cv": 0.22200981804986114,
+      "totalBytes": 41943040,
+      "meanThroughputMiBs": 13.16483411804927,
+      "medianThroughputMiBs": 13.617986125412385
+    },
+    "range_read_small": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 29.538958000019193,
+      "maxMs": 59.19812500011176,
+      "meanMs": 40.77526660002768,
+      "medianMs": 39.37912499997765,
+      "p95Ms": 59.19812500011176,
+      "stdevMs": 10.386202266033306,
+      "cv": 0.2547181939461864,
+      "totalBytes": 20480,
+      "meanThroughputMiBs": 0.10153905659052438,
+      "medianThroughputMiBs": 0.09919595724897942
+    },
+    "delete_small": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 27.875792000442743,
+      "maxMs": 44.230082999914885,
+      "meanMs": 37.079316600039604,
+      "medianMs": 39.941040999256074,
+      "p95Ms": 44.230082999914885,
+      "stdevMs": 5.936573008582759,
+      "cv": 0.16010470399490637,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "post_delete_head_small": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 15.023583000525832,
+      "maxMs": 29.25525000039488,
+      "meanMs": 21.771591600216926,
+      "medianMs": 22.346667000092566,
+      "p95Ms": 29.25525000039488,
+      "stdevMs": 4.741246564565757,
+      "cv": 0.2177721616144277,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "upload_medium": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 4688.6757920002565,
+      "maxMs": 19230.562750000507,
+      "meanMs": 10195.698366800138,
+      "medianMs": 9179.7089169994,
+      "p95Ms": 19230.562750000507,
+      "stdevMs": 5078.719550603366,
+      "cv": 0.4981237545376005,
+      "totalBytes": 335544320,
+      "meanThroughputMiBs": 7.90336552369874,
+      "medianThroughputMiBs": 6.971898627578693
+    },
+    "head_object_medium": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 63.05724999960512,
+      "maxMs": 91.79895900003612,
+      "meanMs": 75.29431679993868,
+      "medianMs": 71.42087499983609,
+      "p95Ms": 91.79895900003612,
+      "stdevMs": 9.898242307529534,
+      "cv": 0.13146068293347732,
+      "totalBytes": 335544320,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "download_medium": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 4376.928499999456,
+      "maxMs": 17395.432333000004,
+      "meanMs": 8179.451899799891,
+      "medianMs": 6100.914290999994,
+      "p95Ms": 17395.432333000004,
+      "stdevMs": 4782.583616124345,
+      "cv": 0.5847071019809225,
+      "totalBytes": 335544320,
+      "meanThroughputMiBs": 9.94054707793513,
+      "medianThroughputMiBs": 10.490230963318425
+    },
+    "range_read_medium": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 31.965750000439584,
+      "maxMs": 52.1860830001533,
+      "meanMs": 42.15098320003599,
+      "medianMs": 42.490375000052154,
+      "p95Ms": 52.1860830001533,
+      "stdevMs": 6.590356534873669,
+      "cv": 0.15635119360319077,
+      "totalBytes": 20480,
+      "meanThroughputMiBs": 0.09508242130973794,
+      "medianThroughputMiBs": 0.09193258473231185
+    },
+    "delete_medium": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 53.0367499999702,
+      "maxMs": 65.83341600000858,
+      "meanMs": 58.82062500007451,
+      "medianMs": 57.535542000085115,
+      "p95Ms": 65.83341600000858,
+      "stdevMs": 4.430535265604731,
+      "cv": 0.07532281857935237,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "post_delete_head_medium": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 12.422582999803126,
+      "maxMs": 18.308000000193715,
+      "meanMs": 16.01316660027951,
+      "medianMs": 17.568292000330985,
+      "p95Ms": 18.308000000193715,
+      "stdevMs": 2.5415350422889156,
+      "cv": 0.15871533131020774,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "upload_large": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 13447.753124999814,
+      "maxMs": 20931.88666599989,
+      "meanMs": 16669.879641399904,
+      "medianMs": 15325.22733299993,
+      "p95Ms": 20931.88666599989,
+      "stdevMs": 2800.136280049885,
+      "cv": 0.1679757946839462,
+      "totalBytes": 1342177280,
+      "meanThroughputMiBs": 15.777591254596583,
+      "medianThroughputMiBs": 16.704483035547096
+    },
+    "head_object_large": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 81.84079100005329,
+      "maxMs": 171.0835000006482,
+      "meanMs": 120.00927520021796,
+      "medianMs": 119.20020900014788,
+      "p95Ms": 171.0835000006482,
+      "stdevMs": 31.429605992212146,
+      "cv": 0.26189314067413905,
+      "totalBytes": 1342177280,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "download_large": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 13530.737707999535,
+      "maxMs": 27844.957709000446,
+      "meanMs": 17727.912116800064,
+      "medianMs": 16065.044625000097,
+      "p95Ms": 27844.957709000446,
+      "stdevMs": 5149.716423145696,
+      "cv": 0.29048634657126415,
+      "totalBytes": 1342177280,
+      "meanThroughputMiBs": 15.384943982470011,
+      "medianThroughputMiBs": 15.935218729589955
+    },
+    "delete_large": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 32.54712500050664,
+      "maxMs": 5055.574292000383,
+      "meanMs": 2045.9495500002056,
+      "medianMs": 74.59458300005645,
+      "p95Ms": 5055.574292000383,
+      "stdevMs": 2447.2876996274917,
+      "cv": 1.1961622903298108,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "post_delete_head_large": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 12.600749999284744,
+      "maxMs": 24.622333000414073,
+      "meanMs": 17.532108199968935,
+      "medianMs": 17.46179199963808,
+      "p95Ms": 24.622333000414073,
+      "stdevMs": 4.007339906492617,
+      "cv": 0.22857147929874844,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "read_after_write_visibility": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 60.68537500035018,
+      "maxMs": 103.4477499993518,
+      "meanMs": 72.04748320002109,
+      "medianMs": 65.7664999999106,
+      "p95Ms": 103.4477499993518,
+      "stdevMs": 15.98065011071452,
+      "cv": 0.22180719437968988,
+      "totalBytes": 41943040,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "delete_propagation": {
+      "count": 5,
+      "okCount": 5,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 41.22570800036192,
+      "maxMs": 66.6099169999361,
+      "meanMs": 52.52527499999851,
+      "medianMs": 51.8464999999851,
+      "p95Ms": 66.6099169999361,
+      "stdevMs": 8.61222256471969,
+      "cv": 0.16396339790167563,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "missing_read": {
+      "count": 3,
+      "okCount": 3,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 698.9287089994177,
+      "maxMs": 731.230000000447,
+      "meanMs": 713.8897226667032,
+      "medianMs": 711.5104590002447,
+      "p95Ms": 731.230000000447,
+      "stdevMs": 13.293833702866184,
+      "cv": 0.01862169083091386,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "missing_head": {
+      "count": 3,
+      "okCount": 3,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 14.547541999258101,
+      "maxMs": 22.97254200000316,
+      "meanMs": 17.567597333031397,
+      "medianMs": 15.182707999832928,
+      "p95Ms": 22.97254200000316,
+      "stdevMs": 3.83065956912918,
+      "cv": 0.21805255986409702,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "parallel_upload_batch": {
+      "count": 2,
+      "okCount": 2,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 7400.9867500001565,
+      "maxMs": 7955.342042000033,
+      "meanMs": 7678.164396000095,
+      "medianMs": 7678.164396000095,
+      "p95Ms": 7955.342042000033,
+      "stdevMs": 277.17764599993825,
+      "cv": 0.03609946749047633,
+      "totalBytes": 268435456,
+      "meanThroughputMiBs": 16.692404200930312,
+      "medianThroughputMiBs": 16.692404200930312
+    },
+    "parallel_read_batch": {
+      "count": 2,
+      "okCount": 2,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 20563.97000000067,
+      "maxMs": 21549.458584000356,
+      "meanMs": 21056.714292000514,
+      "medianMs": 21056.714292000514,
+      "p95Ms": 21549.458584000356,
+      "stdevMs": 492.74429199984297,
+      "cv": 0.023400815776231407,
+      "totalBytes": 268435456,
+      "meanThroughputMiBs": 6.082151716289229,
+      "medianThroughputMiBs": 6.082151716289229
+    },
+    "parallel_delete_batch": {
+      "count": 2,
+      "okCount": 2,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 205.61141599994153,
+      "maxMs": 5087.166457999498,
+      "meanMs": 2646.3889369997196,
+      "medianMs": 2646.3889369997196,
+      "p95Ms": 5087.166457999498,
+      "stdevMs": 2440.777520999778,
+      "cv": 0.9223049140187805,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "seed_many_objects": {
+      "count": 2,
+      "okCount": 2,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 142651.02958299965,
+      "maxMs": 145891.5609170003,
+      "meanMs": 144271.29524999997,
+      "medianMs": 144271.29524999997,
+      "p95Ms": 145891.5609170003,
+      "stdevMs": 1620.2656670003198,
+      "cv": 0.01123068635512455,
+      "totalBytes": 20480000,
+      "meanThroughputMiBs": 0.06769785257896344,
+      "medianThroughputMiBs": 0.06769785257896344
+    },
+    "list_single_page": {
+      "count": 2,
+      "okCount": 2,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 104.19833299983293,
+      "maxMs": 128.2412919998169,
+      "meanMs": 116.21981249982491,
+      "medianMs": 116.21981249982491,
+      "p95Ms": 128.2412919998169,
+      "stdevMs": 12.021479499991983,
+      "cv": 0.10343743671080259,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "list_deep_scan": {
+      "count": 2,
+      "okCount": 2,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 738.7181670004502,
+      "maxMs": 874.0156669998541,
+      "meanMs": 806.3669170001522,
+      "medianMs": 806.3669170001522,
+      "p95Ms": 874.0156669998541,
+      "stdevMs": 67.64874999970198,
+      "cv": 0.08389326071482321,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    },
+    "parallel_delete_many_objects": {
+      "count": 2,
+      "okCount": 2,
+      "failCount": 0,
+      "successRate": 1,
+      "minMs": 38097.05479199998,
+      "maxMs": 38167.33420800045,
+      "meanMs": 38132.194500000216,
+      "medianMs": 38132.194500000216,
+      "p95Ms": 38167.33420800045,
+      "stdevMs": 35.13970800023526,
+      "cv": 0.0009215233600110548,
+      "totalBytes": 0,
+      "meanThroughputMiBs": null,
+      "medianThroughputMiBs": null
+    }
+  },
+  "derived": {
+    "capabilitySuccessRate": 1,
+    "integritySuccessRate": 1,
+    "deleteValidationSuccessRate": 1,
+    "missingReadExpectedErrorRate": 1,
+    "coreFailureRate": 0,
+    "coreMedianCv": 0.2562480823105626,
+    "visibilityMedianMs": 65.64083399996161,
+    "deletePropagationMedianMs": 17.874374999664724,
+    "parallelUploadAggregateMiBsPerSec": 16.692404200930312,
+    "parallelReadAggregateMiBsPerSec": 6.082151716289229,
+    "listObjectsPerSecond": 12401.302420989716,
+    "seedObjectsPerSecond": 69.31385749792803,
+    "parallelDeletesPerSecond": 262.2455940740558,
+    "skippedPhases": [],
+    "skippedCategoryCount": 0,
+    "skippedCategories": [],
+    "abortedByUser": false
+  },
+  "status": "ok"
+}

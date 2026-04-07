@@ -1,0 +1,162 @@
+[
+  {
+    "rank": 1,
+    "provider": "Hetzner FSN1",
+    "scores": {
+      "capability": 100,
+      "latency": 69.55,
+      "throughput": 77.07,
+      "consistency": 51.81,
+      "scalability": 100,
+      "integrity": 100,
+      "overall": 79.73
+    },
+    "derived": {
+      "capabilitySuccessRate": 1,
+      "integritySuccessRate": 1,
+      "deleteValidationSuccessRate": 1,
+      "missingReadExpectedErrorRate": 1,
+      "coreFailureRate": 0,
+      "coreMedianCv": 0.23907047763507383,
+      "visibilityMedianMs": 17.807083000196144,
+      "deletePropagationMedianMs": 16.607499999925494,
+      "parallelUploadAggregateMiBsPerSec": 18.246149577891757,
+      "parallelReadAggregateMiBsPerSec": 14.977368712569206,
+      "listObjectsPerSecond": 12416.604396514182,
+      "seedObjectsPerSecond": 342.9244258542252,
+      "parallelDeletesPerSecond": 623.6341802629397,
+      "skippedPhases": [],
+      "skippedCategoryCount": 0,
+      "skippedCategories": [],
+      "abortedByUser": false
+    }
+  },
+  {
+    "rank": 2,
+    "provider": "Impossible API",
+    "scores": {
+      "capability": 100,
+      "latency": 58.02,
+      "throughput": 98.68,
+      "consistency": 65.18,
+      "scalability": 63.59,
+      "integrity": 100,
+      "overall": 79.2
+    },
+    "derived": {
+      "capabilitySuccessRate": 1,
+      "integritySuccessRate": 1,
+      "deleteValidationSuccessRate": 1,
+      "missingReadExpectedErrorRate": 1,
+      "coreFailureRate": 0,
+      "coreMedianCv": 0.1455362966226515,
+      "visibilityMedianMs": 55.12120799999684,
+      "deletePropagationMedianMs": 23.866500000003725,
+      "parallelUploadAggregateMiBsPerSec": 21.6299762403171,
+      "parallelReadAggregateMiBsPerSec": 14.103567832183378,
+      "listObjectsPerSecond": 10837.116939770047,
+      "seedObjectsPerSecond": 133.96848121536937,
+      "parallelDeletesPerSecond": 51.09553322306925,
+      "skippedPhases": [],
+      "skippedCategoryCount": 0,
+      "skippedCategories": [],
+      "abortedByUser": false
+    }
+  },
+  {
+    "rank": 3,
+    "provider": "MEGA S4 Amsterdam",
+    "scores": {
+      "capability": 100,
+      "latency": 54.48,
+      "throughput": 60.31,
+      "consistency": 81.25,
+      "scalability": 42.03,
+      "integrity": 100,
+      "overall": 68.72
+    },
+    "derived": {
+      "capabilitySuccessRate": 1,
+      "integritySuccessRate": 1,
+      "deleteValidationSuccessRate": 1,
+      "missingReadExpectedErrorRate": 1,
+      "coreFailureRate": 0,
+      "coreMedianCv": 0.18972539310426006,
+      "visibilityMedianMs": 12.684166999999434,
+      "deletePropagationMedianMs": 9.909915999975055,
+      "parallelUploadAggregateMiBsPerSec": 14.644642557197056,
+      "parallelReadAggregateMiBsPerSec": 8.660361514748093,
+      "listObjectsPerSecond": 9291.484437252218,
+      "seedObjectsPerSecond": 26.10093221203335,
+      "parallelDeletesPerSecond": 34.34718274980751,
+      "skippedPhases": [],
+      "skippedCategoryCount": 0,
+      "skippedCategories": [],
+      "abortedByUser": false
+    }
+  },
+  {
+    "rank": 4,
+    "provider": "Wasabi EU Central 2",
+    "scores": {
+      "capability": 100,
+      "latency": 61.02,
+      "throughput": 64.65,
+      "consistency": 27.39,
+      "scalability": 75.5,
+      "integrity": 100,
+      "overall": 66.73
+    },
+    "derived": {
+      "capabilitySuccessRate": 1,
+      "integritySuccessRate": 1,
+      "deleteValidationSuccessRate": 1,
+      "missingReadExpectedErrorRate": 1,
+      "coreFailureRate": 0,
+      "coreMedianCv": 0.2562480823105626,
+      "visibilityMedianMs": 65.64083399996161,
+      "deletePropagationMedianMs": 17.874374999664724,
+      "parallelUploadAggregateMiBsPerSec": 16.692404200930312,
+      "parallelReadAggregateMiBsPerSec": 6.082151716289229,
+      "listObjectsPerSecond": 12401.302420989716,
+      "seedObjectsPerSecond": 69.31385749792803,
+      "parallelDeletesPerSecond": 262.2455940740558,
+      "skippedPhases": [],
+      "skippedCategoryCount": 0,
+      "skippedCategories": [],
+      "abortedByUser": false
+    }
+  },
+  {
+    "rank": 5,
+    "provider": "Cloudflare R2",
+    "scores": {
+      "capability": 100,
+      "latency": 33.22,
+      "throughput": 0,
+      "consistency": 16.99,
+      "scalability": 36.45,
+      "integrity": 100,
+      "overall": 37.53
+    },
+    "derived": {
+      "capabilitySuccessRate": 1,
+      "integritySuccessRate": 1,
+      "deleteValidationSuccessRate": 1,
+      "missingReadExpectedErrorRate": 1,
+      "coreFailureRate": 0,
+      "coreMedianCv": 0.20152440122784632,
+      "visibilityMedianMs": 107.35187500016764,
+      "deletePropagationMedianMs": 63.63775000022724,
+      "parallelUploadAggregateMiBsPerSec": 9.980454107241258,
+      "parallelReadAggregateMiBsPerSec": 6.019100727997186,
+      "listObjectsPerSecond": 153.80344972796829,
+      "seedObjectsPerSecond": 90.83535350449877,
+      "parallelDeletesPerSecond": 360.96477202142154,
+      "skippedPhases": [],
+      "skippedCategoryCount": 0,
+      "skippedCategories": [],
+      "abortedByUser": false
+    }
+  }
+]
