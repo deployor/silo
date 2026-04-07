@@ -81,7 +81,7 @@ export function AdminRedemptionGeneratedPage({
 						<textarea
 							readOnly
 							value={raw}
-							className="w-full flex-grow bg-black/30 border border-white/10 rounded-xl p-4 text-sm font-mono text-text-muted focus:outline-none focus:border-hc-blue transition-colors resize-none h-96 select-all"
+							className="w-full flex-grow bg-black/30 border border-white/10 rounded-xl p-4 text-sm font-mono text-text-muted focus:outline-none focus:border-hc-red transition-colors resize-none h-96 select-all"
 						/>
 					</div>
 
@@ -103,7 +103,7 @@ export function AdminRedemptionGeneratedPage({
 						<textarea
 							readOnly
 							value={links}
-							className="w-full flex-grow bg-black/30 border border-white/10 rounded-xl p-4 text-sm font-mono text-text-muted focus:outline-none focus:border-hc-blue transition-colors resize-none h-96 select-all"
+							className="w-full flex-grow bg-black/30 border border-white/10 rounded-xl p-4 text-sm font-mono text-text-muted focus:outline-none focus:border-hc-red transition-colors resize-none h-96 select-all"
 						/>
 					</div>
 				</div>
@@ -111,7 +111,7 @@ export function AdminRedemptionGeneratedPage({
 				<div className="flex justify-center">
 					<a
 						href={`/admin/redemptions/${p.program?.id || ""}`}
-						className="px-8 py-3 bg-hc-blue hover:bg-blue-600 text-white font-bold rounded-xl transition-all hover:scale-105 shadow-lg shadow-blue-900/20"
+						className="px-8 py-3 bg-hc-red hover:bg-red-600 text-white font-bold rounded-xl transition-all hover:scale-105 shadow-lg shadow-red-900/20"
 					>
 						Done & Return to Program
 					</a>

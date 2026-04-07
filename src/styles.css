@@ -38,7 +38,7 @@
     --color-hc-red: #ec3750;
     --color-hc-dark: #17171d;
     --color-hc-darker: #131316;
-    --color-hc-blue: #338eda;
+    --color-hc-blue: #ec3750;
     --color-sidebar-bg: #1c1c21;
     --color-text-main: #e0e6ed;
     --color-text-muted: #94a3b8;
@@ -48,7 +48,7 @@
     --color-line: rgba(214, 225, 255, 0.16);
     --color-panel: rgba(20, 23, 30, 0.8);
     --color-panel-strong: rgba(13, 15, 20, 0.94);
-    --focus-ring: 0 0 0 3px rgba(51, 142, 218, 0.35);
+    --focus-ring: 0 0 0 3px rgba(236, 55, 80, 0.35);
     --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
   }
 }

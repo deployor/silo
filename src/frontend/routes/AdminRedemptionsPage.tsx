@@ -93,7 +93,7 @@ export function AdminRedemptionsPage({
 										<td className="px-6 py-4 text-right">
 											<a
 												href={`/admin/redemptions/${program.id}`}
-												className="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider"
+												className="text-hc-red hover:text-hc-red text-xs font-bold uppercase tracking-wider"
 											>
 												Manage Codes
 											</a>
@@ -204,7 +204,7 @@ export function AdminRedemptionsPage({
 								</button>
 								<button
 									type="submit"
-									className="bg-hc-blue hover:bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold"
+									className="bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold"
 								>
 									Create Program
 								</button>

@@ -51,7 +51,7 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 						{step === 2 && (
 							<Panel
-								icon="ph-rocket-launch text-blue-500"
+								icon="ph-rocket-launch text-red-500"
 								title="Ship Projects."
 								subtitle="Get Paid in Storage."
 								content={
@@ -68,8 +68,8 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								extra={
 									<div className="bg-white/5 rounded-xl p-6 mb-12 max-w-2xl mx-auto border border-white/10 flex flex-col gap-4 text-left">
 										<div className="flex items-start gap-4">
-											<div className="bg-green-500/20 p-2 rounded-lg">
-												<PhIcon className="ph-bold ph-check text-green-500 text-xl" />
+											<div className="bg-red-500/20 p-2 rounded-lg">
+												<PhIcon className="ph-bold ph-check text-hc-red text-xl" />
 											</div>
 											<div>
 												<h3 className="text-white font-bold text-lg">
@@ -81,8 +81,8 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											</div>
 										</div>
 										<div className="flex items-start gap-4">
-											<div className="bg-blue-500/20 p-2 rounded-lg">
-												<PhIcon className="ph-bold ph-hard-drives text-blue-500 text-xl" />
+											<div className="bg-red-500/20 p-2 rounded-lg">
+												<PhIcon className="ph-bold ph-hard-drives text-red-500 text-xl" />
 											</div>
 											<div>
 												<h3 className="text-white font-bold text-lg">
@@ -164,7 +164,7 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 						{step === 4 && (
 							<Panel
-								icon="ph-cloud-check text-green-500"
+								icon="ph-cloud-check text-hc-red"
 								title="It's Just S3"
 								content={
 									<>

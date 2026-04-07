@@ -58,7 +58,7 @@ export function RedeemPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<div className="text-center relative z-10">
 								<a
 									href="/"
-									className="inline-block px-8 py-4 bg-hc-blue text-white font-bold rounded-xl hover:scale-105 transition-transform card-shadow"
+									className="inline-block px-8 py-4 bg-hc-red text-white font-bold rounded-xl hover:scale-105 transition-transform card-shadow"
 								>
 									Go to Dashboard
 								</a>

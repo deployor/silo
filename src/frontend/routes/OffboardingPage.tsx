@@ -329,7 +329,7 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 								<div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
 									<div className="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow flex flex-col items-center text-center">
-										<div className={`h-20 w-20 rounded-full flex items-center justify-center mb-6 text-4xl ${isLargeDownload ? "bg-blue-500/10 text-blue-400" : "bg-white/10 text-white"}`}>
+										<div className={`h-20 w-20 rounded-full flex items-center justify-center mb-6 text-4xl ${isLargeDownload ? "bg-red-500/10 text-hc-red" : "bg-white/10 text-white"}`}>
 											<PhIcon
 												className={`text-5xl ${isLargeDownload ? "ph-duotone ph-download" : "ph-duotone ph-file-zip"}`}
 											/>
@@ -343,7 +343,7 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												: "Get one archive containing all bucket files and metadata."}
 										</p>
 										{p.showSuccess ? (
-											<div className="bg-green-500/20 text-green-400 p-4 rounded-xl font-bold w-full">
+											<div className="bg-red-500/20 text-hc-red p-4 rounded-xl font-bold w-full">
 												<PhIcon className="ph-bold ph-check-circle mr-2" />{" "}
 												Archive Created
 											</div>
@@ -371,7 +371,7 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												RECOMMENDED
 											</div>
 										) : null}
-										<div className="h-20 w-20 bg-blue-500/10 rounded-full flex items-center justify-center mb-6 text-4xl text-blue-400">
+										<div className="h-20 w-20 bg-red-500/10 rounded-full flex items-center justify-center mb-6 text-4xl text-hc-red">
 											<PhIcon className="ph-duotone ph-rocket-launch" />
 										</div>
 										<h3 className="text-2xl font-bold text-white mb-2">
@@ -643,12 +643,12 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													</td>
 													<td className="p-4 text-right">
 														{bucket.status === "AVAILABLE" ? (
-															<span className="text-blue-400 text-xs font-bold uppercase">
+															<span className="text-hc-red text-xs font-bold uppercase">
 																Create
 															</span>
 														) : null}
 														{bucket.status === "EXISTS" ? (
-															<span className="text-green-400 text-xs font-bold uppercase">
+															<span className="text-hc-red text-xs font-bold uppercase">
 																Exists
 															</span>
 														) : null}
@@ -697,7 +697,7 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									{logs.map((log) => (
 										<div
 											key={log.id}
-											className={`py-0.5 border-b border-white/5 last:border-0 ${log.type === "error" ? "text-red-400 font-bold bg-red-900/10" : log.type === "success" ? "text-green-400 font-bold" : "text-white/60"}`}
+											className={`py-0.5 border-b border-white/5 last:border-0 ${log.type === "error" ? "text-red-400 font-bold bg-red-900/10" : log.type === "success" ? "text-hc-red font-bold" : "text-white/60"}`}
 										>
 											<span className="opacity-30 mr-2">{log.time}</span>
 											<span>{log.msg}</span>

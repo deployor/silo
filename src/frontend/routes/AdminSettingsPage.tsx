@@ -172,7 +172,7 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							type="button"
 							onClick={save}
 							disabled={loading || saving}
-							className="bg-hc-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
+							className="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
 						>
 							{saving ? "Saving..." : "Save"}
 						</button>

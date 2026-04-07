@@ -285,7 +285,7 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				>
 					<div className="space-y-5">
 						<p className="text-sm text-text-muted">
-							This permanently deletes your account, all sessions, all buckets, and all stored files.
+							Delete account and all data.
 						</p>
 						<p className="text-sm text-text-muted">
 							Wait 10 seconds, type DELETE, then confirm.

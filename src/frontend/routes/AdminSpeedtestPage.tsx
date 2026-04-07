@@ -853,7 +853,7 @@ export function AdminSpeedtestPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 															<td className="px-4 py-2 text-white">
 																{row.downloadWarmMs.toFixed(1)} ms
 															</td>
-															<td className="px-4 py-2 text-hc-green">
+															<td className="px-4 py-2 text-hc-red">
 																{row.warmCacheHeader || "MISS"}
 															</td>
 														</tr>

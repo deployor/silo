@@ -194,7 +194,7 @@ export function AppShell({
 								) : null}
 								<a
 									href="/ysws"
-									className="silo-nav-link text-white hover:text-hc-green font-bold border border-white/20 rounded-lg bg-white/5 hover:bg-white/10"
+									className="silo-nav-link text-white hover:text-hc-red font-bold border border-white/20 rounded-lg bg-white/5 hover:bg-white/10"
 								>
 									YSWS
 								</a>
