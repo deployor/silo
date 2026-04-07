@@ -1651,7 +1651,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														disabled={bucketBusy || isDeepFrozen}
 														aria-label="Empty bucket"
 														title="Empty bucket"
-														className={`${iconActionBase} group text-amber-400 hover:text-amber-300`}
+														className={`${iconActionBase} group text-yellow-500 hover:text-yellow-400`}
 													>
 														<MdDeleteOutline className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1668,7 +1668,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														disabled={bucketBusy || isDeepFrozen}
 														aria-label="Delete bucket"
 														title="Delete bucket"
-													 className={`${iconActionBase} group text-red-400 hover:text-red-300`}
+														className={`${iconActionBase} group text-red-600 hover:text-red-500`}
 													>
 														<MdDeleteForever className="text-base" />
 														<span className={iconActionTooltip}>

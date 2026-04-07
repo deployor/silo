@@ -1241,7 +1241,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												query: "",
 											});
 										}}
-									 className="bg-yellow-500/35 text-yellow-100 border border-yellow-300/60 hover:bg-yellow-400/60 hover:text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors"
+									 className="bg-yellow-400 hover:bg-yellow-300 text-black px-4 py-3 rounded-xl text-sm font-bold transition-colors"
 									>
 										Clear
 									</button>
