@@ -42,13 +42,46 @@
     --color-sidebar-bg: #1c1c21;
     --color-text-main: #e0e6ed;
     --color-text-muted: #94a3b8;
+
+    --color-ink-strong: #f6f7fb;
+    --color-ink-soft: #c3cada;
+    --color-line: rgba(214, 225, 255, 0.16);
+    --color-panel: rgba(20, 23, 30, 0.8);
+    --color-panel-strong: rgba(13, 15, 20, 0.94);
+    --focus-ring: 0 0 0 3px rgba(51, 142, 218, 0.35);
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
   }
 }
 
 /* Common Styles */
 body {
-  background-color: var(--color-hc-darker);
+  background:
+    radial-gradient(circle at 12% -5%, rgba(51, 142, 218, 0.2), transparent 45%),
+    radial-gradient(circle at 85% 2%, rgba(236, 55, 80, 0.16), transparent 42%),
+    linear-gradient(180deg, #101218 0%, #11131a 42%, #101217 100%);
   color: var(--color-text-main);
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+a,
+button,
+input,
+textarea,
+select {
+  transition:
+    color 180ms var(--ease-out-quart),
+    background-color 180ms var(--ease-out-quart),
+    border-color 180ms var(--ease-out-quart),
+    box-shadow 180ms var(--ease-out-quart),
+    transform 180ms var(--ease-out-quart),
+    opacity 180ms var(--ease-out-quart);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 /* Alpine.js: prevent elements from flashing before hydration */
@@ -64,6 +97,94 @@ body {
 
 .card-shadow {
   box-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 0.3);
+}
+
+.silo-glass-nav {
+  backdrop-filter: blur(14px);
+  background: linear-gradient(
+    180deg,
+    rgba(19, 19, 22, 0.9) 0%,
+    rgba(19, 19, 22, 0.78) 100%
+  );
+  border-bottom-color: var(--color-line);
+}
+
+.silo-brand {
+  letter-spacing: -0.06em;
+  text-shadow: 0 0 20px rgba(236, 55, 80, 0.25);
+}
+
+.silo-nav-pill {
+  border: 1px solid rgba(236, 55, 80, 0.28);
+  background: rgba(236, 55, 80, 0.15);
+}
+
+.silo-nav-link {
+  color: var(--color-ink-soft);
+  border-radius: 10px;
+  padding: 0.4rem 0.5rem;
+}
+
+.silo-nav-link:hover {
+  color: var(--color-ink-strong);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.silo-hero {
+  position: relative;
+  isolation: isolate;
+}
+
+.silo-hero::before,
+.silo-hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.silo-hero::before {
+  width: min(40rem, 75vw);
+  height: min(40rem, 75vw);
+  top: -9rem;
+  left: -12rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(51, 142, 218, 0.16), transparent 68%);
+}
+
+.silo-hero::after {
+  width: min(34rem, 70vw);
+  height: min(34rem, 70vw);
+  right: -9rem;
+  bottom: -10rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(236, 55, 80, 0.16), transparent 66%);
+}
+
+.silo-cta {
+  border-radius: 999px;
+  padding: 0.72rem 1.25rem;
+  border: 1px solid transparent;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.silo-cta:hover {
+  transform: translateY(-1px);
+}
+
+.silo-stat-card {
+  background: linear-gradient(180deg, rgba(21, 24, 32, 0.75), rgba(17, 19, 26, 0.95));
+  border: 1px solid var(--color-line);
+  border-radius: 1rem;
+}
+
+.silo-range {
+  accent-color: var(--color-hc-red);
+}
+
+.silo-range:hover {
+  accent-color: #ff5d79;
 }
 
 /* Custom Scrollbar */
@@ -163,5 +284,16 @@ pre code {
   /* Tables: keep scrollable, but add some affordance */
   .overflow-x-auto {
     -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -2,6 +2,9 @@ import { AwsClient } from "aws4fetch";
 import { config } from "../config";
 
 const S3_TIMEOUT_MS = Number(process.env.S3_TIMEOUT_MS ?? "30000");
+const S3_MULTIPART_UPLOAD_TIMEOUT_MS = Number(
+	process.env.S3_MULTIPART_UPLOAD_TIMEOUT_MS ?? "300000",
+);
 
 export class HetznerS3Client {
 	private client: AwsClient;
@@ -64,8 +67,16 @@ export class HetznerS3Client {
 		let lastError: unknown;
 		for (let i = 0; i < retries; i++) {
 			try {
+				const requestUrl = new URL(baseUrl.toString());
+				const isMultipartUploadRequest =
+					init?.method === "PUT" &&
+					requestUrl.searchParams.has("uploadId") &&
+					requestUrl.searchParams.has("partNumber");
+				const timeoutMs = isMultipartUploadRequest
+					? S3_MULTIPART_UPLOAD_TIMEOUT_MS
+					: S3_TIMEOUT_MS;
 				const controller = new AbortController();
-				const timeoutId = setTimeout(() => controller.abort(), S3_TIMEOUT_MS);
+				const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
 				const headersObj: Record<string, string> = {};
 				if (init?.headers) {
@@ -105,7 +116,10 @@ export class HetznerS3Client {
 				lastError = e;
 				const error = e as Error;
 				if (error.name === "AbortError") {
-					console.error("Upstream S3 request timed out");
+					console.error("Upstream S3 request timed out", {
+						method: init?.method,
+						pathAndQuery,
+					});
 				}
 
 				if (i < retries - 1) {

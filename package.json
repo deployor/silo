@@ -6,6 +6,8 @@
 		"build:frontend": "vite build",
 		"build": "npm run build:frontend",
 		"start": "bun run src/index.ts",
+		"bench:cli": "bun run scripts/bench-cli/index.ts",
+		"bench:thorough": "bun run scripts/benchmark-s3-providers-thorough.ts",
 		"db:generate": "drizzle-kit generate:pg",
 		"db:push": "drizzle-kit push:pg",
 		"db:studio": "drizzle-kit studio",

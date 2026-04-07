@@ -500,8 +500,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</h1>
 								<p className="text-lg mb-6 text-text-muted leading-relaxed">
 									This page explains what Silo collects, why we collect it, how long
-									we keep it, and what controls you have. This policy is written in
-									plain language for users.
+									we keep it, and what controls you have.
 								</p>
 								<div className="space-y-8">
 									<div>
