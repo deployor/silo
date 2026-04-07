@@ -104,12 +104,6 @@ select {
 
 .silo-brand {
   letter-spacing: -0.06em;
-  text-shadow: 0 0 20px rgba(236, 55, 80, 0.25);
-}
-
-.silo-nav-pill {
-  border: 1px solid rgba(236, 55, 80, 0.28);
-  background: rgba(236, 55, 80, 0.15);
 }
 
 .silo-nav-link {

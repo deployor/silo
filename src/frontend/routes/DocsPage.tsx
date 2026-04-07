@@ -180,7 +180,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			<div className="flex flex-1 max-w-7xl mx-auto w-full">
 				<aside
 					id="docs-sidebar"
-					className={`fixed inset-0 z-40 bg-hc-dark p-6 overflow-y-auto transition-transform duration-300 ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 md:relative md:inset-auto md:w-64 md:block md:h-[calc(100vh-65px)] md:sticky md:top-[65px] md:border-r md:border-white/10`}
+					className={`fixed inset-0 z-40 bg-hc-dark p-4 overflow-y-auto transition-transform duration-300 ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 md:relative md:inset-auto md:w-56 md:block md:h-[calc(100vh-65px)] md:sticky md:top-[65px] md:border-r md:border-white/10`}
 				>
 					<div className="md:hidden flex justify-between items-center mb-6">
 						<span className="font-bold text-white">Navigation</span>
@@ -193,19 +193,19 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</button>
 					</div>
 
-					<div className="space-y-8">
+					<div className="space-y-6">
 						{groups.map(([group, groupSections]) => (
 							<div key={group}>
-								<h5 className="font-bold text-text-muted text-xs uppercase tracking-wider mb-3 pl-3">
+								<h5 className="font-bold text-text-muted text-[11px] uppercase tracking-wider mb-2 pl-2">
 									{group}
 								</h5>
-								<ul className="space-y-1 text-sm font-medium">
+								<ul className="space-y-0.5 text-[13px] font-medium">
 									{groupSections.map((s) => (
 										<li key={s.id}>
 											<button
 												type="button"
 												onClick={() => setSection(s.id)}
-												className={`text-left w-full transition-colors py-2 px-3 rounded-lg ${active === s.id ? "bg-white/10 text-white" : "text-text-muted hover:text-white"}`}
+												className={`text-left w-full transition-colors py-1.5 px-2 rounded-md ${active === s.id ? "bg-white/10 text-white" : "text-text-muted hover:text-white"}`}
 											>
 												{s.label}
 											</button>
