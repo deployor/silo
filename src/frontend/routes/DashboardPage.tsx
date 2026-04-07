@@ -1578,7 +1578,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														onClick={() => openCorsModal(bucket)}
 														aria-label="Configure CORS"
 														title="Configure CORS"
-													 className={`${iconActionBase} group text-lime-400 hover:text-lime-300`}
+														className={`${iconActionBase} group text-sky-400 hover:text-sky-300`}
 													>
 														<MdCode className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1592,7 +1592,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														onClick={() => openCollaborationModal(bucket)}
 														aria-label="Manage collaborators"
 														title="Manage collaborators"
-													 className={`${iconActionBase} group text-fuchsia-400 hover:text-fuchsia-300`}
+														className={`${iconActionBase} group text-violet-400 hover:text-violet-300`}
 													>
 														<MdGroups className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1651,7 +1651,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														disabled={bucketBusy || isDeepFrozen}
 														aria-label="Empty bucket"
 														title="Empty bucket"
-													 className={`${iconActionBase} group text-yellow-300 hover:text-yellow-200`}
+														className={`${iconActionBase} group text-amber-400 hover:text-amber-300`}
 													>
 														<MdDeleteOutline className="text-base" />
 														<span className={iconActionTooltip}>
