@@ -143,7 +143,7 @@ export function AdminYswsReviewPage({
 										</p>
 									</div>
 								) : (
-									<div className="bg-green-500/10 border border-green-500/20 text-green-400 p-4 rounded-lg flex items-center gap-2">
+									<div className="bg-red-500/10 border border-red-500/20 text-hc-red p-4 rounded-lg flex items-center gap-2">
 										<PhIcon className="ph ph-check text-lg" />
 										<span>No AI used. 100% Human Made.</span>
 									</div>
@@ -189,7 +189,7 @@ export function AdminYswsReviewPage({
 											submission.status === "pending"
 												? "text-yellow-400"
 												: submission.status === "approved"
-													? "text-green-400"
+													? "text-hc-red"
 													: "text-red-400"
 										}`}
 									>
@@ -274,7 +274,7 @@ export function AdminYswsReviewPage({
 											type="submit"
 											name="action"
 											value="approve"
-											className="w-full bg-green-500/10 hover:bg-green-500/20 text-green-500 border border-green-500/20 py-2 rounded text-sm font-bold transition-colors"
+											className="w-full bg-red-500/10 hover:bg-red-500/20 text-hc-red border border-red-500/20 py-2 rounded text-sm font-bold transition-colors"
 										>
 											Approve
 										</button>
@@ -302,7 +302,7 @@ export function AdminYswsReviewPage({
 									{(submission.tierBonusPercent || 0) > 0 ? (
 										<div className="flex justify-between">
 											<span className="text-text-muted">Tier Bonus</span>
-											<span className="text-green-400 font-bold font-mono">
+											<span className="text-hc-red font-bold font-mono">
 												+{submission.tierBonusPercent}%
 											</span>
 										</div>
@@ -310,7 +310,7 @@ export function AdminYswsReviewPage({
 									{(submission.adminBonusPercent || 0) > 0 ? (
 										<div className="flex justify-between">
 											<span className="text-text-muted">Admin Bonus</span>
-											<span className="text-green-400 font-bold font-mono">
+											<span className="text-hc-red font-bold font-mono">
 												+{submission.adminBonusPercent}%
 											</span>
 										</div>

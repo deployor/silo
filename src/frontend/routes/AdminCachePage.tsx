@@ -98,7 +98,7 @@ export function AdminCachePage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				<div className="p-6 border-b border-white/10 flex justify-between items-start gap-4 flex-wrap">
 					<div>
 						<h2 className="text-xl font-bold text-white flex items-center gap-2">
-							<PhIcon className="ph ph-database text-hc-blue" />
+							<PhIcon className="ph ph-database text-hc-red" />
 							Cache Observability
 						</h2>
 						<p className="text-text-muted text-sm mt-1">
@@ -181,7 +181,7 @@ export function AdminCachePage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											</div>
 											<div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
 												<div
-													className="bg-hc-blue rounded-full h-2 transition-all duration-500"
+													className="bg-hc-red rounded-full h-2 transition-all duration-500"
 													style={{
 														width: `${stats.disk?.capacityPercentNum || 0}%`,
 													}}
@@ -204,7 +204,7 @@ export function AdminCachePage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 							<div className="bg-black/30 p-6 rounded-xl border border-white/10 mb-6">
 								<h3 className="text-white font-bold mb-4 flex items-center gap-2">
-									<PhIcon className="ph ph-key text-hc-blue" />
+									<PhIcon className="ph ph-key text-hc-red" />
 									Redis Key Breakdown
 								</h3>
 								<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -253,7 +253,7 @@ export function AdminCachePage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														{obj.key}
 													</td>
 													<td className="py-2">
-														<span className="px-2 py-0.5 bg-hc-blue/20 text-hc-blue rounded text-xs font-mono">
+														<span className="px-2 py-0.5 bg-hc-red/20 text-hc-red rounded text-xs font-mono">
 															{obj.hits}
 														</span>
 													</td>
@@ -263,7 +263,7 @@ export function AdminCachePage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													<td className="py-2">
 														<div className="flex items-center gap-2 text-xs">
 															{obj.cachedInRedis ? (
-																<span className="inline-flex items-center gap-1 rounded border border-hc-blue/30 bg-hc-blue/10 px-2 py-1 text-hc-blue">
+																<span className="inline-flex items-center gap-1 rounded border border-hc-red/30 bg-hc-red/10 px-2 py-1 text-hc-red">
 																	<PhIcon className="ph ph-lightning text-[11px]" />
 																	Redis
 																</span>
@@ -320,7 +320,7 @@ function StatCard({
 	return (
 		<div className="bg-black/30 p-6 rounded-xl border border-white/10">
 			<div className="flex items-center gap-2 mb-4">
-				<PhIcon className={`ph ${icon} text-hc-blue text-xl`} />
+				<PhIcon className={`ph ${icon} text-hc-red text-xl`} />
 				<h3 className="text-white font-semibold">{title}</h3>
 			</div>
 			<div className="space-y-3">

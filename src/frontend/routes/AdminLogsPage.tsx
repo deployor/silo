@@ -58,7 +58,7 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const limit = 50;
 
 	const methodColor = (m: string) => {
-		if (m === "GET") return "text-blue-400";
+		if (m === "GET") return "text-hc-red";
 		if (m === "PUT") return "text-yellow-400";
 		if (m === "DELETE") return "text-red-400";
 		return "text-white";
@@ -221,7 +221,7 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<button
 									type="button"
 									onClick={() => loadLogs(true)}
-									className="bg-hc-blue hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+									className="bg-hc-red hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
 								>
 									Apply
 								</button>
@@ -335,7 +335,7 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<button
 											type="button"
 											onClick={() => setSelected(log)}
-											className="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider"
+											className="text-hc-red hover:text-hc-red text-xs font-bold uppercase tracking-wider"
 										>
 											View
 										</button>

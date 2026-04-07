@@ -80,7 +80,7 @@ export function YswsListPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							onClick={() => setTab("my-ships")}
 							className={`px-6 py-2 rounded-md font-bold transition-all text-sm flex items-center gap-2 ${
 								activeTab === "my-ships"
-									? "bg-hc-blue text-white shadow-sm"
+									? "bg-hc-red text-white shadow-sm"
 									: "text-white/60 hover:text-white hover:bg-white/5"
 							}`}
 						>
@@ -91,7 +91,7 @@ export function YswsListPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							onClick={() => setTab("gallery")}
 							className={`px-6 py-2 rounded-md font-bold transition-all text-sm flex items-center gap-2 ${
 								activeTab === "gallery"
-									? "bg-hc-green text-white shadow-sm"
+									? "bg-hc-red text-white shadow-sm"
 									: "text-white/60 hover:text-white hover:bg-white/5"
 							}`}
 						>
@@ -101,13 +101,13 @@ export function YswsListPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				</div>
 
 				{p.success && activeTab === "my-ships" ? (
-					<div className="mb-8 bg-green-500/10 border border-green-500/20 rounded-xl p-4 flex items-center gap-4">
-						<div className="bg-green-500/20 p-2 rounded-full">
-							<PhIcon className="ph-bold ph-check text-green-400" />
+					<div className="mb-8 bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-4">
+						<div className="bg-red-500/20 p-2 rounded-full">
+							<PhIcon className="ph-bold ph-check text-hc-red" />
 						</div>
 						<div>
-							<h3 className="font-bold text-green-400">Submission Received!</h3>
-							<p className="text-green-300/80 text-sm">
+							<h3 className="font-bold text-hc-red">Submission Received!</h3>
+							<p className="text-red-300/80 text-sm">
 								Your project is in the queue.
 							</p>
 						</div>
@@ -149,7 +149,7 @@ function MyShips({ submissions }: { submissions: Submission[] }) {
 		if (status === "pending")
 			return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
 		if (status === "approved")
-			return "bg-green-500/10 text-green-500 border-green-500/20";
+			return "bg-red-500/10 text-hc-red border-red-500/20";
 		return "bg-red-500/10 text-red-500 border-red-500/20";
 	};
 
@@ -187,7 +187,7 @@ function MyShips({ submissions }: { submissions: Submission[] }) {
 										)}
 									</div>
 									<div>
-										<div className="font-bold text-white group-hover:text-hc-blue transition-colors">
+										<div className="font-bold text-white group-hover:text-hc-red transition-colors">
 											{s.projectName}
 										</div>
 										<div className="text-xs text-text-muted max-w-xs truncate">
@@ -209,7 +209,7 @@ function MyShips({ submissions }: { submissions: Submission[] }) {
 									<span>{s.hoursSpent || 0}h</span>
 									<div className="flex flex-wrap gap-1">
 										{(s.tierBonusPercent || 0) > 0 ? (
-											<div className="inline-flex items-center gap-1 text-[10px] text-hc-green border border-hc-green/30 bg-hc-green/10 px-1.5 py-0.5 rounded">
+											<div className="inline-flex items-center gap-1 text-[10px] text-hc-red border border-hc-red/30 bg-hc-red/10 px-1.5 py-0.5 rounded">
 												+{s.tierBonusPercent}%
 											</div>
 										) : null}
@@ -297,7 +297,7 @@ function GalleryTab({ projects }: { projects: GalleryProject[] }) {
 							</div>
 						)}
 						<div className="absolute top-3 right-3 bg-black/80 backdrop-blur-sm border border-white/10 rounded px-2 py-1 text-xs font-mono text-white flex items-center gap-1.5 shadow-sm">
-							<PhIcon className="ph-fill ph-check-circle text-hc-green" />
+							<PhIcon className="ph-fill ph-check-circle text-hc-red" />
 							{item.hoursSpent || 0}h
 						</div>
 					</a>
@@ -308,7 +308,7 @@ function GalleryTab({ projects }: { projects: GalleryProject[] }) {
 								href={item.demoUrl}
 								target="_blank"
 								rel="noreferrer"
-								className="text-lg font-bold text-white hover:text-hc-blue transition-colors line-clamp-1"
+								className="text-lg font-bold text-white hover:text-hc-red transition-colors line-clamp-1"
 							>
 								{item.projectName}
 							</a>

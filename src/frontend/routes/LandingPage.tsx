@@ -95,11 +95,11 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</p>
 						</div>
 						<div className="silo-stat-card p-5">
-							<h3 className="font-mono text-hc-blue mb-2">02 / FAST</h3>
+							<h3 className="font-mono text-hc-red mb-2">02 / FAST</h3>
 							<p className="text-sm text-text-muted">Built on Cloudflare R2.</p>
 						</div>
 						<div className="silo-stat-card p-5">
-							<h3 className="font-mono text-green-500 mb-2">03 / FREE</h3>
+							<h3 className="font-mono text-hc-red mb-2">03 / FREE</h3>
 							<p className="text-sm text-text-muted">
 								Start with free object storage. Ship projects to unlock more
 								quota.
@@ -157,7 +157,7 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											Permanent storage added to your account
 										</p>
 										{tier > 0 ? (
-											<p className="text-xs text-green-300 font-bold mt-2">
+											<p className="text-xs text-red-300 font-bold mt-2">
 												+{tier}% Bonus Applied!
 											</p>
 										) : null}

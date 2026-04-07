@@ -88,7 +88,7 @@ export function AdminRedemptionDetailsPage({
 						<button
 							type="button"
 							onClick={() => setOpen(true)}
-							className="px-4 py-2 bg-hc-blue text-white text-sm font-bold rounded-lg hover:bg-blue-600 transition-colors shadow-lg shadow-blue-900/20"
+							className="px-4 py-2 bg-hc-red text-white text-sm font-bold rounded-lg hover:bg-red-600 transition-colors shadow-lg shadow-red-900/20"
 						>
 							Generate Codes
 						</button>
@@ -176,7 +176,7 @@ export function AdminRedemptionDetailsPage({
 														`https://silo.deployor.dev/redeem?code=${code.code}`,
 													)
 												}
-												className="text-hc-blue hover:text-blue-400 font-bold uppercase tracking-wider text-[10px]"
+												className="text-hc-red hover:text-hc-red font-bold uppercase tracking-wider text-[10px]"
 											>
 												Copy Link
 											</button>
@@ -232,7 +232,7 @@ export function AdminRedemptionDetailsPage({
 								</button>
 								<button
 									type="submit"
-									className="bg-hc-blue hover:bg-blue-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all"
+									className="bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all"
 								>
 									Generate
 								</button>

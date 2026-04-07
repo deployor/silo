@@ -183,7 +183,7 @@ function StatusBadges({ user }: { user: UserRow }) {
 			<span
 				key="locked"
 				title={`Account Manually Locked${user.lockReason ? `: ${user.lockReason}` : ""}`}
-				className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded text-xs font-bold border border-blue-500/30"
+				className="bg-red-500/20 text-hc-red px-2 py-0.5 rounded text-xs font-bold border border-red-500/30"
 			>
 				LOCKED
 			</span>,
@@ -926,7 +926,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										</div>
 										<div className="w-24 bg-white/10 rounded-full h-1.5 mt-1 overflow-hidden">
 											<div
-												className="bg-hc-blue h-1.5 rounded-full"
+												className="bg-hc-red h-1.5 rounded-full"
 												style={{
 													width: `${Math.min((u.storageUsageBytes / (u.storageLimitBytes || 1)) * 100, 100)}%`,
 												}}
@@ -967,7 +967,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<td className="px-6 py-4 text-right">
 										<button
 											type="button"
-											className="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider"
+											className="text-hc-red hover:text-hc-red text-xs font-bold uppercase tracking-wider"
 										>
 											Manage
 										</button>
@@ -1033,7 +1033,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										type="button"
 										onClick={updateStorageQuota}
 										disabled={isQuotaLoading}
-										className="bg-hc-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold"
+										className="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold"
 									>
 										{isQuotaLoading ? "Updating..." : "Update"}
 									</button>
@@ -1046,7 +1046,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</p>
 								<div className="w-full bg-white/10 rounded-full h-1.5 mt-2 overflow-hidden">
 									<div
-										className="bg-hc-blue h-1.5 rounded-full"
+										className="bg-hc-red h-1.5 rounded-full"
 										style={{ width: `${selectedStoragePercent}%` }}
 									/>
 								</div>
@@ -1101,7 +1101,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										type="button"
 										onClick={updateEgressQuota}
 										disabled={isQuotaLoading}
-										className="bg-hc-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold w-full"
+										className="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold w-full"
 									>
 										{isQuotaLoading ? "Updating..." : "Update Egress Limit"}
 									</button>
@@ -1182,7 +1182,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</div>
 
 							<div className="bg-red-500/10 p-6 rounded-xl border border-red-500/20">
-								<h4 className="text-red-400 font-bold mb-4">Danger Zone</h4>
+								<h4 className="text-red-400 font-bold mb-4">Offboarding</h4>
 								<button
 									type="button"
 									disabled={!!selected.markedAsOverAge}
@@ -1202,10 +1202,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										</span>
 									) : null}
 								</button>
-								<p className="text-[11px] text-red-300/60 mt-2">
-									Triggers offboarding flow: Slack notification, 2-month grace
-									period, then deletion.
-								</p>
+								<p className="text-[11px] text-red-300/60 mt-2">Starts offboarding.</p>
 							</div>
 						</div>
 
@@ -1393,7 +1390,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													type="button"
 													onClick={() => openKeyNoteModal(k)}
 													disabled={!!bucketActionLoading}
-													className="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider"
+													className="text-hc-red hover:text-hc-red text-xs font-bold uppercase tracking-wider"
 												>
 													Note
 												</button>
@@ -1426,7 +1423,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								href={`/dashboard/buckets/${selectedBucketDetails.name}`}
 								target="_blank"
 								rel="noreferrer"
-								className="text-hc-blue hover:text-blue-400 text-sm font-bold flex items-center gap-1"
+								className="text-hc-red hover:text-hc-red text-sm font-bold flex items-center gap-1"
 							>
 								Open File Explorer <MdOpenInNew className="text-base" />
 							</a>
@@ -1458,7 +1455,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													href={f.url}
 													target="_blank"
 													rel="noreferrer"
-													className="text-hc-blue hover:text-blue-400 text-xs font-bold uppercase tracking-wider"
+													className="text-hc-red hover:text-hc-red text-xs font-bold uppercase tracking-wider"
 												>
 													View
 												</a>
@@ -1553,7 +1550,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								)
 							}
 							placeholder="Add internal admin note for this key"
-							className="w-full min-h-32 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-blue resize-y"
+							className="w-full min-h-32 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red resize-y"
 						/>
 						<div className="flex justify-end gap-3">
 							<button
@@ -1568,7 +1565,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								type="button"
 								onClick={saveKeyNote}
 								disabled={keyNoteLoading}
-								className="bg-hc-blue hover:bg-blue-600 text-white px-4 py-2.5 rounded-lg text-sm font-bold disabled:opacity-50"
+								className="bg-hc-red hover:bg-red-600 text-white px-4 py-2.5 rounded-lg text-sm font-bold disabled:opacity-50"
 							>
 								{keyNoteLoading ? "Saving..." : "Save Note"}
 							</button>

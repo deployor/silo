@@ -173,7 +173,7 @@ export function YswsSubmitPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					<p className="text-xl text-white/60">
 						Ship your projects, earn more storage. Simple as that.
 					</p>
-					<p className="mt-4 text-sm text-hc-green bg-hc-green/10 border border-hc-green/20 rounded-full px-4 py-1 inline-block">
+					<p className="mt-4 text-sm text-hc-red bg-hc-red/10 border border-hc-red/20 rounded-full px-4 py-1 inline-block">
 						Earn {p.quotaPerHourFormatted || formatBytes(quotaPerHour)} per hour
 						tracked on Hackatime
 					</p>
@@ -453,7 +453,7 @@ export function YswsSubmitPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												value={search}
 												onChange={(e) => setSearch(e.target.value)}
 												placeholder="Search projects..."
-												className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-hc-blue placeholder-white/20"
+												className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-hc-red placeholder-white/20"
 											/>
 										</div>
 										<div className="overflow-y-auto flex-1 p-1 scrollbar-thin">
@@ -489,7 +489,7 @@ export function YswsSubmitPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																</div>
 															</div>
 														</div>
-														<div className="text-xs font-mono text-hc-green bg-hc-green/10 px-2 py-0.5 rounded">
+														<div className="text-xs font-mono text-hc-red bg-hc-red/10 px-2 py-0.5 rounded">
 															{formatBytes(project.hours * quotaPerHour)}
 														</div>
 													</button>
@@ -520,7 +520,7 @@ export function YswsSubmitPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									style={{ display: activeTierBonus > 0 ? "flex" : "none" }}
 								>
 									<span className="text-sm text-text-muted">Tier Bonus:</span>
-									<span className="text-sm font-bold text-hc-green">
+									<span className="text-sm font-bold text-hc-red">
 										+{activeTierBonus}%
 									</span>
 								</div>
@@ -528,7 +528,7 @@ export function YswsSubmitPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<span className="text-sm font-bold text-white">
 										Total Reward:
 									</span>
-									<span className="text-sm font-bold text-hc-green">
+									<span className="text-sm font-bold text-hc-red">
 										{formatBytes(totalRewardBytes)}
 									</span>
 								</div>
@@ -589,7 +589,7 @@ export function YswsSubmitPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</div>
 
 								<div
-									className={`text-center p-4 rounded-lg border mt-5 ${isRejected ? "border-red-500/50 bg-red-500/10" : aiLevel === 0 ? "border-hc-green/30 bg-hc-green/10" : "border-white/10 bg-white/5"}`}
+									className={`text-center p-4 rounded-lg border mt-5 ${isRejected ? "border-red-500/50 bg-red-500/10" : aiLevel === 0 ? "border-hc-red/30 bg-hc-red/10" : "border-white/10 bg-white/5"}`}
 								>
 									<h4 className="font-bold text-lg text-white">{aiLabel}</h4>
 									<p className="text-sm text-text-muted">{aiDescription}</p>

@@ -1203,20 +1203,20 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											? "Search inside this folder"
 											: "Search entire bucket"
 									}
-								 className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue flex-1"
+								 className="bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-red flex-1"
 								/>
 								<div className="inline-flex rounded-xl border border-white/10 overflow-hidden bg-black/20">
 									<button
 										type="button"
 										onClick={() => setSearchScope("current")}
-									 className={`px-4 py-3 text-sm font-bold transition-colors ${searchScope === "current" ? "bg-hc-blue text-white" : "text-text-muted hover:text-white"}`}
+									 className={`px-4 py-3 text-sm font-bold transition-colors ${searchScope === "current" ? "bg-hc-red text-white" : "text-text-muted hover:text-white"}`}
 									>
 										This folder
 									</button>
 									<button
 										type="button"
 										onClick={() => setSearchScope("all")}
-									 className={`px-4 py-3 text-sm font-bold transition-colors ${searchScope === "all" ? "bg-hc-blue text-white" : "text-text-muted hover:text-white"}`}
+									 className={`px-4 py-3 text-sm font-bold transition-colors ${searchScope === "all" ? "bg-hc-red text-white" : "text-text-muted hover:text-white"}`}
 									>
 										Everywhere
 									</button>
@@ -1353,7 +1353,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												 className="rounded border-white/10 bg-black/30"
 												/>
 											</td>
-											<td className="px-4 py-4 text-hc-blue">
+											<td className="px-4 py-4 text-hc-red">
 												<PhIcon className="ph ph-folder-open text-xl" />
 											</td>
 											<td className="px-4 py-3.5 font-medium text-white font-mono">
@@ -1366,7 +1366,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 															query: "",
 														})
 													}
-												 className="hover:text-hc-blue"
+												 className="hover:text-hc-red"
 												>
 													{folder.name}
 												</button>
@@ -1437,7 +1437,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														<button
 															type="button"
 															onClick={() => void openPreview(file)}
-														 className="text-hc-blue hover:text-blue-400 text-xs font-medium"
+														 className="text-hc-red hover:text-hc-red text-xs font-medium"
 														>
 															Preview
 														</button>
@@ -1882,10 +1882,8 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			>
 				<div className="space-y-4">
 					<p className="text-text-muted">
-						This action permanently deletes{" "}
-						<span className="text-white">{deleteTargets.length}</span> file
-						{deleteTargets.length === 1 ? "" : "s"} and updates storage
-						accounting.
+						Delete <span className="text-white">{deleteTargets.length}</span> file
+						{deleteTargets.length === 1 ? "" : "s"}.
 					</p>
 					<div className="max-h-48 overflow-auto rounded-2xl border border-white/10 bg-black/20 p-3 space-y-2">
 						{deleteTargets.map((key) => (
@@ -1988,7 +1986,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						onKeyDown={(event) => {
 							if (event.key === "Enter") void submitRename();
 						}}
-					 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue"
+					 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-red"
 					/>
 					<div className="flex justify-end gap-3">
 						<button
@@ -2035,7 +2033,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							if (event.key === "Enter") void submitMove();
 						}}
 						placeholder="folder/subfolder/"
-					 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue"
+					 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-red"
 					/>
 					<div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
 						<div className="flex items-center gap-2 text-sm font-mono overflow-x-auto whitespace-nowrap">
@@ -2132,7 +2130,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								value={uploadPrefix}
 								onChange={(event) => setUploadPrefix(event.target.value)}
 								placeholder="folder/subfolder/"
-							 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-blue"
+							 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-hc-red"
 							/>
 						</div>
 						<div className="flex items-end">
@@ -2242,7 +2240,7 @@ export function FilesPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													[mapKey]: event.target.value,
 												}))
 											}
-										 className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-hc-blue font-mono"
+										 className="w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-hc-red font-mono"
 										/>
 									</div>
 								);

@@ -323,7 +323,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														Permanent storage added to your account
 													</p>
 													{activeTierBonus > 0 ? (
-														<p className="text-xs text-hc-green font-bold">
+														<p className="text-xs text-hc-red font-bold">
 															+{activeTierBonus}% Bonus Applied!
 														</p>
 													) : null}
@@ -662,7 +662,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</button>
 									{reportStatus.type !== "idle" ? (
 										<p
-											className={`text-sm ${reportStatus.type === "success" ? "text-green-300" : "text-red-300"}`}
+											className={`text-sm ${reportStatus.type === "success" ? "text-red-300" : "text-red-300"}`}
 										>
 											{reportStatus.message}
 										</p>
@@ -687,38 +687,38 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										</h3>
 										<ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-text-muted font-mono text-sm">
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span> ListBuckets{" "}
+												<span className="text-hc-red">✓</span> ListBuckets{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(GET /)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span> HeadBucket{" "}
+												<span className="text-hc-red">✓</span> HeadBucket{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(HEAD /bucket)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span>{" "}
+												<span className="text-hc-red">✓</span>{" "}
 												GetBucketLocation{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(GET /bucket?location)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span> PutBucketCors{" "}
+												<span className="text-hc-red">✓</span> PutBucketCors{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(PUT /bucket?cors)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span> GetBucketCors{" "}
+												<span className="text-hc-red">✓</span> GetBucketCors{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(GET /bucket?cors)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span>{" "}
+												<span className="text-hc-red">✓</span>{" "}
 												DeleteBucketCors{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(DELETE /bucket?cors)
@@ -733,43 +733,43 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										</h3>
 										<ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-text-muted font-mono text-sm">
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span> PutObject{" "}
+												<span className="text-hc-red">✓</span> PutObject{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(PUT /bucket/key)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span> GetObject{" "}
+												<span className="text-hc-red">✓</span> GetObject{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(GET /bucket/key)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span> HeadObject{" "}
+												<span className="text-hc-red">✓</span> HeadObject{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(HEAD /bucket/key)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span> DeleteObject{" "}
+												<span className="text-hc-red">✓</span> DeleteObject{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(DELETE /bucket/key)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span> CopyObject{" "}
+												<span className="text-hc-red">✓</span> CopyObject{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(PUT /bucket/key + x-amz-copy-source)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span> ListObjectsV2{" "}
+												<span className="text-hc-red">✓</span> ListObjectsV2{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(GET /bucket?list-type=2)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span> DeleteObjects{" "}
+												<span className="text-hc-red">✓</span> DeleteObjects{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(POST /bucket?delete)
 												</span>
@@ -786,41 +786,41 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										</p>
 										<ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-text-muted font-mono text-sm">
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span>{" "}
+												<span className="text-hc-red">✓</span>{" "}
 												CreateMultipartUpload{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(POST /bucket/key?uploads)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span> UploadPart{" "}
+												<span className="text-hc-red">✓</span> UploadPart{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(PUT /bucket/key?partNumber&uploadId)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span>{" "}
+												<span className="text-hc-red">✓</span>{" "}
 												CompleteMultipartUpload{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(POST /bucket/key?uploadId)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span>{" "}
+												<span className="text-hc-red">✓</span>{" "}
 												AbortMultipartUpload{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(DELETE /bucket/key?uploadId)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span>{" "}
+												<span className="text-hc-red">✓</span>{" "}
 												ListMultipartUploads{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(GET /bucket?uploads)
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-green-400">✓</span> ListParts{" "}
+												<span className="text-hc-red">✓</span> ListParts{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(GET /bucket/key?uploadId)
 												</span>
@@ -992,7 +992,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<h3 className="text-lg font-bold text-white mb-2">
 											Endpoint URL
 										</h3>
-										<code className="text-hc-blue">
+										<code className="text-hc-red">
 											https://silo.deployor.dev
 										</code>
 									</div>
@@ -1032,9 +1032,9 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												</span>
 												<span className="text-white">
 													https://
-													<span className="text-hc-blue">{"{bucket}"}</span>
+													<span className="text-hc-red">{"{bucket}"}</span>
 													.silo.deployor.dev/
-													<span className="text-green-400">{"{key}"}</span>
+													<span className="text-hc-red">{"{key}"}</span>
 												</span>
 											</div>
 											<div className="flex flex-col gap-1 mt-4">
@@ -1043,8 +1043,8 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												</span>
 												<span className="text-white">
 													https://silo.deployor.dev/
-													<span className="text-hc-blue">{"{bucket}"}</span>/
-													<span className="text-green-400">{"{key}"}</span>
+													<span className="text-hc-red">{"{bucket}"}</span>/
+													<span className="text-hc-red">{"{key}"}</span>
 												</span>
 											</div>
 										</div>
@@ -1123,8 +1123,8 @@ aws s3 ls s3://my-bucket --endpoint-url https://silo.deployor.dev --profile silo
 									The best way to interact with Silo in JavaScript/TypeScript is
 									using the official AWS SDK v3.
 								</p>
-								<div className="bg-hc-blue/10 border border-hc-blue/20 p-4 rounded-lg mb-8">
-									<h4 className="text-hc-blue font-bold mb-2">Quick Start</h4>
+								<div className="bg-hc-red/10 border border-hc-red/20 p-4 rounded-lg mb-8">
+									<h4 className="text-hc-red font-bold mb-2">Quick Start</h4>
 									<p className="text-sm text-text-muted">
 										Don't want to read? Copy the initialization code and start
 										shipping.
@@ -1436,43 +1436,43 @@ func main() {
 								</p>
 								<ol className="list-decimal list-inside space-y-2 text-text-muted mb-6 font-mono text-sm bg-black/20 p-4 rounded-lg">
 									<li>
-										<span className="text-hc-blue">n</span> (New remote)
+										<span className="text-hc-red">n</span> (New remote)
 									</li>
 									<li>
-										name: <span className="text-hc-blue">silo</span>
+										name: <span className="text-hc-red">silo</span>
 									</li>
 									<li>
-										Storage: <span className="text-hc-blue">s3</span>
+										Storage: <span className="text-hc-red">s3</span>
 									</li>
 									<li>
-										Provider: <span className="text-hc-blue">Other</span>
+										Provider: <span className="text-hc-red">Other</span>
 									</li>
 									<li>
-										env_auth: <span className="text-hc-blue">false</span>
+										env_auth: <span className="text-hc-red">false</span>
 									</li>
 									<li>
 										access_key_id:{" "}
-										<span className="text-hc-blue">
+										<span className="text-hc-red">
 											[Paste your Access Key]
 										</span>
 									</li>
 									<li>
 										secret_access_key:{" "}
-										<span className="text-hc-blue">
+										<span className="text-hc-red">
 											[Paste your Secret Key]
 										</span>
 									</li>
 									<li>
-										region: <span className="text-hc-blue">auto</span>
+										region: <span className="text-hc-red">auto</span>
 									</li>
 									<li>
 										endpoint:{" "}
-										<span className="text-hc-blue">
+										<span className="text-hc-red">
 											https://silo.deployor.dev
 										</span>
 									</li>
 									<li>
-										acl: <span className="text-hc-blue">private</span>
+										acl: <span className="text-hc-red">private</span>
 									</li>
 								</ol>
 								<h3 className="text-lg font-bold text-white mb-3">

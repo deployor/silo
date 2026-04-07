@@ -266,7 +266,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const buttonBase =
 		"inline-flex items-center justify-center gap-2 rounded-xl border text-sm font-bold transition-colors";
 	const buttonPrimaryBlue =
-		"bg-hc-blue hover:bg-blue-600 border-hc-blue text-white px-6 py-3";
+		"bg-hc-red hover:bg-red-600 border-hc-red text-white px-6 py-3";
 	const buttonPrimaryRed =
 		"bg-hc-red hover:bg-red-600 border-hc-red text-white px-6 py-3";
 	const buttonNeutral =
@@ -436,7 +436,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			confirmLabel: isPublic ? "Make Public" : "Make Private",
 			confirmClassName: isPublic
 				? "bg-hc-red hover:bg-red-600 border-hc-red text-white"
-				: "bg-hc-blue hover:bg-blue-600 border-hc-blue text-white",
+				: "bg-hc-red hover:bg-red-600 border-hc-red text-white",
 			pendingKey: `visibility:${bucketName}`,
 			publicRiskWarning: showPublicWarningWizard,
 			confirmDelaySeconds: isPublic ? 5 : 0,
@@ -1533,7 +1533,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														<span
 														 className={`relative h-6 w-11 rounded-full border transition-colors ${
 																bucket.isPublic
-																	? "bg-hc-blue/80 border-hc-blue"
+																	? "bg-hc-red/80 border-hc-red"
 																	: "bg-white/10 border-white/20"
 															}`}
 														>
@@ -1564,7 +1564,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														href={`/dashboard/buckets/${bucket.name}`}
 														aria-label="Open bucket files"
 														title="Open bucket files"
-													 className={`${iconActionBase} group text-hc-blue hover:text-blue-300 hover:bg-hc-blue/10`}
+													 className={`${iconActionBase} group text-hc-red hover:text-red-300 hover:bg-hc-red/10`}
 													>
 														<MdFolderOpen className="text-base" />
 														<span className={iconActionTooltip}>
@@ -2345,7 +2345,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																		setEditingKeyNote(null);
 																	}
 																}}
-															 className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-hc-blue"
+															 className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-hc-red"
 															/>
 															<button
 															 type="button"
@@ -2578,7 +2578,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									)
 								}
 								placeholder="Optional note for this key"
-							 className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-blue focus:ring-1 focus:ring-hc-blue transition-colors resize-y"
+							 className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red transition-colors resize-y"
 							/>
 						</div>
 						{keyCreateModal.error ? (
@@ -2620,7 +2620,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div className="bg-black/30 rounded-xl border border-white/10 overflow-hidden mb-6">
 							<div className="px-4 py-3 border-b border-white/10 bg-white/[0.02]">
 								<p className="text-text-muted text-sm flex items-start gap-2">
-									<MdInfoOutline className="text-hc-blue text-base mt-0.5" />
+									<MdInfoOutline className="text-hc-red text-base mt-0.5" />
 									<span>
 										Configure CORS as a JSON array of rules. Invalid JSON or
 										missing fields will be rejected.
@@ -2633,7 +2633,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									setCorsEditor(e.target.value);
 									setCorsError(null);
 								}}
-							 className="w-full h-64 bg-black/40 p-4 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-hc-blue/40 resize-none"
+							 className="w-full h-64 bg-black/40 p-4 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-hc-red/40 resize-none"
 							/>
 						</div>
 
@@ -2774,7 +2774,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									Public URL Example
 								</p>
 								<div className="flex items-center gap-2 bg-black/20 rounded-lg p-2 border border-white/5 hover:border-white/10 transition-colors">
-									<div className="font-mono text-sm select-all text-hc-blue overflow-x-auto whitespace-nowrap scrollbar-thin flex-1">
+									<div className="font-mono text-sm select-all text-hc-red overflow-x-auto whitespace-nowrap scrollbar-thin flex-1">
 										{credentialModal.publicUrl}
 									</div>
 									<button

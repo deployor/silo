@@ -76,7 +76,7 @@ export function GalleryPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										</div>
 									)}
 									<div className="absolute top-3 right-3 bg-black/80 backdrop-blur-sm border border-white/10 rounded px-2 py-1 text-xs font-mono text-white flex items-center gap-1.5 shadow-sm">
-										<PhIcon className="ph-fill ph-check-circle text-hc-green" />{" "}
+										<PhIcon className="ph-fill ph-check-circle text-hc-red" />{" "}
 										{item.hoursSpent || 0}h
 									</div>
 								</a>
@@ -86,7 +86,7 @@ export function GalleryPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											href={item.demoUrl}
 											target="_blank"
 											rel="noreferrer"
-											className="text-lg font-bold text-white hover:text-hc-blue transition-colors line-clamp-1"
+											className="text-lg font-bold text-white hover:text-hc-red transition-colors line-clamp-1"
 										>
 											{item.projectName}
 										</a>
