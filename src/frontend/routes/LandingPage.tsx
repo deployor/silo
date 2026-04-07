@@ -39,18 +39,14 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		>
 			<div className="silo-hero flex flex-col items-center font-sans w-full min-h-[80vh] justify-center">
 				<div className="w-full max-w-5xl mx-auto text-center px-4 sm:px-6">
-					<p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-text-muted mb-6">
-						<span className="h-1.5 w-1.5 rounded-full bg-hc-red" />
-						S3-compatible storage for Hack Club
-					</p>
 					<h1 className="text-6xl sm:text-7xl md:text-9xl font-bold mb-3 italic tracking-tighter text-white select-none leading-[0.95]">
 						SILO
 					</h1>
 					<h2 className="sr-only">
-						Free S3 Compatible Object Storage for YSWS
+						Free S3 Compatible Object Storage for Teens YSWS
 					</h2>
 					<p className="text-xl md:text-3xl text-text-muted mb-10 max-w-3xl mx-auto font-light leading-tight md:leading-tight">
-						The YSWS object storage thing.
+						S3 storage for teens in YSWS.
 						<br />
 						<span className="text-white font-normal">
 							Build projects. Get free S3 buckets.
@@ -60,9 +56,9 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					<div className="flex flex-wrap gap-3 justify-center items-center">
 						<a
 							href="/auth/login"
-							className="silo-cta text-white bg-hc-red/85 hover:bg-hc-red border-hc-red/70 shadow-[0_8px_28px_rgba(236,55,80,0.3)]"
+							className="silo-cta text-white bg-hc-red/85 hover:bg-hc-red border-hc-red/70"
 						>
-							Start Shipping
+							Login
 						</a>
 						<a
 							href="/gallery"
