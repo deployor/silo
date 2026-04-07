@@ -1560,11 +1560,11 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											</td>
 											<td className="px-6 py-4 text-right flex justify-end items-center gap-1.5">
 												{canOpenFiles && !isDeepFrozen ? (
-													<a
+													 <a
 														href={`/dashboard/buckets/${bucket.name}`}
 														aria-label="Open bucket files"
 														title="Open bucket files"
-													 className={`${iconActionBase} group text-blue-400 hover:text-blue-300`}
+													 className={`${iconActionBase} group text-orange-400 hover:text-orange-300 hover:bg-orange-500/10`}
 													>
 														<MdFolderOpen className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1578,7 +1578,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														onClick={() => openCorsModal(bucket)}
 														aria-label="Configure CORS"
 														title="Configure CORS"
-														className={`${iconActionBase} group text-sky-400 hover:text-sky-300`}
+														className={`${iconActionBase} group text-blue-500 hover:text-blue-400 hover:bg-blue-500/10`}
 													>
 														<MdCode className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1592,7 +1592,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														onClick={() => openCollaborationModal(bucket)}
 														aria-label="Manage collaborators"
 														title="Manage collaborators"
-														className={`${iconActionBase} group text-violet-400 hover:text-violet-300`}
+														className={`${iconActionBase} group text-fuchsia-400 hover:text-fuchsia-300 hover:bg-fuchsia-500/10`}
 													>
 														<MdGroups className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1606,7 +1606,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														onClick={() => openDomainModal(bucket)}
 														aria-label="Manage custom domains"
 														title="Manage custom domains"
-														className={`${iconActionBase} group text-violet-200 hover:text-violet-100 hover:bg-violet-400/10`}
+														className={`${iconActionBase} group text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10`}
 													>
 														<MdPublic className="text-base" />
 														<span className={iconActionTooltip}>Custom domains</span>
@@ -1627,8 +1627,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														title="Deep Freeze"
 													 className={`${iconActionBase} group ${
 															deepFreezeState === "active"
-																? "text-sky-300 hover:text-sky-200 hover:bg-sky-500/10"
-																: "text-cyan-200 hover:text-cyan-100 hover:bg-cyan-500/10"
+																? "text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+																: "text-slate-300 hover:text-slate-200 hover:bg-slate-500/10"
 														}`}
 													>
 														<MdSevereCold className="text-base" />
@@ -1651,7 +1651,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														disabled={bucketBusy || isDeepFrozen}
 														aria-label="Empty bucket"
 														title="Empty bucket"
-														className={`${iconActionBase} group text-yellow-500 hover:text-yellow-400`}
+														className={`${iconActionBase} group text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10`}
 													>
 														<MdDeleteOutline className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1668,7 +1668,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														disabled={bucketBusy || isDeepFrozen}
 														aria-label="Delete bucket"
 														title="Delete bucket"
-														className={`${iconActionBase} group text-red-600 hover:text-red-500`}
+														className={`${iconActionBase} group text-red-500 hover:text-red-400 hover:bg-red-500/10`}
 													>
 														<MdDeleteForever className="text-base" />
 														<span className={iconActionTooltip}>
