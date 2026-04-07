@@ -1564,7 +1564,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														href={`/dashboard/buckets/${bucket.name}`}
 														aria-label="Open bucket files"
 														title="Open bucket files"
-													 className={`${iconActionBase} group text-orange-400 hover:text-orange-300 hover:bg-orange-500/10`}
+													 className={`${iconActionBase} group text-blue-400 hover:text-blue-300 hover:bg-blue-500/10`}
 													>
 														<MdFolderOpen className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1578,7 +1578,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														onClick={() => openCorsModal(bucket)}
 														aria-label="Configure CORS"
 														title="Configure CORS"
-														className={`${iconActionBase} group text-blue-500 hover:text-blue-400 hover:bg-blue-500/10`}
+														className={`${iconActionBase} group text-orange-400 hover:text-orange-300 hover:bg-orange-500/10`}
 													>
 														<MdCode className="text-base" />
 														<span className={iconActionTooltip}>
