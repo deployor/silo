@@ -1,6 +1,7 @@
 import { desc, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { config } from "../../config";
+import { buildCorsConfig } from "../../core/s3/cors";
 import { getInternalPath } from "../../core/s3/utils";
 import { db } from "../../db";
 import { buckets, users, yswsSubmissions } from "../../db/schema";
@@ -298,6 +299,7 @@ export async function handleYswsRequest(req: Request): Promise<Response> {
 								isPublic: true,
 								isSystem: true,
 								region: "auto",
+								corsConfig: JSON.stringify(buildCorsConfig()),
 							})
 							.returning();
 						targetBucket = newBucket;

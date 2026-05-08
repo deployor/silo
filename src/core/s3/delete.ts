@@ -5,6 +5,7 @@ import { diskCacheInvalidate } from "../../lib/disk-cache";
 import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
+import { buildCorsConfig } from "./cors";
 import { filterUpstreamHeaders, stripAuthQueryParams } from "./utils";
 
 export async function handleDeleteRequest(
@@ -17,7 +18,7 @@ export async function handleDeleteRequest(
 	if (key === "" && url.searchParams.has("cors")) {
 		await db
 			.update(buckets)
-			.set({ corsConfig: null })
+			.set({ corsConfig: JSON.stringify(buildCorsConfig()) })
 			.where(eq(buckets.id, bucket.id));
 
 		return new Response(null, { status: 204 });
@@ -26,7 +27,9 @@ export async function handleDeleteRequest(
 	try {
 		let existingSize = 0;
 		try {
-			const headResponse = await s3Client.fetch(internalPath, { method: "HEAD" });
+			const headResponse = await s3Client.fetch(internalPath, {
+				method: "HEAD",
+			});
 			if (headResponse.ok) {
 				existingSize = Number(headResponse.headers.get("content-length") || 0);
 			}

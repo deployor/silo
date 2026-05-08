@@ -1,6 +1,22 @@
 import type { buckets } from "../../db/schema";
 import type { CORSConfiguration, CORSRule } from "./types";
 
+export const DEFAULT_CORS_RULES: CORSRule[] = [
+	{
+		AllowedOrigins: ["*"],
+		AllowedMethods: ["GET", "HEAD", "PUT", "POST", "DELETE"],
+		AllowedHeaders: ["*"],
+		ExposeHeaders: ["*"],
+		MaxAgeSeconds: 86400,
+	},
+];
+
+export function buildCorsConfig(
+	rules: CORSRule[] = DEFAULT_CORS_RULES,
+): CORSConfiguration {
+	return { CORSRules: rules };
+}
+
 type CorsParseResult =
 	| { ok: true; config: CORSConfiguration }
 	| { ok: false; error: string };
@@ -85,22 +101,31 @@ export async function handleCorsPreflight(
 	req: Request,
 	bucket: typeof buckets.$inferSelect,
 ) {
-	const parsed = parseCorsConfig(bucket.corsConfig);
-	if (!parsed.ok) return new Response(null, { status: 403 });
-
 	const origin = req.headers.get("Origin");
 	const requestMethod = req.headers.get("Access-Control-Request-Method");
 	const requestHeaders = req.headers.get("Access-Control-Request-Headers");
+	const fallbackHeaders = new Headers();
+	if (origin) {
+		fallbackHeaders.set("Access-Control-Allow-Origin", "*");
+		fallbackHeaders.set("Vary", "Origin");
+	}
+	varyForCorsPreflight(fallbackHeaders);
 
-	if (!origin || !requestMethod) return new Response(null, { status: 403 });
+	const parsed = parseCorsConfig(bucket.corsConfig);
+	const config = parsed.ok ? parsed.config : buildCorsConfig();
+
+	if (!origin || !requestMethod) {
+		return new Response(null, { status: 403, headers: fallbackHeaders });
+	}
 
 	const rule = findPreflightRule({
 		origin,
 		requestMethod,
 		requestHeaders,
-		rules: parsed.config.CORSRules,
+		rules: config.CORSRules,
 	});
-	if (!rule) return new Response(null, { status: 403 });
+	if (!rule)
+		return new Response(null, { status: 403, headers: fallbackHeaders });
 
 	const headers = new Headers();
 	setAllowOrigin(headers, origin, rule);
@@ -139,9 +164,9 @@ export function getCorsHeaders(
 	if (!origin) return corsHeaders;
 
 	const parsed = parseCorsConfig(bucket.corsConfig);
-	if (!parsed.ok) return corsHeaders;
+	const config = parsed.ok ? parsed.config : buildCorsConfig();
 
-	const rule = parsed.config.CORSRules.find((r) => {
+	const rule = config.CORSRules.find((r) => {
 		const originMatch = matchExactOrWildcard(origin, r.AllowedOrigins);
 		const methodMatch = matchExactOrWildcard(req.method, r.AllowedMethods);
 		return originMatch && methodMatch;
@@ -160,4 +185,22 @@ export function getCorsHeaders(
 
 	corsHeaders.set("Vary", "Origin");
 	return corsHeaders;
+}
+
+export function withCorsResponse(
+	response: Response,
+	corsHeaders: Headers,
+): Response {
+	if (corsHeaders.size === 0) return response;
+
+	const headers = new Headers(response.headers);
+	for (const [headerKey, headerValue] of corsHeaders.entries()) {
+		headers.set(headerKey, headerValue);
+	}
+
+	return new Response(response.body, {
+		status: response.status,
+		statusText: response.statusText,
+		headers,
+	});
 }

@@ -9,10 +9,10 @@ import {
 	Section,
 } from "slack-block-builder";
 import { config } from "../../config";
-import { getInternalPath, isReservedBucketName } from "../../core/s3/utils";
+import { buildCorsConfig } from "../../core/s3/cors";
+import { isReservedBucketName } from "../../core/s3/utils";
 import { db } from "../../db";
 import { bucketKeys, buckets } from "../../db/schema";
-import { s3Client } from "../../lib/s3-client";
 import { createKey } from "../../services/key-service";
 import { getAppSettings } from "../../services/settings-service";
 import { getStorageUsage, getUserBySlackId } from "../../services/user-service";
@@ -244,6 +244,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 				name: bucketName,
 				userId: user.id,
 				isPublic: false,
+				corsConfig: JSON.stringify(buildCorsConfig()),
 			})
 			.returning();
 
@@ -447,15 +448,6 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			return;
 		}
 
-		const bucketId = actionValue;
-		if (bucketId) {
-			const bucket = await db
-				.select()
-				.from(buckets)
-				.where(eq(buckets.id, bucketId))
-				.limit(1);
-		}
-
 		await openModal(payload.trigger_id, deleteBucketWarningModal());
 	}
 
@@ -506,5 +498,4 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			),
 		);
 	}
-
 }

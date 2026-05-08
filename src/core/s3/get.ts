@@ -1,5 +1,6 @@
 import { config } from "../../config";
 import type { buckets, users } from "../../db/schema";
+import { getContext } from "../../lib/context";
 import {
 	diskCacheGet,
 	diskCacheGetPath,
@@ -16,12 +17,12 @@ import {
 	rewriteListObjectsV2Response,
 	rewriteMultipartUploadResponse,
 } from "../../lib/xml-rewriter";
+import { buildCorsConfig } from "./cors";
 import {
 	filterUpstreamHeaders,
 	getInternalPath,
 	stripAuthQueryParams,
 } from "./utils";
-import { getContext } from "../../lib/context";
 
 // Tracks in-flight cache population for object keys so subsequent requests can
 // briefly wait and then hit Redis/Disk instead of immediately re-fetching S3.
@@ -97,10 +98,6 @@ export async function handleGetRequest(
 	const ctx = getContext();
 	const isOffboardingExport = Boolean(ctx?.isOffboardingExport);
 	if (key === "" && url.searchParams.has("cors")) {
-		if (!bucket.corsConfig) {
-			return S3Errors.NoSuchCORSConfiguration().toResponse();
-		}
-
 		type StoredCorsRule = {
 			ID?: string;
 			AllowedOrigins: string | string[];
@@ -114,7 +111,9 @@ export async function handleGetRequest(
 			CORSRules: StoredCorsRule[];
 		};
 
-		const config = JSON.parse(bucket.corsConfig) as StoredCorsConfig;
+		const config = bucket.corsConfig
+			? (JSON.parse(bucket.corsConfig) as StoredCorsConfig)
+			: buildCorsConfig();
 		const rulesXml = config.CORSRules.map((r) => {
 			let rule = "<CORSRule>";
 			if (r.ID) rule += `<ID>${r.ID}</ID>`;
@@ -330,7 +329,8 @@ ${rulesXml}
 		const cacheKeyMeta = `s3:meta:${bucket.name}:${key}`;
 		const cachePopulationId = `${bucket.name}\0${key}`;
 		const rangeHeader = req.headers.get("range");
-		const isCacheable = !url.searchParams.has("uploadId") && !isOffboardingExport;
+		const isCacheable =
+			!url.searchParams.has("uploadId") && !isOffboardingExport;
 		const isSimpleGet = isCacheable && !rangeHeader;
 		const REDIS_CACHE_LIMIT = 10 * 1024 * 1024; // 10 MB hard ceiling
 		const diskMinSize = getDiskCacheMinSizeBytes();
@@ -727,7 +727,7 @@ ${rulesXml}
 		// Add Cache-Control if not already set by upstream
 		if (!headers.has("cache-control")) {
 			if (!user) {
-			// Public bucket access — allow browser caching
+				// Public bucket access — allow browser caching
 				headers.set("Cache-Control", "public, max-age=3600");
 			} else {
 				// Authenticated access — don't cache in shared caches
