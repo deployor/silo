@@ -1,7 +1,14 @@
-import { and, eq, isNull, gt } from "drizzle-orm";
+import { createHmac } from "node:crypto";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { config } from "../config";
+import { getKeyFromRequest } from "../core/s3/utils";
 import { db } from "../db";
-import { bucketKeys, buckets, offboardingExportSessions, users } from "../db/schema";
+import {
+	bucketKeys,
+	buckets,
+	offboardingExportSessions,
+	users,
+} from "../db/schema";
 import { verifyAwsV4Signature } from "../lib/auth-v4";
 import { resolveBucketByHostname } from "../lib/bucket-domains";
 import { context } from "../lib/context";
@@ -12,8 +19,6 @@ import {
 } from "../lib/offboarding-export";
 import { redis } from "../lib/redis";
 import { S3Errors } from "../lib/s3-errors";
-import { getKeyFromRequest } from "../core/s3/utils";
-import { createHmac } from "node:crypto";
 import { getBucketDeepFreezeMessage } from "../services/deep-freeze-service";
 
 const S3_DOMAIN = config.s3Domain;
@@ -262,38 +267,38 @@ export type AuthResult =
 	| Response;
 
 export const authenticate = async (req: Request): Promise<AuthResult> => {
+	if (req.method === "OPTIONS") {
+		const requestedBucket = await getBucketFromRequest(req);
+		if (!requestedBucket) {
+			return new Response(null, { status: 400 });
+		}
+
+		const authContext = await getPublicAuthContext(requestedBucket);
+		if (!authContext) {
+			return new Response(null, { status: 404 });
+		}
+
+		const bucket = authContext.bucket;
+		const user = authContext.userId
+			? await getFreshUserById(authContext.userId)
+			: null;
+
+		if (!user && !bucket.isSystem) {
+			return new Response(null, { status: 404 });
+		}
+
+		const ctx = context.getStore();
+		if (ctx) {
+			ctx.user = user || undefined;
+			ctx.bucket = bucket;
+			ctx.mode = "public";
+		}
+		return { user, bucket, mode: "public" };
+	}
+
 	const credential = getCredential(req);
 
 	if (!credential) {
-		if (req.method === "OPTIONS") {
-			const requestedBucket = await getBucketFromRequest(req);
-			if (!requestedBucket) {
-				return new Response(null, { status: 400 });
-			}
-
-			const authContext = await getPublicAuthContext(requestedBucket);
-			if (!authContext) {
-				return new Response(null, { status: 404 });
-			}
-
-			const bucket = authContext.bucket;
-			const user = authContext.userId
-				? await getFreshUserById(authContext.userId)
-				: null;
-
-			if (!user && !bucket.isSystem) {
-				return new Response(null, { status: 404 });
-			}
-
-			const ctx = context.getStore();
-			if (ctx) {
-				ctx.user = user || undefined;
-				ctx.bucket = bucket;
-				ctx.mode = "public";
-			}
-			return { user, bucket, mode: "public" };
-		}
-
 		if (req.method !== "GET" && req.method !== "HEAD") {
 			return S3Errors.AccessDenied().toResponse();
 		}
@@ -442,17 +447,17 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 		const requestedBucket = await getBucketFromRequest(req);
 		const bucket = requestedBucket
 			? (
-				await db
-					.select()
-					.from(buckets)
-					.where(
-						and(
-							eq(buckets.name, requestedBucket),
-							eq(buckets.userId, exportAuth.user.id),
-						),
-					)
-					.limit(1)
-			)[0] || null
+					await db
+						.select()
+						.from(buckets)
+						.where(
+							and(
+								eq(buckets.name, requestedBucket),
+								eq(buckets.userId, exportAuth.user.id),
+							),
+						)
+						.limit(1)
+				)[0] || null
 			: await getOffboardingExportBucketForUser(exportAuth.user.id);
 
 		if (!bucket) {
@@ -463,7 +468,9 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 		if (!amzDate)
 			return S3Errors.AccessDenied("Missing Date Header").toResponse();
 
-		const derivedSecret = deriveOffboardingExportSecret(exportAuth.session.accessKey);
+		const derivedSecret = deriveOffboardingExportSecret(
+			exportAuth.session.accessKey,
+		);
 		const isValid = await verifyAwsV4Signature(req, derivedSecret);
 		if (!isValid) {
 			return S3Errors.SignatureDoesNotMatch().toResponse();
