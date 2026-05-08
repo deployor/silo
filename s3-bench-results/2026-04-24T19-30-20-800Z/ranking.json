@@ -1,0 +1,30 @@
+[
+  {
+    "rank": 1,
+    "provider": "hc-silo-dev",
+    "scores": {
+      "capability": 0,
+      "latency": 0,
+      "throughput": 0,
+      "consistency": 0,
+      "scalability": 0,
+      "integrity": 0,
+      "overall": 0
+    },
+    "derived": {}
+  },
+  {
+    "rank": 2,
+    "provider": "hc-silo-dev",
+    "scores": {
+      "capability": 0,
+      "latency": 0,
+      "throughput": 0,
+      "consistency": 0,
+      "scalability": 0,
+      "integrity": 0,
+      "overall": 0
+    },
+    "derived": {}
+  }
+]

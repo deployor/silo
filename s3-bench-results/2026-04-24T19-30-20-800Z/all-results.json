@@ -1,0 +1,32 @@
+[
+  {
+    "name": "hc-silo-dev",
+    "providerKey": "hc-silo-dev",
+    "aggregates": {},
+    "derived": {},
+    "scores": {
+      "capability": 0,
+      "latency": 0,
+      "throughput": 0,
+      "consistency": 0,
+      "scalability": 0,
+      "integrity": 0,
+      "overall": 0
+    }
+  },
+  {
+    "name": "hc-silo-dev",
+    "providerKey": "hc-silo-dev",
+    "aggregates": {},
+    "derived": {},
+    "scores": {
+      "capability": 0,
+      "latency": 0,
+      "throughput": 0,
+      "consistency": 0,
+      "scalability": 0,
+      "integrity": 0,
+      "overall": 0
+    }
+  }
+]

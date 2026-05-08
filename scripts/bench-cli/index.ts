@@ -7,7 +7,7 @@ const MAIN_CHOICES: MenuChoice[] = [
   {
     id: "run",
     label: "Run Benchmarks",
-    detail: "Launch normal, stress, or resilience benchmark profiles.",
+    detail: "Launch very-fast, normal, stress, resilience, or study benchmark profiles.",
   },
   {
     id: "recent",

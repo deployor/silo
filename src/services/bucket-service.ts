@@ -1,4 +1,6 @@
 import { eq } from "drizzle-orm";
+import { config } from "../config";
+import { buildCorsConfig } from "../core/s3/cors";
 import {
 	deleteBucketContents,
 	getInternalPath,
@@ -7,13 +9,13 @@ import {
 import { db } from "../db";
 import { bucketKeys, buckets, users } from "../db/schema";
 import {
-	createCustomDomainRecord,
 	type BucketCustomDomain,
+	createCustomDomainRecord,
 	invalidateBucketCustomDomainCache,
+	normalizeCustomDomain,
 	parseBucketCustomDomains,
 	sanitizeBucketCustomDomains,
 	serializeBucketCustomDomains,
-	normalizeCustomDomain,
 } from "../lib/bucket-domains";
 import {
 	applyCloudflareHostnameState,
@@ -23,7 +25,6 @@ import {
 	isCloudflareForSaasConfigured,
 } from "../lib/cloudflare-for-saas";
 import { redis } from "../lib/redis";
-import { config } from "../config";
 import {
 	assertBucketCollaborationAllowed,
 	assertCanManageCors,
@@ -74,7 +75,9 @@ function assertCustomDomainsEnabled() {
 	}
 }
 
-async function syncCustomDomainsForBucketRecord(bucket: typeof buckets.$inferSelect) {
+async function syncCustomDomainsForBucketRecord(
+	bucket: typeof buckets.$inferSelect,
+) {
 	const current = parseBucketCustomDomains(bucket.customDomains);
 	if (!isCloudflareForSaasConfigured()) {
 		return current;
@@ -92,10 +95,10 @@ async function syncCustomDomainsForBucketRecord(bucket: typeof buckets.$inferSel
 				return synced.verified
 					? synced
 					: {
-						...synced,
-						primary: false,
-						verifiedAt: null,
-					};
+							...synced,
+							primary: false,
+							verifiedAt: null,
+						};
 			} catch (error) {
 				console.error("custom domain sync failed", error);
 				return domain;
@@ -212,7 +215,11 @@ export async function getBucketsForUser(userId: string) {
 	return [...ownedBucketsWithDomains, ...sharedKeys];
 }
 
-async function getOwnedBucketOrThrow(name: string, userId: string, isAdmin = false) {
+async function getOwnedBucketOrThrow(
+	name: string,
+	userId: string,
+	isAdmin = false,
+) {
 	const bucket = await db
 		.select()
 		.from(buckets)
@@ -269,6 +276,7 @@ export async function createBucket(userId: string, name: string) {
 		.values({
 			name,
 			userId,
+			corsConfig: JSON.stringify(buildCorsConfig()),
 		})
 		.returning();
 
@@ -430,7 +438,9 @@ export async function addBucketCustomDomain(params: {
 		: created;
 	const next = [...current, provisioned].map((entry) => ({
 		...entry,
-		primary: params.makePrimary ? entry.domain === normalizedDomain : entry.primary,
+		primary: params.makePrimary
+			? entry.domain === normalizedDomain
+			: entry.primary,
 	}));
 	const sanitized = sanitizeBucketCustomDomains(next);
 	await db
@@ -465,7 +475,11 @@ export async function removeBucketCustomDomain(params: {
 	const sanitized = sanitizeBucketCustomDomains(next);
 	await db
 		.update(buckets)
-		.set({ customDomains: sanitized.length ? serializeBucketCustomDomains(sanitized) : null })
+		.set({
+			customDomains: sanitized.length
+				? serializeBucketCustomDomains(sanitized)
+				: null,
+		})
 		.where(eq(buckets.id, bucket.id));
 	await invalidateBucketCustomDomainCache(current);
 	return sanitized;
@@ -537,7 +551,8 @@ export async function verifyBucketCustomDomain(params: {
 			? {
 					...synced,
 					primary:
-						target.primary || !current.some((item) => item.primary && item.verified),
+						target.primary ||
+						!current.some((item) => item.primary && item.verified),
 				}
 			: entry,
 	);
@@ -566,7 +581,9 @@ export async function listBucketCustomDomains(params: {
 	return syncCustomDomainsForBucketRecord(bucket);
 }
 
-export async function revalidateVerifiedCustomDomainsForBucket(bucketId: string) {
+export async function revalidateVerifiedCustomDomainsForBucket(
+	bucketId: string,
+) {
 	if (!config.customDomainsEnabled) return;
 	const rows = await db
 		.select()
@@ -602,7 +619,7 @@ export async function deleteCorsConfig(
 
 	await db
 		.update(buckets)
-		.set({ corsConfig: null })
+		.set({ corsConfig: JSON.stringify(buildCorsConfig()) })
 		.where(eq(buckets.id, access.bucket.id));
 }
 

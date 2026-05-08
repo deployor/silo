@@ -4,6 +4,7 @@ import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { XMLParser } from "fast-xml-parser";
 import { z } from "zod";
 import { config } from "../../config";
+import { buildCorsConfig } from "../../core/s3/cors";
 import { deleteBucketContents, getInternalPath } from "../../core/s3/utils";
 import { db } from "../../db";
 import {
@@ -1419,15 +1420,9 @@ async function pauseBucket(bucketName: string, req: Request) {
 }
 
 async function resetBucketCors(bucketName: string) {
-	const bucket = await db
-		.select()
-		.from(buckets)
-		.where(eq(buckets.name, bucketName))
-		.limit(1);
-
 	await db
 		.update(buckets)
-		.set({ corsConfig: null })
+		.set({ corsConfig: JSON.stringify(buildCorsConfig()) })
 		.where(eq(buckets.name, bucketName));
 	return new Response("Reset", { status: 200 });
 }

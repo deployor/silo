@@ -19,6 +19,14 @@ function clamp(value: number, min: number, max: number) {
 
 export const PROVIDERS: ProviderConfig[] = [
   {
+    name: "fil.one EU West 1",
+    region: "eu-west-1",
+    endpoint: "https://eu-west-1.s3.fil.one",
+    accessKeyId: "X4I60O1PP578WDQ3M8J4",
+    secretAccessKey: "FeNw57fu+LBlSvtWljlAl6+Efnhn+bJem9tghdlc",
+    bucket: "benchdeployor",
+  },
+  {
     name: "Impossible API",
     region: "eu-central-2",
     endpoint: "https://eu-central-2.storage.impossibleapi.net",
@@ -57,6 +65,22 @@ export const PROVIDERS: ProviderConfig[] = [
     accessKeyId: "USMNFISOJ474CA38ZM9D",
     secretAccessKey: "pbIbBzXgKDb6SCzkOjAP7BY3IcugWoyPwL9acgv7",
     bucket: "speedtestbenchamark",
+  },
+  {
+    name: "hc-silo-dev",
+    region: "us-east-1",
+    endpoint: "https://s3.us-east-1.rabata.io",
+    accessKeyId: "AKIABYVLDA76IRQYWHC5",
+    secretAccessKey: "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",
+    bucket: "benchdeployor",
+  },
+  {
+    name: "hc-silo-dev",
+    region: "fra1",
+    endpoint: "https://hc-silo-dev.fra1.digitaloceanspaces.com",
+    accessKeyId: "DO002X2PQZWCZ26UH3NH",
+    secretAccessKey: "Uv1ml1Lb1P5pJUwH6R87s0mThNM56yaYeKEN3lyEqfg",
+    bucket: "hc-silo-dev",
   },
 ];
 

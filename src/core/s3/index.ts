@@ -6,7 +6,7 @@ import { context } from "../../lib/context";
 import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
-import { getCorsHeaders, handleCorsPreflight } from "./cors";
+import { getCorsHeaders, handleCorsPreflight, withCorsResponse } from "./cors";
 import { handleDeleteRequest } from "./delete";
 import { handleGetRequest } from "./get";
 import { handlePostRequest } from "./post";
@@ -25,6 +25,9 @@ export async function handleS3Request(
 	bucket: typeof buckets.$inferSelect,
 	mode: "authenticated" | "public",
 ): Promise<Response> {
+	const corsHeaders = getCorsHeaders(req, bucket);
+	const withCors = (response: Response) =>
+		withCorsResponse(response, corsHeaders);
 	const method = req.method;
 	const url = new URL(req.url);
 	const S3_DOMAIN = config.s3Domain;
@@ -35,7 +38,7 @@ export async function handleS3Request(
 		key = getKeyFromRequest(req, bucket.name);
 	} catch {
 		// Treat invalid keys as AccessDenied (403) instead of 500.
-		return S3Errors.AccessDenied().toResponse();
+		return withCors(S3Errors.AccessDenied().toResponse());
 	}
 
 	// Determine Action
@@ -45,7 +48,7 @@ export async function handleS3Request(
 
 	// Whitelist Check
 	if (action === S3Action.Unknown) {
-		return S3Errors.MethodNotAllowed().toResponse();
+		return withCors(S3Errors.MethodNotAllowed().toResponse());
 	}
 
 	// Public Access Check
@@ -57,7 +60,7 @@ export async function handleS3Request(
 			S3Action.Options,
 		];
 		if (!allowedPublicActions.includes(action)) {
-			return S3Errors.AccessDenied().toResponse();
+			return withCors(S3Errors.AccessDenied().toResponse());
 		}
 	}
 
@@ -72,12 +75,14 @@ export async function handleS3Request(
 			S3Action.Options,
 		];
 		if (!allowedExportActions.includes(action)) {
-			return S3Errors.AccessDenied(
-				"Offboarding export sessions are read-only.",
-			).toResponse();
+			return withCors(
+				S3Errors.AccessDenied(
+					"Offboarding export sessions are read-only.",
+				).toResponse(),
+			);
 		}
 		if (!user || bucket.userId !== user.id) {
-			return S3Errors.AccessDenied().toResponse();
+			return withCors(S3Errors.AccessDenied().toResponse());
 		}
 	}
 
@@ -125,8 +130,8 @@ export async function handleS3Request(
 				);
 			}
 			// If no user (public system bucket access attempt on root), or bad method
-			if (!user) return S3Errors.AccessDenied().toResponse();
-			return S3Errors.MethodNotAllowed().toResponse();
+			if (!user) return withCors(S3Errors.AccessDenied().toResponse());
+			return withCors(S3Errors.MethodNotAllowed().toResponse());
 		}
 	}
 
@@ -134,16 +139,20 @@ export async function handleS3Request(
 
 	if (user) {
 		if (user.dataExported && !isOffboardingExport) {
-			return S3Errors.AccessDenied(
-				"Account is frozen due to data export. No new modifications allowed.",
-			).toResponse();
+			return withCors(
+				S3Errors.AccessDenied(
+					"Account is frozen due to data export. No new modifications allowed.",
+				).toResponse(),
+			);
 		}
 
 		if (user.markedAsOverAge && !user.isImmortal) {
 			if (method === "PUT" || method === "POST" || method === "DELETE") {
-				return S3Errors.AccessDenied(
-					"Account is in migration grace period. New uploads are disabled.",
-				).toResponse();
+				return withCors(
+					S3Errors.AccessDenied(
+						"Account is in migration grace period. New uploads are disabled.",
+					).toResponse(),
+				);
 			}
 		}
 	}
@@ -152,14 +161,18 @@ export async function handleS3Request(
 	// Although determineAction maps them to Unknown if not CORS, we double check here for safety if logic changes
 	if (key === "") {
 		if (method === "PUT" && !url.searchParams.has("cors")) {
-			return S3Errors.AccessDenied(
-				"Bucket creation is not allowed. Please use the dashboard.",
-			).toResponse();
+			return withCors(
+				S3Errors.AccessDenied(
+					"Bucket creation is not allowed. Please use the dashboard.",
+				).toResponse(),
+			);
 		}
 		if (method === "DELETE" && !url.searchParams.has("cors")) {
-			return S3Errors.AccessDenied(
-				"Bucket deletion is not allowed. Please use the dashboard.",
-			).toResponse();
+			return withCors(
+				S3Errors.AccessDenied(
+					"Bucket deletion is not allowed. Please use the dashboard.",
+				).toResponse(),
+			);
 		}
 	}
 
@@ -168,48 +181,50 @@ export async function handleS3Request(
 	}
 
 	if (method === "GET") {
-		const corsHeaders = getCorsHeaders(req, bucket);
-		return handleGetRequest(
-			req,
-			user,
-			bucket,
-			key,
-			internalPath,
-			url,
-			corsHeaders,
+		return withCors(
+			await handleGetRequest(
+				req,
+				user,
+				bucket,
+				key,
+				internalPath,
+				url,
+				corsHeaders,
+			),
 		);
 	}
 
 	if (method === "PUT") {
-		if (!user) return S3Errors.AccessDenied().toResponse();
-		return handlePutRequest(req, user, bucket, key, internalPath, url);
+		if (!user) return withCors(S3Errors.AccessDenied().toResponse());
+		return withCors(
+			await handlePutRequest(req, user, bucket, key, internalPath, url),
+		);
 	}
 
 	if (method === "DELETE") {
-		if (!user) return S3Errors.AccessDenied().toResponse();
-		return handleDeleteRequest(req, bucket, internalPath, url, key);
+		if (!user) return withCors(S3Errors.AccessDenied().toResponse());
+		return withCors(
+			await handleDeleteRequest(req, bucket, internalPath, url, key),
+		);
 	}
 
 	if (method === "HEAD") {
 		if (key === "") {
-			return new Response(null, { status: 200 });
+			return withCors(new Response(null, { status: 200 }));
 		}
 		try {
-			const corsHeaders = getCorsHeaders(req, bucket);
-
 			// Check Redis for cached metadata
 			const cacheKeyMeta = `s3:meta:${bucket.name}:${key}`;
 			try {
 				const cachedMeta = await redis.get(cacheKeyMeta);
 				if (cachedMeta) {
 					const headers = new Headers(JSON.parse(cachedMeta));
-					for (const [k, v] of corsHeaders.entries()) {
-						headers.set(k, v);
-					}
-					return new Response(null, {
-						status: 200,
-						headers,
-					});
+					return withCors(
+						new Response(null, {
+							status: 200,
+							headers,
+						}),
+					);
 				}
 			} catch (e) {
 				console.error("Redis meta cache error:", e);
@@ -227,11 +242,6 @@ export async function handleS3Request(
 			});
 
 			const headers = new Headers(response.headers);
-			// Apply CORS for HEAD too
-			for (const [k, v] of corsHeaders.entries()) {
-				headers.set(k, v);
-			}
-
 			// Cache metadata on miss if success
 			if (response.status === 200) {
 				const headersObj: Record<string, string> = {};
@@ -243,19 +253,23 @@ export async function handleS3Request(
 				});
 			}
 
-			return new Response(null, {
-				status: response.status,
-				headers: headers,
-			});
+			return withCors(
+				new Response(null, {
+					status: response.status,
+					headers: headers,
+				}),
+			);
 		} catch (_e) {
-			return S3Errors.InternalError().toResponse();
+			return withCors(S3Errors.InternalError().toResponse());
 		}
 	}
 
 	if (method === "POST") {
-		if (!user) return S3Errors.AccessDenied().toResponse();
-		return handlePostRequest(req, user, bucket, internalPath, url);
+		if (!user) return withCors(S3Errors.AccessDenied().toResponse());
+		return withCors(
+			await handlePostRequest(req, user, bucket, internalPath, url),
+		);
 	}
 
-	return S3Errors.MethodNotAllowed().toResponse();
+	return withCors(S3Errors.MethodNotAllowed().toResponse());
 }

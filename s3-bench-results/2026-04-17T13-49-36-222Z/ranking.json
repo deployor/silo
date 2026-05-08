@@ -1,0 +1,34 @@
+[
+  {
+    "rank": 1,
+    "provider": "fil.one EU West 1",
+    "scores": {
+      "capability": 100,
+      "latency": 100,
+      "throughput": 100,
+      "consistency": 100,
+      "scalability": 100,
+      "integrity": 100,
+      "overall": 100
+    },
+    "derived": {
+      "capabilitySuccessRate": 1,
+      "integritySuccessRate": 1,
+      "deleteValidationSuccessRate": 1,
+      "missingReadExpectedErrorRate": 1,
+      "coreFailureRate": 0,
+      "coreMedianCv": 0.3991591733190613,
+      "visibilityMedianMs": 302.0051659999881,
+      "deletePropagationMedianMs": 36.79595900001004,
+      "parallelUploadAggregateMiBsPerSec": 7.10304209089454,
+      "parallelReadAggregateMiBsPerSec": 8.053136759543424,
+      "listObjectsPerSecond": 1239.3775884221272,
+      "seedObjectsPerSecond": 222.70619846406876,
+      "parallelDeletesPerSecond": 521.6987934824953,
+      "skippedPhases": [],
+      "skippedCategoryCount": 0,
+      "skippedCategories": [],
+      "abortedByUser": false
+    }
+  }
+]

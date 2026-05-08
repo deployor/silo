@@ -1,0 +1,60 @@
+{
+  "provider": {
+    "name": "hc-silo-dev",
+    "region": "fra1",
+    "endpoint": "https://hc-silo-dev.fra1.digitaloceanspaces.com",
+    "bucket": "hc-silo-dev"
+  },
+  "runId": "2026-04-24T19-30-20-800Z",
+  "startedAtUtc": "2026-04-24T19:30:22.270Z",
+  "completedAtUtc": "2026-04-24T19:30:22.270Z",
+  "status": "failed",
+  "config": {
+    "repeats": 2,
+    "heavyRepeats": 1,
+    "sizesMiB": {
+      "small": 1,
+      "medium": 8,
+      "large": 32
+    },
+    "parallel": {
+      "uploads": 8,
+      "reads": 8,
+      "deletes": 12
+    },
+    "manyObjectsCount": 256,
+    "manyObjectsSizeBytes": 512,
+    "listTarget": 256,
+    "consistency": {
+      "pollMs": 50,
+      "timeoutMs": 15000
+    },
+    "multipart": {
+      "partSizeMiB": 5,
+      "parts": 2
+    },
+    "reliability": {
+      "opTimeoutMs": 45000,
+      "opRetries": 1,
+      "retryBaseDelayMs": 150,
+      "rateLimitBaseCooldownMs": 2500,
+      "rateLimitMaxCooldownMs": 15000,
+      "rateLimitSkipThreshold": 4,
+      "rateLimitTotalSkipThreshold": 10,
+      "rateLimitAutoSkipProvider": true,
+      "batchMinSuccessRate": 0.85,
+      "phaseSoftTimeoutMs": 60000
+    },
+    "keepTestData": false
+  },
+  "probes": [],
+  "trials": {},
+  "fatalError": {
+    "name": "NotFound",
+    "message": "Unknown",
+    "statusCode": 404
+  },
+  "notes": [
+    "Unknown"
+  ]
+}
