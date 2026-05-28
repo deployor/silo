@@ -20,16 +20,9 @@ function CodeBlock({ code }: { code: string }) {
 export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const p = bootstrap.props as {
 		user?: FrontendUser | null;
-		yswsQuotaPerHour?: number;
-		yswsBonusTiers?: Array<{
-			hours: number;
-			percent: number;
-			enabled: boolean;
-		}>;
 	};
 
 	const [mobileOpen, setMobileOpen] = useState(false);
-	const [hours, setHours] = useState(10);
 	const [active, setActive] = useState("intro");
 	const [reportSubmitting, setReportSubmitting] = useState(false);
 	const [reportStatus, setReportStatus] = useState<{
@@ -40,7 +33,6 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const sections = useMemo<Section[]>(
 		() => [
 			{ id: "intro", label: "Introduction", group: "Basics" },
-			{ id: "ysws", label: "YSWS Program", group: "Basics" },
 			{ id: "auth", label: "Authentication", group: "Basics" },
 			{ id: "custom-domains", label: "Custom Domains", group: "Basics" },
 			{
@@ -80,20 +72,6 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		}
 		return Array.from(g.entries());
 	}, [sections]);
-
-	const tiers = useMemo(
-		() =>
-			(p.yswsBonusTiers || [])
-				.filter((t) => t.enabled)
-				.sort((a, b) => b.hours - a.hours),
-		[p.yswsBonusTiers],
-	);
-	const activeTier = tiers.find((t) => hours >= t.hours);
-	const activeTierBonus = activeTier ? activeTier.percent : 0;
-	const finalRewardGb = (
-		(hours * (p.yswsQuotaPerHour || 0) * (1 + activeTierBonus / 100)) /
-		(1024 * 1024 * 1024)
-	).toFixed(1);
 
 	useEffect(() => {
 		const hash = window.location.hash.replace("#", "");
@@ -253,104 +231,6 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<p className="text-lg mb-6 text-text-muted leading-relaxed">
 									Just log in and start shipping.
 								</p>
-							</div>
-						) : null}
-
-						{activeSection === "ysws" ? (
-							<div id="ysws" className="section-content active">
-								<h1 className="text-4xl font-bold mb-6 text-white">
-									YSWS Program
-								</h1>
-								<p className="text-lg mb-6 text-text-muted leading-relaxed">
-									"You Ship, We Ship" (YSWS) is how you earn more storage.
-								</p>
-								<p className="text-lg mb-6 text-text-muted leading-relaxed">
-									Instead of paying with money, you pay with code. When you ship
-									a project using Silo, you can submit it to us. Based on the
-									hours you spent coding, we'll permanently increase your
-									storage quota.
-								</p>
-
-								{p.yswsQuotaPerHour ? (
-									<div className="mt-8 mb-12 border border-white/10 rounded-3xl p-8 bg-hc-darker/50">
-										<h3 className="text-text-muted text-sm font-bold uppercase tracking-wider mb-6 text-center">
-											Reward Calculator
-										</h3>
-										<div className="flex flex-col md:flex-row gap-8 items-center">
-											<div className="flex-1 w-full">
-												<div className="flex justify-between items-end mb-4">
-													<label
-														className="text-sm font-bold text-white"
-														htmlFor="docs-hours"
-													>
-														Hours Spent Coding
-													</label>
-													<span className="text-2xl font-bold text-hc-red font-mono">
-														{hours}h
-													</span>
-												</div>
-												<input
-													id="docs-hours"
-													type="range"
-													min={1}
-													max={100}
-													value={hours}
-													onChange={(e) => setHours(Number(e.target.value))}
-													className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-hc-red hover:accent-red-400 transition-all"
-												/>
-												<div className="flex justify-between mt-2 text-xs text-text-muted font-mono">
-													<span>1h</span>
-													<span>100h</span>
-												</div>
-											</div>
-
-											<div className="hidden md:block w-px h-24 bg-white/10" />
-
-											<div className="flex-1 w-full text-center md:text-left">
-												<p className="text-text-muted text-xs font-bold uppercase tracking-wider mb-2">
-													You Earn
-												</p>
-												<div className="flex items-baseline justify-center md:justify-start gap-2">
-													<span className="text-5xl font-bold text-white tracking-tighter">
-														{finalRewardGb}
-													</span>
-													<span className="text-xl text-white/40 font-bold">
-														GB
-													</span>
-												</div>
-												<div className="flex flex-col gap-1 mt-2">
-													<p className="text-xs text-text-muted">
-														Permanent storage added to your account
-													</p>
-													{activeTierBonus > 0 ? (
-														<p className="text-xs text-hc-red font-bold">
-															+{activeTierBonus}% Bonus Applied!
-														</p>
-													) : null}
-												</div>
-											</div>
-										</div>
-									</div>
-								) : null}
-
-								<h3 className="text-2xl font-bold mb-4 text-white">
-									How it works
-								</h3>
-								<ol className="list-decimal list-inside space-y-4 text-text-muted mb-8">
-									<li>Build a project that uses Silo for storage.</li>
-									<li>
-										Go to the{" "}
-										<a href="/ysws" className="text-hc-red hover:underline">
-											YSWS Dashboard
-										</a>
-										.
-									</li>
-									<li>Submit your project details and hours spent.</li>
-									<li>
-										Once approved, your storage limit is automatically
-										increased!
-									</li>
-								</ol>
 							</div>
 						) : null}
 

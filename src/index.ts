@@ -22,9 +22,7 @@ import { statsService } from "./services/stats-service";
 import { handleAdminRequest } from "./web/admin";
 import { handleRevocationRequest } from "./web/api/revocation";
 import { handleDashboardRequest } from "./web/dashboard";
-import { handleGalleryRequest } from "./web/gallery";
 import { handleRedeemRequest } from "./web/redemptions";
-import { handleYswsRequest } from "./web/ysws";
 
 const S3_DOMAIN = config.s3Domain;
 
@@ -80,9 +78,6 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 		"/api/admin",
 		"/onboarding",
 		"/api/onboarding/",
-		"/ysws",
-		"/api/ysws",
-		"/gallery",
 		"/redeem",
 		"/api/revocation",
 		"/health",
@@ -233,10 +228,6 @@ const server = Bun.serve({
 						url.pathname.startsWith("/api/admin")
 					) {
 						response = await handleAdminRequest(req);
-					} else if (url.pathname.startsWith("/ysws")) {
-						response = await handleYswsRequest(req);
-					} else if (url.pathname.startsWith("/gallery")) {
-						response = await handleGalleryRequest(req);
 					} else if (url.pathname.startsWith("/redeem")) {
 						response = await handleRedeemRequest(req);
 					} else if (url.pathname === "/api/slack/events") {

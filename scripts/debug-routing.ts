@@ -9,12 +9,8 @@ const dashboardPaths = [
 	"/assets/",
 	"/admin",
 	"/api/admin",
-	"/cdn",
-	"/api/cdn/",
 	"/onboarding",
 	"/api/onboarding/",
-	"/ysws",
-	"/api/ysws",
 ];
 
 function isDashboardRequest(urlStr: string, host: string): boolean {
@@ -59,27 +55,11 @@ console.log("----------------------");
 
 const testCases = [
 	{ url: "http://localhost:3000/", host: "localhost:3000", expected: true },
-	{ url: "http://localhost:3000/ysws", host: "localhost:3000", expected: true },
-	{
-		url: "http://localhost:3000/ysws/",
-		host: "localhost:3000",
-		expected: true,
-	},
-	{
-		url: "http://localhost:3000/admin/ysws",
-		host: "localhost:3000",
-		expected: true,
-	},
 	{
 		url: "http://localhost:3000/my-bucket",
 		host: "localhost:3000",
 		expected: false,
 	},
-	{
-		url: "http://ysws.localhost:3000/",
-		host: "ysws.localhost:3000",
-		expected: true,
-	}, // Should be true if wildcard localhost
 	{
 		url: "http://other.localhost:3000/",
 		host: "other.localhost:3000",

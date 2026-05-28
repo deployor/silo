@@ -5,7 +5,6 @@ export function AdminSubnav({
 		| "users"
 		| "buckets"
 		| "speedtest"
-		| "ysws"
 		| "redemptions"
 		| "logs"
 		| "settings"
@@ -29,7 +28,6 @@ export function AdminSubnav({
 			{item("/admin/users", "users", "Users")}
 			{item("/admin/buckets", "buckets", "Buckets")}
 			{item("/admin/speedtest", "speedtest", "Speedtest")}
-			{item("/admin/ysws", "ysws", "YSWS")}
 			{item("/admin/redemptions", "redemptions", "Redemptions")}
 			{item("/admin/logs", "logs", "Logs")}
 			{item("/admin/settings", "settings", "Settings")}

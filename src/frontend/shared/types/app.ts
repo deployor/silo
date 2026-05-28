@@ -26,7 +26,6 @@ export type FrontendUser = {
 	avatarUrl?: string | null;
 	pendingCollaborationInvites?: number;
 	isAdmin?: boolean;
-	isReviewer?: boolean;
 	isImmortal?: boolean;
 	isLocked?: boolean;
 	lockReason?: string | null;

@@ -9,7 +9,6 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const p = bootstrap.props as {
 		hideNavLinks?: boolean;
 		mainClass?: string;
-		yswsQuotaPerHourHuman?: string;
 	};
 	const [step, setStep] = useState(1);
 
@@ -52,17 +51,16 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						{step === 2 && (
 							<Panel
 								icon="ph-rocket-launch text-red-500"
-								title="Ship Projects."
-								subtitle="Get Paid in Storage."
+								title="Free Storage."
+								subtitle="For Projects That Need Buckets."
 								content={
 									<>
-										Every YSWS project you ship unlocks more permanent cloud
-										storage.
+										Use Silo when your project needs S3-compatible storage
+										without a credit card or cloud account.
 										<br />
 										<span className="text-white font-bold">
-											Shipping is the currency.
-										</span>{" "}
-										Storage is the reward.
+											Create buckets, generate keys, and start uploading.
+										</span>
 									</>
 								}
 								extra={
@@ -73,10 +71,10 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											</div>
 											<div>
 												<h3 className="text-white font-bold text-lg">
-													You ship a project
+													You get storage
 												</h3>
 												<p className="text-text-muted">
-													Submit your YSWS project through Cargo.
+													Your account starts with free object storage.
 												</p>
 											</div>
 										</div>
@@ -86,14 +84,10 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											</div>
 											<div>
 												<h3 className="text-white font-bold text-lg">
-													We expand your quota
+													You stay portable
 												</h3>
 												<p className="text-text-muted">
-													Earn{" "}
-													<span className="text-white font-bold">
-														{p.yswsQuotaPerHourHuman || "quota"}
-													</span>{" "}
-													of storage for every hour.
+													Use standard S3 tools and move your data elsewhere any time.
 												</p>
 											</div>
 										</div>
