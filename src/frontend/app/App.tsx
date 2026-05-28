@@ -7,15 +7,12 @@ import { AdminRedemptionsPage } from "../routes/AdminRedemptionsPage";
 import { AdminSettingsPage } from "../routes/AdminSettingsPage";
 import { AdminSpeedtestPage } from "../routes/AdminSpeedtestPage";
 import { AdminUsersPage } from "../routes/AdminUsersPage";
-import { AdminYswsListPage } from "../routes/AdminYswsListPage";
-import { AdminYswsReviewPage } from "../routes/AdminYswsReviewPage";
 import { AgedOutPage } from "../routes/AgedOutPage";
 import { AccountPage } from "../routes/AccountPage";
 import { AccountDeletedPage } from "../routes/AccountDeletedPage";
 import { DashboardPage } from "../routes/DashboardPage";
 import { DocsPage } from "../routes/DocsPage";
 import { FilesPage } from "../routes/FilesPage";
-import { GalleryPage } from "../routes/GalleryPage";
 import { LandingPage } from "../routes/LandingPage";
 import { LockedPage } from "../routes/LockedPage";
 import { OffboardingPage } from "../routes/OffboardingPage";
@@ -23,8 +20,6 @@ import { OnboardingPage } from "../routes/OnboardingPage";
 import { RedeemPage } from "../routes/RedeemPage";
 import { SlackSuccessPage } from "../routes/SlackSuccessPage";
 import { WipPage } from "../routes/WipPage";
-import { YswsListPage } from "../routes/YswsListPage";
-import { YswsSubmitPage } from "../routes/YswsSubmitPage";
 import type { AppBootstrap } from "../shared/types/app";
 
 type Props = { bootstrap: AppBootstrap };
@@ -66,16 +61,6 @@ export function App({ bootstrap }: Props) {
 			return <AdminRedemptionDetailsPage bootstrap={bootstrap} />;
 		case "admin-redemption-generated":
 			return <AdminRedemptionGeneratedPage bootstrap={bootstrap} />;
-		case "admin-ysws":
-			return <AdminYswsListPage bootstrap={bootstrap} />;
-		case "admin-ysws-review":
-			return <AdminYswsReviewPage bootstrap={bootstrap} />;
-		case "ysws-list":
-			return <YswsListPage bootstrap={bootstrap} />;
-		case "ysws-submit":
-			return <YswsSubmitPage bootstrap={bootstrap} />;
-		case "gallery":
-			return <GalleryPage bootstrap={bootstrap} />;
 		case "redeem":
 			return <RedeemPage bootstrap={bootstrap} />;
 		case "slack-success":

@@ -8,7 +8,6 @@ import {
 } from "../../services/collaboration-service";
 import { getBucketDeepFreezeMessage } from "../../services/deep-freeze-service";
 import { getAppSettings } from "../../services/settings-service";
-import { YswsService } from "../../services/ysws-service";
 import { handleApiRequest } from "./api/index";
 import { handleAuthRequest } from "./auth";
 import { handleOffboardingRequest } from "./offboarding";
@@ -37,13 +36,10 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 					pendingCollaborationInvites: await listPendingInviteCount(user.id),
 				}
 			: null;
-		const settings = await getAppSettings();
 		const html = await render("docs", {
 			title: "Documentation - Silo",
 			user: viewUser,
 			s3Domain: config.s3Domain,
-			yswsQuotaPerHour: settings.yswsQuotaPerHourBytes,
-			yswsBonusTiers: settings.yswsBonusTiers,
 		});
 
 		return new Response(html, {
@@ -67,7 +63,6 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 			hideNavLinks: true,
 			mainClass: "flex flex-col items-center justify-center",
 			defaultStorageLimitHuman: formatBytes(settings.defaultStorageLimitBytes),
-			yswsQuotaPerHourHuman: formatBytes(settings.yswsQuotaPerHourBytes),
 		});
 		return new Response(html, {
 			headers: { "Content-Type": "text/html" },
@@ -101,14 +96,11 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 	const user = await getCurrentUser(req);
 	if (!user) {
-		const settings = await getAppSettings();
 		const html = await render("landing", {
 			title: "Silo S3 Gateway",
 			layout: "main",
 			hideNavLinks: true,
 			mainClass: "flex flex-col items-center justify-center",
-			yswsQuotaPerHour: settings.yswsQuotaPerHourBytes,
-			yswsBonusTiers: settings.yswsBonusTiers,
 		});
 		return new Response(html, {
 			headers: { "Content-Type": "text/html" },
@@ -199,16 +191,10 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		});
 	}
 
-	const submissions = await YswsService.getSubmissionsByUserId(user.id);
-	const latestSubmission = submissions.length > 0 ? submissions[0] : null;
-
-	const settings = await getAppSettings();
 	const html = await render("dashboard", {
 		title: "Dashboard - Silo",
 		user: viewUser,
 		s3Domain: config.s3Domain,
-		latestSubmission,
-		yswsQuotaPerHourHuman: formatBytes(settings.yswsQuotaPerHourBytes),
 	});
 
 	return new Response(html, {

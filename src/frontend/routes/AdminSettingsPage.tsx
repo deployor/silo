@@ -4,22 +4,12 @@ import { AppShell } from "../components/AppShell";
 import { fetchJson, fetchText } from "../shared/api/http";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 
-type BonusTier = {
-	hours: number;
-	percent: number;
-	enabled: boolean;
-};
-
-type BonusTierRow = BonusTier & { id: string };
-
 type SettingsPayload = {
 	defaultStorageLimitBytes: number;
 	egressMultiplier: number;
 	minEgressBytes: number;
 	defaultMaxBucketsPerUser: number;
 	defaultMaxKeysPerBucket: number;
-	yswsQuotaPerHourBytes: number;
-	yswsBonusTiers?: BonusTier[];
 };
 
 const UNITS = [
@@ -66,11 +56,6 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [maxBuckets, setMaxBuckets] = useState(1);
 	const [maxKeys, setMaxKeys] = useState(2);
 
-	const [yswsAmount, setYswsAmount] = useState(100);
-	const [yswsUnit, setYswsUnit] = useState(1024 ** 2);
-
-	const [tiers, setTiers] = useState<BonusTierRow[]>([]);
-
 	const loadSettings = useCallback(async () => {
 		setLoading(true);
 		setStatus("Loading...");
@@ -90,16 +75,6 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			setMaxBuckets(data.defaultMaxBucketsPerUser);
 			setMaxKeys(data.defaultMaxKeysPerBucket);
 
-			const ysws = toAmountUnit(data.yswsQuotaPerHourBytes || 0);
-			setYswsAmount(ysws.amount);
-			setYswsUnit(ysws.unit);
-
-			setTiers(
-				(data.yswsBonusTiers || []).map((tier) => ({
-					id: crypto.randomUUID(),
-					...tier,
-				})),
-			);
 			setStatus("Loaded");
 		} catch (e) {
 			setStatus(e instanceof Error ? e.message : "Failed to load settings");
@@ -125,8 +100,6 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				minEgressBytes: toBytes(minEgressAmount, minEgressUnit),
 				defaultMaxBucketsPerUser: maxBuckets,
 				defaultMaxKeysPerBucket: maxKeys,
-				yswsQuotaPerHourBytes: toBytes(yswsAmount, yswsUnit),
-				yswsBonusTiers: tiers.map(({ id: _id, ...tier }) => tier),
 			};
 
 			await fetchText("/api/admin/settings", {
@@ -312,126 +285,6 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<p className="text-xs text-text-muted mt-4">
 								Max keys is enforced when generating access keys.
 							</p>
-						</div>
-
-						<div className="bg-black/30 p-6 rounded-xl border border-white/10">
-							<h4 className="text-white font-bold mb-1">YSWS</h4>
-							<p className="text-xs text-text-muted mb-4">
-								Storage reward per shipped hour.
-							</p>
-							<div className="flex gap-2 items-center mt-3 mb-3">
-								<input
-									type="number"
-									min={0}
-									step="0.01"
-									value={yswsAmount}
-									onChange={(e) => setYswsAmount(Number(e.target.value))}
-									className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white w-full font-mono"
-								/>
-								<select
-									value={yswsUnit}
-									onChange={(e) => setYswsUnit(Number(e.target.value))}
-									className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white cursor-pointer font-mono"
-								>
-									{UNITS.slice(0, 5).map((u) => (
-										<option key={u.value} value={u.value}>
-											{u.label}
-										</option>
-									))}
-								</select>
-							</div>
-						</div>
-
-						<div className="bg-black/30 p-6 rounded-xl border border-white/10 md:col-span-2">
-							<div className="flex justify-between items-center mb-3">
-								<h4 className="text-white font-bold">YSWS Bonus Tiers</h4>
-								<button
-									type="button"
-									onClick={() =>
-										setTiers((prev) => [
-											...prev,
-											{
-												id: crypto.randomUUID(),
-												hours: 50,
-												percent: 5,
-												enabled: true,
-											},
-										])
-									}
-									className="text-xs bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 py-2 rounded-lg transition-colors"
-								>
-									+ Add Tier
-								</button>
-							</div>
-							<p className="text-xs text-text-muted mb-4">
-								Configure automatic bonuses for high-hour projects.
-							</p>
-							<div className="grid grid-cols-12 gap-3 mb-2 text-xs text-text-muted uppercase font-bold tracking-wider">
-								<div className="col-span-4">Hours &gt;</div>
-								<div className="col-span-3">Bonus %</div>
-								<div className="col-span-2 text-center">Enabled</div>
-								<div className="col-span-3" />
-							</div>
-							<div className="space-y-2">
-								{tiers.map((tier) => (
-									<div
-										key={tier.id}
-										className="grid grid-cols-12 gap-3 items-center bg-white/5 p-3 rounded-lg border border-white/5"
-									>
-										<input
-											type="number"
-											value={tier.hours}
-											onChange={(e) =>
-												setTiers((prev) =>
-													prev.map((t) =>
-														t.id === tier.id
-															? { ...t, hours: Number(e.target.value) }
-															: t,
-													),
-												)
-											}
-											className="col-span-4 bg-black/50 border border-white/10 rounded px-2 py-1 text-white font-mono text-sm"
-										/>
-										<input
-											type="number"
-											value={tier.percent}
-											onChange={(e) =>
-												setTiers((prev) =>
-													prev.map((t) =>
-														t.id === tier.id
-															? { ...t, percent: Number(e.target.value) }
-															: t,
-													),
-												)
-											}
-											className="col-span-3 bg-black/50 border border-white/10 rounded px-2 py-1 text-white font-mono text-sm"
-										/>
-										<input
-											type="checkbox"
-											checked={tier.enabled}
-											onChange={(e) =>
-												setTiers((prev) =>
-													prev.map((t) =>
-														t.id === tier.id
-															? { ...t, enabled: e.target.checked }
-															: t,
-													),
-												)
-											}
-											className="col-span-2"
-										/>
-										<button
-											type="button"
-											onClick={() =>
-												setTiers((prev) => prev.filter((t) => t.id !== tier.id))
-											}
-											className="col-span-3 text-red-400 hover:text-red-300 text-xs font-bold px-2 py-1 text-right"
-										>
-											Delete
-										</button>
-									</div>
-								))}
-							</div>
 						</div>
 					</div>
 				</div>

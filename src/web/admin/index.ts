@@ -25,7 +25,6 @@ import {
 	updateAppSettings,
 } from "../../services/settings-service";
 import { handleAdminRedemptionsRequest } from "../redemptions";
-import { handleAdminYswsRequest } from "./ysws";
 
 function secureFlag(): string {
 	return config.isProduction ? "; Secure" : "";
@@ -274,7 +273,6 @@ async function listUsers(url: URL, user: typeof users.$inferSelect) {
 			createdAt: users.createdAt,
 			updatedAt: users.updatedAt,
 			isAdmin: users.isAdmin,
-			isReviewer: users.isReviewer,
 			isImmortal: users.isImmortal,
 			isLocked: users.isLocked,
 			lockReason: users.lockReason,
@@ -1205,15 +1203,6 @@ async function lockUser(userId: string, req: Request) {
 	return new Response("Updated", { status: 200 });
 }
 
-async function toggleUserReviewer(userId: string, req: Request) {
-	const body = await req.json();
-	await db
-		.update(users)
-		.set({ isReviewer: body.isReviewer })
-		.where(eq(users.id, userId));
-	return new Response("Updated", { status: 200 });
-}
-
 async function toggleUserImmortal(userId: string, req: Request) {
 	const body = await req.json();
 	await db
@@ -1687,14 +1676,6 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 
 	const path = url.pathname;
 
-	// YSWS reviewers can access YSWS admin
-	if (path.startsWith("/admin/ysws")) {
-		if (!user.isAdmin && !user.isReviewer) {
-			return new Response("Forbidden", { status: 403 });
-		}
-		return handleAdminYswsRequest(req, user);
-	}
-
 	if (!user.isAdmin) {
 		return new Response("Forbidden", { status: 403 });
 	}
@@ -1958,16 +1939,6 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				minEgressBytes: z.number().int().min(0),
 				defaultMaxBucketsPerUser: z.number().int().min(1).max(10000),
 				defaultMaxKeysPerBucket: z.number().int().min(1).max(10000),
-				yswsQuotaPerHourBytes: z.number().int().min(0),
-				yswsBonusTiers: z
-					.array(
-						z.object({
-							hours: z.number().min(0),
-							percent: z.number().min(0),
-							enabled: z.boolean(),
-						}),
-					)
-					.optional(),
 			});
 
 			const body = await req.json().catch(() => null);
@@ -1993,14 +1964,6 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		const userLockMatch = path.match(/^\/api\/admin\/users\/([^/]+)\/lock$/);
 		if (userLockMatch && req.method === "POST") {
 			return lockUser(userLockMatch[1], req);
-		}
-
-		// Toggle Reviewer Status
-		const userReviewerMatch = path.match(
-			/^\/api\/admin\/users\/([^/]+)\/reviewer$/,
-		);
-		if (userReviewerMatch && req.method === "POST") {
-			return toggleUserReviewer(userReviewerMatch[1], req);
 		}
 
 		// Toggle Immortal Status

@@ -64,8 +64,6 @@
       <div class="flex items-center gap-6 font-bold text-sm">
         {{#unless hideNavLinks}}
           {{#if user}}
-            <a href="/ysws" class="text-white hover:text-hc-green transition-colors font-bold border border-white/20 rounded px-3 py-1 bg-white/5 hover:bg-white/10">YSWS</a>
-            <a href="/cdn" class="text-text-muted hover:text-white transition-colors">CDN</a>
             <a href="/docs" class="text-text-muted hover:text-white transition-colors">Docs</a>
             <div class="flex items-center gap-2 min-w-0">
               <img id="user-avatar" src="{{user.avatarUrl}}" alt="User Avatar" class="w-6 h-6 rounded-full {{#unless user.avatarUrl}}hidden{{/unless}}" />
@@ -78,10 +76,6 @@
             </div>
             {{#if user.isAdmin}}
               <a href="/admin" id="admin-link" class="text-text-muted hover:text-white transition-colors">Admin</a>
-            {{else}}
-              {{#if user.isReviewer}}
-                <a href="/admin/ysws" id="admin-link" class="text-text-muted hover:text-white transition-colors">Admin</a>
-              {{/if}}
             {{/if}}
             <a href="/auth/logout" class="text-hc-red hover:text-white transition-colors" id="logout-link">Logout</a>
             <script>

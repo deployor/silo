@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-	MdAccessTimeFilled,
 	MdArrowForward,
 	MdCheck,
 	MdCheckCircle,
@@ -13,7 +12,6 @@ import {
 	MdGroups,
 	MdInfoOutline,
 	MdKey,
-	MdOutlineRocketLaunch,
 	MdPublic,
 	MdSevereCold,
 	MdSync,
@@ -217,8 +215,6 @@ function formatDurationEstimate(totalSeconds: number | null | undefined) {
 export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const p = bootstrap.props as {
 		user?: FrontendUser | null;
-		latestSubmission?: { status?: string; projectName?: string } | null;
-		yswsQuotaPerHourHuman?: string;
 	};
 	const customDomainsEnabled =
 		bootstrap.config?.customDomainsEnabled === true;
@@ -1270,45 +1266,6 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					</a>
 				</div>
 			) : null}
-
-			<div className="mb-10">
-				{stats?.user.isImmortal ? null : p.latestSubmission?.status ===
-					"pending" ? (
-					<div className="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow">
-						<div className="inline-flex items-center gap-2 bg-yellow-500/10 text-yellow-400 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 border border-yellow-500/20">
-							<MdAccessTimeFilled className="animate-pulse" /> Under Review
-						</div>
-						<h2 className="text-3xl font-black text-white italic tracking-tight mb-2">
-							“{p.latestSubmission.projectName}” is in the pipeline.
-						</h2>
-						<p className="text-text-muted text-lg max-w-xl">
-							We're reviewing your submission. Once approved, your storage quota
-							will be upgraded automatically.
-						</p>
-					</div>
-				) : (
-					<div className="bg-hc-dark rounded-3xl card-shadow border border-white/10 p-8">
-						<h2 className="text-3xl md:text-4xl font-black text-white italic tracking-tight mb-3">
-							Ship projects.{" "}
-							<span className="text-hc-red">Get paid in storage.</span>
-						</h2>
-						<p className="text-text-muted text-lg max-w-xl mb-6">
-							Built something cool? Submit it to YSWS. Every shipped hour
-							unlocks{" "}
-							<span className="text-white font-bold">
-								{p.yswsQuotaPerHourHuman || "more"} of permanent storage
-							</span>
-							.
-						</p>
-						<a
-							href="/ysws/submit"
-							className="bg-hc-red hover:bg-red-500 text-white px-8 py-4 rounded-xl text-lg font-bold transition-all shadow-lg shadow-hc-red/20 inline-flex items-center gap-3"
-						>
-							<MdOutlineRocketLaunch /> Ship a Project
-						</a>
-					</div>
-				)}
-			</div>
 
 			<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 				<div className="bg-hc-dark rounded-3xl p-6 border border-white/10 card-shadow">

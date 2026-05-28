@@ -2,20 +2,12 @@ import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { appSettings } from "../db/schema";
 
-export type YswsBonusTier = {
-	hours: number;
-	percent: number;
-	enabled: boolean;
-};
-
 export type AppSettings = {
 	defaultStorageLimitBytes: number;
 	egressMultiplier: number;
 	minEgressBytes: number;
 	defaultMaxBucketsPerUser: number;
 	defaultMaxKeysPerBucket: number;
-	yswsQuotaPerHourBytes: number;
-	yswsBonusTiers: YswsBonusTier[];
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -24,8 +16,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 	minEgressBytes: 10 * 1024 * 1024 * 1024, // 10GB
 	defaultMaxBucketsPerUser: 50,
 	defaultMaxKeysPerBucket: 20,
-	yswsQuotaPerHourBytes: 1_073_741_824, // 1GB
-	yswsBonusTiers: [],
 };
 
 let cached: { value: AppSettings; fetchedAtMs: number } | null = null;
@@ -43,8 +33,6 @@ async function ensureRowExists() {
 			minEgressBytes: DEFAULT_APP_SETTINGS.minEgressBytes,
 			defaultMaxBucketsPerUser: DEFAULT_APP_SETTINGS.defaultMaxBucketsPerUser,
 			defaultMaxKeysPerBucket: DEFAULT_APP_SETTINGS.defaultMaxKeysPerBucket,
-			yswsQuotaPerHourBytes: DEFAULT_APP_SETTINGS.yswsQuotaPerHourBytes,
-			yswsBonusTiers: JSON.stringify(DEFAULT_APP_SETTINGS.yswsBonusTiers),
 		})
 		.onConflictDoNothing();
 }
@@ -66,10 +54,6 @@ export async function getAppSettings(force = false): Promise<AppSettings> {
 				minEgressBytes: Number(row.minEgressBytes),
 				defaultMaxBucketsPerUser: Number(row.defaultMaxBucketsPerUser),
 				defaultMaxKeysPerBucket: Number(row.defaultMaxKeysPerBucket),
-				yswsQuotaPerHourBytes: Number(row.yswsQuotaPerHourBytes),
-				yswsBonusTiers: row.yswsBonusTiers
-					? JSON.parse(row.yswsBonusTiers)
-					: [],
 			}
 		: DEFAULT_APP_SETTINGS;
 
@@ -93,8 +77,6 @@ export async function updateAppSettings(patch: Partial<AppSettings>) {
 			minEgressBytes: next.minEgressBytes,
 			defaultMaxBucketsPerUser: next.defaultMaxBucketsPerUser,
 			defaultMaxKeysPerBucket: next.defaultMaxKeysPerBucket,
-			yswsQuotaPerHourBytes: next.yswsQuotaPerHourBytes,
-			yswsBonusTiers: JSON.stringify(next.yswsBonusTiers),
 			updatedAt: new Date(),
 		})
 		.where(eq(appSettings.id, "global"));

@@ -17,7 +17,6 @@ type UserRow = {
 	egressLimitBytes: number | null;
 	egressBytes: number;
 	isAdmin: boolean;
-	isReviewer: boolean;
 	isImmortal: boolean;
 	isLocked: boolean;
 	lockReason?: string | null;
@@ -210,16 +209,6 @@ function StatusBadges({ user }: { user: UserRow }) {
 				className="bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded text-xs font-bold border border-purple-500/30"
 			>
 				ADMIN
-			</span>,
-		);
-	} else if (user.isReviewer) {
-		badges.push(
-			<span
-				key="reviewer"
-				title="YSWS Reviewer Access"
-				className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-xs font-bold border border-emerald-500/30"
-			>
-				REVIEWER
 			</span>,
 		);
 	}
@@ -546,11 +535,6 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				await patchUser("lock", { isLocked, lockReason: value || null });
 			},
 		});
-	};
-
-	const toggleReviewer = async (isReviewer: boolean) => {
-		setSelected((prev) => (prev ? { ...prev, isReviewer } : prev));
-		await patchUser("reviewer", { isReviewer });
 	};
 
 	const toggleImmortal = async (isImmortal: boolean) => {
@@ -1131,13 +1115,6 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										color="red"
 										label="Account Locked"
 										disabled={userActionLoading === "lock"}
-									/>
-									<Toggle
-										checked={selected.isReviewer}
-										onChange={toggleReviewer}
-										color="green"
-										label="YSWS Reviewer"
-										disabled={userActionLoading === "reviewer"}
 									/>
 									<Toggle
 										checked={selected.isImmortal}

@@ -193,12 +193,6 @@ export function AppShell({
 									</button>
 								) : null}
 								<a
-									href="/ysws"
-									className="silo-nav-link text-white hover:text-hc-red font-bold border border-white/20 rounded-lg bg-white/5 hover:bg-white/10"
-								>
-									YSWS
-								</a>
-								<a
 									href="/docs"
 									className="silo-nav-link"
 								>
@@ -228,13 +222,6 @@ export function AppShell({
 								{user.isAdmin ? (
 									<a
 										href="/admin/users"
-										className="silo-nav-link"
-									>
-										Admin
-									</a>
-								) : user.isReviewer ? (
-									<a
-										href="/admin/ysws"
 										className="silo-nav-link"
 									>
 										Admin
