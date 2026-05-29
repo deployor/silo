@@ -1,12 +1,11 @@
 import { eq } from "drizzle-orm";
-import { XMLParser } from "fast-xml-parser";
 import { config } from "../config";
 import { getInternalPath } from "../core/s3/utils";
 import { db } from "../db";
 import { buckets, users } from "../db/schema";
 import { s3Client } from "../lib/s3-client";
+import { parseS3Xml } from "../lib/s3-xml";
 
-const parser = new XMLParser();
 const PAGE_SIZE = 1000;
 
 async function sumPrefixBytes(prefix: string): Promise<number> {
@@ -30,7 +29,7 @@ async function sumPrefixBytes(prefix: string): Promise<number> {
 		}
 
 		const xml = await response.text();
-		const result = parser.parse(xml).ListBucketResult;
+		const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
 		const contents = result?.Contents
 			? Array.isArray(result.Contents)
 				? result.Contents
