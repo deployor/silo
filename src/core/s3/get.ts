@@ -5,6 +5,7 @@ import {
 	diskCacheGet,
 	diskCacheGetPath,
 	diskCachePut,
+	diskCachePutStream,
 	getDiskCacheMinSizeBytes,
 	isDiskCacheEligible,
 	recordDemand,
@@ -14,13 +15,15 @@ import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
 import {
-	rewriteListObjectsV2Response,
+	rewriteListObjectsResponse,
 	rewriteMultipartUploadResponse,
 } from "../../lib/xml-rewriter";
 import { buildCorsConfig } from "./cors";
 import {
 	filterUpstreamHeaders,
 	getInternalPath,
+	getListCacheVersion,
+	getObjectCacheKeys,
 	stripAuthQueryParams,
 } from "./utils";
 
@@ -201,23 +204,6 @@ ${rulesXml}
 
 	if (isListObjects) {
 		const query = url.searchParams;
-		// Redis Cache Check for ListObjects
-		const queryStr = query.toString();
-		const cacheKeyList = `s3:list:${bucket.name}:${queryStr}`;
-
-		try {
-			const cachedList = await redis.get(cacheKeyList);
-			if (cachedList) {
-				const headers = new Headers({ "Content-Type": "application/xml" });
-				for (const [k, v] of corsHeaders.entries()) {
-					headers.set(k, v);
-				}
-				return new Response(cachedList, { headers });
-			}
-		} catch (e) {
-			console.error("Redis list cache error:", e);
-		}
-
 		const userPrefix = query.get("prefix") || "";
 		const internalPrefix = getInternalPath(
 			userPrefix,
@@ -239,21 +225,45 @@ ${rulesXml}
 			);
 		}
 
+		if (query.has("marker")) {
+			newQuery.set(
+				"marker",
+				getInternalPath(
+					query.get("marker") as string,
+					user || undefined,
+					bucket,
+				),
+			);
+		}
+
 		const cleanUrl = stripAuthQueryParams(
 			new URL(`http://localhost/?${newQuery.toString()}`),
 		);
+		const cleanQueryStr = cleanUrl.searchParams.toString();
+		const listVersion = await getListCacheVersion(bucket.id);
+		const cacheKeyList = `s3:list:${bucket.id}:${listVersion}:${listType || "1"}:${cleanQueryStr}`;
 
-		const response = await s3Client.fetch(
-			`?${cleanUrl.searchParams.toString()}`,
-			{
-				method: "GET",
-				headers: filterUpstreamHeaders(req.headers),
-			},
-		);
+		try {
+			const cachedList = await redis.get(cacheKeyList);
+			if (cachedList) {
+				const headers = new Headers({ "Content-Type": "application/xml" });
+				for (const [k, v] of corsHeaders.entries()) {
+					headers.set(k, v);
+				}
+				return new Response(cachedList, { headers });
+			}
+		} catch (e) {
+			console.error("Redis list cache error:", e);
+		}
+
+		const response = await s3Client.fetch(`?${cleanQueryStr}`, {
+			method: "GET",
+			headers: filterUpstreamHeaders(req.headers),
+		});
 
 		const xml = await response.text();
 		const rootPrefix = getInternalPath("", user || undefined, bucket);
-		const rewrittenXml = rewriteListObjectsV2Response(xml, rootPrefix);
+		const rewrittenXml = rewriteListObjectsResponse(xml, rootPrefix);
 
 		if (response.status === 200) {
 			redis.set(cacheKeyList, rewrittenXml, "EX", 21600).catch((e) => {
@@ -325,9 +335,10 @@ ${rulesXml}
 
 	try {
 		// Redis Cache Check for Object (L1)
-		const cacheKeyBody = `s3:body:${bucket.name}:${key}`;
-		const cacheKeyMeta = `s3:meta:${bucket.name}:${key}`;
-		const cachePopulationId = `${bucket.name}\0${key}`;
+		const cacheKeys = getObjectCacheKeys(bucket.id, key);
+		const cacheKeyBody = cacheKeys.body;
+		const cacheKeyMeta = cacheKeys.meta;
+		const cachePopulationId = `${bucket.id}\0${key}`;
 		const rangeHeader = req.headers.get("range");
 		const isCacheable =
 			!url.searchParams.has("uploadId") && !isOffboardingExport;
@@ -337,16 +348,19 @@ ${rulesXml}
 
 		// Record demand for smart disk cache admission tracking
 		if (isCacheable && key !== "") {
-			recordDemand(bucket.name, key, 0); // size filled in later
+			recordDemand(bucket.id, key, 0); // size filled in later
 		}
 
 		// Conditional request check (ETag / 304 Not Modified)
-		if (isCacheable && key !== "") {
+		if (isSimpleGet && key !== "") {
 			const ifNoneMatch = req.headers.get("if-none-match");
 			if (ifNoneMatch) {
 				try {
-					const cachedMeta = await redis.get(cacheKeyMeta);
-					if (cachedMeta) {
+					const [cachedBodyFor304, cachedMeta] = await Promise.all([
+						redis.exists(cacheKeyBody),
+						redis.get(cacheKeyMeta),
+					]);
+					if (cachedBodyFor304 && cachedMeta) {
 						const meta = JSON.parse(cachedMeta);
 						const cachedEtag = meta.etag || meta.ETag || "";
 						// Normalize: strip weak validator prefix, compare
@@ -388,12 +402,9 @@ ${rulesXml}
 					);
 
 					if (cachedSize >= diskMinSize || cachedSize >= REDIS_CACHE_LIMIT) {
-						Promise.all([
-							redis.del(cacheKeyBody),
-							redis.del(cacheKeyMeta),
-						]).catch(() => undefined);
+						redis.del(cacheKeyBody, cacheKeyMeta).catch(() => undefined);
 					} else {
-						recordDemand(bucket.name, key, cachedSize);
+						recordDemand(bucket.id, key, cachedSize);
 						for (const [k, v] of corsHeaders.entries()) {
 							headers.set(k, v);
 						}
@@ -456,7 +467,7 @@ ${rulesXml}
 			try {
 				// For Range requests, use path-based access for efficient partial reads
 				if (rangeHeader) {
-					const diskPathHit = await diskCacheGetPath(bucket.name, key);
+					const diskPathHit = await diskCacheGetPath(bucket.id, key);
 					if (diskPathHit) {
 						const headers = new Headers(diskPathHit.meta.headers);
 						for (const [k, v] of corsHeaders.entries()) {
@@ -515,7 +526,7 @@ ${rulesXml}
 						});
 					}
 				} else {
-					const diskHit = await diskCacheGet(bucket.name, key);
+					const diskHit = await diskCacheGet(bucket.id, key);
 					if (diskHit) {
 						const allowed = await reserveEgressQuota(diskHit.meta.size);
 						if (!allowed) {
@@ -582,12 +593,9 @@ ${rulesXml}
 						);
 
 						if (cachedSize >= diskMinSize || cachedSize >= REDIS_CACHE_LIMIT) {
-							Promise.all([
-								redis.del(cacheKeyBody),
-								redis.del(cacheKeyMeta),
-							]).catch(() => undefined);
+							redis.del(cacheKeyBody, cacheKeyMeta).catch(() => undefined);
 						} else {
-							recordDemand(bucket.name, key, cachedSize);
+							recordDemand(bucket.id, key, cachedSize);
 							for (const [k, v] of corsHeaders.entries()) {
 								headers.set(k, v);
 							}
@@ -613,7 +621,7 @@ ${rulesXml}
 						}
 					}
 
-					const diskHitAfterWait = await diskCacheGet(bucket.name, key);
+					const diskHitAfterWait = await diskCacheGet(bucket.id, key);
 					if (diskHitAfterWait) {
 						const allowed = await reserveEgressQuota(
 							diskHitAfterWait.meta.size,
@@ -709,6 +717,17 @@ ${rulesXml}
 		const contentLengthNum = contentLength
 			? Number.parseInt(contentLength, 10)
 			: 0;
+		if (
+			!contentLength &&
+			shouldConsumeQuota &&
+			!isOffboardingExport &&
+			user &&
+			!user.isImmortal
+		) {
+			return S3Errors.InvalidRequest(
+				"Upstream response is missing Content-Length for quota enforcement.",
+			).toResponse();
+		}
 		const allowed = await reserveEgressQuota(contentLengthNum);
 		if (!allowed) {
 			return S3Errors.QuotaExceeded(
@@ -749,7 +768,7 @@ ${rulesXml}
 
 			// Update demand tracker with actual size
 			if (key !== "") {
-				recordDemand(bucket.name, key, sizeHint);
+				recordDemand(bucket.id, key, sizeHint);
 			}
 
 			if (shouldCacheRedis || shouldCacheDisk) {
@@ -759,6 +778,27 @@ ${rulesXml}
 				// Background cache population — fires and forgets
 				const cacheWritePromise = (async () => {
 					try {
+						const headersObj: Record<string, string> = {};
+						for (const [k, v] of headers.entries()) {
+							headersObj[k] = v;
+						}
+
+						if (shouldCacheDisk && !shouldCacheRedis) {
+							const cached = await diskCachePutStream(
+								bucket.id,
+								key,
+								stream2,
+								sizeHint,
+								headersObj,
+							);
+							if (cached && process.env.DEBUG_S3_CACHE === "1") {
+								console.log(
+									`[disk-cache] streamed ${bucket.name}/${key} (${(sizeHint / (1024 * 1024)).toFixed(1)} MB)`,
+								);
+							}
+							return;
+						}
+
 						const reader = stream2.getReader();
 						const chunks: Uint8Array[] = [];
 						let totalSize = 0;
@@ -786,40 +826,30 @@ ${rulesXml}
 							offset += chunk.length;
 						}
 
-						const headersObj: Record<string, string> = {};
-						for (const [k, v] of headers.entries()) {
-							headersObj[k] = v;
-						}
-
 						// L1: Redis (small objects, with TTL to prevent unbounded growth)
 						if (totalSize < REDIS_CACHE_LIMIT) {
 							const REDIS_BODY_TTL = 21600; // 6 hours
-							const REDIS_META_TTL = 43200; // 12 hours
-							await Promise.all([
-								redis.set(
+							await redis
+								.pipeline()
+								.set(
 									cacheKeyMeta,
 									JSON.stringify(headersObj),
 									"EX",
-									REDIS_META_TTL,
-								),
-								redis.set(
-									cacheKeyBody,
-									Buffer.from(buffer),
-									"EX",
 									REDIS_BODY_TTL,
-								),
-							]);
+								)
+								.set(cacheKeyBody, Buffer.from(buffer), "EX", REDIS_BODY_TTL)
+								.exec();
 						}
 
 						// L2: Disk (larger objects, demand-gated)
 						if (isDiskCacheEligible(totalSize)) {
 							const cached = await diskCachePut(
-								bucket.name,
+								bucket.id,
 								key,
 								buffer,
 								headersObj,
 							);
-							if (cached) {
+							if (cached && process.env.DEBUG_S3_CACHE === "1") {
 								console.log(
 									`[disk-cache] cached ${bucket.name}/${key} (${(totalSize / (1024 * 1024)).toFixed(1)} MB)`,
 								);

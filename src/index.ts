@@ -11,7 +11,6 @@ import { S3Errors } from "./lib/s3-errors";
 import { validateOrigin } from "./lib/security";
 import { render } from "./lib/view-engine";
 import { authenticate } from "./middleware/auth";
-import { compressResponse } from "./middleware/compression";
 import { rateLimit } from "./middleware/rate-limit";
 import { securityHeaders } from "./middleware/security-headers";
 import { bucketUsageReconciliationService } from "./services/bucket-usage-reconciliation-service";
@@ -113,7 +112,12 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 
 	// 3. Local/dev fallback: treat normal browser navigation to known dashboard
 	// routes as dashboard even when host doesn't match configured S3 domain.
-	if (!hasAuthHeader && !hasAmzParams && isBrowserNavigation && isDashboardHost) {
+	if (
+		!hasAuthHeader &&
+		!hasAmzParams &&
+		isBrowserNavigation &&
+		isDashboardHost
+	) {
 		if (path === "/") return true;
 		if (dashboardPaths.some((p) => p !== "/" && path.startsWith(p))) {
 			return true;
@@ -147,8 +151,9 @@ const server = Bun.serve({
 				let response: Response = new Response("Internal Error", {
 					status: 500,
 				});
+				const isDashboard = isDashboardRequest(req, url);
 
-				if (isDashboardRequest(req, url)) {
+				if (isDashboard) {
 					// Health check — no rate limiting, no auth
 					if (url.pathname === "/health") {
 						try {
@@ -315,15 +320,9 @@ const server = Bun.serve({
 
 					if (!response) response = S3Errors.InternalError().toResponse();
 
-					// Compress compressible S3 GET responses
-					const currentCtx = context.getStore();
-					if (
-						req.method === "GET" &&
-						response.ok &&
-						!currentCtx?.isOffboardingExport
-					) {
-						response = await compressResponse(req, response);
-					}
+					// Do not compress proxied S3 objects here: compression buffers the
+					// full body and destroys streaming latency. CDN/client compression can
+					// handle generated small responses outside the S3 object hot path.
 				}
 
 				// Post-request logging and stats
@@ -337,7 +336,7 @@ const server = Bun.serve({
 					!ctx.isOffboardingExport &&
 					!(ctx.path.startsWith("/") && disableS3Stats)
 				) {
-					const isS3Request = !isDashboardRequest(req, url);
+					const isS3Request = !isDashboard;
 					if (!(disableS3Stats && isS3Request)) {
 						// For PUT requests, we might have already logged ingress in the handler
 						// But for general stats, we do it here.
@@ -363,7 +362,7 @@ const server = Bun.serve({
 					}
 				}
 
-				const isS3 = !isDashboardRequest(req, url);
+				const isS3 = !isDashboard;
 				return securityHeaders(req, response, isS3);
 			},
 		);

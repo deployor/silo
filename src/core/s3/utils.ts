@@ -3,8 +3,129 @@ import { eq } from "drizzle-orm";
 import { config } from "../../config";
 import { db } from "../../db";
 import { buckets, type users } from "../../db/schema";
+import { diskCacheInvalidate } from "../../lib/disk-cache";
+import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { createS3XmlParser } from "../../lib/s3-xml";
+
+const PATH_TRAVERSAL_ERROR = "Invalid Key: Path traversal detected";
+const USER_ID_SAFE_CHARS = /[^a-zA-Z0-9-]/g;
+const RESERVED_BUCKET_NAME = /^[uw][a-z0-9]{7,}$/;
+const AUTH_QUERY_PARAMS = [
+	"X-Amz-Signature",
+	"X-Amz-Credential",
+	"X-Amz-Date",
+	"X-Amz-Algorithm",
+	"X-Amz-SignedHeaders",
+	"X-Amz-Security-Token",
+	"x-amz-signature",
+	"x-amz-credential",
+	"x-amz-date",
+	"x-amz-algorithm",
+	"x-amz-signedheaders",
+	"x-amz-security-token",
+	"X-Amz-Expires",
+	"x-amz-expires",
+] as const;
+const UPSTREAM_HEADER_ALLOWLIST = new Set([
+	"content-type",
+	"content-length",
+	"content-md5",
+	"cache-control",
+	"content-disposition",
+	"content-encoding",
+	"content-language",
+	"expires",
+	"range",
+	"if-match",
+	"if-none-match",
+	"if-modified-since",
+	"if-unmodified-since",
+	"x-amz-tagging",
+	"x-amz-storage-class",
+	"x-amz-acl",
+	"x-amz-grant-read",
+	"x-amz-grant-write",
+	"x-amz-grant-read-acp",
+	"x-amz-grant-write-acp",
+	"x-amz-grant-full-control",
+]);
+
+const listDeleteParser = createS3XmlParser({
+	isArray: (name: string) => name === "Contents",
+});
+
+export function getObjectCacheKeys(bucketId: string, key: string) {
+	return {
+		body: `s3:body:${bucketId}:${key}`,
+		meta: `s3:meta:${bucketId}:${key}`,
+	};
+}
+
+export function getListCacheVersionKey(bucketId: string) {
+	return `s3:listver:${bucketId}`;
+}
+
+export async function getListCacheVersion(bucketId: string) {
+	try {
+		return (await redis.get(getListCacheVersionKey(bucketId))) || "0";
+	} catch (error) {
+		console.error("Failed to read list cache version:", error);
+		return "0";
+	}
+}
+
+export function bumpListCacheVersion(bucketId: string) {
+	return redis.incr(getListCacheVersionKey(bucketId)).catch((error) => {
+		console.error("Failed to bump list cache version:", error);
+	});
+}
+
+export function invalidateObjectCaches(
+	bucketId: string,
+	_bucketName: string,
+	key: string,
+) {
+	const cacheKeys = getObjectCacheKeys(bucketId, key);
+	redis
+		.pipeline()
+		.del(cacheKeys.body, cacheKeys.meta)
+		.incr(getListCacheVersionKey(bucketId))
+		.exec()
+		.catch((error) => {
+			console.error("Failed to invalidate object cache:", error);
+		});
+	diskCacheInvalidate(bucketId, key);
+}
+
+function decodeRepeated(input: string, rounds: number) {
+	let out = input;
+	for (let i = 0; i < rounds; i++) {
+		try {
+			out = decodeURIComponent(out);
+		} catch {
+			break;
+		}
+	}
+	return out;
+}
+
+function assertNoTraversal(rawKey: string) {
+	const decodedKey = decodeRepeated(rawKey, 3);
+
+	if (decodedKey.includes("..") && decodedKey.split("/").includes("..")) {
+		throw new Error(PATH_TRAVERSAL_ERROR);
+	}
+
+	const lowerRaw = rawKey.toLowerCase();
+	if (
+		lowerRaw.includes("%2e%2e") ||
+		lowerRaw.includes("%2e.") ||
+		lowerRaw.includes(".%2e")
+	) {
+		throw new Error(PATH_TRAVERSAL_ERROR);
+	}
+}
 
 export function getKeyFromRequest(req: Request, bucketName: string): string {
 	const url = new URL(req.url);
@@ -34,45 +155,6 @@ export function getKeyFromRequest(req: Request, bucketName: string): string {
 		// Keep the raw key if the path is not valid percent-encoding.
 	}
 
-	// Security: reject path traversal.
-	// Important: `url.pathname` may already have normalized away raw ".." segments
-	// in some runtimes, but keys can still contain encoded traversal like "%2e%2e".
-	// Also note: some stacks decode "%2e%2e" into ".." *before* we see it.
-	const decodeRepeated = (input: string, rounds: number) => {
-		let out = input;
-		for (let i = 0; i < rounds; i++) {
-			try {
-				out = decodeURIComponent(out);
-			} catch {
-				break;
-			}
-		}
-		return out;
-	};
-
-	const assertNoTraversal = (rawKey: string) => {
-		const decodedKey = decodeRepeated(rawKey, 3);
-
-		// 1) Block any literal ".." segment after decoding.
-		if (decodedKey.includes("..")) {
-			const parts = decodedKey.split("/");
-			if (parts.includes("..")) {
-				throw new Error("Invalid Key: Path traversal detected");
-			}
-		}
-
-		// 2) Block any *encoded* dot-segments that might be normalized later.
-		// We check case-insensitively on the raw key too, to stop bypasses like "%2E%2E".
-		const lowerRaw = rawKey.toLowerCase();
-		if (
-			lowerRaw.includes("%2e%2e") ||
-			lowerRaw.includes("%2e.") ||
-			lowerRaw.includes(".%2e")
-		) {
-			throw new Error("Invalid Key: Path traversal detected");
-		}
-	};
-
 	assertNoTraversal(key);
 
 	return key;
@@ -83,28 +165,7 @@ export function getInternalPath(
 	user: typeof users.$inferSelect | null | undefined,
 	bucket: typeof buckets.$inferSelect,
 ): string {
-	// Security: reject path traversal.
-	// NOTE: `key` may contain encoded traversal ("%2e%2e", "%2f") even if it doesn't
-	// literally include "..". Decode repeatedly to catch double-encoding.
-	const decodeRepeated = (input: string, rounds: number) => {
-		let out = input;
-		for (let i = 0; i < rounds; i++) {
-			try {
-				out = decodeURIComponent(out);
-			} catch {
-				break;
-			}
-		}
-		return out;
-	};
-
-	const decodedKey = decodeRepeated(key, 3);
-	if (decodedKey.includes("..")) {
-		const parts = decodedKey.split("/");
-		if (parts.includes("..")) {
-			throw new Error("Invalid Key: Path traversal detected");
-		}
-	}
+	assertNoTraversal(key);
 
 	const cleanKey = key.startsWith("/") ? key.slice(1) : key;
 
@@ -116,29 +177,13 @@ export function getInternalPath(
 		throw new Error("User required for non-system buckets");
 	}
 
-	const sanitizedUserId = user.id.replace(/[^a-zA-Z0-9-]/g, "_");
+	const sanitizedUserId = user.id.replace(USER_ID_SAFE_CHARS, "_");
 	return `users/${sanitizedUserId}/${bucket.name}/${cleanKey}`;
 }
 
 export function stripAuthQueryParams(url: URL): URL {
 	const newUrl = new URL(url.toString());
-	const paramsToRemove = [
-		"X-Amz-Signature",
-		"X-Amz-Credential",
-		"X-Amz-Date",
-		"X-Amz-Algorithm",
-		"X-Amz-SignedHeaders",
-		"X-Amz-Security-Token",
-		"x-amz-signature",
-		"x-amz-credential",
-		"x-amz-date",
-		"x-amz-algorithm",
-		"x-amz-signedheaders",
-		"x-amz-security-token",
-		"X-Amz-Expires",
-		"x-amz-expires",
-	];
-	for (const p of paramsToRemove) {
+	for (const p of AUTH_QUERY_PARAMS) {
 		newUrl.searchParams.delete(p);
 	}
 	return newUrl;
@@ -146,34 +191,10 @@ export function stripAuthQueryParams(url: URL): URL {
 
 export function filterUpstreamHeaders(reqHeaders: Headers): Headers {
 	const upstreamHeaders = new Headers();
-	const allowedHeaders = [
-		"content-type",
-		"content-length",
-		"content-md5",
-		"cache-control",
-		"content-disposition",
-		"content-encoding",
-		"content-language",
-		"expires",
-		"range",
-		"if-match",
-		"if-none-match",
-		"if-modified-since",
-		"if-unmodified-since",
-		"x-amz-tagging",
-		"x-amz-storage-class",
-		"x-amz-acl",
-		"x-amz-grant-read",
-		"x-amz-grant-write",
-		"x-amz-grant-read-acp",
-		"x-amz-grant-write-acp",
-		"x-amz-grant-full-control",
-	];
-
 	reqHeaders.forEach((value, key) => {
 		const lowerKey = key.toLowerCase();
 		if (
-			allowedHeaders.includes(lowerKey) ||
+			UPSTREAM_HEADER_ALLOWLIST.has(lowerKey) ||
 			lowerKey.startsWith("x-amz-meta-")
 		) {
 			upstreamHeaders.set(key, value);
@@ -184,7 +205,7 @@ export function filterUpstreamHeaders(reqHeaders: Headers): Headers {
 }
 
 export function isReservedBucketName(name: string): boolean {
-	return /^[uw][a-z0-9]{7,}$/.test(name);
+	return RESERVED_BUCKET_NAME.test(name);
 }
 
 export async function deleteBucketContents(prefix: string) {
@@ -201,11 +222,7 @@ export async function deleteBucketContents(prefix: string) {
 		if (!res.ok) throw new Error(`Failed to list objects: ${res.status}`);
 
 		const xml = await res.text();
-		// Ensure array handling is consistent
-		const parser = createS3XmlParser({
-			isArray: (name) => name === "Contents",
-		});
-		const result = parser.parse(xml).ListBucketResult;
+		const result = listDeleteParser.parse(xml).ListBucketResult;
 
 		if (!result.Contents || result.Contents.length === 0) break;
 
@@ -293,7 +310,10 @@ export async function rewriteCopySourceHeader(
 		internalPath = `system/${sourceBucket.name}/${key}`;
 	} else {
 		if (!sourceBucket.userId) return null;
-		const sanitizedUserId = sourceBucket.userId.replace(/[^a-zA-Z0-9-]/g, "_");
+		const sanitizedUserId = sourceBucket.userId.replace(
+			USER_ID_SAFE_CHARS,
+			"_",
+		);
 		internalPath = `users/${sanitizedUserId}/${sourceBucket.name}/${key}`;
 	}
 

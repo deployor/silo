@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { config } from "../config";
 import { getKeyFromRequest } from "../core/s3/utils";
@@ -24,6 +24,7 @@ import { getBucketDeepFreezeMessage } from "../services/deep-freeze-service";
 const S3_DOMAIN = config.s3Domain;
 const AUTH_CACHE_TTL_SECONDS = 300;
 const AUTH_USER_CACHE_TTL_SECONDS = 15;
+const HEX_HMAC_SHA256 = /^[0-9a-fA-F]{64}$/;
 
 type CachedPublicAuth = {
 	bucket: typeof buckets.$inferSelect;
@@ -95,6 +96,16 @@ function getDate(req: Request) {
 		req.headers.get("x-amz-date") ||
 		url.searchParams.get("X-Amz-Date") ||
 		url.searchParams.get("x-amz-date")
+	);
+}
+
+function secureHexEquals(expected: string, actual: string) {
+	if (expected.length !== actual.length || !HEX_HMAC_SHA256.test(actual)) {
+		return false;
+	}
+	return timingSafeEqual(
+		Buffer.from(expected, "hex"),
+		Buffer.from(actual, "hex"),
 	);
 }
 
@@ -314,7 +325,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 		}
 
 		const bucket = authContext.bucket;
-		let user: typeof users.$inferSelect | null = authContext.userId
+		const user: typeof users.$inferSelect | null = authContext.userId
 			? await getFreshUserById(authContext.userId)
 			: null;
 
@@ -345,13 +356,6 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 			}
 			return S3Errors.AccessDenied().toResponse();
 		}
-
-		// Always refresh dynamic user fields for quota checks (storage/egress/lock/immortal).
-		const freshUser = await getFreshUserById(user.id);
-		if (!freshUser) {
-			return S3Errors.AccessDenied().toResponse();
-		}
-		user = freshUser;
 
 		if (user.isLocked) {
 			return S3Errors.AccessDenied(
@@ -406,7 +410,7 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 			const expectedSignature = createHmac("sha256", config.hcAuth.clientSecret)
 				.update(`${bucket.name}:${key}:${expires}`)
 				.digest("hex");
-			if (signature !== expectedSignature) {
+			if (!secureHexEquals(expectedSignature, signature)) {
 				return S3Errors.AccessDenied("Invalid signed URL.").toResponse();
 			}
 		} else {
@@ -499,17 +503,10 @@ export const authenticate = async (req: Request): Promise<AuthResult> => {
 
 	const bucket = authContext.bucket;
 	const key = authContext.key;
-	let user = await getFreshUserById(authContext.userId);
+	const user = await getFreshUserById(authContext.userId);
 	if (!user) {
 		return S3Errors.InvalidAccessKeyId().toResponse();
 	}
-
-	// Always refresh dynamic user fields for quota checks (storage/egress/lock/immortal).
-	const freshUser = await getFreshUserById(user.id);
-	if (!freshUser) {
-		return S3Errors.AccessDenied().toResponse();
-	}
-	user = freshUser;
 
 	if (user.isLocked) {
 		return S3Errors.AccessDenied("Account is temporarily locked.").toResponse();

@@ -56,6 +56,8 @@ import {
 import { readFile, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+const META_WRITEBACK_MIN_INTERVAL_MS = 30_000;
+
 // ---------------------------------------------------------------------------
 // Configuration (all tunable via env)
 // ---------------------------------------------------------------------------
@@ -158,6 +160,7 @@ interface EvictCandidate {
 // ---------------------------------------------------------------------------
 
 const demandMap = new Map<string, DemandEntry>();
+const metaWritebackTimes = new Map<string, number>();
 
 function demandKey(bucket: string, key: string): string {
 	return `${bucket}\0${key}`;
@@ -394,19 +397,7 @@ export async function diskCacheGet(
 			return null;
 		}
 
-		// Update hit stats (non-blocking write-back)
-		meta.hitCount++;
-		meta.lastAccess = Date.now();
-		setImmediate(() => {
-			try {
-				writeFileSync(mp, JSON.stringify(meta));
-			} catch {
-				/* best effort */
-			}
-		});
-
-		// Touch atime for OS-level tracking too
-		utimes(bp, new Date(), statSync(bp).mtime).catch(() => {});
+		recordDiskCacheHit(hash, bp, mp, meta);
 
 		// Also update in-memory demand tracker
 		recordDemand(bucket, key, meta.size);
@@ -448,19 +439,7 @@ export async function diskCacheGetPath(
 			return null;
 		}
 
-		// Update hit stats (non-blocking write-back)
-		meta.hitCount++;
-		meta.lastAccess = Date.now();
-		setImmediate(() => {
-			try {
-				writeFileSync(mp, JSON.stringify(meta));
-			} catch {
-				/* best effort */
-			}
-		});
-
-		// Touch atime for OS-level tracking too
-		utimes(bp, new Date(), statSync(bp).mtime).catch(() => {});
+		recordDiskCacheHit(hash, bp, mp, meta);
 
 		// Also update in-memory demand tracker
 		recordDemand(bucket, key, meta.size);
@@ -469,6 +448,56 @@ export async function diskCacheGetPath(
 	} catch {
 		return null;
 	}
+}
+
+export async function diskCacheGetMeta(
+	bucket: string,
+	key: string,
+): Promise<CacheMeta | null> {
+	if (!ENABLED || !cacheWritable) return null;
+
+	const hash = hashKey(bucket, key);
+	const bp = blobPath(hash);
+	const mp = metaPath(hash);
+
+	try {
+		if (!existsSync(bp) || !existsSync(mp)) return null;
+		const rawMeta = await readFile(mp, "utf-8");
+		const meta: CacheMeta = JSON.parse(rawMeta);
+		if (isExpired(meta)) {
+			setImmediate(() => evictEntry(hash, meta.size));
+			return null;
+		}
+		recordDiskCacheHit(hash, bp, mp, meta);
+		recordDemand(bucket, key, meta.size);
+		return meta;
+	} catch {
+		return null;
+	}
+}
+
+function recordDiskCacheHit(
+	hash: string,
+	blobFilePath: string,
+	metaFilePath: string,
+	meta: CacheMeta,
+): void {
+	meta.hitCount++;
+	meta.lastAccess = Date.now();
+
+	const lastWriteback = metaWritebackTimes.get(hash) || 0;
+	if (meta.lastAccess - lastWriteback < META_WRITEBACK_MIN_INTERVAL_MS) return;
+	metaWritebackTimes.set(hash, meta.lastAccess);
+
+	setImmediate(() => {
+		try {
+			writeFileSync(metaFilePath, JSON.stringify(meta));
+		} catch {
+			/* best effort */
+		}
+	});
+
+	utimes(blobFilePath, new Date(), new Date()).catch(() => {});
 }
 
 /**
@@ -571,6 +600,99 @@ export async function diskCachePut(
 			/* ignore */
 		}
 		console.error("[disk-cache] write error:", e);
+		return false;
+	}
+}
+
+export async function diskCachePutStream(
+	bucket: string,
+	key: string,
+	stream: ReadableStream<Uint8Array>,
+	sizeHint: number,
+	headers: Record<string, string>,
+): Promise<boolean> {
+	if (!ENABLED || !cacheWritable) return false;
+	if (!isDiskCacheEligible(sizeHint)) return false;
+	if (!meetsAdmissionThreshold(bucket, key)) return false;
+
+	initSizeTracking();
+	if (currentTotalSize + sizeHint > MAX_TOTAL_SIZE * 1.1) {
+		runEviction();
+		if (currentTotalSize + sizeHint > MAX_TOTAL_SIZE) return false;
+	}
+
+	const hash = hashKey(bucket, key);
+	const bp = blobPath(hash);
+	const mp = metaPath(hash);
+	const tmpBlob = `${bp}.tmp.${process.pid}.${Date.now()}`;
+	const tmpMeta = `${mp}.tmp.${process.pid}.${Date.now()}`;
+	let bytesWritten = 0;
+
+	try {
+		ensureParentDir(bp);
+		const maxBytes = sizeHint + 1024;
+		const countingStream = stream.pipeThrough(
+			new TransformStream<Uint8Array, Uint8Array>({
+				transform(chunk, controller) {
+					bytesWritten += chunk.byteLength;
+					if (bytesWritten > maxBytes) {
+						throw new Error("Disk cache stream exceeded expected size");
+					}
+					controller.enqueue(chunk);
+				},
+			}),
+		);
+
+		let previousSize = 0;
+		if (existsSync(bp)) {
+			try {
+				previousSize = statSync(bp).size;
+			} catch {
+				/* ignore */
+			}
+		}
+
+		await Bun.write(tmpBlob, countingStream);
+		if (bytesWritten !== sizeHint) {
+			throw new Error(
+				`Disk cache size mismatch: expected=${sizeHint} actual=${bytesWritten}`,
+			);
+		}
+
+		const demand = demandMap.get(demandKey(bucket, key));
+		const meta: CacheMeta = {
+			etag: headers.etag || headers.ETag || "",
+			contentType:
+				headers["content-type"] ||
+				headers["Content-Type"] ||
+				"application/octet-stream",
+			size: bytesWritten,
+			headers,
+			cachedAt: Date.now(),
+			lastAccess: Date.now(),
+			hitCount: demand?.hits || 1,
+			bucket,
+			key,
+		};
+
+		renameSync(tmpBlob, bp);
+		await writeFile(tmpMeta, JSON.stringify(meta));
+		renameSync(tmpMeta, mp);
+		currentTotalSize = currentTotalSize - previousSize + bytesWritten;
+		scheduleEviction();
+		return true;
+	} catch (e) {
+		try {
+			unlinkSync(tmpBlob);
+		} catch {
+			/* ignore */
+		}
+		try {
+			unlinkSync(tmpMeta);
+		} catch {
+			/* ignore */
+		}
+		console.error("[disk-cache] stream write error:", e);
 		return false;
 	}
 }

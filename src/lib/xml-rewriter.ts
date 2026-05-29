@@ -10,7 +10,7 @@ const builder = new XMLBuilder({
 	format: false,
 });
 
-export function rewriteListObjectsV2Response(
+export function rewriteListObjectsResponse(
 	xmlBody: string,
 	internalPrefix: string,
 ): string {
@@ -29,11 +29,15 @@ export function rewriteListObjectsV2Response(
 				return str;
 			};
 
-			if (result.Prefix) {
-				result.Prefix = stripPrefix(result.Prefix);
-			}
-			if (result.StartAfter) {
-				result.StartAfter = stripPrefix(result.StartAfter);
+			for (const field of [
+				"Prefix",
+				"Marker",
+				"NextMarker",
+				"StartAfter",
+				"ContinuationToken",
+				"NextContinuationToken",
+			] as const) {
+				if (result[field]) result[field] = stripPrefix(result[field]);
 			}
 
 			if (result.Contents) {

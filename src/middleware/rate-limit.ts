@@ -8,7 +8,7 @@ interface RateLimitStore {
 const store = new Map<string, RateLimitStore>();
 
 // Clean up expired entries every minute
-setInterval(() => {
+const cleanupTimer = setInterval(() => {
 	const now = Date.now();
 	for (const [key, value] of store.entries()) {
 		if (now > value.resetTime) {
@@ -16,6 +16,9 @@ setInterval(() => {
 		}
 	}
 }, 60000);
+if (typeof cleanupTimer === "object" && "unref" in cleanupTimer) {
+	cleanupTimer.unref();
+}
 
 interface RateLimitOptions {
 	limit: number; // Max requests
@@ -23,8 +26,17 @@ interface RateLimitOptions {
 }
 
 export function rateLimit(options: RateLimitOptions) {
+	if (
+		!Number.isFinite(options.limit) ||
+		options.limit <= 0 ||
+		options.limit >= 1_000_000
+	) {
+		return async (): Promise<Response | null> => null;
+	}
+
 	return async (req: Request): Promise<Response | null> => {
-		const ip = req.headers.get("x-forwarded-for") || "127.0.0.1";
+		const forwardedFor = req.headers.get("x-forwarded-for");
+		const ip = forwardedFor?.split(",", 1)[0]?.trim() || "127.0.0.1";
 		const now = Date.now();
 
 		let record = store.get(ip);

@@ -1,15 +1,19 @@
 import { eq, sql } from "drizzle-orm";
 import { db } from "../../db";
-import { buckets } from "../../db/schema";
-import { diskCacheInvalidate } from "../../lib/disk-cache";
-import { redis } from "../../lib/redis";
+import { buckets, type users } from "../../db/schema";
+import { releaseMultipartQuota } from "../../lib/quota-cache";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
 import { buildCorsConfig } from "./cors";
-import { filterUpstreamHeaders, stripAuthQueryParams } from "./utils";
+import {
+	filterUpstreamHeaders,
+	invalidateObjectCaches,
+	stripAuthQueryParams,
+} from "./utils";
 
 export async function handleDeleteRequest(
 	req: Request,
+	user: typeof users.$inferSelect,
 	bucket: typeof buckets.$inferSelect,
 	internalPath: string,
 	url: URL,
@@ -25,8 +29,12 @@ export async function handleDeleteRequest(
 	}
 
 	try {
+		const isAbortMultipartUpload =
+			key !== "" && url.searchParams.has("uploadId");
 		let existingSize = 0;
 		try {
+			if (isAbortMultipartUpload)
+				throw new Error("skip HEAD for multipart abort");
 			const headResponse = await s3Client.fetch(internalPath, {
 				method: "HEAD",
 			});
@@ -49,6 +57,17 @@ export async function handleDeleteRequest(
 		});
 
 		if (response.ok || response.status === 204 || response.status === 404) {
+			if (isAbortMultipartUpload) {
+				const uploadId = url.searchParams.get("uploadId");
+				if (uploadId) {
+					await releaseMultipartQuota({
+						userId: user.id,
+						bucketId: bucket.id,
+						uploadId,
+					});
+				}
+			}
+
 			if (existingSize > 0 && response.status !== 404) {
 				await db
 					.update(buckets)
@@ -58,35 +77,7 @@ export async function handleDeleteRequest(
 					.where(eq(buckets.id, bucket.id));
 			}
 
-			// Invalidate all cache layers (Redis L1 + Disk L2)
-			// Fire-and-forget background invalidation
-			(async () => {
-				try {
-					const redisKeys = [
-						`s3:body:${bucket.name}:${key}`,
-						`s3:meta:${bucket.name}:${key}`,
-					];
-
-					await redis.del(redisKeys);
-
-					// Same eventual consistency pattern as PUT
-					const stream = redis.scanStream({
-						match: `s3:list:${bucket.name}:*`,
-						count: 100,
-					});
-
-					stream.on("data", (foundKeys: string[]) => {
-						if (foundKeys.length) {
-							redis.del(foundKeys);
-						}
-					});
-				} catch (e) {
-					console.error("Background cache invalidation error:", e);
-				}
-			})();
-
-			// Invalidate disk cache (non-blocking)
-			diskCacheInvalidate(bucket.name, key);
+			invalidateObjectCaches(bucket.id, bucket.name, key);
 		}
 
 		return new Response(response.body, {

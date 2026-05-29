@@ -1,4 +1,74 @@
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+
+const AWS_ALGORITHM = "AWS4-HMAC-SHA256";
+const RFC3986_EXTRA_CHARS = /[!'()*]/g;
+const PCT_ENCODED_TRIPLET = /%[0-9A-Fa-f]{2}/g;
+const UPPER_PCT_ENCODED_TRIPLET = /%[0-9A-F]{2}/g;
+const WHITESPACE = /\s+/g;
+const PLUS = /\+/g;
+const HEX_SHA256 = /^[0-9a-fA-F]{64}$/;
+const PCT_PLACEHOLDER = "___PCT___";
+const PCT_PLACEHOLDER_RE = new RegExp(`${PCT_PLACEHOLDER}([0-9A-F]{2})`, "g");
+const SIGNING_KEY_CACHE_MAX = 256;
+const signingKeyCache = new Map<string, Buffer>();
+
+function awsUriEncode(input: string, encodeSlash: boolean = true) {
+	let result = encodeURIComponent(input).replace(
+		RFC3986_EXTRA_CHARS,
+		(c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+	);
+	if (!encodeSlash) {
+		result = result.replace(/%2F/g, "/");
+	}
+	return result;
+}
+
+function preservePctEncoded(input: string) {
+	return input.replace(PCT_ENCODED_TRIPLET, (match) => match.toUpperCase());
+}
+
+function decodeQueryPart(input: string) {
+	return decodeURIComponent(input.replace(PLUS, "%20"));
+}
+
+function getSigningKey(
+	secretKey: string,
+	dateStamp: string,
+	regionScope: string,
+	serviceScope: string,
+) {
+	const secretKeyHash = createHash("sha256")
+		.update(secretKey)
+		.digest("base64url");
+	const cacheKey = `${secretKeyHash}\0${dateStamp}\0${regionScope}\0${serviceScope}`;
+	const cached = signingKeyCache.get(cacheKey);
+	if (cached) return cached;
+
+	const kDate = createHmac("sha256", `AWS4${secretKey}`)
+		.update(dateStamp)
+		.digest();
+	const kRegion = createHmac("sha256", kDate).update(regionScope).digest();
+	const kService = createHmac("sha256", kRegion).update(serviceScope).digest();
+	const kSigning = createHmac("sha256", kService)
+		.update("aws4_request")
+		.digest();
+
+	if (signingKeyCache.size >= SIGNING_KEY_CACHE_MAX) {
+		const firstKey = signingKeyCache.keys().next().value;
+		if (firstKey) signingKeyCache.delete(firstKey);
+	}
+	signingKeyCache.set(cacheKey, kSigning);
+	return kSigning;
+}
+
+function signaturesMatch(calculatedSignature: string, signature: string) {
+	if (signature.length !== calculatedSignature.length) return false;
+	if (!HEX_SHA256.test(signature)) return false;
+	return timingSafeEqual(
+		Buffer.from(calculatedSignature, "hex"),
+		Buffer.from(signature, "hex"),
+	);
+}
 
 export async function verifyAwsV4Signature(
 	req: Request,
@@ -14,14 +84,14 @@ export async function verifyAwsV4Signature(
 	let signedHeadersStr = "";
 	let credential = "";
 	let date = "";
-	let algorithm = "AWS4-HMAC-SHA256";
+	let algorithm = AWS_ALGORITHM;
 
 	const authHeader = headers.get("Authorization");
 	const query = url.searchParams;
 
-	if (authHeader?.startsWith("AWS4-HMAC-SHA256")) {
-		algorithm = "AWS4-HMAC-SHA256";
-		const params = authHeader.slice("AWS4-HMAC-SHA256".length).trim();
+	if (authHeader?.startsWith(AWS_ALGORITHM)) {
+		algorithm = AWS_ALGORITHM;
+		const params = authHeader.slice(AWS_ALGORITHM.length).trim();
 		const pairs = params.split(",").map((p) => p.trim());
 		for (const pair of pairs) {
 			const [key, value] = pair.split("=");
@@ -35,7 +105,7 @@ export async function verifyAwsV4Signature(
 		credential = query.get("X-Amz-Credential") || "";
 		signedHeadersStr = query.get("X-Amz-SignedHeaders") || "";
 		date = query.get("X-Amz-Date") || "";
-		algorithm = query.get("X-Amz-Algorithm") || "AWS4-HMAC-SHA256";
+		algorithm = query.get("X-Amz-Algorithm") || AWS_ALGORITHM;
 	} else {
 		return false;
 	}
@@ -43,25 +113,13 @@ export async function verifyAwsV4Signature(
 	if (!signature || !credential || !date || !signedHeadersStr) {
 		return false;
 	}
+	if (algorithm !== AWS_ALGORITHM) {
+		return false;
+	}
 
 	let canonicalUri = url.pathname;
 
 	if (canonicalUri === "") canonicalUri = "/";
-
-	const awsUriEncode = (input: string, encodeSlash: boolean = true) => {
-		// AWS SigV4 percent-encoding:
-		// - encodeURIComponent + RFC3986 fixes for !'()*
-		// - spaces must be %20 (encodeURIComponent already does this)
-		// - for canonical URI, slashes are preserved between segments; for query, slashes are encoded.
-		let result = encodeURIComponent(input).replace(
-			/[!'()*]/g,
-			(c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
-		);
-		if (!encodeSlash) {
-			result = result.replace(/%2F/g, "/");
-		}
-		return result;
-	};
 
 	// Canonical URI: URL.pathname is already decoded for some characters.
 	// If the incoming path contains percent-encoded bytes (e.g. %20), `url.pathname`
@@ -69,21 +127,17 @@ export async function verifyAwsV4Signature(
 	//
 	// AWS rule: each path segment is URI-encoded, but existing percent-encoded triplets
 	// should be preserved.
-	const preservePctEncoded = (s: string) =>
-		s.replace(/%[0-9A-Fa-f]{2}/g, (m) => m.toUpperCase());
-
 	canonicalUri = canonicalUri
 		.split("/")
 		.map((segment) => {
 			// Protect existing %XX sequences from being re-encoded.
 			const protectedSegment = preservePctEncoded(segment);
-			const placeholder = "___PCT___";
 			const withPlaceholders = protectedSegment.replace(
-				/%[0-9A-F]{2}/g,
-				(m) => `${placeholder}${m.slice(1)}`,
+				UPPER_PCT_ENCODED_TRIPLET,
+				(m) => `${PCT_PLACEHOLDER}${m.slice(1)}`,
 			);
 			let enc = awsUriEncode(withPlaceholders, false);
-			enc = enc.replace(new RegExp(`${placeholder}([0-9A-F]{2})`, "g"), "%$1");
+			enc = enc.replace(PCT_PLACEHOLDER_RE, "%$1");
 			return enc;
 		})
 		.join("/");
@@ -105,10 +159,7 @@ export async function verifyAwsV4Signature(
 				const i = kv.indexOf("=");
 				const k = i === -1 ? kv : kv.slice(0, i);
 				const v = i === -1 ? "" : kv.slice(i + 1);
-				// decode '+' as space for query params
-				const decode = (s: string) =>
-					decodeURIComponent(s.replace(/\+/g, "%20"));
-				return [decode(k), decode(v)] as [string, string];
+				return [decodeQueryPart(k), decodeQueryPart(v)] as [string, string];
 			})
 		: [];
 
@@ -142,7 +193,7 @@ export async function verifyAwsV4Signature(
 			if (!value && header.toLowerCase() === "host") {
 				value = url.host;
 			}
-			return `${header.toLowerCase()}:${value.trim().replace(/\s+/g, " ")}`;
+			return `${header.toLowerCase()}:${value.trim().replace(WHITESPACE, " ")}`;
 		})
 		.join("\n")}\n`;
 
@@ -178,6 +229,14 @@ export async function verifyAwsV4Signature(
 
 	const [_accessKey, dateStamp, regionScope, serviceScope, requestType] =
 		credential.split("/");
+	if (
+		!dateStamp ||
+		!regionScope ||
+		!serviceScope ||
+		requestType !== "aws4_request"
+	) {
+		return false;
+	}
 	const credentialScope = `${dateStamp}/${regionScope}/${serviceScope}/${requestType}`;
 
 	const stringToSign = [
@@ -187,20 +246,16 @@ export async function verifyAwsV4Signature(
 		hashedCanonicalRequest,
 	].join("\n");
 
-	const kDate = createHmac("sha256", `AWS4${secretKey}`)
-		.update(dateStamp)
-		.digest();
-	const kRegion = createHmac("sha256", kDate).update(regionScope).digest();
-	const kService = createHmac("sha256", kRegion).update(serviceScope).digest();
-	// Per SigV4, the final key derivation step is ALWAYS with the literal string "aws4_request".
-	// (Not the requestType from the credential scope; it should always be aws4_request.)
-	const kSigning = createHmac("sha256", kService)
-		.update("aws4_request")
-		.digest();
+	const kSigning = getSigningKey(
+		secretKey,
+		dateStamp,
+		regionScope,
+		serviceScope,
+	);
 
 	const calculatedSignature = createHmac("sha256", kSigning)
 		.update(stringToSign)
 		.digest("hex");
 
-	return calculatedSignature === signature;
+	return signaturesMatch(calculatedSignature, signature);
 }

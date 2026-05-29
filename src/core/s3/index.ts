@@ -3,6 +3,7 @@ import { config } from "../../config";
 import { db } from "../../db";
 import { buckets, type users } from "../../db/schema";
 import { context } from "../../lib/context";
+import { diskCacheGetMeta } from "../../lib/disk-cache";
 import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
 import { S3Errors } from "../../lib/s3-errors";
@@ -16,6 +17,7 @@ import {
 	filterUpstreamHeaders,
 	getInternalPath,
 	getKeyFromRequest,
+	getObjectCacheKeys,
 	stripAuthQueryParams,
 } from "./utils";
 
@@ -204,7 +206,7 @@ export async function handleS3Request(
 	if (method === "DELETE") {
 		if (!user) return withCors(S3Errors.AccessDenied().toResponse());
 		return withCors(
-			await handleDeleteRequest(req, bucket, internalPath, url, key),
+			await handleDeleteRequest(req, user, bucket, internalPath, url, key),
 		);
 	}
 
@@ -213,11 +215,17 @@ export async function handleS3Request(
 			return withCors(new Response(null, { status: 200 }));
 		}
 		try {
+			const hasConditionalHead =
+				req.headers.has("if-none-match") ||
+				req.headers.has("if-modified-since") ||
+				req.headers.has("if-match") ||
+				req.headers.has("if-unmodified-since");
+
 			// Check Redis for cached metadata
-			const cacheKeyMeta = `s3:meta:${bucket.name}:${key}`;
+			const cacheKeyMeta = getObjectCacheKeys(bucket.id, key).meta;
 			try {
 				const cachedMeta = await redis.get(cacheKeyMeta);
-				if (cachedMeta) {
+				if (cachedMeta && !hasConditionalHead) {
 					const headers = new Headers(JSON.parse(cachedMeta));
 					return withCors(
 						new Response(null, {
@@ -228,6 +236,18 @@ export async function handleS3Request(
 				}
 			} catch (e) {
 				console.error("Redis meta cache error:", e);
+			}
+
+			if (!hasConditionalHead) {
+				const diskMeta = await diskCacheGetMeta(bucket.id, key);
+				if (diskMeta) {
+					return withCors(
+						new Response(null, {
+							status: 200,
+							headers: new Headers(diskMeta.headers),
+						}),
+					);
+				}
 			}
 
 			const cleanUrl = stripAuthQueryParams(url);
@@ -248,9 +268,11 @@ export async function handleS3Request(
 				headers.forEach((v, k) => {
 					headersObj[k] = v;
 				});
-				redis.set(cacheKeyMeta, JSON.stringify(headersObj)).catch((e) => {
-					console.error("Failed to cache HEAD metadata:", e);
-				});
+				redis
+					.set(cacheKeyMeta, JSON.stringify(headersObj), "EX", 21600)
+					.catch((e) => {
+						console.error("Failed to cache HEAD metadata:", e);
+					});
 			}
 
 			return withCors(
