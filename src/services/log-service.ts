@@ -41,11 +41,12 @@ class LogService {
 	private queue: LogEntry[] = [];
 	private flushTimer: Timer | null = null;
 	private readonly BATCH_SIZE = 100;
+	private readonly INSERT_CHUNK_SIZE = 250;
 	private readonly FLUSH_INTERVAL_MS = 5000;
 
 	public logRequest(response: Response, ingress: number = 0) {
 		const ctx = getContext();
-		if (!ctx || !ctx.bucket || !ctx.user) return;
+		if (!ctx?.bucket || !ctx.user) return;
 
 		const duration = Math.round(performance.now() - ctx.startTime);
 		const egress = parseInt(response.headers.get("content-length") || "0", 10);
@@ -71,7 +72,6 @@ class LogService {
 		} else {
 			this.scheduleFlush();
 		}
-
 	}
 
 	private async flush() {
@@ -86,7 +86,11 @@ class LogService {
 		this.queue = [];
 
 		try {
-			await db.insert(requestLogs).values(batch);
+			for (let i = 0; i < batch.length; i += this.INSERT_CHUNK_SIZE) {
+				await db
+					.insert(requestLogs)
+					.values(batch.slice(i, i + this.INSERT_CHUNK_SIZE));
+			}
 
 			const objectEntries = batch.filter(
 				(entry) =>
@@ -96,16 +100,42 @@ class LogService {
 					entry.path !== "/",
 			);
 
+			const aggregates = new Map<
+				string,
+				{
+					bucketId: string;
+					objectKey: string;
+					hitCount: number;
+					errorCount: number;
+					egressBytes: number;
+				}
+			>();
+
 			for (const entry of objectEntries) {
 				const objectKey = getObjectKeyFromLogEntry(entry);
 				if (!objectKey) continue;
+				const aggregateKey = `${entry.bucketId}\0${objectKey}`;
+				const aggregate = aggregates.get(aggregateKey) || {
+					bucketId: entry.bucketId,
+					objectKey,
+					hitCount: 0,
+					errorCount: 0,
+					egressBytes: 0,
+				};
+				aggregate.hitCount += 1;
+				aggregate.errorCount += entry.statusCode >= 400 ? 1 : 0;
+				aggregate.egressBytes += entry.egressBytes;
+				aggregates.set(aggregateKey, aggregate);
+			}
+
+			for (const aggregate of aggregates.values()) {
 				const existing = await db
 					.select({ id: objectStats.id })
 					.from(objectStats)
 					.where(
 						and(
-							eq(objectStats.bucketId, entry.bucketId),
-							eq(objectStats.objectKey, objectKey),
+							eq(objectStats.bucketId, aggregate.bucketId),
+							eq(objectStats.objectKey, aggregate.objectKey),
 						),
 					)
 					.limit(1);
@@ -114,23 +144,23 @@ class LogService {
 					await db
 						.update(objectStats)
 						.set({
-							hitCount: sql`${objectStats.hitCount} + 1`,
+							hitCount: sql`${objectStats.hitCount} + ${aggregate.hitCount}`,
 							errorCount:
-								entry.statusCode >= 400
-									? sql`${objectStats.errorCount} + 1`
+								aggregate.errorCount > 0
+									? sql`${objectStats.errorCount} + ${aggregate.errorCount}`
 									: sql`${objectStats.errorCount}`,
-							egressBytes: sql`${objectStats.egressBytes} + ${entry.egressBytes}`,
+							egressBytes: sql`${objectStats.egressBytes} + ${aggregate.egressBytes}`,
 							lastAccessedAt: new Date(),
 							updatedAt: new Date(),
 						})
 						.where(eq(objectStats.id, existing[0].id));
 				} else {
 					await db.insert(objectStats).values({
-						bucketId: entry.bucketId,
-						objectKey,
-						hitCount: 1,
-						errorCount: entry.statusCode >= 400 ? 1 : 0,
-						egressBytes: entry.egressBytes,
+						bucketId: aggregate.bucketId,
+						objectKey: aggregate.objectKey,
+						hitCount: aggregate.hitCount,
+						errorCount: aggregate.errorCount,
+						egressBytes: aggregate.egressBytes,
 						lastAccessedAt: new Date(),
 						updatedAt: new Date(),
 					});

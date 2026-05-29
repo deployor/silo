@@ -15,6 +15,13 @@ const gunzipAsync = promisify(gunzip);
 type BucketRecord = typeof buckets.$inferSelect;
 type UserRecord = typeof users.$inferSelect;
 
+type S3ListBucketResult = {
+	Contents?:
+		| { Key: string; Size: number }
+		| Array<{ Key: string; Size: number }>;
+	NextContinuationToken?: string;
+};
+
 export type DeepFreezeManifestEntry = {
 	key: string;
 	internalKey: string;
@@ -68,7 +75,9 @@ async function listBucketObjects(owner: UserRecord, bucket: BucketRecord) {
 		}
 
 		const xml = await listRes.text();
-		const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
+		const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
+			xml,
+		).ListBucketResult;
 		const contents = result.Contents
 			? Array.isArray(result.Contents)
 				? result.Contents
@@ -124,7 +133,7 @@ export async function buildDeepFreezeArchive(params: {
 	let processedObjects = 0;
 	let processedBytes = 0;
 
-	pack.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+	pack.on("data", (chunk: Buffer) => chunks.push(chunk));
 
 	for (const object of objects) {
 		const { buffer, headers } = await fetchObjectBuffer(object.internalKey);
@@ -178,7 +187,7 @@ export async function buildDeepFreezeArchive(params: {
 
 	const archiveUpload = await s3Client.fetch(params.archiveKey, {
 		method: "PUT",
-		body: new Uint8Array(compressedTar),
+		body: compressedTar,
 		headers: {
 			"Content-Type": "application/zstd",
 			"Content-Length": String(compressedTar.length),
@@ -193,7 +202,7 @@ export async function buildDeepFreezeArchive(params: {
 
 	const manifestUpload = await s3Client.fetch(params.manifestKey, {
 		method: "PUT",
-		body: new Uint8Array(compressedManifest),
+		body: compressedManifest,
 		headers: {
 			"Content-Type": "application/gzip",
 			"Content-Length": String(compressedManifest.length),
@@ -258,7 +267,7 @@ export async function restoreDeepFreezeArchive(params: {
 	await new Promise<void>((resolve, reject) => {
 		extract.on("entry", (header, stream, next) => {
 			const chunks: Buffer[] = [];
-			stream.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+			stream.on("data", (chunk: Buffer) => chunks.push(chunk));
 			stream.on("end", () => {
 				entries.set(header.name, Buffer.concat(chunks));
 				next();
@@ -286,7 +295,7 @@ export async function restoreDeepFreezeArchive(params: {
 		const liveKey = getInternalPath(item.key, params.owner, params.bucket);
 		const putRes = await s3Client.fetch(liveKey, {
 			method: "PUT",
-			body: new Uint8Array(buffer),
+			body: buffer,
 			headers: {
 				"Content-Type": item.contentType || "application/octet-stream",
 				"Content-Length": String(buffer.length),
@@ -325,9 +334,13 @@ export async function deleteLiveBucketObjects(params: {
 	let processedBytes = 0;
 
 	for (const item of params.manifest) {
-		const deleteRes = await s3Client.fetch(item.internalKey, { method: "DELETE" });
+		const deleteRes = await s3Client.fetch(item.internalKey, {
+			method: "DELETE",
+		});
 		if (!deleteRes.ok) {
-			throw new Error(`Failed to delete live object ${item.key} (${deleteRes.status})`);
+			throw new Error(
+				`Failed to delete live object ${item.key} (${deleteRes.status})`,
+			);
 		}
 		processedObjects += 1;
 		processedBytes += item.size;

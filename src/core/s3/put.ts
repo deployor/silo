@@ -3,10 +3,11 @@ import { XMLParser } from "fast-xml-parser";
 import { db } from "../../db";
 import { buckets, type users } from "../../db/schema";
 import { AwsChunkedDecoder } from "../../lib/aws-chunked-decoder";
-import { diskCacheInvalidate } from "../../lib/disk-cache";
+import { diskCacheGetMeta } from "../../lib/disk-cache";
 import {
 	consumeStorageQuota,
 	releaseStorageQuota,
+	reserveMultipartPartQuota,
 } from "../../lib/quota-cache";
 import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
@@ -14,10 +15,25 @@ import { S3Errors } from "../../lib/s3-errors";
 import { getCorsHeaders } from "./cors";
 import {
 	filterUpstreamHeaders,
+	getObjectCacheKeys,
+	invalidateObjectCaches,
 	isReservedBucketName,
 	rewriteCopySourceHeader,
 	stripAuthQueryParams,
 } from "./utils";
+
+const SMALL_UPLOAD_BUFFER_THRESHOLD = 10 * 1024 * 1024;
+const CORS_ARRAY_NODES = new Set([
+	"CORSRule",
+	"AllowedOrigin",
+	"AllowedMethod",
+	"AllowedHeader",
+	"ExposeHeader",
+]);
+const corsXmlParser = new XMLParser({
+	ignoreAttributes: false,
+	isArray: (name: string) => CORS_ARRAY_NODES.has(name),
+});
 
 export async function handlePutRequest(
 	req: Request,
@@ -73,8 +89,8 @@ export async function handlePutRequest(
 		if (isReservedBucketName(bucket.name)) {
 			return withCors(
 				S3Errors.AccessDenied(
-				"Bucket name is reserved for system use.",
-				`/${bucket.name}`,
+					"Bucket name is reserved for system use.",
+					`/${bucket.name}`,
 				).toResponse(),
 			);
 		}
@@ -82,25 +98,11 @@ export async function handlePutRequest(
 
 	if (key === "" && url.searchParams.has("cors")) {
 		const bodyText = await req.text();
-		const parser = new XMLParser({
-			ignoreAttributes: false,
-			isArray: (name: string) => {
-				return (
-					[
-						"CORSRule",
-						"AllowedOrigin",
-						"AllowedMethod",
-						"AllowedHeader",
-						"ExposeHeader",
-					].indexOf(name) !== -1
-				);
-			},
-		});
 
 		try {
-			const parsed = parser.parse(bodyText);
+			const parsed = corsXmlParser.parse(bodyText);
 
-			if (!parsed.CORSConfiguration || !parsed.CORSConfiguration.CORSRule) {
+			if (!parsed.CORSConfiguration?.CORSRule) {
 				throw new Error("Invalid CORS Configuration");
 			}
 
@@ -204,13 +206,25 @@ export async function handlePutRequest(
 	}
 
 	try {
-		if (!copySource) {
+		if (!copySource && !isMultipartPartUpload) {
 			try {
-				const existingObject = await s3Client.fetch(internalPath, { method: "HEAD" });
-				if (existingObject.ok) {
-					existingSize = Number(
-						existingObject.headers.get("content-length") || 0,
-					);
+				const cachedMeta = await redisGetObjectMetaSize(bucket.id, key);
+				if (cachedMeta !== null) {
+					existingSize = cachedMeta;
+				} else {
+					const diskMeta = await diskCacheGetMeta(bucket.id, key);
+					if (diskMeta) {
+						existingSize = diskMeta.size;
+					} else {
+						const existingObject = await s3Client.fetch(internalPath, {
+							method: "HEAD",
+						});
+						if (existingObject.ok) {
+							existingSize = Number(
+								existingObject.headers.get("content-length") || 0,
+							);
+						}
+					}
 				}
 			} catch {
 				existingSize = 0;
@@ -237,7 +251,9 @@ export async function handlePutRequest(
 			// And we also need to strip the `aws-chunked` encoding from upstream headers
 			// because we are decoding it here.
 			if (isAwsChunked) {
-				console.log(`[PUT] Detected aws-chunked encoding for ${key}`);
+				if (process.env.DEBUG_S3_PUT === "1") {
+					console.log(`[PUT] Detected aws-chunked encoding for ${key}`);
+				}
 
 				// Remove content-encoding: aws-chunked so upstream doesn't try to decode it again
 				// (since we are sending raw bytes)
@@ -307,8 +323,8 @@ export async function handlePutRequest(
 					) {
 						return withCors(
 							S3Errors.QuotaExceeded(
-							"You have exceeded your storage quota.",
-							key,
+								"You have exceeded your storage quota.",
+								key,
 							).toResponse(),
 						);
 					}
@@ -323,7 +339,7 @@ export async function handlePutRequest(
 				if (declared !== null && (!Number.isFinite(declared) || declared < 0)) {
 					return withCors(
 						S3Errors.InvalidRequest(
-						"Invalid Content-Length header",
+							"Invalid Content-Length header",
 						).toResponse(),
 					);
 				}
@@ -341,8 +357,8 @@ export async function handlePutRequest(
 						) {
 							return withCors(
 								S3Errors.QuotaExceeded(
-								"You have exceeded your storage quota.",
-								key,
+									"You have exceeded your storage quota.",
+									key,
 								).toResponse(),
 							);
 						}
@@ -367,8 +383,8 @@ export async function handlePutRequest(
 						) {
 							return withCors(
 								S3Errors.QuotaExceeded(
-								"You have exceeded your storage quota.",
-								key,
+									"You have exceeded your storage quota.",
+									key,
 								).toResponse(),
 							);
 						}
@@ -378,9 +394,7 @@ export async function handlePutRequest(
 					// If `declared` length is small (e.g., < 10MB), buffer it to ensure upstream S3 gets a clean Content-Length.
 					// This avoids issues where streaming bodies drop the Content-Length header in some runtimes/proxies.
 					// 10MB is a reasonable tradeoff for memory vs reliability.
-					const BUFFER_THRESHOLD = 10 * 1024 * 1024; // 10 MB
-
-					if (declared !== null && declared < BUFFER_THRESHOLD) {
+					if (declared !== null && declared < SMALL_UPLOAD_BUFFER_THRESHOLD) {
 						const chunks: Uint8Array[] = [];
 						const reader = body.getReader();
 						let totalLength = 0;
@@ -402,7 +416,7 @@ export async function handlePutRequest(
 						if (totalLength !== declared) {
 							return withCors(
 								S3Errors.InvalidRequest(
-								`Content-Length mismatch: declared=${declared} actual=${totalLength}`,
+									`Content-Length mismatch: declared=${declared} actual=${totalLength}`,
 								).toResponse(),
 							);
 						}
@@ -415,8 +429,8 @@ export async function handlePutRequest(
 							) {
 								return withCors(
 									S3Errors.QuotaExceeded(
-									"You have exceeded your storage quota.",
-									key,
+										"You have exceeded your storage quota.",
+										key,
 									).toResponse(),
 								);
 							}
@@ -449,37 +463,36 @@ export async function handlePutRequest(
 		const sizeDelta = Math.max(0, actualSize - existingSize);
 
 		if (!copySource && sizeDelta > 0 && user && !user.isImmortal) {
-			storageQuotaReserved = await consumeStorageQuota(
-				{
-					id: user.id,
-					isImmortal: user.isImmortal,
-					storageLimitBytes: user.storageLimitBytes,
-					egressLimitBytes: user.egressLimitBytes,
-				},
-				Number(user.storageUsageBytes) || 0,
-				sizeDelta,
-			);
+			const quotaUser = {
+				id: user.id,
+				isImmortal: user.isImmortal,
+				storageLimitBytes: user.storageLimitBytes,
+				egressLimitBytes: user.egressLimitBytes,
+			};
+
+			storageQuotaReserved = isMultipartPartUpload
+				? await reserveMultipartPartQuota({
+						user: quotaUser,
+						currentStorageUsageBytes: Number(user.storageUsageBytes) || 0,
+						bucketId: bucket.id,
+						uploadId: uploadId as string,
+						partNumber: partNumber as string,
+						partSize: actualSize,
+					})
+				: await consumeStorageQuota(
+						quotaUser,
+						Number(user.storageUsageBytes) || 0,
+						sizeDelta,
+					);
 
 			if (!storageQuotaReserved) {
 				return withCors(
 					S3Errors.QuotaExceeded(
-					"You have exceeded your storage quota.",
-					key,
+						"You have exceeded your storage quota.",
+						key,
 					).toResponse(),
 				);
 			}
-		}
-
-		// Debug logging for Content-Length
-		if (
-			upstreamHeaders.has("Content-Length") ||
-			upstreamHeaders.has("content-length")
-		) {
-			console.log(
-				`[PUT] Content-Length present in upstreamHeaders: ${upstreamHeaders.get("Content-Length") || upstreamHeaders.get("content-length")}`,
-			);
-		} else {
-			console.log("[PUT] Content-Length MISSING in upstreamHeaders");
 		}
 
 		// Convert Headers to plain object to ensure control over casing
@@ -545,41 +558,11 @@ export async function handlePutRequest(
 				sizeDelta,
 			});
 
-			// Invalidate all cache layers (Redis L1 + Disk L2)
-			try {
-				const redisKeys = [
-					`s3:body:${bucket.name}:${key}`,
-					`s3:meta:${bucket.name}:${key}`,
-				];
-
-				// Fire-and-forget background invalidation
-				(async () => {
-					try {
-						await redis.del(redisKeys);
-
-						// SCAN is slow, but acceptable in background for "eventual" list consistency
-						const stream = redis.scanStream({
-							match: `s3:list:${bucket.name}:*`,
-							count: 100,
-						});
-
-						stream.on("data", (foundKeys: string[]) => {
-							if (foundKeys.length) {
-								redis.del(foundKeys);
-							}
-						});
-					} catch (e) {
-						console.error("Background cache invalidation error:", e);
-					}
-				})();
-
-				// Invalidate disk cache (non-blocking)
-				diskCacheInvalidate(bucket.name, key);
-			} catch (e) {
-				console.error("Cache invalidation error:", e);
+			if (!isMultipartPartUpload) {
+				invalidateObjectCaches(bucket.id, bucket.name, key);
 			}
 
-			if (!copySource && actualSize > 0) {
+			if (!copySource && !isMultipartPartUpload && actualSize > 0) {
 				const bucketDelta = actualSize - existingSize;
 				await db
 					.update(buckets)
@@ -595,10 +578,12 @@ export async function handlePutRequest(
 
 		if (copySource && response.ok) {
 			const xml = await response.text();
-			return withCors(new Response(xml, {
-				status: response.status,
-				headers: response.headers,
-			}));
+			return withCors(
+				new Response(xml, {
+					status: response.status,
+					headers: response.headers,
+				}),
+			);
 		}
 
 		const resHeaders = new Headers(response.headers);
@@ -610,10 +595,12 @@ export async function handlePutRequest(
 			});
 		}
 
-		return withCors(new Response(response.body, {
-			status: response.status,
-			headers: resHeaders,
-		}));
+		return withCors(
+			new Response(response.body, {
+				status: response.status,
+				headers: resHeaders,
+			}),
+		);
 	} catch (e: unknown) {
 		const sizeDelta = Math.max(0, actualSize - existingSize);
 		if (storageQuotaReserved && user && !copySource && sizeDelta > 0) {
@@ -634,12 +621,26 @@ export async function handlePutRequest(
 		) {
 			return withCors(
 				S3Errors.QuotaExceeded(
-				"You have exceeded your storage quota.",
-				key,
+					"You have exceeded your storage quota.",
+					key,
 				).toResponse(),
 			);
 		}
 
 		return withCors(S3Errors.InternalError(error.message).toResponse());
+	}
+}
+
+async function redisGetObjectMetaSize(bucketId: string, key: string) {
+	try {
+		const cachedMeta = await redis.get(getObjectCacheKeys(bucketId, key).meta);
+		if (!cachedMeta) return null;
+		const headers = JSON.parse(cachedMeta) as Record<string, string>;
+		const size = Number(
+			headers["content-length"] || headers["Content-Length"] || 0,
+		);
+		return Number.isFinite(size) && size > 0 ? size : 0;
+	} catch {
+		return null;
 	}
 }

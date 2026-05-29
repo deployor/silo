@@ -6,10 +6,18 @@ const S3_MULTIPART_UPLOAD_TIMEOUT_MS = Number(
 	process.env.S3_MULTIPART_UPLOAD_TIMEOUT_MS ?? "300000",
 );
 
+function encodeS3Path(path: string) {
+	return path
+		.split("/")
+		.map((segment) => encodeURIComponent(segment))
+		.join("/");
+}
+
 export class HetznerS3Client {
 	private client: AwsClient;
 	private endpoint: string;
 	private bucket: string;
+	private bucketBaseUrl: string;
 
 	private consecutiveFailures = 0;
 	private circuitOpenUntil = 0;
@@ -26,6 +34,7 @@ export class HetznerS3Client {
 
 		this.endpoint = endpoint.replace(/^https?:\/\//, "").replace(/\/$/, "");
 		this.bucket = bucket;
+		this.bucketBaseUrl = `https://${this.bucket}.${this.endpoint}`;
 
 		this.client = new AwsClient({
 			accessKeyId,
@@ -50,56 +59,41 @@ export class HetznerS3Client {
 			this.consecutiveFailures = HetznerS3Client.CIRCUIT_THRESHOLD; // keep at threshold
 		}
 
-		const baseUrl = new URL(`https://${this.bucket}.${this.endpoint}`);
+		const baseUrl = new URL(this.bucketBaseUrl);
 
 		if (pathAndQuery.startsWith("?")) {
 			baseUrl.search = pathAndQuery;
 		} else {
-			const relative = pathAndQuery.startsWith("/")
-				? pathAndQuery.slice(1)
-				: pathAndQuery;
-			const rewrittenUrl = new URL(relative, baseUrl.toString());
+			const queryStart = pathAndQuery.indexOf("?");
+			const rawPath =
+				queryStart === -1 ? pathAndQuery : pathAndQuery.slice(0, queryStart);
+			const rawQuery = queryStart === -1 ? "" : pathAndQuery.slice(queryStart);
+			const relative = rawPath.startsWith("/") ? rawPath.slice(1) : rawPath;
 
-			baseUrl.pathname = rewrittenUrl.pathname;
-			baseUrl.search = rewrittenUrl.search;
+			baseUrl.pathname = `/${encodeS3Path(relative)}`;
+			baseUrl.search = rawQuery;
 		}
+
+		const url = baseUrl.toString();
+		const isMultipartUploadRequest =
+			init?.method === "PUT" &&
+			baseUrl.searchParams.has("uploadId") &&
+			baseUrl.searchParams.has("partNumber");
+		const timeoutMs = isMultipartUploadRequest
+			? S3_MULTIPART_UPLOAD_TIMEOUT_MS
+			: S3_TIMEOUT_MS;
+		const headersObj = normalizeHeaders(init?.headers);
 
 		let lastError: unknown;
 		for (let i = 0; i < retries; i++) {
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 			try {
-				const requestUrl = new URL(baseUrl.toString());
-				const isMultipartUploadRequest =
-					init?.method === "PUT" &&
-					requestUrl.searchParams.has("uploadId") &&
-					requestUrl.searchParams.has("partNumber");
-				const timeoutMs = isMultipartUploadRequest
-					? S3_MULTIPART_UPLOAD_TIMEOUT_MS
-					: S3_TIMEOUT_MS;
-				const controller = new AbortController();
-				const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-				const headersObj: Record<string, string> = {};
-				if (init?.headers) {
-					if (init.headers instanceof Headers) {
-						init.headers.forEach((v, k) => {
-							headersObj[k] = v;
-						});
-					} else if (Array.isArray(init.headers)) {
-						init.headers.forEach(([k, v]) => {
-							headersObj[k] = v;
-						});
-					} else {
-						Object.assign(headersObj, init.headers);
-					}
-				}
-
-				const res = await this.client.fetch(baseUrl.toString(), {
+				const res = await this.client.fetch(url, {
 					...init,
 					headers: headersObj,
 					signal: controller.signal,
 				});
-
-				clearTimeout(timeoutId);
 
 				if (res.status >= 500) {
 					throw new Error(`Server error: ${res.status}`);
@@ -135,6 +129,8 @@ export class HetznerS3Client {
 						`S3 circuit breaker opened after ${this.consecutiveFailures} consecutive failures`,
 					);
 				}
+			} finally {
+				clearTimeout(timeoutId);
 			}
 		}
 		throw lastError;
@@ -148,7 +144,7 @@ export class HetznerS3Client {
 		path: string,
 		_expiresIn: number = 3600,
 	): Promise<string> {
-		const baseUrl = new URL(`https://${this.bucket}.${this.endpoint}`);
+		const baseUrl = new URL(this.bucketBaseUrl);
 		const relative = path.startsWith("/") ? path.slice(1) : path;
 		const url = new URL(relative, baseUrl.toString());
 
@@ -178,3 +174,24 @@ export class HetznerS3Client {
 }
 
 export const s3Client = new HetznerS3Client();
+
+function normalizeHeaders(
+	headers: HeadersInit | undefined,
+): Record<string, string> {
+	if (!headers) return {};
+	if (headers instanceof Headers) {
+		const normalized: Record<string, string> = {};
+		headers.forEach((value, key) => {
+			normalized[key] = value;
+		});
+		return normalized;
+	}
+	if (Array.isArray(headers)) {
+		const normalized: Record<string, string> = {};
+		for (const [key, value] of headers) {
+			normalized[key] = value;
+		}
+		return normalized;
+	}
+	return { ...headers };
+}
