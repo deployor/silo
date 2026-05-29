@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { XMLParser } from "fast-xml-parser";
 import { config } from "../../config";
 import { db } from "../../db";
 import { buckets, type users } from "../../db/schema";
 import { s3Client } from "../../lib/s3-client";
+import { createS3XmlParser } from "../../lib/s3-xml";
 
 export function getKeyFromRequest(req: Request, bucketName: string): string {
 	const url = new URL(req.url);
@@ -202,7 +202,7 @@ export async function deleteBucketContents(prefix: string) {
 
 		const xml = await res.text();
 		// Ensure array handling is consistent
-		const parser = new XMLParser({
+		const parser = createS3XmlParser({
 			isArray: (name) => name === "Contents",
 		});
 		const result = parser.parse(xml).ListBucketResult;

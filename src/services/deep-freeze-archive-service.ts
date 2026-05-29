@@ -3,17 +3,15 @@ import { Readable } from "node:stream";
 import { promisify } from "node:util";
 import { gunzip, gzip } from "node:zlib";
 import { compress, decompress } from "@mongodb-js/zstd";
-import { XMLParser } from "fast-xml-parser";
 import tar from "tar-stream";
 import { config } from "../config";
 import { getInternalPath } from "../core/s3/utils";
 import type { buckets, users } from "../db/schema";
 import { s3Client } from "../lib/s3-client";
+import { parseS3Xml } from "../lib/s3-xml";
 
 const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);
-const parser = new XMLParser();
-
 type BucketRecord = typeof buckets.$inferSelect;
 type UserRecord = typeof users.$inferSelect;
 
@@ -70,7 +68,7 @@ async function listBucketObjects(owner: UserRecord, bucket: BucketRecord) {
 		}
 
 		const xml = await listRes.text();
-		const result = parser.parse(xml).ListBucketResult;
+		const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
 		const contents = result.Contents
 			? Array.isArray(result.Contents)
 				? result.Contents

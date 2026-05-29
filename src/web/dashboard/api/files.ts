@@ -1,6 +1,5 @@
 import { createHmac } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { XMLParser } from "fast-xml-parser";
 import { config } from "../../../config";
 import { getCorsHeaders } from "../../../core/s3/cors";
 import { handleGetRequest } from "../../../core/s3/get";
@@ -14,6 +13,7 @@ import {
 	parseBucketCustomDomains,
 } from "../../../lib/bucket-domains";
 import { s3Client } from "../../../lib/s3-client";
+import { parseS3Xml } from "../../../lib/s3-xml";
 import { getCurrentUser } from "../../../lib/session";
 import {
 	assertCanReadFiles,
@@ -64,7 +64,6 @@ type BucketContext = {
 	owner: typeof users.$inferSelect;
 };
 
-const parser = new XMLParser();
 const MAX_BULK_KEYS = 250;
 const MAX_UPLOAD_FILES = 100;
 const MAX_SEARCH_PAGES = 25;
@@ -249,7 +248,7 @@ async function listDirectoryPage(params: {
 	}
 
 	const xml = await s3Res.text();
-	const result = parser.parse(xml).ListBucketResult;
+	const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
 
 	const contents = result.Contents
 		? Array.isArray(result.Contents)
@@ -322,7 +321,7 @@ async function countDirectoryTotals(params: {
 		}
 
 		const xml = await s3Res.text();
-		const result = parser.parse(xml).ListBucketResult;
+		const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
 		const contents = result.Contents
 			? Array.isArray(result.Contents)
 				? result.Contents
@@ -401,7 +400,7 @@ async function searchFiles(params: {
 		}
 
 		const xml = await s3Res.text();
-		const result = parser.parse(xml).ListBucketResult;
+		const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
 		const contents = result.Contents
 			? Array.isArray(result.Contents)
 				? result.Contents
@@ -486,7 +485,7 @@ async function deletePrefixObjects(params: {
 			}
 
 			const xml = await listRes.text();
-			const result = parser.parse(xml).ListBucketResult;
+			const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
 			const contents = result.Contents
 				? Array.isArray(result.Contents)
 					? result.Contents

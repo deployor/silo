@@ -17,6 +17,7 @@ import {
 	hashOffboardingExportSecret,
 } from "../../lib/offboarding-export";
 import { s3Client } from "../../lib/s3-client";
+import { parseS3Xml } from "../../lib/s3-xml";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
 
@@ -29,9 +30,7 @@ async function getS3Error(res: Response): Promise<string> {
 	try {
 		const text = await res.text();
 		if (text.includes("<?xml") || text.includes("<Error>")) {
-			const { XMLParser } = await import("fast-xml-parser");
-			const parser = new XMLParser();
-			const parsed = parser.parse(text);
+			const parsed = parseS3Xml<{ Error?: { Code?: string; Message?: string } }>(text);
 			if (parsed.Error) {
 				return `${parsed.Error.Code}: ${parsed.Error.Message}`;
 			}
@@ -295,9 +294,7 @@ async function getBucketObjectCount(
 		if (!listRes.ok) break;
 
 		const xml = await listRes.text();
-		const { XMLParser } = await import("fast-xml-parser");
-		const parser = new XMLParser();
-		const result = parser.parse(xml).ListBucketResult;
+		const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
 		const contents = result.Contents
 			? Array.isArray(result.Contents)
 				? result.Contents
@@ -409,9 +406,7 @@ async function analyzeMigration(
 		}
 
 		const xml = await listRes.text();
-		const { XMLParser } = await import("fast-xml-parser");
-		const parser = new XMLParser();
-		const result = parser.parse(xml).ListAllMyBucketsResult;
+		const result = parseS3Xml<{ ListAllMyBucketsResult?: any }>(xml).ListAllMyBucketsResult;
 
 		const remoteBuckets = new Set<string>();
 		if (result.Buckets?.Bucket) {
@@ -731,9 +726,7 @@ async function migrateUserData(
 						}
 
 						const xml = await listRes.text();
-						const { XMLParser } = await import("fast-xml-parser");
-						const parser = new XMLParser();
-						const result = parser.parse(xml).ListBucketResult;
+						const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
 
 						const contents = result.Contents
 							? Array.isArray(result.Contents)
@@ -816,7 +809,7 @@ async function migrateUserData(
 									});
 									if (tagRes.ok) {
 										const tXml = await tagRes.text();
-										const tRes = parser.parse(tXml);
+							const tRes = parseS3Xml<any>(tXml);
 										const tagSet = tRes.Tagging?.TagSet?.Tag;
 										if (tagSet) {
 											const tagArray = Array.isArray(tagSet)
@@ -953,9 +946,7 @@ async function streamUserData(user: typeof users.$inferSelect) {
 					if (!listRes.ok) break;
 
 					const xml = await listRes.text();
-					const { XMLParser } = await import("fast-xml-parser");
-					const parser = new XMLParser();
-					const result = parser.parse(xml).ListBucketResult;
+					const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
 
 					const contents = result.Contents
 						? Array.isArray(result.Contents)
@@ -978,8 +969,7 @@ async function streamUserData(user: typeof users.$inferSelect) {
 							});
 							if (taggingRes.ok) {
 								const xml = await taggingRes.text();
-								const p = new XMLParser();
-								const r = p.parse(xml);
+								const r = parseS3Xml<any>(xml);
 								const tagSet = r.Tagging?.TagSet?.Tag;
 								if (tagSet) {
 									const tagArray = Array.isArray(tagSet) ? tagSet : [tagSet];

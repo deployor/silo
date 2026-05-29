@@ -18,6 +18,7 @@ import { jsonResponse } from "../../lib/api-utils";
 import { getDiskCacheStats } from "../../lib/disk-cache";
 import { redis } from "../../lib/redis";
 import { s3Client } from "../../lib/s3-client";
+import { parseS3Xml } from "../../lib/s3-xml";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
 import {
@@ -1332,8 +1333,7 @@ async function getBucketDetails(bucketName: string) {
 			});
 			if (s3Res.ok) {
 				const xml = await s3Res.text();
-				const parser = new XMLParser();
-				const result = parser.parse(xml).ListBucketResult;
+				const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
 				if (result.Contents) {
 					const contents: S3ListContentsItem[] = Array.isArray(result.Contents)
 						? (result.Contents as S3ListContentsItem[])
