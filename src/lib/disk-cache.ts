@@ -649,6 +649,15 @@ export async function diskCachePutStream(
 		await writer.flush();
 		await writer.end();
 
+		let previousSize = 0;
+		if (existsSync(bp)) {
+			try {
+				previousSize = statSync(bp).size;
+			} catch {
+				/* ignore */
+			}
+		}
+
 		if (bytesWritten !== sizeHint) {
 			throw new Error(
 				`Disk cache size mismatch: expected=${sizeHint} actual=${bytesWritten}`,

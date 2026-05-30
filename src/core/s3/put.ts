@@ -242,9 +242,12 @@ export async function handlePutRequest(
 		if (!copySource) {
 			const body = req.body;
 			if (body === null || body === undefined) {
-				return withCors(
-					S3Errors.InvalidRequest("Missing request body").toResponse(),
-				);
+				const contentLength = req.headers.get("content-length");
+				if (contentLength !== "0") {
+					return withCors(
+						S3Errors.InvalidRequest("Missing request body").toResponse(),
+					);
+				}
 			}
 
 			// If input is aws-chunked, we MUST decode it to get the real content.

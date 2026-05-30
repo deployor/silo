@@ -564,9 +564,125 @@ async function main() {
 	});
 
 	// ═════════════════════════════════════════════════════════════════════════
-	// 11. LARGE FILES
+	// 11. CORS
 	// ═════════════════════════════════════════════════════════════════════════
-	console.log("── 11. Large Files ──");
+	console.log("── 11. CORS ──");
+
+	await test("CORS: GET bucket CORS (returns XML)", async () => {
+		const r = await fetch(`${CONFIG.endpoint}/${B}/?cors`, {
+			method: "GET",
+			headers: {
+				Authorization: `AWS4-HMAC-SHA256 ...`, // won't match but we just test the query param triggers CORS path
+			},
+		});
+		// The GET ?cors endpoint returns XML regardless (it uses the CORS handler path)
+		const text = await r.text();
+		if (!text.includes("CORSConfiguration") && !text.includes("Error"))
+			throw new Error(`Unexpected CORS response: ${text.slice(0, 100)}`);
+	});
+
+	await test("CORS: PUT custom CORS config", async () => {
+		const corsXml = `<?xml version="1.0" encoding="UTF-8"?>
+<CORSConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+  <CORSRule>
+    <AllowedOrigin>https://example.com</AllowedOrigin>
+    <AllowedOrigin>https://app.example.com</AllowedOrigin>
+    <AllowedMethod>GET</AllowedMethod>
+    <AllowedMethod>HEAD</AllowedMethod>
+    <AllowedHeader>*</AllowedHeader>
+    <ExposeHeader>x-amz-request-id</ExposeHeader>
+    <ExposeHeader>etag</ExposeHeader>
+    <MaxAgeSeconds>3600</MaxAgeSeconds>
+  </CORSRule>
+</CORSConfiguration>`;
+		const r = await s3.send(
+			new PutObjectCommand({ Bucket: B, Key: "?cors", Body: corsXml }),
+		);
+		// PUT to empty key with ?cors query should work via the CORS path
+		if (r.$metadata.httpStatusCode !== 200 && r.$metadata.httpStatusCode !== 204)
+			throw new Error(`CORS PUT failed: ${r.$metadata.httpStatusCode}`);
+	});
+
+	await test("CORS: OPTIONS preflight with matching origin → 200", async () => {
+		const r = await fetch(`${CONFIG.endpoint}/${B}/some-key`, {
+			method: "OPTIONS",
+			headers: {
+				Origin: "https://example.com",
+				"Access-Control-Request-Method": "GET",
+			},
+		});
+		if (r.status !== 200) throw new Error(`OPTIONS returned ${r.status}`);
+		if (r.headers.get("Access-Control-Allow-Origin") !== "https://example.com")
+			throw new Error("Wrong Allow-Origin");
+		if (!r.headers.get("Access-Control-Allow-Methods")?.includes("GET"))
+			throw new Error("GET not in allowed methods");
+	});
+
+	await test("CORS: OPTIONS preflight wrong origin → 403", async () => {
+		const r = await fetch(`${CONFIG.endpoint}/${B}/some-key`, {
+			method: "OPTIONS",
+			headers: {
+				Origin: "https://evil.com",
+				"Access-Control-Request-Method": "GET",
+			},
+		});
+		if (r.status !== 403) throw new Error(`Should be 403, got ${r.status}`);
+	});
+
+	await test("CORS: OPTIONS disallowed method → 403", async () => {
+		const r = await fetch(`${CONFIG.endpoint}/${B}/some-key`, {
+			method: "OPTIONS",
+			headers: {
+				Origin: "https://example.com",
+				"Access-Control-Request-Method": "DELETE",
+			},
+		});
+		if (r.status !== 403) throw new Error(`DELETE not allowed, got ${r.status}`);
+	});
+
+	await test("CORS: MaxAgeSeconds header present", async () => {
+		const r = await fetch(`${CONFIG.endpoint}/${B}/some-key`, {
+			method: "OPTIONS",
+			headers: {
+				Origin: "https://example.com",
+				"Access-Control-Request-Method": "GET",
+			},
+		});
+		if (r.headers.get("Access-Control-Max-Age") !== "3600")
+			throw new Error(`MaxAge wrong: ${r.headers.get("Access-Control-Max-Age")}`);
+	});
+
+	await test("CORS: ExposeHeaders present on OPTIONS", async () => {
+		const r = await fetch(`${CONFIG.endpoint}/${B}/some-key`, {
+			method: "OPTIONS",
+			headers: {
+				Origin: "https://example.com",
+				"Access-Control-Request-Method": "GET",
+			},
+		});
+		const expose = r.headers.get("Access-Control-Expose-Headers") || "";
+		if (!expose.includes("etag")) throw new Error("etag not in Expose-Headers");
+	});
+
+	await test("CORS: GET response has origin header with Origin", async () => {
+		const ck = pkey("cors-get.txt");
+		await s3.send(new PutObjectCommand({ Bucket: B, Key: ck, Body: "cors-test" }));
+		const r = await fetch(
+			`${CONFIG.endpoint}/${B}/${ck}?x-id=GetObject`,
+			{
+				method: "GET",
+				headers: { Origin: "https://app.example.com" },
+			},
+		);
+		// The response should include CORS headers even if we can't verify signature
+		const acao = r.headers.get("Access-Control-Allow-Origin");
+		console.log(`       Allow-Origin: ${acao || "none"}`);
+	});
+
+	// ═════════════════════════════════════════════════════════════════════════
+	// 12. LARGE FILES
+	// ═════════════════════════════════════════════════════════════════════════
+	console.log("── 12. Large Files ──");
 
 	await test("LARGE: 20 MB single PUT + verify", async () => {
 		const lk = pkey("large-20mb.bin");

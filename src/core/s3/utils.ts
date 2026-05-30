@@ -167,7 +167,10 @@ export function getInternalPath(
 ): string {
 	assertNoTraversal(key);
 
-	const cleanKey = key.startsWith("/") ? key.slice(1) : key;
+	const cleanKey = (key.startsWith("/") ? key.slice(1) : key)
+		.replace(/\?/g, "%3F")
+		.replace(/#/g, "%23")
+		.replace(/&/g, "%26");
 
 	if (bucket.isSystem && !bucket.userId) {
 		return `system/${bucket.name}/${cleanKey}`;
