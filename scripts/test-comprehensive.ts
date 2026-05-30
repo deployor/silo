@@ -595,12 +595,22 @@ async function main() {
     <MaxAgeSeconds>3600</MaxAgeSeconds>
   </CORSRule>
 </CORSConfiguration>`;
-		const r = await s3.send(
-			new PutObjectCommand({ Bucket: B, Key: "?cors", Body: corsXml }),
+		// CORS config is set via PUT to bucket root with ?cors query param.
+		// The SDK can't represent this (Key: "?cors" would be in path, not query).
+		// Use raw fetch with aws4fetch signing.
+		const { AwsClient } = await import("aws4fetch");
+		const awsS3 = new AwsClient({
+			accessKeyId: CONFIG.accessKeyId,
+			secretAccessKey: CONFIG.secretAccessKey,
+			service: "s3",
+			region: CONFIG.region,
+		});
+		const r = await awsS3.fetch(
+			`${CONFIG.endpoint}/${B}/?cors`,
+			{ method: "PUT", body: corsXml },
 		);
-		// PUT to empty key with ?cors query should work via the CORS path
-		if (r.$metadata.httpStatusCode !== 200 && r.$metadata.httpStatusCode !== 204)
-			throw new Error(`CORS PUT failed: ${r.$metadata.httpStatusCode}`);
+		if (r.status !== 200 && r.status !== 204)
+			throw new Error(`CORS PUT failed: ${r.status} ${await r.text()}`);
 	});
 
 	await test("CORS: OPTIONS preflight with matching origin → 200", async () => {
