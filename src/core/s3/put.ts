@@ -165,6 +165,8 @@ export async function handlePutRequest(
 				.set({ corsConfig: JSON.stringify(corsConfig) })
 				.where(eq(buckets.id, bucket.id));
 
+			redis.del(`auth:pub:${bucket.name}`).catch(() => {});
+
 			return withCors(new Response(null, { status: 200 }));
 		} catch (_e) {
 			return withCors(S3Errors.MalformedXML().toResponse());
