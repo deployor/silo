@@ -9,7 +9,12 @@ const S3_MULTIPART_UPLOAD_TIMEOUT_MS = Number(
 function encodeS3Path(path: string) {
 	return path
 		.split("/")
-		.map((segment) => encodeURIComponent(segment))
+		.map((segment) =>
+			segment.replace(
+				/(%[0-9A-Fa-f]{2})|([^/]+)/g,
+				(match, pctEncoded) => pctEncoded || encodeURIComponent(match),
+			),
+		)
 		.join("/");
 }
 

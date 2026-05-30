@@ -374,21 +374,15 @@ async function main() {
 		if (!condETag) throw new Error("No ETag");
 	});
 
-	await test("If-None-Match → 304 Not Modified (BUG: 304 blocked by quota check)", async () => {
-		// KNOWN PRODUCTION BUG: conditional 304 responses from upstream S3 are
-		// blocked because our quota enforcement requires Content-Length on every
-		// response (get.ts ~720-732). 304 has no body and no Content-Length.
-		// FIX: add `response.status !== 304 && response.status !== 204` to the
-		// Content-Length guard condition in src/core/s3/get.ts.
+	await test("If-None-Match → 304 Not Modified", async () => {
 		const ck = pkey("cond.txt");
 		try {
 			await s3.send(
 				new GetObjectCommand({ Bucket: B, Key: ck, IfNoneMatch: condETag }),
 			);
-			console.log("       Note: 304 returned normally (fix deployed?)");
+			throw new Error("Expected 304");
 		} catch (e: any) {
 			if (e.$metadata?.httpStatusCode !== 304) throw e;
-			console.log("       Note: 304 correctly returned by upstream, but blocked by gateway");
 		}
 	});
 
@@ -622,23 +616,13 @@ async function main() {
 	// ═════════════════════════════════════════════════════════════════════════
 	console.log("── 12. Edge Cases ──");
 
-	await test("Empty object 0 bytes (BUG: gateway rejects empty body)", async () => {
-		// KNOWN PRODUCTION BUG: PUT with zero-length body is rejected because
-		// put.ts ~228 checks `if (!body)` which is true for empty strings/Blobs.
-		// FIX: change to `if (body === null || body === undefined)`.
-		try {
-			await s3.send(new PutObjectCommand({ Bucket: B, Key: ek, Body: new Uint8Array(0) }));
-			const r = await s3.send(new GetObjectCommand({ Bucket: B, Key: ek }));
-			const b = await r.Body?.transformToByteArray();
-			if (b?.length !== 0) throw new Error("Empty object has bytes");
-			console.log("       Note: empty body works (fix deployed?)");
-		} catch (e: any) {
-			if (e.message?.includes("Missing request body") || e.message?.includes("body")) {
-				console.log("       Note: known bug - gateway rejects empty body PUT");
-			} else {
-				throw e;
-			}
-		}
+	await test("Empty object (0 bytes)", async () => {
+		const ek = pkey("empty.txt");
+		await s3.send(new PutObjectCommand({ Bucket: B, Key: ek, Body: new Uint8Array(0) }));
+		const r = await s3.send(new GetObjectCommand({ Bucket: B, Key: ek }));
+		const b = await r.Body?.transformToByteArray();
+		if (b?.length !== 0) throw new Error("Empty object has bytes");
+		if (r.ContentLength !== 0) throw new Error("ContentLength not 0");
 	});
 
 	await test("Unicode key name", async () => {
@@ -655,22 +639,11 @@ async function main() {
 		if (body !== "deep") throw new Error("Nested key mishandled");
 	});
 
-	await test("Key with percent-encoded chars (BUG: %XX double-encoded)", async () => {
-		// KNOWN PRODUCTION BUG: s3-client.ts encodeS3Path re-encodes already
-		// percent-encoded sequences (%3F → %253F). FIX: preserve %XX in encodeS3Path
-		// by skipping re-encoding of percent-encoded triplets.
-		try {
-			const pk = pkey(`pct-${randomBytes(4).toString("hex")}.txt`);
-			await s3.send(new PutObjectCommand({ Bucket: B, Key: pk, Body: "percent" }));
-			const body = await retryGet(pk);
-			if (body !== "percent") throw new Error("Key mishandled");
-		} catch (e: any) {
-			if (e.name === "UnknownError") {
-				console.log("       Note: known bug - percent-encoded keys double-encoded upstream");
-			} else {
-				throw e;
-			}
-		}
+	await test("Key with percent-encoded chars (%3F, %23 etc)", async () => {
+		const pk = pkey(`pct%3F%23${randomBytes(4).toString("hex")}.txt`);
+		await s3.send(new PutObjectCommand({ Bucket: B, Key: pk, Body: "percent" }));
+		const body = await retryGet(pk);
+		if (body !== "percent") throw new Error("Percent-encoded key mishandled");
 	});
 
 	await test("Rapid overwrites (5x same key)", async () => {
