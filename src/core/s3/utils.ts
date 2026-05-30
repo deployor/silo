@@ -153,7 +153,6 @@ export function getKeyFromRequest(req: Request, bucketName: string): string {
 
 	return key;
 }
-}
 
 export function getInternalPath(
 	key: string,
