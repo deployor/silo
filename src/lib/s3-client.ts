@@ -11,7 +11,7 @@ function encodeS3Path(path: string) {
 		.split("/")
 		.map((segment) =>
 			segment.replace(
-				/(%[0-9A-Fa-f]{2})|([^/]+)/g,
+				/(%[0-9A-Fa-f]{2})|([^/%]+)/g,
 				(match, pctEncoded) => pctEncoded || encodeURIComponent(match),
 			),
 		)
