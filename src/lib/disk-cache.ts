@@ -48,6 +48,7 @@ import {
 	existsSync,
 	mkdirSync,
 	readdirSync,
+	readFileSync,
 	renameSync,
 	statSync,
 	unlinkSync,
@@ -772,7 +773,7 @@ function runEviction(): void {
 				const mp = join(subDir, file);
 
 				try {
-					const rawMeta = require("node:fs").readFileSync(mp, "utf-8");
+					const rawMeta = readFileSync(mp, "utf-8");
 					const meta: CacheMeta = JSON.parse(rawMeta);
 
 					if (isExpired(meta, now)) {

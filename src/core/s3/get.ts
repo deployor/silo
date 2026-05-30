@@ -722,7 +722,9 @@ ${rulesXml}
 			shouldConsumeQuota &&
 			!isOffboardingExport &&
 			user &&
-			!user.isImmortal
+			!user.isImmortal &&
+			response.status !== 304 &&
+			response.status !== 204
 		) {
 			return S3Errors.InvalidRequest(
 				"Upstream response is missing Content-Length for quota enforcement.",

@@ -462,7 +462,7 @@ export async function handlePutRequest(
 
 		const sizeDelta = Math.max(0, actualSize - existingSize);
 
-		if (!copySource && sizeDelta > 0 && user && !user.isImmortal) {
+		if (!copySource && user && !user.isImmortal) {
 			const quotaUser = {
 				id: user.id,
 				isImmortal: user.isImmortal,
@@ -470,22 +470,29 @@ export async function handlePutRequest(
 				egressLimitBytes: user.egressLimitBytes,
 			};
 
-			storageQuotaReserved = isMultipartPartUpload
-				? await reserveMultipartPartQuota({
-						user: quotaUser,
-						currentStorageUsageBytes: Number(user.storageUsageBytes) || 0,
-						bucketId: bucket.id,
-						uploadId: uploadId as string,
-						partNumber: partNumber as string,
-						partSize: actualSize,
-					})
-				: await consumeStorageQuota(
-						quotaUser,
-						Number(user.storageUsageBytes) || 0,
-						sizeDelta,
-					);
+			if (sizeDelta > 0) {
+				storageQuotaReserved = isMultipartPartUpload
+					? await reserveMultipartPartQuota({
+							user: quotaUser,
+							currentStorageUsageBytes: Number(user.storageUsageBytes) || 0,
+							bucketId: bucket.id,
+							uploadId: uploadId as string,
+							partNumber: partNumber as string,
+							partSize: actualSize,
+						})
+					: await consumeStorageQuota(
+							quotaUser,
+							Number(user.storageUsageBytes) || 0,
+							sizeDelta,
+						);
+			} else if (sizeDelta < 0) {
+				await releaseStorageQuota(user.id, Math.abs(sizeDelta));
+				storageQuotaReserved = true;
+			} else {
+				storageQuotaReserved = true;
+			}
 
-			if (!storageQuotaReserved) {
+			if (!storageQuotaReserved && sizeDelta > 0) {
 				return withCors(
 					S3Errors.QuotaExceeded(
 						"You have exceeded your storage quota.",

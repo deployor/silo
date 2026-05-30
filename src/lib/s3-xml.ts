@@ -1,13 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 
 const s3XmlOptions = {
-	processEntities: {
-		enabled: true,
-		maxEntitySize: 10_000,
-		maxExpansionDepth: 10,
-		maxTotalExpansions: 250_000,
-		maxExpandedLength: 10_000_000,
-	},
+	processEntities: true,
 };
 
 export function createS3XmlParser(options: Record<string, unknown> = {}) {
