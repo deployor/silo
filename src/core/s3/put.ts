@@ -248,12 +248,14 @@ export async function handlePutRequest(
 						S3Errors.InvalidRequest("Missing request body").toResponse(),
 					);
 				}
+				requestBody = new Uint8Array(0);
+				actualSize = 0;
+				upstreamHeaders.set("Content-Length", "0");
 			}
 
-			// If input is aws-chunked, we MUST decode it to get the real content.
-			// And we also need to strip the `aws-chunked` encoding from upstream headers
-			// because we are decoding it here.
-			if (isAwsChunked) {
+			if (body === null || body === undefined) {
+				// Zero-length body, skip to send
+			} else if (isAwsChunked) {
 				if (process.env.DEBUG_S3_PUT === "1") {
 					console.log(`[PUT] Detected aws-chunked encoding for ${key}`);
 				}
