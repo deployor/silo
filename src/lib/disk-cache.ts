@@ -632,28 +632,23 @@ export async function diskCachePutStream(
 	try {
 		ensureParentDir(bp);
 		const maxBytes = sizeHint + 1024;
-		const countingStream = stream.pipeThrough(
-			new TransformStream<Uint8Array, Uint8Array>({
-				transform(chunk, controller) {
-					bytesWritten += chunk.byteLength;
-					if (bytesWritten > maxBytes) {
-						throw new Error("Disk cache stream exceeded expected size");
-					}
-					controller.enqueue(chunk);
-				},
-			}),
-		);
+		const writer = Bun.file(tmpBlob).writer();
+		const reader = stream.getReader();
 
-		let previousSize = 0;
-		if (existsSync(bp)) {
-			try {
-				previousSize = statSync(bp).size;
-			} catch {
-				/* ignore */
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			bytesWritten += value.byteLength;
+			if (bytesWritten > maxBytes) {
+				reader.cancel();
+				throw new Error("Disk cache stream exceeded expected size");
 			}
+			writer.write(value);
 		}
 
-		await Bun.write(tmpBlob, countingStream);
+		await writer.flush();
+		await writer.end();
+
 		if (bytesWritten !== sizeHint) {
 			throw new Error(
 				`Disk cache size mismatch: expected=${sizeHint} actual=${bytesWritten}`,
