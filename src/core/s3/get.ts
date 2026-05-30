@@ -777,7 +777,6 @@ ${rulesXml}
 				const [stream1, stream2] = response.body.tee();
 				responseBody = stream1;
 
-				// Background cache population — fires and forgets
 				const cacheWritePromise = (async () => {
 					try {
 						const headersObj: Record<string, string> = {};
@@ -785,26 +784,22 @@ ${rulesXml}
 							headersObj[k] = v;
 						}
 
+						// Fast path: disk-only large objects — stream directly, avoid memory copy
 						if (shouldCacheDisk && !shouldCacheRedis) {
-							const cached = await diskCachePutStream(
+							await diskCachePutStream(
 								bucket.id,
 								key,
 								stream2,
 								sizeHint,
 								headersObj,
 							);
-							if (cached && process.env.DEBUG_S3_CACHE === "1") {
-								console.log(
-									`[disk-cache] streamed ${bucket.name}/${key} (${(sizeHint / (1024 * 1024)).toFixed(1)} MB)`,
-								);
-							}
 							return;
 						}
 
+						// Buffer path: Redis + optional disk (objects under 10 MB)
 						const reader = stream2.getReader();
 						const chunks: Uint8Array[] = [];
 						let totalSize = 0;
-						// Hard cap: don't buffer more than what we'd cache
 						const maxBuffer = shouldCacheDisk
 							? sizeHint + 1024
 							: REDIS_CACHE_LIMIT;
@@ -812,7 +807,6 @@ ${rulesXml}
 						while (true) {
 							const { done, value } = await reader.read();
 							if (done) break;
-
 							totalSize += value.length;
 							if (totalSize > maxBuffer) {
 								reader.cancel();
@@ -828,34 +822,15 @@ ${rulesXml}
 							offset += chunk.length;
 						}
 
-						// L1: Redis (small objects, with TTL to prevent unbounded growth)
 						if (totalSize < REDIS_CACHE_LIMIT) {
-							const REDIS_BODY_TTL = 21600; // 6 hours
 							await redis
 								.pipeline()
-								.set(
-									cacheKeyMeta,
-									JSON.stringify(headersObj),
-									"EX",
-									REDIS_BODY_TTL,
-								)
-								.set(cacheKeyBody, Buffer.from(buffer), "EX", REDIS_BODY_TTL)
+								.set(cacheKeyMeta, JSON.stringify(headersObj), "EX", 21600)
+								.set(cacheKeyBody, Buffer.from(buffer), "EX", 21600)
 								.exec();
 						}
-
-						// L2: Disk (larger objects, demand-gated)
 						if (isDiskCacheEligible(totalSize)) {
-							const cached = await diskCachePut(
-								bucket.id,
-								key,
-								buffer,
-								headersObj,
-							);
-							if (cached && process.env.DEBUG_S3_CACHE === "1") {
-								console.log(
-									`[disk-cache] cached ${bucket.name}/${key} (${(totalSize / (1024 * 1024)).toFixed(1)} MB)`,
-								);
-							}
+							await diskCachePut(bucket.id, key, buffer, headersObj);
 						}
 					} catch (e) {
 						console.error("Failed to cache S3 object in background:", e);
