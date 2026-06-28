@@ -1266,7 +1266,7 @@ async function ageOutUser(userId: string, _req: Request) {
 				Actions().elements(
 					Button({
 						text: "Migrate or Download Data",
-						url: `https://${config.s3Domain}/dashboard/offboarding`,
+						url: `${config.dashboardUrl}/dashboard/offboarding`,
 						actionId: "open_export_portal",
 					}).danger(),
 				),
@@ -1333,7 +1333,9 @@ async function getBucketDetails(bucketName: string) {
 			});
 			if (s3Res.ok) {
 				const xml = await s3Res.text();
-				const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
+				const result = parseS3Xml<{ ListBucketResult?: any }>(
+					xml,
+				).ListBucketResult;
 				if (result.Contents) {
 					const contents: S3ListContentsItem[] = Array.isArray(result.Contents)
 						? (result.Contents as S3ListContentsItem[])

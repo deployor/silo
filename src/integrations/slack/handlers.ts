@@ -74,7 +74,7 @@ export async function handleAppHomeOpened(event: { user: string }) {
 				.blocks(
 					Header({ text: "Welcome to Silo! :wave:" }),
 					Section({
-						text: `Heyho — you need an account on Silo so we can manage quota (and more) for you.\n\nPlease sign in with Hack Club Auth so we can match this Slack user to your record:\n\n*<https://${config.s3Domain}/auth/login?source=slack|Sign in to Silo>*`,
+						text: `Heyho — you need an account on Silo so we can manage quota (and more) for you.\n\nPlease sign in with Hack Club Auth so we can match this Slack user to your record:\n\n*<${config.dashboardUrl}/auth/login?source=slack|Sign in to Silo>*`,
 					}),
 					Context().elements(
 						"Once you've logged in, come back here and click 'Refresh'!",

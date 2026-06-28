@@ -21,6 +21,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const p = bootstrap.props as {
 		user?: FrontendUser | null;
 	};
+	const dashboardHref = bootstrap.config?.dashboardUrl || "";
 
 	const [mobileOpen, setMobileOpen] = useState(false);
 	const [active, setActive] = useState("intro");
@@ -97,7 +98,9 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		}
 	};
 
-	const submitTakedownReport = async (event: React.FormEvent<HTMLFormElement>) => {
+	const submitTakedownReport = async (
+		event: React.FormEvent<HTMLFormElement>,
+	) => {
 		event.preventDefault();
 		if (reportSubmitting) return;
 
@@ -123,9 +126,9 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			});
 
 			if (!res.ok) {
-				const data = (await res.json().catch(() => null)) as
-					| { error?: string }
-					| null;
+				const data = (await res.json().catch(() => null)) as {
+					error?: string;
+				} | null;
 				throw new Error(data?.error || "Failed to submit report");
 			}
 
@@ -138,9 +141,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			setReportStatus({
 				type: "error",
 				message:
-					error instanceof Error
-						? error.message
-						: "Failed to submit report",
+					error instanceof Error ? error.message : "Failed to submit report",
 			});
 		} finally {
 			setReportSubmitting(false);
@@ -234,8 +235,8 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							</div>
 						) : null}
 
-				{activeSection === "auth" ? (
-					<div id="auth" className="section-content active">
+						{activeSection === "auth" ? (
+							<div id="auth" className="section-content active">
 								<h1 className="text-4xl font-bold mb-6 text-white">
 									Authentication
 								</h1>
@@ -245,7 +246,10 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<ol className="list-decimal list-inside space-y-4 text-text-muted mb-8">
 									<li>
 										Log in to the{" "}
-										<a href="/" className="text-hc-red hover:underline">
+										<a
+											href={dashboardHref || "/"}
+											className="text-hc-red hover:underline"
+										>
 											Dashboard
 										</a>
 										.
@@ -261,38 +265,54 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										once. Make sure to save it securely.
 									</p>
 								</div>
-					</div>
-				) : null}
+							</div>
+						) : null}
 
-				{activeSection === "custom-domains" ? (
-					<div id="custom-domains" className="section-content active">
-						<h1 className="text-4xl font-bold mb-6 text-white">
-							Custom Domains
-						</h1>
-						<p className="text-lg mb-6 text-text-muted leading-relaxed">
-							Every bucket can publish through your own hostname. This keeps your app portable and lets you repoint DNS to another S3-compatible provider later without changing object URLs.
-						</p>
-						<div className="rounded-3xl border border-white/10 p-8 bg-hc-darker/50 mb-8">
-							<h3 className="text-2xl font-bold mb-4 text-white">Setup flow</h3>
-							<ol className="list-decimal list-inside space-y-3 text-text-muted">
-								<li>Add a hostname in the bucket custom-domain modal.</li>
-								<li>Create a CNAME or ALIAS to <code>silo.deployor.dev</code>.</li>
-								<li>Publish the TXT token at <code>_silo-domain-verification.your-domain.com</code>.</li>
-								<li>Verify the domain and set it as primary.</li>
-								<li>Public URLs and temporary private links will now default to that domain.</li>
-							</ol>
-						</div>
-						<h3 className="text-2xl font-bold mb-4 text-white">Example URLs</h3>
-						<CodeBlock
-							code={`# Public object URL\nhttps://assets.example.com/images/logo.png\n\n# Temporary private link\nhttps://assets.example.com/private/report.pdf?expires=1742873000000&signature=...`}
-						/>
-						<p className="text-text-muted">
-							When you ever need to leave Silo, migrate the objects to another S3-compatible provider and repoint the same DNS records. Your application URLs stay the same.
-						</p>
-					</div>
-				) : null}
+						{activeSection === "custom-domains" ? (
+							<div id="custom-domains" className="section-content active">
+								<h1 className="text-4xl font-bold mb-6 text-white">
+									Custom Domains
+								</h1>
+								<p className="text-lg mb-6 text-text-muted leading-relaxed">
+									Every bucket can publish through your own hostname. This keeps
+									your app portable and lets you repoint DNS to another
+									S3-compatible provider later without changing object URLs.
+								</p>
+								<div className="rounded-3xl border border-white/10 p-8 bg-hc-darker/50 mb-8">
+									<h3 className="text-2xl font-bold mb-4 text-white">
+										Setup flow
+									</h3>
+									<ol className="list-decimal list-inside space-y-3 text-text-muted">
+										<li>Add a hostname in the bucket custom-domain modal.</li>
+										<li>
+											Create a CNAME or ALIAS to <code>silo.deployor.dev</code>.
+										</li>
+										<li>
+											Publish the TXT token at{" "}
+											<code>_silo-domain-verification.your-domain.com</code>.
+										</li>
+										<li>Verify the domain and set it as primary.</li>
+										<li>
+											Public URLs and temporary private links will now default
+											to that domain.
+										</li>
+									</ol>
+								</div>
+								<h3 className="text-2xl font-bold mb-4 text-white">
+									Example URLs
+								</h3>
+								<CodeBlock
+									code={`# Public object URL\nhttps://assets.example.com/images/logo.png\n\n# Temporary private link\nhttps://assets.example.com/private/report.pdf?expires=1742873000000&signature=...`}
+								/>
+								<p className="text-text-muted">
+									When you ever need to leave Silo, migrate the objects to
+									another S3-compatible provider and repoint the same DNS
+									records. Your application URLs stay the same.
+								</p>
+							</div>
+						) : null}
 
-				{activeSection === "public-buckets" ? (
+						{activeSection === "public-buckets" ? (
 							<div id="public-buckets" className="section-content active">
 								<h1 className="text-4xl font-bold mb-6 text-white">
 									Public Buckets
@@ -379,12 +399,14 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									Privacy & Data
 								</h1>
 								<p className="text-lg mb-6 text-text-muted leading-relaxed">
-									This page explains what Silo collects, why we collect it, how long
-									we keep it, and what controls you have.
+									This page explains what Silo collects, why we collect it, how
+									long we keep it, and what controls you have.
 								</p>
 								<div className="space-y-8">
 									<div>
-										<h3 className="text-2xl font-bold mb-3 text-white">What we collect</h3>
+										<h3 className="text-2xl font-bold mb-3 text-white">
+											What we collect
+										</h3>
 										<ul className="list-disc list-inside space-y-2 text-text-muted">
 											<li>Account identifiers from login providers.</li>
 											<li>
@@ -392,70 +414,94 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												user-agent, and response status.
 											</li>
 											<li>
-												Storage usage metadata such as bucket names, object keys,
-												size totals, and request counts.
+												Storage usage metadata such as bucket names, object
+												keys, size totals, and request counts.
 											</li>
 										</ul>
 									</div>
 
 									<div>
-										<h3 className="text-2xl font-bold mb-3 text-white">What we do not collect</h3>
+										<h3 className="text-2xl font-bold mb-3 text-white">
+											What we do not collect
+										</h3>
 										<ul className="list-disc list-inside space-y-2 text-text-muted">
 											<li>We do not sell personal data.</li>
 											<li>
-												We do not inspect file contents for ads or behavioral profiling.
+												We do not inspect file contents for ads or behavioral
+												profiling.
 											</li>
 										</ul>
 									</div>
 
 									<div>
-										<h3 className="text-2xl font-bold mb-3 text-white">Why we process data</h3>
+										<h3 className="text-2xl font-bold mb-3 text-white">
+											Why we process data
+										</h3>
 										<ul className="list-disc list-inside space-y-2 text-text-muted">
-											<li>Provide storage, authentication, and account functionality.</li>
-											<li>Enforce quotas, stop abuse, and protect platform security.</li>
+											<li>
+												Provide storage, authentication, and account
+												functionality.
+											</li>
+											<li>
+												Enforce quotas, stop abuse, and protect platform
+												security.
+											</li>
 											<li>Investigate outages and improve reliability.</li>
 										</ul>
 									</div>
 
 									<div>
-										<h3 className="text-2xl font-bold mb-3 text-white">Retention and deletion</h3>
+										<h3 className="text-2xl font-bold mb-3 text-white">
+											Retention and deletion
+										</h3>
 										<ul className="list-disc list-inside space-y-2 text-text-muted">
 											<li>
-												We retain operational logs and metadata only as long as needed
-												for security, abuse handling, and reliability.
+												We retain operational logs and metadata only as long as
+												needed for security, abuse handling, and reliability.
 											</li>
 											<li>
-												After you age out of Hack Club (high school), we will ask you
-												to export and delete your Silo data during offboarding.
+												After you age out of Hack Club (high school), we will
+												ask you to export and delete your Silo data during
+												offboarding.
 											</li>
 											<li>
 												You can delete your full account data yourself from the
-												account page at <a href="/account" className="text-hc-red hover:underline">/account</a>.
+												account page at{" "}
+												<a
+													href={`${dashboardHref}/account`}
+													className="text-hc-red hover:underline"
+												>
+													/account
+												</a>
+												.
 											</li>
 											<li>
-												Need a data export? Reach out to us in Slack or email us.
+												Need a data export? Reach out to us in Slack or email
+												us.
 											</li>
 										</ul>
 									</div>
 
 									<div>
-										<h3 className="text-2xl font-bold mb-3 text-white">Safety and abuse</h3>
+										<h3 className="text-2xl font-bold mb-3 text-white">
+											Safety and abuse
+										</h3>
 										<ul className="list-disc list-inside space-y-2 text-text-muted">
 											<li>
-												Abuse can lead to permanent suspension and possible exclusion
-												from other Hack Club programs.
+												Abuse can lead to permanent suspension and possible
+												exclusion from other Hack Club programs.
 											</li>
 											<li>
-												We may retain relevant logs and report details to investigate
-												and enforce policy.
+												We may retain relevant logs and report details to
+												investigate and enforce policy.
 											</li>
 										</ul>
 									</div>
 
 									<div className="bg-white/5 border border-white/10 rounded-xl p-4">
 										<p className="text-sm text-text-muted">
-											Last updated: March 2026. If something here is unclear, contact
-											the Silo team and we will clarify it.
+											Last updated: March 2026. If something here is unclear,
+											contact the Silo team and we will clarify it.
 										</p>
 									</div>
 								</div>
@@ -468,10 +514,13 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									Takedown Report
 								</h1>
 								<p className="text-lg mb-6 text-text-muted leading-relaxed">
-									Use this form to report harmful or infringing content. Reports are
-									sent directly to the Silo team for review.
+									Use this form to report harmful or infringing content. Reports
+									are sent directly to the Silo team for review.
 								</p>
-								<form onSubmit={submitTakedownReport} className="space-y-4 max-w-2xl">
+								<form
+									onSubmit={submitTakedownReport}
+									className="space-y-4 max-w-2xl"
+								>
 									<input
 										type="text"
 										name="website"
@@ -481,7 +530,10 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										aria-hidden="true"
 									/>
 									<div>
-										<label className="block text-sm font-bold text-white mb-2" htmlFor="takedown-url">
+										<label
+											className="block text-sm font-bold text-white mb-2"
+											htmlFor="takedown-url"
+										>
 											URL where this happened
 										</label>
 										<input
@@ -494,7 +546,10 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										/>
 									</div>
 									<div>
-										<label className="block text-sm font-bold text-white mb-2" htmlFor="takedown-title">
+										<label
+											className="block text-sm font-bold text-white mb-2"
+											htmlFor="takedown-title"
+										>
 											Title
 										</label>
 										<input
@@ -508,7 +563,10 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										/>
 									</div>
 									<div>
-										<label className="block text-sm font-bold text-white mb-2" htmlFor="takedown-description">
+										<label
+											className="block text-sm font-bold text-white mb-2"
+											htmlFor="takedown-description"
+										>
 											Description
 										</label>
 										<textarea
@@ -521,7 +579,10 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										/>
 									</div>
 									<div>
-										<label className="block text-sm font-bold text-white mb-2" htmlFor="takedown-email">
+										<label
+											className="block text-sm font-bold text-white mb-2"
+											htmlFor="takedown-email"
+										>
 											Your email
 										</label>
 										<input
@@ -579,8 +640,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-hc-red">✓</span>{" "}
-												GetBucketLocation{" "}
+												<span className="text-hc-red">✓</span> GetBucketLocation{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(GET /bucket?location)
 												</span>
@@ -598,8 +658,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												</span>
 											</li>
 											<li className="flex items-center gap-2">
-												<span className="text-hc-red">✓</span>{" "}
-												DeleteBucketCors{" "}
+												<span className="text-hc-red">✓</span> DeleteBucketCors{" "}
 												<span className="text-xs opacity-50 ml-auto">
 													(DELETE /bucket?cors)
 												</span>
@@ -1332,15 +1391,11 @@ func main() {
 									</li>
 									<li>
 										access_key_id:{" "}
-										<span className="text-hc-red">
-											[Paste your Access Key]
-										</span>
+										<span className="text-hc-red">[Paste your Access Key]</span>
 									</li>
 									<li>
 										secret_access_key:{" "}
-										<span className="text-hc-red">
-											[Paste your Secret Key]
-										</span>
+										<span className="text-hc-red">[Paste your Secret Key]</span>
 									</li>
 									<li>
 										region: <span className="text-hc-red">auto</span>
@@ -1411,7 +1466,6 @@ rclone mount silo:my-bucket ~/mnt/silo --vfs-cache-mode writes`}
 								</div>
 							</div>
 						) : null}
-
 					</div>
 				</main>
 			</div>

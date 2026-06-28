@@ -6,6 +6,7 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		hideNavLinks?: boolean;
 		mainClass?: string;
 	};
+	const dashboardHref = bootstrap.config?.dashboardUrl || "";
 
 	return (
 		<AppShell
@@ -31,13 +32,13 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 					<div className="flex flex-wrap gap-3 justify-center items-center">
 						<a
-							href="/auth/login"
+							href={`${dashboardHref}/auth/login`}
 							className="silo-cta text-white bg-hc-red/85 hover:bg-hc-red border-hc-red/70"
 						>
 							Login
 						</a>
 						<a
-							href="/docs"
+							href={`${dashboardHref}/docs`}
 							className="silo-cta text-white/90 border-white/20 bg-white/5 hover:bg-white/10 hover:text-white"
 						>
 							Docs
