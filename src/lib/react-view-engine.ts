@@ -36,6 +36,9 @@ export function renderReactDocument(
 		config: {
 			env: config.env,
 			git: config.git,
+			s3Domain: config.s3Domain,
+			dashboardDomain: config.dashboardDomain,
+			dashboardUrl: config.dashboardUrl,
 			customDomainsEnabled: config.customDomainsEnabled,
 			deepFreezeEnabled: config.deepFreezeEnabled,
 			cloudflareForSaas: {

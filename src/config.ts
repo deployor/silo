@@ -36,6 +36,10 @@ const envSchema = z.object({
 });
 
 const env = envSchema.parse(process.env);
+const dashboardDomain =
+	env.S3_DOMAIN === "localhost:3000"
+		? env.S3_DOMAIN
+		: `dashboard.${env.S3_DOMAIN}`;
 
 let gitSha = env.GIT_COMMIT_SHA;
 let gitDate = env.GIT_COMMIT_DATE;
@@ -90,6 +94,8 @@ export const config = {
 	},
 	isProduction: env.NODE_ENV === "production",
 	s3Domain: env.S3_DOMAIN,
+	dashboardDomain,
+	dashboardUrl: `${env.NODE_ENV === "production" ? "https" : "http"}://${dashboardDomain}`,
 	databaseUrl: env.DATABASE_URL,
 	redisUrl: env.REDIS_URL,
 	s3: {

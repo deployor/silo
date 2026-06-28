@@ -24,6 +24,35 @@ import { handleDashboardRequest } from "./web/dashboard";
 import { handleRedeemRequest } from "./web/redemptions";
 
 const S3_DOMAIN = config.s3Domain;
+const DASHBOARD_HOST = config.dashboardDomain;
+
+const dashboardPaths = [
+	"/auth/",
+	"/api/dashboard/",
+	"/dashboard",
+	"/dashboard/",
+	"/docs",
+	"/account",
+	"/api/docs/takedown",
+	"/account/",
+	"/api/slack/",
+	"/assets/",
+	"/admin",
+	"/api/admin",
+	"/onboarding",
+	"/api/onboarding/",
+	"/redeem",
+	"/api/revocation",
+	"/health",
+	"/slack-success",
+];
+
+const apexPublicDashboardPaths = new Set([
+	"/",
+	"/health",
+	"/api/slack/events",
+	"/api/revocation",
+]);
 
 // Rate Limiters
 const apiLimiter = rateLimit({ limit: 300, windowMs: 60000 }); // 300 req/min for API
@@ -35,6 +64,19 @@ const s3Limiter = rateLimit({
 	limit: Number(process.env.S3_RATE_LIMIT_PER_MIN ?? "1000000"),
 	windowMs: 60000,
 });
+
+function dashboardUrl(url: URL): string {
+	const target = new URL(url.pathname + url.search, config.dashboardUrl);
+	return target.toString();
+}
+
+function isApexDashboardPath(path: string): boolean {
+	if (path.startsWith("/assets/")) return false;
+	return (
+		!apexPublicDashboardPaths.has(path) &&
+		dashboardPaths.some((p) => path.startsWith(p))
+	);
+}
 
 /**
  * Determines if a request is intended for the dashboard or the S3 gateway.
@@ -56,58 +98,27 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 	const isBrowserNavigation =
 		req.method === "GET" && accept.includes("text/html");
 	const isDashboardHost =
-		host === S3_DOMAIN ||
-		host.startsWith("dashboard.") ||
+		host === DASHBOARD_HOST ||
 		(S3_DOMAIN === "localhost:3000" && host.startsWith("localhost"));
 
 	const path = url.pathname;
-	const dashboardPaths = [
-		"/",
-		"/auth/",
-		"/api/dashboard/",
-		"/dashboard",
-		"/dashboard/",
-		"/docs",
-		"/account",
-		"/api/docs/takedown",
-		"/account/",
-		"/api/slack/",
-		"/assets/",
-		"/admin",
-		"/api/admin",
-		"/onboarding",
-		"/api/onboarding/",
-		"/redeem",
-		"/api/revocation",
-		"/health",
-		"/slack-success",
-	];
 
 	// 1. Explicit dashboard subdomain
-	if (host.startsWith("dashboard.")) {
+	if (host === DASHBOARD_HOST && DASHBOARD_HOST !== S3_DOMAIN) {
 		return true;
 	}
 
-	// 2. Host matches S3 domain (or localhost)
-	if (
-		host === S3_DOMAIN ||
-		(S3_DOMAIN === "localhost:3000" && host.startsWith("localhost"))
-	) {
-		// Exact match for root
-		if (path === "/") return true;
-
-		// Prefix match for others
-		if (dashboardPaths.some((p) => p !== "/" && path.startsWith(p))) {
-			return true;
-		}
-
-		// If it looks like an S3 request (Auth header or params), treat as S3
-		if (hasAuthHeader || hasAmzParams) {
+	// 2. Apex only serves the public landing page from the dashboard app. All
+	// authenticated dashboard routes live on dashboard.<domain> so uploaded public
+	// objects never share the dashboard cookie origin.
+	if (host === S3_DOMAIN) {
+		if (DASHBOARD_HOST === S3_DOMAIN) {
+			if (path === "/") return true;
+			if (dashboardPaths.some((p) => path.startsWith(p))) return true;
+			if (hasAuthHeader || hasAmzParams) return false;
 			return false;
 		}
-
-		// Default to S3 for unknown paths (public bucket access)
-		return false;
+		return apexPublicDashboardPaths.has(path) || path.startsWith("/assets/");
 	}
 
 	// 3. Local/dev fallback: treat normal browser navigation to known dashboard
@@ -151,9 +162,32 @@ const server = Bun.serve({
 				let response: Response = new Response("Internal Error", {
 					status: 500,
 				});
+				const host = req.headers.get("host") || "";
+
+				if (
+					host === S3_DOMAIN &&
+					DASHBOARD_HOST !== S3_DOMAIN &&
+					isApexDashboardPath(url.pathname)
+				) {
+					return Response.redirect(dashboardUrl(url), 302);
+				}
+
 				const isDashboard = isDashboardRequest(req, url);
 
 				if (isDashboard) {
+					if (host === S3_DOMAIN && url.pathname === "/") {
+						const html = await render("landing", {
+							title: "Silo S3 Gateway",
+							layout: "main",
+							hideNavLinks: true,
+							mainClass: "flex flex-col items-center justify-center",
+						});
+						response = new Response(html, {
+							headers: { "Content-Type": "text/html" },
+						});
+						return securityHeaders(req, response, false);
+					}
+
 					// Health check — no rate limiting, no auth
 					if (url.pathname === "/health") {
 						try {

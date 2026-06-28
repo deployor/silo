@@ -11,6 +11,9 @@ export type GitInfo = {
 export type FrontendConfig = {
 	env?: string;
 	git?: GitInfo;
+	s3Domain?: string;
+	dashboardDomain?: string;
+	dashboardUrl?: string;
 	customDomainsEnabled?: boolean;
 	deepFreezeEnabled?: boolean;
 	cloudflareForSaas?: {

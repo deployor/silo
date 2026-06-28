@@ -8,15 +8,12 @@ export function validateOrigin(req: Request): boolean {
 		return true;
 	}
 
-	const allowedDomain = config.s3Domain;
+	const allowedDomains = new Set([config.dashboardDomain, "localhost"]);
 
 	if (origin) {
 		try {
 			const originUrl = new URL(origin);
-			if (
-				originUrl.hostname !== allowedDomain &&
-				originUrl.hostname !== "localhost"
-			) {
+			if (!allowedDomains.has(originUrl.hostname)) {
 				return false;
 			}
 		} catch (_e) {
@@ -27,10 +24,7 @@ export function validateOrigin(req: Request): boolean {
 	if (referer) {
 		try {
 			const refererUrl = new URL(referer);
-			if (
-				refererUrl.hostname !== allowedDomain &&
-				refererUrl.hostname !== "localhost"
-			) {
+			if (!allowedDomains.has(refererUrl.hostname)) {
 				return false;
 			}
 		} catch (_e) {
