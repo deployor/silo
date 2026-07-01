@@ -193,7 +193,7 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 	// NOTE: Dashboard UI sends:
 	// - DELETE /api/dashboard/buckets/:name           => delete bucket
 	// - DELETE /api/dashboard/buckets/:name?empty=true => empty bucket (delete all files only)
-	if (req.method === "DELETE") {
+		if (req.method === "DELETE") {
 		if (user.dataExported) {
 			return errorResponse(
 				"Account is frozen. Buckets cannot be deleted.",
@@ -202,18 +202,17 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 		}
 		const isEmpty = url.searchParams.get("empty") === "true";
 
-		try {
-			if (isEmpty) {
-				await emptyBucket(bucketName, user.id, user.isAdmin);
-				return jsonResponse({ message: "Emptied" });
-			}
-
-			await deleteBucket(bucketName, user.id, user.isAdmin);
-			return jsonResponse({ message: "Deleted" });
-		} catch (e: unknown) {
-			const message = e instanceof Error ? e.message : "Internal Error";
-			return errorResponse(message, 500);
+		if (isEmpty) {
+			emptyBucket(bucketName, user.id, user.isAdmin).catch((e) =>
+				console.error("[emptyBucket] background error:", e),
+			);
+			return jsonResponse({ message: "Emptied" });
 		}
+
+		deleteBucket(bucketName, user.id, user.isAdmin).catch((e) =>
+			console.error("[deleteBucket] background error:", e),
+		);
+		return jsonResponse({ message: "Deleted" });
 	}
 
 	if (req.method === "PATCH") {

@@ -121,29 +121,37 @@ export function isReservedBucketName(name: string): boolean {
 
 export async function deleteBucketContents(prefix: string) {
 	let continuationToken: string | undefined;
+	let pendingDelete: Promise<Response> | null = null;
+
 	do {
 		const query = new URLSearchParams();
 		query.set("list-type", "2");
+		query.set("max-keys", "1000");
 		query.set("prefix", prefix);
 		if (continuationToken) {
 			query.set("continuation-token", continuationToken);
 		}
 
-		const res = await s3Client.fetch(`?${query.toString()}`, { method: "GET" });
-		if (!res.ok) throw new Error(`Failed to list objects: ${res.status}`);
+		const listRes = await s3Client.fetch(`?${query.toString()}`, {
+			method: "GET",
+		});
+		if (!listRes.ok)
+			throw new Error(`Failed to list objects: ${listRes.status}`);
 
-		const xml = await res.text();
+		const xml = await listRes.text();
 		const result = listDeleteParser.parse(xml).ListBucketResult;
-
-		if (!result.Contents || result.Contents.length === 0) break;
-
 		const contents = result.Contents;
 
-		console.log(
-			`[deleteBucketContents] Found ${contents.length} objects to delete for prefix: ${prefix}`,
-		);
+		// Wait for previous delete batch to finish before starting next
+		if (pendingDelete) {
+			const prev = await pendingDelete;
+			if (!prev.ok)
+				throw new Error(`Failed to delete objects: ${prev.status}`);
+		}
 
-		const objects = contents
+		if (!contents || contents.length === 0) break;
+
+		const objects = (Array.isArray(contents) ? contents : [contents])
 			.map(
 				(object: { Key: string }) =>
 					`<Object><Key>${object.Key}</Key></Object>`,
@@ -153,7 +161,7 @@ export async function deleteBucketContents(prefix: string) {
 		const deleteBody = `<Delete xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Quiet>true</Quiet>${objects}</Delete>`;
 		const md5 = createHash("md5").update(deleteBody).digest("base64");
 
-		const deleteRes = await s3Client.fetch("?delete", {
+		pendingDelete = s3Client.fetch("?delete", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/xml",
@@ -162,9 +170,13 @@ export async function deleteBucketContents(prefix: string) {
 			body: deleteBody,
 		});
 
-		if (!deleteRes.ok)
-			throw new Error(`Failed to delete objects: ${deleteRes.status}`);
-
 		continuationToken = result.NextContinuationToken;
+
+		// Fire + await same-batch if this is the last page
+		if (!continuationToken && pendingDelete) {
+			const final = await pendingDelete;
+			if (!final.ok)
+				throw new Error(`Failed to delete objects: ${final.status}`);
+		}
 	} while (continuationToken);
 }
