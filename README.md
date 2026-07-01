@@ -47,12 +47,13 @@ at the dataplane service.
 1. Copy `.env.production.example` to `.env.production` and fill in the real
    Postgres, Redis, provider S3, Hack Club Auth, Slack, and
    `DATAPLANE_INTERNAL_SECRET` values.
-2. Deploy with `bun run prod:up`.
+2. Deploy with `docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build`.
 
-`bun run prod:up` exports `GIT_SHA`, `GIT_DATE`, and `GIT_MESSAGE` from the
-current checkout before running Docker Compose, so the dashboard build metadata
-shows the exact deployed commit instead of `unknown`. For direct Compose usage,
-export those variables yourself or run `bun run prod:compose <compose args>`.
+The Docker build reads git metadata from the checkout and bakes it into the
+dashboard, so the nav shows the deployed commit instead of `unknown`. If you
+build from a Git worktree or another source without a real `.git` directory,
+use `bun run prod:up` or export `GIT_SHA`, `GIT_DATE`, and `GIT_MESSAGE`
+yourself before running Compose.
 
 The dataplane exposes `/health` and owns auth, bucket jail enforcement, quota
 checks, provider streaming, Redis metadata cache, and disk object cache.

@@ -15,6 +15,9 @@ COPY package.json bun.lock /temp/prod/
 RUN cd /temp/prod && bun install --frozen-lockfile --production && bun pm trust @mongodb-js/zstd || true
 
 FROM base AS prerelease
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git && \
+    rm -rf /var/lib/apt/lists/*
 COPY --from=install /temp/dev/node_modules node_modules
 COPY . .
 # Generate git info file
@@ -24,7 +27,7 @@ ARG GIT_MESSAGE=unknown
 ENV GIT_SHA=$GIT_SHA
 ENV GIT_DATE=$GIT_DATE
 ENV GIT_MESSAGE=$GIT_MESSAGE
-RUN bun -e 'const fs = require("node:fs"); const info = { sha: process.env.GIT_SHA || "unknown", date: process.env.GIT_DATE || "unknown", message: process.env.GIT_MESSAGE || "unknown", buildDate: new Date().toISOString() }; fs.writeFileSync("src/git-info.json", JSON.stringify(info));'
+RUN bun -e 'const fs = require("node:fs"); const cp = require("node:child_process"); const known = (value) => { value = String(value || "").trim(); return value && value !== "unknown" ? value : undefined; }; const git = (args) => { try { return known(cp.execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })); } catch { return undefined; } }; const info = { sha: known(process.env.GIT_SHA) || git(["rev-parse", "HEAD"]) || "unknown", date: known(process.env.GIT_DATE) || git(["show", "-s", "--format=%cI", "HEAD"]) || "unknown", message: known(process.env.GIT_MESSAGE) || git(["show", "-s", "--format=%s", "HEAD"]) || "unknown", buildDate: new Date().toISOString() }; fs.writeFileSync("src/git-info.json", JSON.stringify(info));'
 RUN bun run build
 
 FROM base AS release
