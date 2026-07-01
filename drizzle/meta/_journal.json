@@ -85,60 +85,6 @@
 			"when": 1774711320000,
 			"tag": "0018_offboarding_export_sessions",
 			"breakpoints": true
-		},
-		{
-			"idx": 12,
-			"tag": "0010_key_notes",
-			"when": 1774711320001,
-			"breakpoints": true
-		},
-		{
-			"idx": 13,
-			"tag": "0011_bucket_collaboration",
-			"when": 1774711320002,
-			"breakpoints": true
-		},
-		{
-			"idx": 14,
-			"tag": "0012_bucket_analytics",
-			"when": 1774711320003,
-			"breakpoints": true
-		},
-		{
-			"idx": 15,
-			"tag": "0013_deep_freeze",
-			"when": 1774711320004,
-			"breakpoints": true
-		},
-		{
-			"idx": 16,
-			"tag": "0014_deep_freeze_jobs",
-			"when": 1774711320005,
-			"breakpoints": true
-		},
-		{
-			"idx": 17,
-			"tag": "0015_bucket_custom_domains",
-			"when": 1774711320006,
-			"breakpoints": true
-		},
-		{
-			"idx": 18,
-			"tag": "0016_session_metadata",
-			"when": 1774711320007,
-			"breakpoints": true
-		},
-		{
-			"idx": 19,
-			"tag": "0019_remove_ysws",
-			"when": 1774711320008,
-			"breakpoints": true
-		},
-		{
-			"idx": 20,
-			"tag": "0020_monthly_egress_period",
-			"when": 1774711320009,
-			"breakpoints": true
 		}
 	]
 }

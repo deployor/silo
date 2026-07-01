@@ -1,5 +1,4 @@
 import { sql } from "drizzle-orm";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { config } from "./config";
 import { db } from "./db";
 import { handleSlackRequest } from "./integrations/slack";
@@ -145,13 +144,6 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 	}
 
 	return false;
-}
-
-try {
-	await migrate(db, { migrationsFolder: "./drizzle" });
-	console.log("[migrate] ok");
-} catch (err) {
-	console.error("[migrate] continuing:", err);
 }
 
 const server = Bun.serve({

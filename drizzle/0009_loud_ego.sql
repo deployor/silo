@@ -43,11 +43,11 @@ CREATE TABLE IF NOT EXISTS "redemption_programs" (
 --> statement-breakpoint
 ALTER TABLE "buckets" ALTER COLUMN "user_id" DROP NOT NULL;--> statement-breakpoint
 ALTER TABLE "users" ALTER COLUMN "storage_limit_bytes" DROP DEFAULT;--> statement-breakpoint
-ALTER TABLE "buckets" ADD COLUMN IF NOT EXISTS "is_system" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "marked_as_over_age" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "over_age_grace_period_ends_at" timestamp;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "data_exported" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "files_deleted" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "buckets" ADD COLUMN "is_system" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "marked_as_over_age" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "over_age_grace_period_ends_at" timestamp;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "data_exported" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "files_deleted" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "redemption_code_program_idx" ON "redemption_codes" ("program_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "redemption_code_code_idx" ON "redemption_codes" ("code");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "redemption_code_redeemed_by_idx" ON "redemption_codes" ("redeemed_by");--> statement-breakpoint
