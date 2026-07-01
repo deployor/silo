@@ -8,6 +8,8 @@ services:
         GIT_DATE: ${GIT_DATE:-unknown}
         GIT_MESSAGE: ${GIT_MESSAGE:-unknown}
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       PORT: "3000"
     volumes:
@@ -18,6 +20,8 @@ services:
       context: ./dataplane
       dockerfile: Dockerfile
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       DATAPLANE_BIND: "0.0.0.0:3001"
       CONTROL_PLANE_URL: "http://control-plane:3000"
