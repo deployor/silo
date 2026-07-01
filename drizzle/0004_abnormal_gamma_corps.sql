@@ -1,1 +1,0 @@
-ALTER TABLE "buckets" ADD COLUMN IF NOT EXISTS "cors_config" text;
