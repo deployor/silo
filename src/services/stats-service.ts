@@ -10,6 +10,10 @@ const KEY_PREFIX_BUCKET = "stats:bucket:";
 const ACTIVE_USERS_KEY = "stats:active:users";
 const ACTIVE_BUCKETS_KEY = "stats:active:buckets";
 
+function currentEgressPeriod() {
+	return new Date().toISOString().slice(0, 7);
+}
+
 class StatsService {
 	private flushTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -152,12 +156,14 @@ class StatsService {
 
 			// Batch all updates into a single DB transaction
 			await db.transaction(async (tx) => {
+				const egressPeriod = currentEgressPeriod();
 				for (const [userId, stats] of userStats) {
 					await tx
 						.update(users)
 						.set({
 							ingressBytes: sql`COALESCE(${users.ingressBytes}, 0) + ${stats.ingress}`,
-							egressBytes: sql`COALESCE(${users.egressBytes}, 0) + ${stats.egress}`,
+							egressBytes: sql`CASE WHEN ${users.egressPeriod} = ${egressPeriod} THEN COALESCE(${users.egressBytes}, 0) + ${stats.egress} ELSE ${stats.egress} END`,
+							egressPeriod,
 							totalRequests: sql`COALESCE(${users.totalRequests}, 0) + ${stats.requests}`,
 						})
 						.where(eq(users.id, userId));

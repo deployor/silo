@@ -1,12 +1,15 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { config } from "../../../config";
 import { db } from "../../../db";
 import { buckets, sessions, users } from "../../../db/schema";
-import { errorResponse, jsonResponse, parseCookies } from "../../../lib/api-utils";
+import {
+	errorResponse,
+	jsonResponse,
+	parseCookies,
+} from "../../../lib/api-utils";
 import { getCurrentUser } from "../../../lib/session";
 import { deepFreezeActionSchema } from "../../../lib/validation";
-import { deleteBucket } from "../../../services/bucket-service";
-import { getBucketsForUser } from "../../../services/bucket-service";
+import { deleteBucket, getBucketsForUser } from "../../../services/bucket-service";
 import {
 	getDeepFreezeSnapshot,
 	requestBucketDeepFreezeAction,
@@ -15,6 +18,7 @@ import { getAppSettings } from "../../../services/settings-service";
 import { handleBucketOperations, handleBuckets } from "./buckets";
 import { handleCollaboration } from "./collaboration";
 import { handleCors } from "./cors";
+import { handleDataplaneAuthorize } from "./dataplane";
 import { handleFiles } from "./files";
 import { handleKeys } from "./keys";
 import { handleTakedownReport } from "./takedown";
@@ -25,6 +29,10 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 
 	if (path === "/api/docs/takedown") {
 		return handleTakedownReport(req);
+	}
+
+	if (path === "/api/internal/dataplane/authorize") {
+		return handleDataplaneAuthorize(req);
 	}
 
 	if (path === "/api/onboarding/complete" && req.method === "POST") {

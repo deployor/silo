@@ -29,3 +29,6 @@ src/assets/styles.css
 
 # Disk cache
 .s3-disk-cache/
+
+.env.production
+dataplane/target/

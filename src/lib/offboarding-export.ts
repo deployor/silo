@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import { and, eq, isNull, lte } from "drizzle-orm";
 import { config } from "../config";
-import { getInternalPath } from "../core/s3/utils";
+import { getInternalPath } from "./s3/paths";
 import { db } from "../db";
 import { buckets, offboardingExportSessions, users } from "../db/schema";
 

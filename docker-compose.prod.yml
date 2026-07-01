@@ -1,0 +1,49 @@
+services:
+  control-plane:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        GIT_DATE: ${GIT_DATE:-unknown}
+        GIT_MESSAGE: ${GIT_MESSAGE:-unknown}
+    restart: unless-stopped
+    env_file:
+      - path: .env.production
+        required: false
+    environment:
+      PORT: "3000"
+    expose:
+      - "3000"
+    volumes:
+      - dataplane-cache:/var/cache/silo-dataplane:ro
+    ports:
+      # Point dashboard.${S3_DOMAIN} at this service in production.
+      - "3000:3000"
+
+  dataplane:
+    build:
+      context: ./dataplane
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env.production
+        required: false
+    environment:
+      DATAPLANE_BIND: "0.0.0.0:3001"
+      CONTROL_PLANE_URL: "http://control-plane:3000"
+      DATAPLANE_PUBLIC_SCHEME: "https"
+      DISK_CACHE_DIR: "/var/cache/silo-dataplane"
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    volumes:
+      - dataplane-cache:/var/cache/silo-dataplane
+    expose:
+      - "3001"
+    ports:
+      # Point ${S3_DOMAIN} at this service in production.
+      - "3001:3001"
+
+volumes:
+  dataplane-cache:

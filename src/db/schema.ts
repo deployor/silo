@@ -23,6 +23,7 @@ export const users = pgTable("users", {
 		.notNull()
 		.default(0),
 	egressBytes: bigint("egress_bytes", { mode: "number" }).notNull().default(0),
+	egressPeriod: text("egress_period"),
 	totalRequests: bigint("total_requests", { mode: "number" })
 		.notNull()
 		.default(0),

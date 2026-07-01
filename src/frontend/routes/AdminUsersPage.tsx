@@ -862,7 +862,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<th className="px-6 py-4">User</th>
 								<th className="px-6 py-4">Slack ID</th>
 								<th className="px-6 py-4">Storage</th>
-								<th className="px-6 py-4">Egress</th>
+								<th className="px-6 py-4">Monthly Egress</th>
 								<th className="px-6 py-4">Status</th>
 								<th className="px-6 py-4 text-right">Actions</th>
 							</tr>
@@ -1023,7 +1023,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</button>
 								</div>
 								<p className="text-xs text-text-muted mt-2">
-									Current Usage:{" "}
+									Storage Used:{" "}
 									<span className="text-white font-mono">
 										{formatBytes(selected.storageUsageBytes)}
 									</span>
@@ -1255,38 +1255,36 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</p>
 
 						<div className="mb-6 flex gap-3 flex-wrap items-center">
-								<>
-									<button
-										type="button"
-										onClick={() => deleteBucketAdmin(false)}
-										disabled={!!bucketActionLoading}
-										className="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold"
-									>
-										{bucketActionLoading === "bucket-delete"
-											? "Deleting..."
-											: "Delete Bucket"}
-									</button>
-									<button
-										type="button"
-										onClick={() => deleteBucketAdmin(true)}
-										disabled={!!bucketActionLoading}
-										className="bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 px-4 py-2 rounded-lg text-sm font-bold border border-yellow-500/20"
-									>
-										{bucketActionLoading === "bucket-empty"
-											? "Emptying..."
-											: "Empty Bucket"}
-									</button>
-									<button
-										type="button"
-										onClick={resetBucketCorsAdmin}
-										disabled={!!bucketActionLoading}
-										className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-bold border border-white/10"
-									>
-										{bucketActionLoading === "cors-reset"
-											? "Resetting..."
-											: "Reset CORS"}
-									</button>
-								</>
+							<button
+								type="button"
+								onClick={() => deleteBucketAdmin(false)}
+								disabled={!!bucketActionLoading}
+								className="bg-hc-red hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold"
+							>
+								{bucketActionLoading === "bucket-delete"
+									? "Deleting..."
+									: "Delete Bucket"}
+							</button>
+							<button
+								type="button"
+								onClick={() => deleteBucketAdmin(true)}
+								disabled={!!bucketActionLoading}
+								className="bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 px-4 py-2 rounded-lg text-sm font-bold border border-yellow-500/20"
+							>
+								{bucketActionLoading === "bucket-empty"
+									? "Emptying..."
+									: "Empty Bucket"}
+							</button>
+							<button
+								type="button"
+								onClick={resetBucketCorsAdmin}
+								disabled={!!bucketActionLoading}
+								className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg text-sm font-bold border border-white/10"
+							>
+								{bucketActionLoading === "cors-reset"
+									? "Resetting..."
+									: "Reset CORS"}
+							</button>
 
 							<label className="inline-flex items-center cursor-pointer bg-black/30 px-4 py-2 rounded-lg border border-white/10">
 								<input

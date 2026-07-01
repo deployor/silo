@@ -1,16 +1,14 @@
 import { sql } from "drizzle-orm";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { config } from "./config";
-import { handleS3Request } from "./core/s3";
 import { db } from "./db";
 import { handleSlackRequest } from "./integrations/slack";
 import { errorResponse } from "./lib/api-utils";
 import { context } from "./lib/context";
-import { getDiskCacheStats, stopPeriodicEviction } from "./lib/disk-cache";
+import { getDiskCacheStats } from "./lib/disk-cache";
 import { redis } from "./lib/redis";
-import { S3Errors } from "./lib/s3-errors";
 import { validateOrigin } from "./lib/security";
 import { render } from "./lib/view-engine";
-import { authenticate } from "./middleware/auth";
 import { rateLimit } from "./middleware/rate-limit";
 import { securityHeaders } from "./middleware/security-headers";
 import { bucketUsageReconciliationService } from "./services/bucket-usage-reconciliation-service";
@@ -58,13 +56,6 @@ const apexPublicDashboardPaths = new Set([
 const apiLimiter = rateLimit({ limit: 300, windowMs: 60000 }); // 300 req/min for API
 const authLimiter = rateLimit({ limit: 60, windowMs: 60000 }); // 60 req/min for Auth
 
-// S3 should be more tolerant and independent from dashboard/API.
-// Defaults are intentionally high; override via env for different tiers.
-const s3Limiter = rateLimit({
-	limit: Number(process.env.S3_RATE_LIMIT_PER_MIN ?? "1000000"),
-	windowMs: 60000,
-});
-
 function dashboardUrl(url: URL): string {
 	const target = new URL(url.pathname + url.search, config.dashboardUrl);
 	return target.toString();
@@ -75,6 +66,19 @@ function isApexDashboardPath(path: string): boolean {
 	return (
 		!apexPublicDashboardPaths.has(path) &&
 		dashboardPaths.some((p) => path.startsWith(p))
+	);
+}
+
+function s3DataplaneOnlyResponse() {
+	return new Response(
+		'<?xml version="1.0" encoding="UTF-8"?>\n<Error><Code>MisdirectedRequest</Code><Message>S3 requests must be routed to the Rust data plane.</Message></Error>',
+		{
+			status: 421,
+			headers: {
+				"content-type": "application/xml",
+				"x-content-type-options": "nosniff",
+			},
+		},
 	);
 }
 
@@ -103,6 +107,10 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 
 	const path = url.pathname;
 
+	if (path.startsWith("/api/internal/dataplane/")) {
+		return true;
+	}
+
 	// 1. Explicit dashboard subdomain
 	if (host === DASHBOARD_HOST && DASHBOARD_HOST !== S3_DOMAIN) {
 		return true;
@@ -118,6 +126,7 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 			if (hasAuthHeader || hasAmzParams) return false;
 			return false;
 		}
+		if (hasAuthHeader || hasAmzParams) return false;
 		return apexPublicDashboardPaths.has(path) || path.startsWith("/assets/");
 	}
 
@@ -137,6 +146,8 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 
 	return false;
 }
+
+await migrate(db, { migrationsFolder: "./drizzle" });
 
 const server = Bun.serve({
 	port: process.env.PORT || 3000,
@@ -239,11 +250,14 @@ const server = Bun.serve({
 						}
 					}
 
-					// Rate Limiting
-					if (url.pathname.startsWith("/api/")) {
-						const limitRes = await apiLimiter(req);
-						if (limitRes) return limitRes;
-					}
+				// Rate Limiting (skip dataplane authorize — internal service traffic)
+				if (
+					url.pathname.startsWith("/api/") &&
+					!url.pathname.startsWith("/api/internal/dataplane/")
+				) {
+					const limitRes = await apiLimiter(req);
+					if (limitRes) return limitRes;
+				}
 					if (url.pathname.startsWith("/auth/")) {
 						const limitRes = await authLimiter(req);
 						if (limitRes) return limitRes;
@@ -252,6 +266,7 @@ const server = Bun.serve({
 					// Global Security Check for API routes (except Slack events which are verified by signature)
 					if (
 						url.pathname.startsWith("/api/") &&
+						!url.pathname.startsWith("/api/internal/dataplane/") &&
 						!url.pathname.startsWith("/api/slack/") &&
 						!url.pathname.startsWith("/api/revocation") &&
 						req.method !== "GET" &&
@@ -298,65 +313,7 @@ const server = Bun.serve({
 						response = await handleDashboardRequest(req);
 					}
 				} else {
-					// S3 Rate Limiting
-					const limitRes = await s3Limiter(req);
-					if (limitRes) return limitRes;
-
-					// S3 Request Handling
-					const forbiddenParams = [
-						"policy",
-						"acl",
-						"lifecycle",
-						"replication",
-						"tagging",
-						"encryption",
-						"website",
-						"logging",
-						"accelerate",
-						"payment",
-						"object-lock",
-						"versioning",
-						"versions",
-					];
-
-					let forbidden = false;
-					for (const param of forbiddenParams) {
-						if (url.searchParams.has(param)) {
-							response = S3Errors.NotImplemented().toResponse();
-							forbidden = true;
-							break;
-						}
-					}
-
-					if (!forbidden) {
-						try {
-							const authResult = await authenticate(req);
-
-							if (authResult instanceof Response) {
-								response = authResult;
-							} else {
-								const { user, bucket, mode } = authResult;
-								// Populate context with auth info
-								const ctx = context.getStore();
-								if (ctx) {
-									ctx.user = user || undefined;
-									ctx.bucket = bucket;
-									ctx.mode = mode;
-								}
-
-								response = await handleS3Request(req, user, bucket, mode);
-							}
-						} catch (e) {
-							console.error("S3 Request Error:", e);
-							response = S3Errors.InternalError().toResponse();
-						}
-					}
-
-					if (!response) response = S3Errors.InternalError().toResponse();
-
-					// Do not compress proxied S3 objects here: compression buffers the
-					// full body and destroys streaming latency. CDN/client compression can
-					// handle generated small responses outside the S3 object hot path.
+					response = s3DataplaneOnlyResponse();
 				}
 
 				// Post-request logging and stats
@@ -445,7 +402,6 @@ async function gracefulShutdown(signal: string) {
 	}
 	bucketUsageReconciliationService.stop();
 	customDomainRevalidationService.stop();
-	stopPeriodicEviction();
 
 	// 5. Close connections
 	try {

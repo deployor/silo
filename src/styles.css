@@ -134,12 +134,6 @@ select {
   transform: translateY(-1px);
 }
 
-.silo-stat-card {
-  background: rgba(18, 21, 28, 0.92);
-  border: 1px solid var(--color-line);
-  border-radius: 1rem;
-}
-
 .silo-modal-overlay {
   background: rgba(3, 4, 7, 0.78);
   backdrop-filter: blur(3px);

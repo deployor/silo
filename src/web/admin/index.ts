@@ -1,11 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { AwsClient } from "aws4fetch";
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
-import { XMLParser } from "fast-xml-parser";
 import { z } from "zod";
 import { config } from "../../config";
-import { buildCorsConfig } from "../../core/s3/cors";
-import { deleteBucketContents, getInternalPath } from "../../core/s3/utils";
+import { buildCorsConfig } from "../../lib/s3/cors";
+import { deleteBucketContents, getInternalPath } from "../../lib/s3/paths";
 import { db } from "../../db";
 import {
 	bucketKeys,
@@ -39,6 +38,10 @@ type AdminUpdateUserQuotaBody = {
 type S3ListContentsItem = {
 	Key: string;
 	Size: number;
+};
+
+type S3ListBucketResult = {
+	Contents?: S3ListContentsItem | S3ListContentsItem[];
 };
 
 // --- Handlers ---
@@ -1333,7 +1336,7 @@ async function getBucketDetails(bucketName: string) {
 			});
 			if (s3Res.ok) {
 				const xml = await s3Res.text();
-				const result = parseS3Xml<{ ListBucketResult?: any }>(
+				const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
 					xml,
 				).ListBucketResult;
 				if (result.Contents) {
@@ -1925,14 +1928,14 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		// Global Settings API
 		if (path === "/api/admin/settings" && req.method === "GET") {
 			const user = await getCurrentUser(req);
-			if (!user || !user.isAdmin)
+			if (!user?.isAdmin)
 				return new Response("Forbidden", { status: 403 });
 			return jsonResponse(await getAppSettings());
 		}
 
 		if (path === "/api/admin/settings" && req.method === "POST") {
 			const user = await getCurrentUser(req);
-			if (!user || !user.isAdmin)
+			if (!user?.isAdmin)
 				return new Response("Forbidden", { status: 403 });
 
 			const schema = z.object({

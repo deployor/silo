@@ -26,6 +26,7 @@ const envSchema = z.object({
 	CF_SAAS_FALLBACK_ORIGIN: z.string().optional(),
 	CF_SAAS_TARGET: z.string().optional(),
 	CF_SAAS_MIN_TLS: z.string().optional(),
+	DATAPLANE_INTERNAL_SECRET: z.string().min(1, "DATAPLANE_INTERNAL_SECRET is required"),
 	NODE_ENV: z
 		.enum(["development", "production", "test"])
 		.default("development"),
@@ -131,6 +132,9 @@ export const config = {
 		configured: Boolean(
 			env.CF_API_TOKEN && env.CF_ZONE_ID && env.CF_SAAS_FALLBACK_ORIGIN,
 		),
+	},
+	dataplane: {
+		internalSecret: env.DATAPLANE_INTERNAL_SECRET,
 	},
 	bucketUsageReconcileIntervalMs: Number(
 		env.BUCKET_USAGE_RECONCILE_INTERVAL_MS || 10 * 60 * 1000,
