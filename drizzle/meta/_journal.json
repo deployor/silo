@@ -8,6 +8,13 @@
       "when": 1782912520473,
       "tag": "0000_initial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1782938962805,
+      "tag": "0001_spooky_sway",
+      "breakpoints": true
     }
   ]
 }

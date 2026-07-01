@@ -7,6 +7,7 @@ import {
 	pgTable,
 	text,
 	timestamp,
+	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
 
@@ -255,7 +256,9 @@ export const objectStats = pgTable(
 		objectKey: text("object_key").notNull(),
 		hitCount: bigint("hit_count", { mode: "number" }).notNull().default(0),
 		errorCount: bigint("error_count", { mode: "number" }).notNull().default(0),
-		egressBytes: bigint("egress_bytes", { mode: "number" }).notNull().default(0),
+		egressBytes: bigint("egress_bytes", { mode: "number" })
+			.notNull()
+			.default(0),
 		lastAccessedAt: timestamp("last_accessed_at"),
 		updatedAt: timestamp("updated_at").defaultNow().notNull(),
 	},
@@ -309,6 +312,9 @@ export const redemptionPrograms = pgTable("redemption_programs", {
 	quotaCreditBytes: bigint("quota_credit_bytes", { mode: "number" })
 		.notNull()
 		.default(0),
+	apiKeyHash: text("api_key_hash"),
+	apiKeySuffix: text("api_key_suffix"),
+	apiKeyCreatedAt: timestamp("api_key_created_at"),
 	isActive: boolean("is_active").default(true).notNull(),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -322,6 +328,7 @@ export const redemptionCodes = pgTable(
 			.references(() => redemptionPrograms.id, { onDelete: "cascade" })
 			.notNull(),
 		code: text("code").notNull().unique(),
+		quotaCreditBytes: bigint("quota_credit_bytes", { mode: "number" }),
 		isRedeemed: boolean("is_redeemed").default(false).notNull(),
 		redeemedBy: text("redeemed_by").references(() => users.id),
 		redeemedAt: timestamp("redeemed_at"),
@@ -357,6 +364,46 @@ export const redemptionLogs = pgTable(
 			userIdIdx: index("redemption_log_user_id_idx").on(table.userId),
 			ipIdx: index("redemption_log_ip_idx").on(table.ipAddress),
 			createdAtIdx: index("redemption_log_created_at_idx").on(table.createdAt),
+		};
+	},
+);
+
+export const redemptionTransactions = pgTable(
+	"redemption_transactions",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		programId: uuid("program_id")
+			.references(() => redemptionPrograms.id, { onDelete: "cascade" })
+			.notNull(),
+		userId: text("user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		actorUserId: text("actor_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		source: text("source").notNull(),
+		codeId: uuid("code_id").references(() => redemptionCodes.id, {
+			onDelete: "set null",
+		}),
+		externalId: text("external_id"),
+		amountBytes: bigint("amount_bytes", { mode: "number" }).notNull(),
+		reason: text("reason"),
+		ipAddress: text("ip_address"),
+		createdAt: timestamp("created_at").defaultNow().notNull(),
+	},
+	(table) => {
+		return {
+			programIdx: index("redemption_transaction_program_idx").on(
+				table.programId,
+			),
+			userIdIdx: index("redemption_transaction_user_id_idx").on(table.userId),
+			createdAtIdx: index("redemption_transaction_created_at_idx").on(
+				table.createdAt,
+			),
+			externalIdIdx: uniqueIndex("redemption_transaction_external_id_idx").on(
+				table.programId,
+				table.externalId,
+			),
 		};
 	},
 );

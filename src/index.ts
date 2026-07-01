@@ -18,6 +18,7 @@ import { logService } from "./services/log-service";
 import { statsService } from "./services/stats-service";
 import { handleAdminRequest } from "./web/admin";
 import { handleRevocationRequest } from "./web/api/revocation";
+import { handleYswsApiRequest } from "./web/api/ysws";
 import { handleDashboardRequest } from "./web/dashboard";
 import { handleRedeemRequest } from "./web/redemptions";
 
@@ -34,6 +35,7 @@ const dashboardPaths = [
 	"/api/docs/takedown",
 	"/account/",
 	"/api/slack/",
+	"/api/ysws/",
 	"/assets/",
 	"/admin",
 	"/api/admin",
@@ -267,6 +269,7 @@ const server = Bun.serve({
 						url.pathname.startsWith("/api/") &&
 						!url.pathname.startsWith("/api/internal/dataplane/") &&
 						!url.pathname.startsWith("/api/slack/") &&
+						!url.pathname.startsWith("/api/ysws/") &&
 						!url.pathname.startsWith("/api/revocation") &&
 						req.method !== "GET" &&
 						req.method !== "HEAD"
@@ -285,6 +288,8 @@ const server = Bun.serve({
 						response = await handleRedeemRequest(req);
 					} else if (url.pathname === "/api/slack/events") {
 						response = await handleSlackRequest(req);
+					} else if (url.pathname.startsWith("/api/ysws/")) {
+						response = await handleYswsApiRequest(req);
 					} else if (url.pathname.startsWith("/assets/")) {
 						const filePath = `src${url.pathname}`;
 						const file = Bun.file(filePath);

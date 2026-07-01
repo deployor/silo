@@ -2,6 +2,12 @@ import { useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { PhIcon } from "../components/ui/PhIcon";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
+import { formatBytes } from "../shared/utils/format";
+
+type GeneratedCode = {
+	code: string;
+	quotaCreditBytes?: number | null;
+};
 
 export function AdminRedemptionGeneratedPage({
 	bootstrap,
@@ -11,19 +17,29 @@ export function AdminRedemptionGeneratedPage({
 	const p = bootstrap.props as {
 		user?: FrontendUser | null;
 		program?: { id: string; name: string };
-		codes?: string[];
+		codes?: Array<string | GeneratedCode>;
 	};
 	const [rawCopied, setRawCopied] = useState(false);
 	const [linksCopied, setLinksCopied] = useState(false);
 	const codes = p.codes || [];
 
-	const raw = useMemo(() => codes.join("\n"), [codes]);
+	const codeRows = useMemo(
+		() =>
+			codes.map((entry) =>
+				typeof entry === "string" ? { code: entry } : entry,
+			),
+		[codes],
+	);
+	const raw = useMemo(
+		() => codeRows.map((entry) => entry.code).join("\n"),
+		[codeRows],
+	);
 	const links = useMemo(
 		() =>
-			codes
-				.map((code) => `https://silo.deployor.dev/redeem?code=${code}`)
+			codeRows
+				.map((entry) => `https://silo.deployor.dev/redeem?code=${entry.code}`)
 				.join("\n"),
-		[codes],
+		[codeRows],
 	);
 
 	const copy = async (text: string, type: "raw" | "links"): Promise<void> => {
@@ -56,7 +72,7 @@ export function AdminRedemptionGeneratedPage({
 							Codes Generated Successfully! 🎉
 						</h1>
 						<p className="text-text-muted mt-1">
-							{codes.length} new codes created for{" "}
+							{codeRows.length} new codes created for{" "}
 							<span className="text-white font-bold">{p.program?.name}</span>.
 						</p>
 					</div>
@@ -83,6 +99,15 @@ export function AdminRedemptionGeneratedPage({
 							value={raw}
 							className="w-full flex-grow bg-black/30 border border-white/10 rounded-xl p-4 text-sm font-mono text-text-muted focus:outline-none focus:border-hc-red transition-colors resize-none h-96 select-all"
 						/>
+						{codeRows.some((entry) => entry.quotaCreditBytes) ? (
+							<p className="mt-3 text-xs text-text-muted font-mono">
+								Custom amount:{" "}
+								{formatBytes(
+									codeRows.find((entry) => entry.quotaCreditBytes)
+										?.quotaCreditBytes || 0,
+								)}
+							</p>
+						) : null}
 					</div>
 
 					<div className="bg-hc-dark border border-white/10 rounded-3xl p-6 card-shadow flex flex-col h-full">

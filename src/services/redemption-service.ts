@@ -1,12 +1,29 @@
-import { randomBytes } from "node:crypto";
-import { and, count, desc, eq, gt, sql } from "drizzle-orm";
+import { createHash, randomBytes } from "node:crypto";
+import { and, count, desc, eq, gt, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
 	redemptionCodes,
 	redemptionLogs,
 	redemptionPrograms,
+	redemptionTransactions,
 	users,
 } from "../db/schema";
+
+const MAX_PROGRAM_GRANT_BYTES = 100 * 1024 ** 4;
+const MAX_CODES_PER_BATCH = 1000;
+
+function hashApiKey(apiKey: string) {
+	return createHash("sha256").update(apiKey).digest("hex");
+}
+
+function assertGrantAmount(amountBytes: number) {
+	if (!Number.isSafeInteger(amountBytes) || amountBytes <= 0) {
+		throw new Error("Grant amount must be a positive integer byte value.");
+	}
+	if (amountBytes > MAX_PROGRAM_GRANT_BYTES) {
+		throw new Error("Grant amount is too large.");
+	}
+}
 
 // --- Programs ---
 
@@ -20,7 +37,7 @@ export async function createProgram(data: {
 		.insert(redemptionPrograms)
 		.values({
 			name: data.name,
-			prefix: data.prefix.toUpperCase(),
+			prefix: normalizeRedemptionCode(data.prefix),
 			description: data.description,
 			quotaCreditBytes: data.quotaCreditBytes,
 		})
@@ -44,24 +61,90 @@ export async function getProgramById(id: string) {
 	return results[0];
 }
 
+export async function rotateProgramApiKey(programId: string) {
+	const program = await getProgramById(programId);
+	if (!program) throw new Error("Program not found");
+
+	const apiKey = `silo_ysws_${randomBytes(32).toString("hex")}`;
+	const apiKeyHash = hashApiKey(apiKey);
+	const apiKeySuffix = apiKey.slice(-8);
+
+	const [updated] = await db
+		.update(redemptionPrograms)
+		.set({
+			apiKeyHash,
+			apiKeySuffix,
+			apiKeyCreatedAt: new Date(),
+			updatedAt: new Date(),
+		})
+		.where(eq(redemptionPrograms.id, programId))
+		.returning();
+
+	return {
+		program: updated,
+		apiKey,
+	};
+}
+
+export async function authenticateProgramApiKey(apiKey: string) {
+	const key = apiKey.trim();
+	if (!key) return null;
+
+	const [program] = await db
+		.select()
+		.from(redemptionPrograms)
+		.where(
+			and(
+				eq(redemptionPrograms.apiKeyHash, hashApiKey(key)),
+				eq(redemptionPrograms.isActive, true),
+			),
+		)
+		.limit(1);
+
+	return program || null;
+}
+
 // --- Codes ---
 
 export async function generateCodes(
 	programId: string,
 	count: number,
-	createdBy: string,
+	createdBy: string | null,
 	length = 16, // Total length of random part (excluding dashes/prefix)
+	customCodes: string[] = [],
+	quotaCreditBytes?: number,
 ) {
 	const program = await getProgramById(programId);
 	if (!program) throw new Error("Program not found");
+	if (quotaCreditBytes !== undefined) assertGrantAmount(quotaCreditBytes);
+	const randomCount = Math.max(0, Math.floor(count));
+	const totalRequested = randomCount + customCodes.length;
+	if (totalRequested <= 0) throw new Error("Create at least one code.");
+	if (totalRequested > MAX_CODES_PER_BATCH) {
+		throw new Error(
+			`Cannot create more than ${MAX_CODES_PER_BATCH} codes at once.`,
+		);
+	}
 
 	const codesToInsert: {
 		programId: string;
 		code: string;
-		createdBy: string;
+		createdBy?: string | null;
+		quotaCreditBytes?: number;
 	}[] = [];
 
-	for (let i = 0; i < count; i++) {
+	for (const rawCode of customCodes) {
+		const customCode = normalizeCodeForProgram(program.prefix, rawCode);
+		if (!customCode) continue;
+		codesToInsert.push({
+			programId,
+			code: customCode,
+			createdBy,
+			quotaCreditBytes,
+		});
+	}
+
+	for (let i = 0; i < randomCount; i++) {
 		// Generate random hex string
 		const randomPart = randomBytes(Math.ceil(length / 2))
 			.toString("hex")
@@ -77,18 +160,24 @@ export async function generateCodes(
 			programId,
 			code,
 			createdBy,
+			quotaCreditBytes,
 		});
 	}
 
 	// Insert in batches if necessary, but for now just one go assuming sensible limits
 	if (codesToInsert.length > 0) {
-		await db
+		const inserted = await db
 			.insert(redemptionCodes)
 			.values(codesToInsert)
-			.onConflictDoNothing();
+			.onConflictDoNothing()
+			.returning({
+				code: redemptionCodes.code,
+				quotaCreditBytes: redemptionCodes.quotaCreditBytes,
+			});
+		return inserted;
 	}
 
-	return codesToInsert.map((c) => c.code);
+	return [];
 }
 
 export async function getCodes(programId: string, page = 1, limit = 100) {
@@ -118,6 +207,35 @@ export async function getCodes(programId: string, page = 1, limit = 100) {
 	};
 }
 
+export async function getTransactions(programId: string, page = 1, limit = 50) {
+	const safeLimit = Math.min(Math.max(limit, 1), 200);
+	const safePage = Math.max(page, 1);
+	const offset = (safePage - 1) * safeLimit;
+
+	const data = await db
+		.select()
+		.from(redemptionTransactions)
+		.where(eq(redemptionTransactions.programId, programId))
+		.limit(safeLimit)
+		.offset(offset)
+		.orderBy(desc(redemptionTransactions.createdAt));
+
+	const [{ count: total }] = await db
+		.select({ count: count() })
+		.from(redemptionTransactions)
+		.where(eq(redemptionTransactions.programId, programId));
+
+	return {
+		data,
+		pagination: {
+			page: safePage,
+			limit: safeLimit,
+			total,
+			totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+		},
+	};
+}
+
 // --- Redemption ---
 
 export async function checkRateLimit(ipAddress: string): Promise<boolean> {
@@ -140,12 +258,137 @@ export async function checkRateLimit(ipAddress: string): Promise<boolean> {
 	return failures >= maxFailures;
 }
 
+export function normalizeRedemptionCode(code: string) {
+	const raw = code.trim();
+	if (!raw) return "";
+
+	try {
+		const parsed = new URL(raw);
+		const codeParam = parsed.searchParams.get("code");
+		if (codeParam) return normalizeRedemptionCode(codeParam);
+	} catch {
+		// Not a URL; normalize as a code below.
+	}
+
+	return raw
+		.toUpperCase()
+		.replace(/[_\s]+/g, "-")
+		.replace(/[^A-Z0-9-]/g, "")
+		.replace(/-+/g, "-")
+		.replace(/^-|-$/g, "");
+}
+
+function normalizeCodeForProgram(prefix: string, code: string) {
+	const normalizedPrefix = normalizeRedemptionCode(prefix);
+	const normalizedCode = normalizeRedemptionCode(code);
+	if (!normalizedCode || !normalizedPrefix) return "";
+	if (normalizedCode === normalizedPrefix) return "";
+	if (normalizedCode.startsWith(`${normalizedPrefix}-`)) return normalizedCode;
+	return `${normalizedPrefix}-${normalizedCode}`;
+}
+
+async function grantStorageToUser(
+	tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+	userId: string,
+	amountBytes: number,
+) {
+	await tx
+		.update(users)
+		.set({
+			storageLimitBytes: sql`COALESCE(${users.storageLimitBytes}, (SELECT default_storage_limit_bytes FROM app_settings LIMIT 1)) + ${amountBytes}`,
+		})
+		.where(eq(users.id, userId));
+}
+
+export async function grantProgramStorage(params: {
+	programId: string;
+	amountBytes: number;
+	userId?: string;
+	email?: string;
+	slackId?: string;
+	actorUserId?: string;
+	source: "api" | "admin";
+	externalId?: string;
+	reason?: string;
+	ipAddress?: string;
+}) {
+	assertGrantAmount(params.amountBytes);
+
+	const program = await getProgramById(params.programId);
+	if (!program) throw new Error("Program not found");
+	if (!program.isActive) throw new Error("Program is not active.");
+
+	const conditions = [];
+	if (params.userId) conditions.push(eq(users.id, params.userId));
+	if (params.email)
+		conditions.push(eq(users.email, params.email.toLowerCase()));
+	if (params.slackId) conditions.push(eq(users.slackId, params.slackId));
+	if (!conditions.length) {
+		throw new Error("Provide userId, email, or slackId.");
+	}
+
+	const [targetUser] = await db
+		.select()
+		.from(users)
+		.where(conditions.length === 1 ? conditions[0] : or(...conditions))
+		.limit(1);
+
+	if (!targetUser) throw new Error("User not found.");
+
+	return db.transaction(async (tx) => {
+		if (params.externalId) {
+			const [existing] = await tx
+				.select()
+				.from(redemptionTransactions)
+				.where(
+					and(
+						eq(redemptionTransactions.programId, params.programId),
+						eq(redemptionTransactions.externalId, params.externalId),
+					),
+				)
+				.limit(1);
+
+			if (existing) {
+				return {
+					transaction: existing,
+					program,
+					user: targetUser,
+					duplicate: true,
+				};
+			}
+		}
+
+		await grantStorageToUser(tx, targetUser.id, params.amountBytes);
+
+		const [transaction] = await tx
+			.insert(redemptionTransactions)
+			.values({
+				programId: params.programId,
+				userId: targetUser.id,
+				actorUserId: params.actorUserId,
+				source: params.source,
+				externalId: params.externalId,
+				amountBytes: params.amountBytes,
+				reason: params.reason,
+				ipAddress: params.ipAddress,
+			})
+			.returning();
+
+		return {
+			transaction,
+			program,
+			user: targetUser,
+			duplicate: false,
+		};
+	});
+}
+
 export async function redeemCode(
 	code: string,
 	userId: string,
 	ipAddress: string,
 ) {
-	const normalizedCode = code.trim().toUpperCase();
+	const normalizedCode = normalizeRedemptionCode(code);
 
 	// Check rate limit
 	if (await checkRateLimit(ipAddress)) {
@@ -200,63 +443,36 @@ export async function redeemCode(
 
 	// Proceed with redemption
 	try {
+		const creditBytes =
+			foundCode.code.quotaCreditBytes ?? foundCode.program.quotaCreditBytes;
 		await db.transaction(async (tx) => {
 			// 1. Mark code as redeemed
-			await tx
+			const [claimedCode] = await tx
 				.update(redemptionCodes)
 				.set({
 					isRedeemed: true,
 					redeemedBy: userId,
 					redeemedAt: new Date(),
 				})
-				.where(eq(redemptionCodes.id, foundCode.code.id));
+				.where(
+					and(
+						eq(redemptionCodes.id, foundCode.code.id),
+						eq(redemptionCodes.isRedeemed, false),
+					),
+				)
+				.returning({ id: redemptionCodes.id });
 
-			// 2. Add quota to user
-			// We need to fetch current user limit first or just increment if possible.
-			// Drizzle increment: sql`${users.storageLimitBytes} + ${foundCode.program.quotaCreditBytes}`
+			if (!claimedCode) {
+				await tx.insert(redemptionLogs).values({
+					ipAddress,
+					userId,
+					codeAttempted: normalizedCode,
+					success: false,
+				});
+				throw new Error("Code already redeemed.");
+			}
 
-			// Fetch user first to handle null storageLimitBytes (which implies default?)
-			// Actually user.storageLimitBytes is nullable. If null, they use global default.
-			// If we redeem, we probably want to set it to (current_effective + bonus).
-			// Or if it's strictly an override, we set it.
-			// But usually "redeem quota" means ADDING to what they have.
-			// If they have NULL (default), we should resolve default + bonus.
-			// BUT, to keep it simple: if null, we assume default 1GB (or whatever system setting)
-			// However, I can't easily access system settings inside this static method without importing SettingsService.
-			// Let's just update using SQL and coalesce.
-
-			// Wait, if it's null, SQL `coalesce(storage_limit_bytes, 0) + X` might be weird if 0 isn't the default.
-			// I should fetch the user and handle it in application logic to be safe, or just assume if it's null we start from a base + bonus.
-			// The `users` table: `storageLimitBytes` is number, nullable.
-
-			// Let's rely on application logic.
-			const [_user] = await tx
-				.select()
-				.from(users)
-				.where(eq(users.id, userId as string));
-
-			// If user has no custom limit, they are on default.
-			// We should probably NOT hardcode default here.
-			// Let's assume we read the current limit. If null, we leave it null? No, we need to increase it.
-			// If it is null, it means "System Default". If we redeem a code, we MUST set a specific limit now because they are deviating from default.
-			// So we need to know the SYSTEM DEFAULT to add to it.
-
-			// For now, let's assume if it's null, we treat it as 1GB (1073741824) as a fallback, or better,
-			// I should really fetch the app settings.
-
-			await tx
-				.update(users)
-				.set({
-					// If null, we set it to (quota). But wait, if they had default (1GB) and redeem 1GB, they should have 2GB.
-					// So if null, we need (Default + Credit).
-					// I will fetch settings service in the handler, or here.
-					// Let's just do a raw SQL update assuming a default if null for now to avoid circular deps or complex logic in transaction.
-					// Actually, I can import SettingsService.
-
-					// Let's just do this:
-					storageLimitBytes: sql`COALESCE(${users.storageLimitBytes}, (SELECT default_storage_limit_bytes FROM app_settings LIMIT 1)) + ${foundCode.program.quotaCreditBytes}`,
-				})
-				.where(eq(users.id, userId));
+			await grantStorageToUser(tx, userId, creditBytes);
 
 			// 3. Log success
 			await tx.insert(redemptionLogs).values({
@@ -265,14 +481,27 @@ export async function redeemCode(
 				codeAttempted: normalizedCode,
 				success: true,
 			});
+			await tx.insert(redemptionTransactions).values({
+				programId: foundCode.program.id,
+				userId,
+				actorUserId: userId,
+				source: "code",
+				codeId: foundCode.code.id,
+				amountBytes: creditBytes,
+				reason: "Code redemption",
+				ipAddress,
+			});
 		});
 
 		return {
 			success: true,
-			credits: foundCode.program.quotaCreditBytes,
+			credits: creditBytes,
 			programName: foundCode.program.name,
 		};
 	} catch (e) {
+		if (e instanceof Error && e.message === "Code already redeemed.") {
+			throw e;
+		}
 		console.error("Redemption transaction failed", e);
 		throw new Error("Redemption failed due to system error.");
 	}
