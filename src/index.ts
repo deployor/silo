@@ -82,6 +82,52 @@ function s3DataplaneOnlyResponse() {
 	);
 }
 
+async function healthResponse() {
+	try {
+		const checks: Record<string, string> = {};
+		let healthy = true;
+
+		try {
+			await redis.ping();
+			checks.redis = "connected";
+		} catch {
+			checks.redis = "disconnected";
+			healthy = false;
+		}
+
+		try {
+			await db.execute(sql`SELECT 1`);
+			checks.postgres = "connected";
+		} catch {
+			checks.postgres = "disconnected";
+			healthy = false;
+		}
+
+		const diskStats = getDiskCacheStats();
+		const body = {
+			status: healthy ? "ok" : "degraded",
+			uptime: Math.floor(process.uptime()),
+			...checks,
+			diskCache: {
+				entries: diskStats.entryCount,
+				usedBytes: diskStats.totalSizeBytes,
+				budgetBytes: diskStats.maxTotalSizeBytes,
+			},
+			version: config.git?.shortSha || "unknown",
+		};
+
+		return new Response(JSON.stringify(body, null, 2), {
+			status: healthy ? 200 : 503,
+			headers: { "Content-Type": "application/json" },
+		});
+	} catch {
+		return new Response(JSON.stringify({ status: "error" }), {
+			status: 503,
+			headers: { "Content-Type": "application/json" },
+		});
+	}
+}
+
 /**
  * Determines if a request is intended for the dashboard or the S3 gateway.
  *
@@ -175,6 +221,10 @@ const server = Bun.serve({
 				});
 				const host = req.headers.get("host") || "";
 
+				if (url.pathname === "/health") {
+					return healthResponse();
+				}
+
 				if (
 					host === S3_DOMAIN &&
 					DASHBOARD_HOST !== S3_DOMAIN &&
@@ -199,65 +249,14 @@ const server = Bun.serve({
 						return securityHeaders(req, response, false);
 					}
 
-					// Health check — no rate limiting, no auth
-					if (url.pathname === "/health") {
-						try {
-							const checks: Record<string, string> = {};
-							let healthy = true;
-
-							// Redis check
-							try {
-								await redis.ping();
-								checks.redis = "connected";
-							} catch {
-								checks.redis = "disconnected";
-								healthy = false;
-							}
-
-							// Postgres check
-							try {
-								await db.execute(sql`SELECT 1`);
-								checks.postgres = "connected";
-							} catch {
-								checks.postgres = "disconnected";
-								healthy = false;
-							}
-
-							// Disk cache stats
-							const diskStats = getDiskCacheStats();
-
-							const body = {
-								status: healthy ? "ok" : "degraded",
-								uptime: Math.floor(process.uptime()),
-								...checks,
-								diskCache: {
-									entries: diskStats.entryCount,
-									usedBytes: diskStats.totalSizeBytes,
-									budgetBytes: diskStats.maxTotalSizeBytes,
-								},
-								version: config.git?.shortSha || "unknown",
-							};
-
-							return new Response(JSON.stringify(body, null, 2), {
-								status: healthy ? 200 : 503,
-								headers: { "Content-Type": "application/json" },
-							});
-						} catch {
-							return new Response(JSON.stringify({ status: "error" }), {
-								status: 503,
-								headers: { "Content-Type": "application/json" },
-							});
-						}
+					// Rate Limiting (skip dataplane authorize — internal service traffic)
+					if (
+						url.pathname.startsWith("/api/") &&
+						!url.pathname.startsWith("/api/internal/dataplane/")
+					) {
+						const limitRes = await apiLimiter(req);
+						if (limitRes) return limitRes;
 					}
-
-				// Rate Limiting (skip dataplane authorize — internal service traffic)
-				if (
-					url.pathname.startsWith("/api/") &&
-					!url.pathname.startsWith("/api/internal/dataplane/")
-				) {
-					const limitRes = await apiLimiter(req);
-					if (limitRes) return limitRes;
-				}
 					if (url.pathname.startsWith("/auth/")) {
 						const limitRes = await authLimiter(req);
 						if (limitRes) return limitRes;
