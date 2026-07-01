@@ -1,1 +1,1 @@
-ALTER TABLE "buckets" ADD COLUMN "custom_domains" text;
+ALTER TABLE "buckets" ADD COLUMN IF NOT EXISTS "custom_domains" text;

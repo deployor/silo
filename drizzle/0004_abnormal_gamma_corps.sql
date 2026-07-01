@@ -1,1 +1,1 @@
-ALTER TABLE "buckets" ADD COLUMN "cors_config" text;
+ALTER TABLE "buckets" ADD COLUMN IF NOT EXISTS "cors_config" text;
