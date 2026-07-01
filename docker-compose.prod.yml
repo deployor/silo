@@ -12,6 +12,7 @@ services:
       - .env
     environment:
       PORT: "3000"
+      DISK_CACHE_DIR: "/var/cache/silo-dataplane"
       DATAPLANE_URL: "http://dataplane:3001"
     volumes:
       - dataplane-cache:/var/cache/silo-dataplane:ro
