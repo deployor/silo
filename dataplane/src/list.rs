@@ -3,13 +3,35 @@ use axum::{
     body::Body,
     http::{HeaderMap, Method, Response, StatusCode},
 };
+use serde::Deserialize;
 use tracing::warn;
 
 use crate::{
     response::{s3_error, with_s3_headers},
     upstream::signed_upstream_request,
-    AppState, AuthorizeResponse,
+    AppState, AuthBucket, AuthorizeResponse,
 };
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct InternalListRequest {
+    pub(crate) bucket: InternalListBucket,
+    pub(crate) root_prefix: String,
+    pub(crate) query: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct InternalListBucket {
+    pub(crate) id: String,
+    pub(crate) name: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct InternalListInvalidateRequest {
+    pub(crate) bucket_id: String,
+}
 
 pub(crate) async fn fast_list_objects(
     state: AppState,
@@ -24,6 +46,55 @@ pub(crate) async fn fast_list_objects(
         ));
     };
     let query = list_objects_query(&auth)?;
+    cached_list_objects_response(state, &auth, bucket, &query, headers).await
+}
+
+pub(crate) async fn fast_internal_list_objects(
+    state: AppState,
+    request: InternalListRequest,
+) -> Result<Response<Body>> {
+    ensure_internal_list_query_jailed(&request.query, &request.root_prefix)?;
+    let bucket = AuthBucket {
+        id: request.bucket.id,
+        name: request.bucket.name,
+    };
+    let auth = AuthorizeResponse {
+        allowed: true,
+        status: None,
+        body: None,
+        fast_path: Some(true),
+        action: Some("ListObjectsV2".to_string()),
+        key: Some(String::new()),
+        path_with_query: Some(format!("?{}", request.query)),
+        root_prefix: Some(request.root_prefix),
+        part_number: None,
+        upload_id: None,
+        cors_headers: None,
+        bucket: Some(bucket.clone()),
+        user: None,
+    };
+    cached_list_objects_response(state, &auth, &bucket, &request.query, &HeaderMap::new()).await
+}
+
+pub(crate) async fn invalidate_list_cache(state: &AppState, bucket_id: &str) -> Result<()> {
+    let mut conn = state.redis.clone();
+    let result: redis::RedisResult<()> = redis::cmd("INCR")
+        .arg(format!("s3:listver:{bucket_id}"))
+        .query_async(&mut conn)
+        .await;
+    if let Err(error) = result {
+        warn!(error = %error, "list cache invalidation failed");
+    }
+    Ok(())
+}
+
+async fn cached_list_objects_response(
+    state: AppState,
+    auth: &AuthorizeResponse,
+    bucket: &AuthBucket,
+    query: &str,
+    headers: &HeaderMap,
+) -> Result<Response<Body>> {
     let list_version = get_list_cache_version(&state, &bucket.id).await;
     let list_type = query_param_value(&query, "list-type").unwrap_or_else(|| "1".to_string());
     let cache_key = format!(
@@ -139,6 +210,40 @@ fn query_param_value(query: &str, name: &str) -> Option<String> {
             None
         }
     })
+}
+
+fn ensure_internal_list_query_jailed(query: &str, root_prefix: &str) -> Result<()> {
+    if root_prefix.is_empty() {
+        return Err(anyhow!("missing root prefix"));
+    }
+
+    let mut has_prefix = false;
+    for (key, value) in url::form_urlencoded::parse(query.as_bytes()) {
+        match key.as_ref() {
+            "prefix" => {
+                has_prefix = true;
+                ensure_internal_list_value_jailed(&value, root_prefix)?;
+            }
+            "start-after" | "marker" => {
+                ensure_internal_list_value_jailed(&value, root_prefix)?;
+            }
+            _ => {}
+        }
+    }
+
+    if !has_prefix {
+        return Err(anyhow!("missing list prefix"));
+    }
+
+    Ok(())
+}
+
+fn ensure_internal_list_value_jailed(value: &str, root_prefix: &str) -> Result<()> {
+    ensure_no_traversal(value)?;
+    if !value.starts_with(root_prefix) {
+        return Err(anyhow!("list prefix outside bucket jail"));
+    }
+    Ok(())
 }
 
 fn rewrite_list_xml_prefixes(xml: &str, root_prefix: &str) -> String {

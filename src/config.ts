@@ -27,6 +27,7 @@ const envSchema = z.object({
 	CF_SAAS_TARGET: z.string().optional(),
 	CF_SAAS_MIN_TLS: z.string().optional(),
 	DATAPLANE_INTERNAL_SECRET: z.string().optional(),
+	DATAPLANE_URL: z.string().optional(),
 	NODE_ENV: z
 		.enum(["development", "production", "test"])
 		.default("development"),
@@ -135,6 +136,7 @@ export const config = {
 	},
 	dataplane: {
 		internalSecret: env.DATAPLANE_INTERNAL_SECRET,
+		url: env.DATAPLANE_URL || "http://127.0.0.1:3001",
 	},
 	bucketUsageReconcileIntervalMs: Number(
 		env.BUCKET_USAGE_RECONCILE_INTERVAL_MS || 10 * 60 * 1000,

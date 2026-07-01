@@ -9,9 +9,9 @@ use std::{
 use anyhow::{anyhow, Context, Result};
 use axum::{
     body::Body,
-    extract::State,
+    extract::{Json, State},
     http::{header, HeaderMap, Method, Request, Response, StatusCode, Uri},
-    routing::{any, get},
+    routing::{any, get, post},
     Router,
 };
 use futures_util::StreamExt;
@@ -48,7 +48,10 @@ use cache::{
 use copy::fast_copy_object;
 use delete::fast_delete_objects;
 use disk_cache::DiskCache;
-use list::{fast_bucket_location, fast_list_objects};
+use list::{
+    fast_bucket_location, fast_internal_list_objects, fast_list_objects, invalidate_list_cache,
+    InternalListInvalidateRequest, InternalListRequest,
+};
 use multipart::{
     fast_abort_multipart_upload, fast_complete_multipart_upload, fast_create_multipart_upload,
     fast_list_multipart_uploads, fast_list_parts,
@@ -183,6 +186,14 @@ async fn main() -> Result<()> {
     };
     let app = Router::new()
         .route("/health", get(health))
+        .route(
+            "/api/internal/dashboard/list",
+            post(internal_dashboard_list),
+        )
+        .route(
+            "/api/internal/dashboard/list-cache/invalidate",
+            post(internal_dashboard_list_cache_invalidate),
+        )
         .fallback(any(handle_request))
         .layer(TraceLayer::new_for_http())
         .with_state(state);
@@ -225,6 +236,66 @@ async fn health(State(state): State<AppState>) -> Response<Body> {
         .header("content-type", "application/json")
         .body(Body::from(body))
         .unwrap_or_else(|_| Response::new(Body::empty()))
+}
+
+async fn internal_dashboard_list(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<InternalListRequest>,
+) -> Response<Body> {
+    if !internal_auth_ok(&state.cfg, &headers) {
+        return Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .body(Body::from("Unauthorized"))
+            .unwrap_or_else(|_| Response::new(Body::empty()));
+    }
+
+    match fast_internal_list_objects(state, request).await {
+        Ok(response) => response,
+        Err(error) => {
+            error!(error = %error, "internal dashboard list failed");
+            s3_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "InternalError",
+                "Internal Server Error",
+            )
+        }
+    }
+}
+
+async fn internal_dashboard_list_cache_invalidate(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<InternalListInvalidateRequest>,
+) -> Response<Body> {
+    if !internal_auth_ok(&state.cfg, &headers) {
+        return Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .body(Body::from("Unauthorized"))
+            .unwrap_or_else(|_| Response::new(Body::empty()));
+    }
+
+    match invalidate_list_cache(&state, &request.bucket_id).await {
+        Ok(()) => Response::builder()
+            .status(StatusCode::NO_CONTENT)
+            .body(Body::empty())
+            .unwrap_or_else(|_| Response::new(Body::empty())),
+        Err(error) => {
+            error!(error = %error, "internal dashboard list cache invalidation failed");
+            s3_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "InternalError",
+                "Internal Server Error",
+            )
+        }
+    }
+}
+
+fn internal_auth_ok(cfg: &Config, headers: &HeaderMap) -> bool {
+    headers
+        .get("x-dataplane-secret")
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|provided| provided == cfg.internal_secret)
 }
 
 impl Config {

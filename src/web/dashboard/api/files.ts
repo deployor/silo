@@ -90,6 +90,70 @@ function cloneOwnerUser(user: typeof users.$inferSelect) {
 	};
 }
 
+function dataplaneInternalUrl(path: string): string {
+	return `${config.dataplane.url.replace(/\/+$/, "")}${path}`;
+}
+
+async function fetchDataplaneListXml(params: {
+	bucket: BucketRecord;
+	owner: typeof users.$inferSelect;
+	query: URLSearchParams;
+}): Promise<string> {
+	if (!config.dataplane.internalSecret) {
+		throw new Error(
+			"DATAPLANE_INTERNAL_SECRET is required for dashboard listing",
+		);
+	}
+
+	const rootPrefix = getInternalPath("", params.owner, params.bucket);
+	const res = await fetch(
+		dataplaneInternalUrl("/api/internal/dashboard/list"),
+		{
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"x-dataplane-secret": config.dataplane.internalSecret,
+			},
+			body: JSON.stringify({
+				bucket: {
+					id: params.bucket.id,
+					name: params.bucket.name,
+				},
+				rootPrefix,
+				query: params.query.toString(),
+			}),
+		},
+	);
+
+	if (!res.ok) {
+		throw new Error(`Dataplane list error: ${res.status}`);
+	}
+
+	return res.text();
+}
+
+async function invalidateDataplaneListCache(bucketId: string) {
+	if (!config.dataplane.internalSecret) return;
+
+	const res = await fetch(
+		dataplaneInternalUrl("/api/internal/dashboard/list-cache/invalidate"),
+		{
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"x-dataplane-secret": config.dataplane.internalSecret,
+			},
+			body: JSON.stringify({ bucketId }),
+		},
+	);
+	if (!res.ok) {
+		console.warn("Failed to invalidate dataplane list cache", {
+			bucketId,
+			status: res.status,
+		});
+	}
+}
+
 async function getBucketAndOwner(
 	requestUser: UserRecord,
 	bucketName: string,
@@ -254,12 +318,11 @@ async function listDirectoryPage(params: {
 		query.set("continuation-token", params.continuationToken);
 	}
 
-	const s3Res = await s3Client.fetch(`?${query.toString()}`, { method: "GET" });
-	if (!s3Res.ok) {
-		throw new Error(`S3 Error: ${s3Res.status}`);
-	}
-
-	const xml = await s3Res.text();
+	const xml = await fetchDataplaneListXml({
+		bucket: params.bucket,
+		owner: params.owner,
+		query,
+	});
 	const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
 		xml,
 	).ListBucketResult;
@@ -336,14 +399,11 @@ async function searchFiles(params: {
 			if (nextCursor) query.set("continuation-token", nextCursor);
 		}
 
-		const s3Res = await s3Client.fetch(`?${query.toString()}`, {
-			method: "GET",
+		const xml = await fetchDataplaneListXml({
+			bucket: params.bucket,
+			owner: params.owner,
+			query,
 		});
-		if (!s3Res.ok) {
-			throw new Error(`S3 Error: ${s3Res.status}`);
-		}
-
-		const xml = await s3Res.text();
 		const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
 			xml,
 		).ListBucketResult;
@@ -956,6 +1016,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 						})
 						.where(eq(buckets.id, bucketData.bucket.id));
 				}
+				await invalidateDataplaneListCache(bucketData.bucket.id);
 
 				return jsonResponse({
 					message:
@@ -995,6 +1056,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 					.set({ totalBytes: sql`${buckets.totalBytes} - ${deletedBytes}` })
 					.where(eq(buckets.id, bucketData.bucket.id));
 			}
+			await invalidateDataplaneListCache(bucketData.bucket.id);
 
 			return jsonResponse({
 				message: normalizedKeys.length === 1 ? "Deleted" : "Deleted files",
@@ -1141,6 +1203,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 					(sum, item) => sum + item.size,
 					0,
 				);
+				await invalidateDataplaneListCache(bucketData.bucket.id);
 
 				return jsonResponse({
 					message: "Uploaded files",
@@ -1198,6 +1261,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 				await headObject(sourceInternalKey);
 				await copyObject(sourceInternalKey, destinationInternalKey);
 				await deleteSingleObject(sourceInternalKey);
+				await invalidateDataplaneListCache(bucketData.bucket.id);
 
 				return jsonResponse({
 					message: "Renamed file",
@@ -1250,6 +1314,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 
 					moved.push({ sourceKey, destinationKey });
 				}
+				await invalidateDataplaneListCache(bucketData.bucket.id);
 
 				return jsonResponse({
 					message: "Moved files",
