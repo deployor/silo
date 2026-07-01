@@ -10,7 +10,7 @@ use anyhow::{anyhow, Context, Result};
 use axum::{
     body::Body,
     extract::State,
-    http::{HeaderMap, Method, Request, Response, StatusCode, Uri},
+    http::{header, HeaderMap, Method, Request, Response, StatusCode, Uri},
     routing::{any, get},
     Router,
 };
@@ -237,10 +237,14 @@ impl Config {
             ));
         }
 
+        let control_plane_url = env::var("CONTROL_PLANE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:3000".into())
+            .trim_end_matches('/')
+            .to_string();
+
         Ok(Self {
             bind: env::var("DATAPLANE_BIND").unwrap_or_else(|_| "0.0.0.0:3001".into()),
-            control_plane_url: env::var("CONTROL_PLANE_URL")
-                .unwrap_or_else(|_| "http://127.0.0.1:3000".into()),
+            control_plane_url,
             internal_secret,
             public_scheme: env::var("DATAPLANE_PUBLIC_SCHEME").unwrap_or_else(|_| "https".into()),
             s3_domain: env::var("S3_DOMAIN").context("S3_DOMAIN is required")?,
@@ -288,9 +292,13 @@ async fn handle_request_inner(state: AppState, req: Request<Body>) -> Result<Res
     let headers = parts.headers.clone();
     let url = reconstruct_url(&state.cfg, &parts.uri, &headers)?;
 
+    if is_dashboard_host(&state.cfg, &headers) {
+        return proxy_control_plane(state, method, parts.uri, headers, body).await;
+    }
+
     if parts.uri.path() == "/" {
         let accept = headers
-            .get(axum::http::header::ACCEPT)
+            .get(header::ACCEPT)
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
         if accept.contains("text/html") {
@@ -369,6 +377,94 @@ async fn handle_request_inner(state: AppState, req: Request<Body>) -> Result<Res
             "A header or query you requested is not implemented.",
         )),
     }
+}
+
+fn is_dashboard_host(cfg: &Config, headers: &HeaderMap) -> bool {
+    let Some(host) = headers.get(HOST).and_then(|h| h.to_str().ok()) else {
+        return false;
+    };
+    let host = host
+        .split_once(':')
+        .map(|(host, _)| host)
+        .unwrap_or(host)
+        .to_ascii_lowercase();
+    host == format!("dashboard.{}", cfg.s3_domain).to_ascii_lowercase()
+}
+
+async fn proxy_control_plane(
+    state: AppState,
+    method: Method,
+    uri: Uri,
+    headers: HeaderMap,
+    body: Body,
+) -> Result<Response<Body>> {
+    let path_and_query = uri
+        .path_and_query()
+        .map(|v| v.as_str())
+        .unwrap_or_else(|| uri.path());
+    let url = format!("{}{}", state.cfg.control_plane_url, path_and_query);
+    let mut builder = state.http.request(
+        reqwest::Method::from_bytes(method.as_str().as_bytes())?,
+        url,
+    );
+
+    for (name, value) in headers.iter() {
+        if should_forward_control_plane_header(name.as_str()) {
+            builder = builder.header(name, value);
+        }
+    }
+    if let Some(host) = headers.get(HOST).and_then(|value| value.to_str().ok()) {
+        builder = builder
+            .header("x-forwarded-host", host)
+            .header("x-forwarded-proto", &state.cfg.public_scheme);
+    }
+
+    let has_request_body = method != Method::GET && method != Method::HEAD
+        || headers.contains_key(header::CONTENT_LENGTH)
+        || headers.contains_key(header::TRANSFER_ENCODING);
+    let upstream = if has_request_body {
+        let request_body = body
+            .into_data_stream()
+            .map(|chunk| chunk.map_err(std::io::Error::other));
+        builder
+            .body(reqwest::Body::wrap_stream(request_body))
+            .send()
+            .await?
+    } else {
+        builder.send().await?
+    };
+    let status = StatusCode::from_u16(upstream.status().as_u16())?;
+    let mut response = Response::builder().status(status);
+
+    for (name, value) in upstream.headers().iter() {
+        if should_forward_control_plane_header(name.as_str()) {
+            response = response.header(name, value);
+        }
+    }
+
+    let body = upstream
+        .bytes_stream()
+        .map(|chunk| chunk.map_err(std::io::Error::other));
+    Ok(response.body(Body::from_stream(body))?)
+}
+
+fn should_forward_control_plane_header(name: &str) -> bool {
+    let name = name.to_ascii_lowercase();
+    !matches!(
+        name.as_str(),
+        "connection"
+            | "keep-alive"
+            | "proxy-authenticate"
+            | "proxy-authorization"
+            | "te"
+            | "trailer"
+            | "transfer-encoding"
+            | "upgrade"
+            | "host"
+            | "x-forwarded-host"
+            | "x-forwarded-proto"
+            | "x-dataplane-secret"
+    )
 }
 
 fn reconstruct_url(cfg: &Config, uri: &Uri, headers: &HeaderMap) -> Result<String> {

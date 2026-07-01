@@ -146,13 +146,7 @@ fn rewrite_list_xml_prefixes(xml: &str, root_prefix: &str) -> String {
         return xml.to_string();
     }
     let mut rewritten = xml.to_string();
-    for tag in [
-        "Prefix",
-        "Marker",
-        "NextMarker",
-        "StartAfter",
-        "Key",
-    ] {
+    for tag in ["Prefix", "Marker", "NextMarker", "StartAfter", "Key"] {
         rewritten = strip_prefix_from_xml_tag(&rewritten, tag, root_prefix);
     }
     rewritten

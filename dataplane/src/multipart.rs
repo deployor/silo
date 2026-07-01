@@ -74,18 +74,11 @@ pub(crate) async fn fast_create_multipart_upload(
         .unwrap_or("");
     let existing_size = if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref())
     {
-        cached_existing_size(
-            &state,
-            bucket,
-            key,
-            lookup_path,
-        )
-        .await
-        .unwrap_or(0)
-    } else {
-        head_existing_size(&state, lookup_path)
+        cached_existing_size(&state, bucket, key, lookup_path)
             .await
             .unwrap_or(0)
+    } else {
+        head_existing_size(&state, lookup_path).await.unwrap_or(0)
     };
     let upstream = signed_upstream_request(
         &state,
@@ -167,18 +160,11 @@ pub(crate) async fn fast_complete_multipart_upload(
         .unwrap_or("");
     let existing_size = if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref())
     {
-        cached_existing_size(
-            &state,
-            bucket,
-            key,
-            lookup_path,
-        )
-        .await
-        .unwrap_or(0)
-    } else {
-        head_existing_size(&state, lookup_path)
+        cached_existing_size(&state, bucket, key, lookup_path)
             .await
             .unwrap_or(0)
+    } else {
+        head_existing_size(&state, lookup_path).await.unwrap_or(0)
     };
     let content_length = headers
         .get(axum::http::header::CONTENT_LENGTH)

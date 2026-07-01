@@ -58,9 +58,10 @@ pub(crate) async fn fast_delete_objects(
     let rewritten_response = rewrite_delete_result(&response_xml, root_prefix);
 
     if status.is_success() {
-        let deleted_keys: BTreeSet<_> = successful_delete_keys(&response_xml, root_prefix, &requested_keys)
-            .into_iter()
-            .collect();
+        let deleted_keys: BTreeSet<_> =
+            successful_delete_keys(&response_xml, root_prefix, &requested_keys)
+                .into_iter()
+                .collect();
         let mut deleted_bytes = 0u64;
         for key in &deleted_keys {
             if let Some(size) = existing_sizes.get(key) {
