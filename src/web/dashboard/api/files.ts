@@ -1,8 +1,13 @@
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { config } from "../../../config";
 import { db } from "../../../db";
-import { buckets, objectStats, type users } from "../../../db/schema";
+import {
+	bucketKeys,
+	buckets,
+	objectStats,
+	type users,
+} from "../../../db/schema";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import {
 	buildBucketObjectUrl,
@@ -249,6 +254,129 @@ function getExtension(key: string): string {
 	const name = getNameFromKey(key);
 	const dot = name.lastIndexOf(".");
 	return dot > -1 ? name.slice(dot + 1).toLowerCase() : "";
+}
+
+function sigv4Date(date: Date): { amzDate: string; dateStamp: string } {
+	const iso = date.toISOString().replace(/[:-]|\.\d{3}/g, "");
+	return {
+		amzDate: iso,
+		dateStamp: iso.slice(0, 8),
+	};
+}
+
+function hmacSha256(key: string | Buffer, value: string): Buffer {
+	return createHmac("sha256", key).update(value).digest();
+}
+
+function sigv4SigningKey(
+	secretKey: string,
+	dateStamp: string,
+	region: string,
+	service: string,
+): Buffer {
+	const kDate = hmacSha256(`AWS4${secretKey}`, dateStamp);
+	const kRegion = hmacSha256(kDate, region);
+	const kService = hmacSha256(kRegion, service);
+	return hmacSha256(kService, "aws4_request");
+}
+
+function uriEncode(value: string): string {
+	return encodeURIComponent(value).replace(
+		/[!'()*]/g,
+		(char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+	);
+}
+
+function encodeS3PathSegment(segment: string): string {
+	return segment.replace(
+		/(%[0-9A-Fa-f]{2})|([^/%]+)/g,
+		(match, pctEncoded) => pctEncoded?.toUpperCase() || uriEncode(match),
+	);
+}
+
+function canonicalS3Path(bucketName: string, key: string): string {
+	return `/${[bucketName, ...key.replace(/^\/+/, "").split("/")]
+		.map(encodeS3PathSegment)
+		.join("/")}`;
+}
+
+function canonicalQuery(params: URLSearchParams): string {
+	return [...params.entries()]
+		.map(([key, value]) => [uriEncode(key), uriEncode(value)] as const)
+		.sort(([leftKey, leftValue], [rightKey, rightValue]) =>
+			leftKey === rightKey
+				? leftValue.localeCompare(rightValue)
+				: leftKey.localeCompare(rightKey),
+		)
+		.map(([key, value]) => `${key}=${value}`)
+		.join("&");
+}
+
+async function getPresignBucketKey(bucketId: string) {
+	const rows = await db
+		.select({
+			accessKey: bucketKeys.accessKey,
+			secretKey: bucketKeys.secretKey,
+		})
+		.from(bucketKeys)
+		.where(
+			and(eq(bucketKeys.bucketId, bucketId), eq(bucketKeys.isPaused, false)),
+		)
+		.limit(1);
+
+	const key = rows[0];
+	if (!key) {
+		throw new Error("Bucket has no active access key");
+	}
+	return key;
+}
+
+async function createS3PresignedGetUrl(params: {
+	bucket: BucketRecord;
+	key: string;
+	expiresSeconds: number;
+}): Promise<string> {
+	const { accessKey, secretKey } = await getPresignBucketKey(params.bucket.id);
+	const region = config.s3.region || "auto";
+	const service = "s3";
+	const { amzDate, dateStamp } = sigv4Date(new Date());
+	const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+	const credential = `${accessKey}/${credentialScope}`;
+	const host = config.s3Domain;
+	const path = canonicalS3Path(params.bucket.name, params.key);
+	const query = new URLSearchParams({
+		"X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+		"X-Amz-Credential": credential,
+		"X-Amz-Date": amzDate,
+		"X-Amz-Expires": String(params.expiresSeconds),
+		"X-Amz-SignedHeaders": "host",
+	});
+	const canonicalQueryString = canonicalQuery(query);
+	const canonicalRequest = [
+		"GET",
+		path,
+		canonicalQueryString,
+		`host:${host}\n`,
+		"host",
+		"UNSIGNED-PAYLOAD",
+	].join("\n");
+	const hashedCanonicalRequest = createHash("sha256")
+		.update(canonicalRequest)
+		.digest("hex");
+	const stringToSign = [
+		"AWS4-HMAC-SHA256",
+		amzDate,
+		credentialScope,
+		hashedCanonicalRequest,
+	].join("\n");
+	const signature = createHmac(
+		"sha256",
+		sigv4SigningKey(secretKey, dateStamp, region, service),
+	)
+		.update(stringToSign)
+		.digest("hex");
+	query.set("X-Amz-Signature", signature);
+	return `https://${host}${path}?${canonicalQuery(query)}`;
 }
 
 function mapContentToFileItem(
@@ -658,13 +786,11 @@ export async function handleFiles(req: Request): Promise<Response> {
 				.digest("hex");
 
 			const signedUrl = share
-				? `${buildBucketObjectUrl({
-						bucketName,
+				? await createS3PresignedGetUrl({
+						bucket: bucketData.bucket,
 						key,
-						customDomains: parseBucketCustomDomains(
-							bucketData.bucket.customDomains,
-						),
-					})}?expires=${expires}&signature=${signature}`
+						expiresSeconds,
+					})
 				: `/api/dashboard/buckets/${bucketName}/files/preview?key=${encodeURIComponent(
 						key,
 					)}&expires=${expires}&signature=${signature}`;
