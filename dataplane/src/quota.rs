@@ -119,8 +119,8 @@ fn storage_key(user_id: &str) -> String {
     format!("quota:storage:{user_id}")
 }
 
-fn egress_key(user_id: &str) -> String {
-    format!("quota:egress:{user_id}:{}", current_egress_period())
+fn egress_key(user_id: &str, period: &str) -> String {
+    format!("quota:egress:{user_id}:{period}")
 }
 
 fn mpu_key(user_id: &str, bucket_id: &str, upload_id: &str) -> String {
@@ -176,7 +176,15 @@ pub(crate) async fn reserve_egress(state: &AppState, user: &AuthUser, delta: u64
     } else {
         0
     };
-    check_and_incr_quota(state, &egress_key(&user.id), delta, limit, seed, "egress").await
+    let key = egress_key(&user.id, &period);
+    check_and_incr_quota(state, &key, delta, limit, seed, "egress").await?;
+    let mut conn = state.redis.clone();
+    let _: redis::RedisResult<()> = redis::cmd("EXPIRE")
+        .arg(&key)
+        .arg(90 * 24 * 60 * 60)
+        .query_async(&mut conn)
+        .await;
+    Ok(())
 }
 
 fn current_egress_period() -> String {

@@ -65,18 +65,25 @@ pub(crate) async fn fast_create_multipart_upload(
     auth: AuthorizeResponse,
     headers: &HeaderMap,
 ) -> Result<Response<Body>> {
+    let lookup_path = auth
+        .path_with_query
+        .as_deref()
+        .unwrap_or("")
+        .split_once('?')
+        .map(|(p, _)| p)
+        .unwrap_or("");
     let existing_size = if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref())
     {
         cached_existing_size(
             &state,
             bucket,
             key,
-            auth.path_with_query.as_deref().unwrap_or(""),
+            lookup_path,
         )
         .await
         .unwrap_or(0)
     } else {
-        head_existing_size(&state, auth.path_with_query.as_deref().unwrap_or(""))
+        head_existing_size(&state, lookup_path)
             .await
             .unwrap_or(0)
     };
@@ -107,10 +114,13 @@ pub(crate) async fn fast_create_multipart_upload(
                 )
                 .await
                 {
+                    let root = auth.root_prefix.as_deref().unwrap_or("");
+                    let key = auth.key.as_deref().unwrap_or("");
+                    let abort_path = format!("{root}{key}?uploadId={upload_id}");
                     let _ = signed_upstream_request(
                         &state,
                         Method::DELETE,
-                        &auth.path_with_query.unwrap_or_default(),
+                        &abort_path,
                         &HeaderMap::new(),
                         None,
                     )?
@@ -148,18 +158,25 @@ pub(crate) async fn fast_complete_multipart_upload(
             &auth,
         ));
     };
+    let lookup_path = auth
+        .path_with_query
+        .as_deref()
+        .unwrap_or("")
+        .split_once('?')
+        .map(|(p, _)| p)
+        .unwrap_or("");
     let existing_size = if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref())
     {
         cached_existing_size(
             &state,
             bucket,
             key,
-            auth.path_with_query.as_deref().unwrap_or(""),
+            lookup_path,
         )
         .await
         .unwrap_or(0)
     } else {
-        head_existing_size(&state, auth.path_with_query.as_deref().unwrap_or(""))
+        head_existing_size(&state, lookup_path)
             .await
             .unwrap_or(0)
     };
