@@ -1,7 +1,6 @@
 import { createHmac } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { config } from "../../../config";
-import { getInternalPath } from "../../../lib/s3/paths";
 import { db } from "../../../db";
 import { buckets, objectStats, type users } from "../../../db/schema";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
@@ -9,12 +8,14 @@ import {
 	buildBucketObjectUrl,
 	parseBucketCustomDomains,
 } from "../../../lib/bucket-domains";
+import { getInternalPath } from "../../../lib/s3/paths";
 import { s3Client } from "../../../lib/s3-client";
 import { parseS3Xml } from "../../../lib/s3-xml";
 import { getCurrentUser } from "../../../lib/session";
 import {
 	assertCanReadFiles,
 	assertCanWriteFiles,
+	type BucketAccessContext,
 	getBucketAccessForUser,
 } from "../../../services/collaboration-service";
 import { getBucketDeepFreezeMessage } from "../../../services/deep-freeze-service";
@@ -58,11 +59,6 @@ type S3ListBucketResult = {
 	IsTruncated?: boolean;
 };
 
-type DirectoryTotals = {
-	totalFiles: number;
-	totalFolders: number;
-};
-
 type ObjectAnalyticsMap = Record<
 	string,
 	{
@@ -74,6 +70,7 @@ type ObjectAnalyticsMap = Record<
 >;
 
 type BucketContext = {
+	access: BucketAccessContext;
 	bucket: BucketRecord;
 	owner: typeof users.$inferSelect;
 };
@@ -112,6 +109,7 @@ async function getBucketAndOwner(
 	}
 
 	return {
+		access,
 		bucket: access.bucket,
 		owner:
 			access.owner.id === requestUser.id
@@ -262,8 +260,9 @@ async function listDirectoryPage(params: {
 	}
 
 	const xml = await s3Res.text();
-	const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(xml)
-		.ListBucketResult;
+	const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
+		xml,
+	).ListBucketResult;
 
 	const contents = result.Contents
 		? Array.isArray(result.Contents)
@@ -297,77 +296,6 @@ async function listDirectoryPage(params: {
 		files,
 		folders,
 		nextContinuationToken: result.NextContinuationToken || null,
-	};
-}
-
-async function countDirectoryTotals(params: {
-	bucket: BucketRecord;
-	owner: typeof users.$inferSelect;
-	prefix: string;
-}): Promise<DirectoryTotals> {
-	const internalPrefix = getInternalPath(
-		params.prefix,
-		params.owner,
-		params.bucket,
-	);
-	const rootPrefix = getInternalPath("", params.owner, params.bucket);
-	const normalizedCurrentPrefix = normalizeUserKey(params.prefix, {
-		allowEmpty: true,
-	});
-	let continuationToken: string | null = null;
-	let totalFiles = 0;
-	const folderPrefixes = new Set<string>();
-
-	do {
-		const query = new URLSearchParams();
-		query.set("list-type", "2");
-		query.set("prefix", internalPrefix);
-		query.set("delimiter", "/");
-		query.set("max-keys", "1000");
-		if (continuationToken) {
-			query.set("continuation-token", continuationToken);
-		}
-
-		const s3Res = await s3Client.fetch(`?${query.toString()}`, {
-			method: "GET",
-		});
-		if (!s3Res.ok) {
-			throw new Error(`S3 Error: ${s3Res.status}`);
-		}
-
-		const xml = await s3Res.text();
-		const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(xml)
-			.ListBucketResult;
-		const contents = result.Contents
-			? Array.isArray(result.Contents)
-				? result.Contents
-				: [result.Contents]
-			: [];
-		const prefixes = result.CommonPrefixes
-			? Array.isArray(result.CommonPrefixes)
-				? result.CommonPrefixes
-				: [result.CommonPrefixes]
-			: [];
-
-		for (const contentItem of contents as Array<{ Key: string }>) {
-			const relativeKey = contentItem.Key.startsWith(rootPrefix)
-				? contentItem.Key.slice(rootPrefix.length)
-				: contentItem.Key;
-			if (relativeKey !== normalizedCurrentPrefix) {
-				totalFiles += 1;
-			}
-		}
-
-		for (const prefixItem of prefixes as Array<{ Prefix: string }>) {
-			folderPrefixes.add(prefixItem.Prefix);
-		}
-
-		continuationToken = result.NextContinuationToken || null;
-	} while (continuationToken);
-
-	return {
-		totalFiles,
-		totalFolders: folderPrefixes.size,
 	};
 }
 
@@ -416,8 +344,9 @@ async function searchFiles(params: {
 		}
 
 		const xml = await s3Res.text();
-		const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(xml)
-			.ListBucketResult;
+		const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
+			xml,
+		).ListBucketResult;
 		const contents = result.Contents
 			? Array.isArray(result.Contents)
 				? result.Contents
@@ -670,13 +599,15 @@ export async function handleFiles(req: Request): Promise<Response> {
 
 			const signedUrl = share
 				? `${buildBucketObjectUrl({
-					bucketName,
-					key,
-					customDomains: parseBucketCustomDomains(bucketData.bucket.customDomains),
-				})}?expires=${expires}&signature=${signature}`
+						bucketName,
+						key,
+						customDomains: parseBucketCustomDomains(
+							bucketData.bucket.customDomains,
+						),
+					})}?expires=${expires}&signature=${signature}`
 				: `/api/dashboard/buckets/${bucketName}/files/preview?key=${encodeURIComponent(
 						key,
-				  )}&expires=${expires}&signature=${signature}`;
+					)}&expires=${expires}&signature=${signature}`;
 
 			return jsonResponse({
 				url: signedUrl,
@@ -711,12 +642,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 		}
 
 		try {
-			const access = await getBucketAccessForUser({
-				bucketName,
-				userId: user.id,
-				isAdmin: user.isAdmin,
-			});
-			assertCanReadFiles(access);
+			assertCanReadFiles(bucketData.access);
 		} catch (error) {
 			return (
 				responseForBucketError(error) || errorResponse("Unauthorized", 403)
@@ -737,10 +663,12 @@ export async function handleFiles(req: Request): Promise<Response> {
 
 			const publicUrl = bucketData.bucket.isPublic
 				? buildBucketObjectUrl({
-					bucketName,
-					key: safeKey,
-					customDomains: parseBucketCustomDomains(bucketData.bucket.customDomains),
-				})
+						bucketName,
+						key: safeKey,
+						customDomains: parseBucketCustomDomains(
+							bucketData.bucket.customDomains,
+						),
+					})
 				: null;
 
 			return jsonResponse({
@@ -879,12 +807,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 
 	if (req.method === "GET") {
 		try {
-			const access = await getBucketAccessForUser({
-				bucketName,
-				userId: user.id,
-				isAdmin: user.isAdmin,
-			});
-			assertCanReadFiles(access);
+			assertCanReadFiles(bucketData.access);
 		} catch (error) {
 			return (
 				responseForBucketError(error) || errorResponse("Unauthorized", 403)
@@ -941,11 +864,6 @@ export async function handleFiles(req: Request): Promise<Response> {
 				prefix: currentPrefix,
 				continuationToken,
 			});
-			const totals = await countDirectoryTotals({
-				bucket: bucketData.bucket,
-				owner: bucketData.owner,
-				prefix: currentPrefix,
-			});
 			const analyticsMap = await getObjectAnalyticsMap(
 				bucketData.bucket.id,
 				result.files.map((file: FileItem) => file.key),
@@ -963,8 +881,8 @@ export async function handleFiles(req: Request): Promise<Response> {
 				})),
 				folders: result.folders,
 				nextContinuationToken: result.nextContinuationToken,
-				totalFiles: totals.totalFiles,
-				totalFolders: totals.totalFolders,
+				totalFiles: result.files.length,
+				totalFolders: result.folders.length,
 			});
 		} catch (error) {
 			console.error("List Files Error:", error);
@@ -974,12 +892,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 
 	if (req.method === "DELETE") {
 		try {
-			const access = await getBucketAccessForUser({
-				bucketName,
-				userId: user.id,
-				isAdmin: user.isAdmin,
-			});
-			assertCanWriteFiles(access);
+			assertCanWriteFiles(bucketData.access);
 		} catch (error) {
 			return (
 				responseForBucketError(error) || errorResponse("Unauthorized", 403)
@@ -1098,12 +1011,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 
 	if (req.method === "POST") {
 		try {
-			const access = await getBucketAccessForUser({
-				bucketName,
-				userId: user.id,
-				isAdmin: user.isAdmin,
-			});
-			assertCanWriteFiles(access);
+			assertCanWriteFiles(bucketData.access);
 		} catch (error) {
 			return (
 				responseForBucketError(error) || errorResponse("Unauthorized", 403)
@@ -1141,15 +1049,15 @@ export async function handleFiles(req: Request): Promise<Response> {
 					);
 				}
 
-			const uploads: Array<{
-				key: string;
-				name: string;
-				size: number;
-				status: "uploaded";
-			}> = [];
-			let pendingStorageDelta = 0;
+				const uploads: Array<{
+					key: string;
+					name: string;
+					size: number;
+					status: "uploaded";
+				}> = [];
+				let pendingStorageDelta = 0;
 
-			for (const [, file] of entries) {
+				for (const [, file] of entries) {
 					const relativePathValue = formData.get(
 						`path:${file.name}:${file.size}`,
 					);
@@ -1170,38 +1078,35 @@ export async function handleFiles(req: Request): Promise<Response> {
 						bucketData.owner,
 						bucketData.bucket,
 					);
-				const before = await s3Client.fetch(internalKey, { method: "HEAD" });
-				if (!before.ok && before.status !== 404) {
-					return errorResponse("Failed to inspect existing file", 502);
-				}
-				const existingSize = before.ok
-					? Number(before.headers.get("content-length") || 0)
-					: 0;
+					const before = await s3Client.fetch(internalKey, { method: "HEAD" });
+					if (!before.ok && before.status !== 404) {
+						return errorResponse("Failed to inspect existing file", 502);
+					}
+					const existingSize = before.ok
+						? Number(before.headers.get("content-length") || 0)
+						: 0;
 					const delta = Math.max(0, size - existingSize);
 					const limit = bucketData.owner.storageLimitBytes;
-				if (
-					!bucketData.owner.isImmortal &&
-					limit !== null &&
-					BigInt(bucketData.owner.storageUsageBytes) +
-						BigInt(pendingStorageDelta) +
-						BigInt(delta) >
-						BigInt(limit)
-				) {
-					return errorResponse("Storage quota exceeded", 403);
-				}
+					if (
+						!bucketData.owner.isImmortal &&
+						limit !== null &&
+						BigInt(bucketData.owner.storageUsageBytes) +
+							BigInt(pendingStorageDelta) +
+							BigInt(delta) >
+							BigInt(limit)
+					) {
+						return errorResponse("Storage quota exceeded", 403);
+					}
 
-					const uploadRes = await s3Client.fetch(
-						internalKey,
-						{
-							method: "PUT",
-							headers: {
-								"Content-Type": file.type || "application/octet-stream",
-								"Content-Length": String(size),
-							},
-							body: file.stream(),
-							duplex: "half",
-						} as RequestInit,
-					);
+					const uploadRes = await s3Client.fetch(internalKey, {
+						method: "PUT",
+						headers: {
+							"Content-Type": file.type || "application/octet-stream",
+							"Content-Length": String(size),
+						},
+						body: file.stream(),
+						duplex: "half",
+					} as RequestInit);
 
 					if (!uploadRes.ok) {
 						const message = await uploadRes.text();
@@ -1255,12 +1160,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 
 	if (req.method === "PATCH") {
 		try {
-			const access = await getBucketAccessForUser({
-				bucketName,
-				userId: user.id,
-				isAdmin: user.isAdmin,
-			});
-			assertCanWriteFiles(access);
+			assertCanWriteFiles(bucketData.access);
 		} catch (error) {
 			return (
 				responseForBucketError(error) || errorResponse("Unauthorized", 403)
