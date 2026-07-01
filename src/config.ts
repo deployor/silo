@@ -26,7 +26,7 @@ const envSchema = z.object({
 	CF_SAAS_FALLBACK_ORIGIN: z.string().optional(),
 	CF_SAAS_TARGET: z.string().optional(),
 	CF_SAAS_MIN_TLS: z.string().optional(),
-	DATAPLANE_INTERNAL_SECRET: z.string().optional(),
+	DATAPLANE_INTERNAL_SECRET: z.string().min(1, "DATAPLANE_INTERNAL_SECRET is required"),
 	NODE_ENV: z
 		.enum(["development", "production", "test"])
 		.default("development"),

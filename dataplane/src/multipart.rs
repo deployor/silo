@@ -107,7 +107,16 @@ pub(crate) async fn fast_create_multipart_upload(
                 )
                 .await
                 {
-                    warn!(error = %error, "failed to register multipart quota");
+                    let _ = signed_upstream_request(
+                        &state,
+                        Method::DELETE,
+                        &auth.path_with_query.unwrap_or_default(),
+                        &HeaderMap::new(),
+                        None,
+                    )?
+                    .send()
+                    .await;
+                    return Err(anyhow!("failed to register multipart quota: {error}"));
                 }
             }
         }
@@ -191,6 +200,7 @@ pub(crate) async fn fast_complete_multipart_upload(
                 warn!(error = %error, "failed to commit multipart bucket size");
             }
             invalidate_object_caches(&state, bucket, key).await;
+            bump_list_cache(&state, bucket).await;
         }
     }
 
@@ -311,6 +321,14 @@ async fn cached_existing_size(
     head_existing_size(state, path).await
 }
 
+async fn bump_list_cache(state: &AppState, bucket: &AuthBucket) {
+    let mut conn = state.redis.clone();
+    let _: redis::RedisResult<i64> = redis::cmd("INCR")
+        .arg(format!("s3:listver:{}", bucket.id))
+        .query_async(&mut conn)
+        .await;
+}
+
 async fn commit_bucket_delta(
     state: &AppState,
     bucket: &AuthBucket,
@@ -346,7 +364,7 @@ fn rewrite_multipart_xml(xml: &str, root_prefix: &str) -> String {
         return xml.to_string();
     }
     let mut rewritten = xml.to_string();
-    for tag in ["Key", "KeyMarker", "Prefix"] {
+    for tag in ["Key", "KeyMarker", "NextKeyMarker", "Prefix"] {
         rewritten = strip_prefix_from_xml_tag(&rewritten, tag, root_prefix);
     }
     rewritten

@@ -1141,14 +1141,15 @@ export async function handleFiles(req: Request): Promise<Response> {
 					);
 				}
 
-				const uploads: Array<{
-					key: string;
-					name: string;
-					size: number;
-					status: "uploaded";
-				}> = [];
+			const uploads: Array<{
+				key: string;
+				name: string;
+				size: number;
+				status: "uploaded";
+			}> = [];
+			let pendingStorageDelta = 0;
 
-				for (const [, file] of entries) {
+			for (const [, file] of entries) {
 					const relativePathValue = formData.get(
 						`path:${file.name}:${file.size}`,
 					);
@@ -1169,20 +1170,25 @@ export async function handleFiles(req: Request): Promise<Response> {
 						bucketData.owner,
 						bucketData.bucket,
 					);
-					const before = await s3Client.fetch(internalKey, { method: "HEAD" });
-					const existingSize = before.ok
-						? Number(before.headers.get("content-length") || 0)
-						: 0;
+				const before = await s3Client.fetch(internalKey, { method: "HEAD" });
+				if (!before.ok && before.status !== 404) {
+					return errorResponse("Failed to inspect existing file", 502);
+				}
+				const existingSize = before.ok
+					? Number(before.headers.get("content-length") || 0)
+					: 0;
 					const delta = Math.max(0, size - existingSize);
 					const limit = bucketData.owner.storageLimitBytes;
-					if (
-						!bucketData.owner.isImmortal &&
-						limit !== null &&
-						BigInt(bucketData.owner.storageUsageBytes) + BigInt(delta) >
-							BigInt(limit)
-					) {
-						return errorResponse("Storage quota exceeded", 403);
-					}
+				if (
+					!bucketData.owner.isImmortal &&
+					limit !== null &&
+					BigInt(bucketData.owner.storageUsageBytes) +
+						BigInt(pendingStorageDelta) +
+						BigInt(delta) >
+						BigInt(limit)
+				) {
+					return errorResponse("Storage quota exceeded", 403);
+				}
 
 					const uploadRes = await s3Client.fetch(
 						internalKey,
@@ -1215,6 +1221,8 @@ export async function handleFiles(req: Request): Promise<Response> {
 									: sql`GREATEST(0, ${buckets.totalBytes} - ${existingSize - size})`,
 						})
 						.where(eq(buckets.id, bucketData.bucket.id));
+
+					pendingStorageDelta += delta;
 
 					uploads.push({
 						key: destinationKey,

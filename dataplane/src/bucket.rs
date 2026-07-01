@@ -117,11 +117,7 @@ pub(crate) async fn fast_delete_bucket_cors(
     let Some(bucket) = auth.bucket.as_ref() else {
         return Ok(access_denied());
     };
-    let config = CorsConfiguration {
-        cors_rules: default_cors_rules(),
-    };
-    sqlx::query("UPDATE buckets SET cors_config = $1 WHERE id = $2::uuid")
-        .bind(serde_json::to_string(&config)?)
+    sqlx::query("UPDATE buckets SET cors_config = NULL WHERE id = $1::uuid")
         .bind(&bucket.id)
         .execute(&state.pg)
         .await?;
@@ -249,7 +245,7 @@ fn parse_stored_cors(raw: Option<&str>) -> CorsConfiguration {
     raw.and_then(|raw| serde_json::from_str::<CorsConfiguration>(raw).ok())
         .filter(|config| !config.cors_rules.is_empty())
         .unwrap_or_else(|| CorsConfiguration {
-            cors_rules: default_cors_rules(),
+            cors_rules: Vec::new(),
         })
 }
 
@@ -321,23 +317,6 @@ fn cors_config_to_xml(config: &CorsConfiguration) -> String {
     }
     out.push_str("</CORSConfiguration>");
     out
-}
-
-fn default_cors_rules() -> Vec<CorsRule> {
-    vec![CorsRule {
-        id: None,
-        allowed_origins: vec!["*".into()],
-        allowed_methods: vec![
-            "GET".into(),
-            "HEAD".into(),
-            "PUT".into(),
-            "POST".into(),
-            "DELETE".into(),
-        ],
-        allowed_headers: Some(vec!["*".into()]),
-        expose_headers: Some(vec!["*".into()]),
-        max_age_seconds: Some(86400),
-    }]
 }
 
 fn extract_blocks<'a>(xml: &'a str, tag: &str) -> Vec<&'a str> {

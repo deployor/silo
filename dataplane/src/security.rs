@@ -13,11 +13,11 @@ pub(crate) fn authorized_path_is_jailed(auth: &AuthorizeResponse) -> bool {
         .map(|(path, _)| path)
         .unwrap_or(path_with_query)
         .trim_start_matches('/');
-    let root = root_prefix.trim_start_matches('/');
+    let root = root_prefix.trim_start_matches('/').trim_end_matches('/');
 
     !path.contains('\\')
         && !root.is_empty()
-        && (path == root.trim_end_matches('/') || path.starts_with(root))
+        && (path == root || path.starts_with(&format!("{root}/")))
 }
 
 #[cfg(test)]

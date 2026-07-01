@@ -65,15 +65,47 @@ export function getCorsHeaders(
 	const parsed = parseCorsConfig(bucket.corsConfig);
 	const config = parsed.ok ? parsed.config : buildCorsConfig();
 
+	const requestedMethod =
+		req.method === "OPTIONS"
+			? req.headers.get("Access-Control-Request-Method") || ""
+			: req.method;
+
 	const rule = config.CORSRules.find((r) => {
 		const originMatch = matchExactOrWildcard(origin, r.AllowedOrigins);
-		const methodMatch = matchExactOrWildcard(req.method, r.AllowedMethods);
+		const methodMatch = matchExactOrWildcard(
+			requestedMethod,
+			r.AllowedMethods,
+		);
 		return originMatch && methodMatch;
 	});
 
 	if (!rule) return corsHeaders;
 
 	setAllowOrigin(corsHeaders, origin, rule);
+
+	if (req.method === "OPTIONS") {
+		corsHeaders.set(
+			"Access-Control-Allow-Methods",
+			rule.AllowedMethods.join(", "),
+		);
+		const requestedHeaders = req.headers.get(
+			"Access-Control-Request-Headers",
+		);
+		if (requestedHeaders) {
+			corsHeaders.set("Access-Control-Allow-Headers", requestedHeaders);
+		} else if (rule.AllowedHeaders?.length) {
+			corsHeaders.set(
+				"Access-Control-Allow-Headers",
+				rule.AllowedHeaders.join(", "),
+			);
+		}
+		if (rule.MaxAgeSeconds !== undefined) {
+			corsHeaders.set(
+				"Access-Control-Max-Age",
+				String(rule.MaxAgeSeconds),
+			);
+		}
+	}
 
 	if (rule.ExposeHeaders && rule.ExposeHeaders.length > 0) {
 		corsHeaders.set(
