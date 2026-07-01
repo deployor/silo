@@ -31,7 +31,7 @@ services:
       DISK_CACHE_DIR: "/var/cache/silo-dataplane"
     depends_on:
       control-plane:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - dataplane-cache:/var/cache/silo-dataplane
 
