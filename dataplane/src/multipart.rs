@@ -191,10 +191,16 @@ pub(crate) async fn fast_complete_multipart_upload(
             {
                 warn!(error = %error, "failed to clear multipart quota");
             }
-            let final_size =
-                head_existing_size(&state, auth.path_with_query.as_deref().unwrap_or(""))
-                    .await
-                    .unwrap_or(0);
+            let path_without_query = auth
+                .path_with_query
+                .as_deref()
+                .unwrap_or("")
+                .split_once('?')
+                .map(|(path, _)| path)
+                .unwrap_or(auth.path_with_query.as_deref().unwrap_or(""));
+            let final_size = head_existing_size(&state, path_without_query)
+                .await
+                .unwrap_or(0);
             if let Err(error) = commit_bucket_delta(&state, bucket, final_size, existing_size).await
             {
                 warn!(error = %error, "failed to commit multipart bucket size");
