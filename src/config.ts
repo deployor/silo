@@ -18,7 +18,6 @@ const envSchema = z.object({
 	SLACK_SIGNING_SECRET: z.string().min(1, "SLACK_SIGNING_SECRET is required"),
 	SLACK_FILE_UPLOAD_CHANNEL_ID: z.string().optional(),
 	REVOCATION_SECRET: z.string().optional(),
-	DEV_ACCESS_CODE: z.string().optional(),
 	DOMAINS: z.string().optional(),
 	DEEP_FREEZE: z.string().optional(),
 	CF_API_TOKEN: z.string().optional(),
@@ -121,7 +120,6 @@ export const config = {
 		fileUploadChannelId: env.SLACK_FILE_UPLOAD_CHANNEL_ID,
 	},
 	revocationSecret: env.REVOCATION_SECRET,
-	devAccessCode: env.DEV_ACCESS_CODE,
 	customDomainsEnabled: env.DOMAINS === "true",
 	deepFreezeEnabled: env.DEEP_FREEZE === "true",
 	cloudflareForSaas: {

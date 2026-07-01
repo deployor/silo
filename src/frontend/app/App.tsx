@@ -19,7 +19,6 @@ import { OffboardingPage } from "../routes/OffboardingPage";
 import { OnboardingPage } from "../routes/OnboardingPage";
 import { RedeemPage } from "../routes/RedeemPage";
 import { SlackSuccessPage } from "../routes/SlackSuccessPage";
-import { WipPage } from "../routes/WipPage";
 import type { AppBootstrap } from "../shared/types/app";
 
 type Props = { bootstrap: AppBootstrap };
@@ -65,8 +64,6 @@ export function App({ bootstrap }: Props) {
 			return <RedeemPage bootstrap={bootstrap} />;
 		case "slack-success":
 			return <SlackSuccessPage bootstrap={bootstrap} />;
-		case "wip":
-			return <WipPage bootstrap={bootstrap} />;
 		case "onboarding":
 			return <OnboardingPage bootstrap={bootstrap} />;
 		case "locked":

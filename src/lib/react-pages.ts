@@ -18,7 +18,6 @@ export const REACT_PAGE_IDS = [
 	"gallery",
 	"redeem",
 	"slack-success",
-	"wip",
 	"onboarding",
 	"locked",
 	"aged-out",

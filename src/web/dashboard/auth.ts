@@ -95,24 +95,7 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 				.limit(1);
 
 			if (existingUser.length === 0) {
-				const expectedBypass = createHmac("sha256", config.hcAuth.clientSecret)
-					.update("wip_bypass")
-					.digest("hex");
-
-				if (cookies.silo_wip_bypass !== expectedBypass) {
-					const html = await render("wip", {
-						title: "Work In Progress - Silo",
-						layout: "main",
-						hideNavLinks: true,
-						mainClass: "flex items-center justify-center",
-					});
-					return new Response(html, {
-						headers: { "Content-Type": "text/html" },
-					});
-				}
-			}
-
-			await db
+		await db
 				.insert(users)
 				.values({
 					id: userId,
@@ -232,69 +215,6 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 		);
 		headers.set("Location", "/");
 		return new Response(null, { status: 302, headers });
-	}
-
-	if (path === "/auth/wip" && req.method === "POST") {
-		const cookies = parseCookies(req.headers.get("Cookie"));
-
-		const lastAttempt = parseInt(cookies.silo_wip_attempt || "0", 10);
-		const now = Date.now();
-
-		if (now - lastAttempt < 3000) {
-			const html = await render("wip", {
-				title: "Work In Progress - Silo",
-				layout: "main",
-				hideNavLinks: true,
-				mainClass: "flex items-center justify-center",
-				error: "Please wait a few seconds before trying again.",
-			});
-			return new Response(html, {
-				headers: { "Content-Type": "text/html" },
-			});
-		}
-
-		const formData = await req.formData();
-		const code = formData.get("code");
-
-		if (config.devAccessCode && code === config.devAccessCode) {
-			const bypassValue = createHmac("sha256", config.hcAuth.clientSecret)
-				.update("wip_bypass")
-				.digest("hex");
-
-			const headers = new Headers();
-			headers.append(
-				"Set-Cookie",
-				`silo_wip_bypass=${bypassValue}; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Max-Age=31536000`,
-			);
-			headers.append(
-				"Set-Cookie",
-				`silo_wip_attempt=; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Max-Age=0`,
-			);
-			headers.set("Location", "/auth/login");
-			return new Response(null, { status: 302, headers });
-		}
-
-		const headers = new Headers();
-		headers.set(
-			"Set-Cookie",
-			`silo_wip_attempt=${now}; Path=/; HttpOnly; SameSite=Lax${secureFlag()}`,
-		);
-
-		const html = await render("wip", {
-			title: "Work In Progress - Silo",
-			layout: "main",
-			hideNavLinks: true,
-			mainClass: "flex items-center justify-center",
-			error: "Invalid access code. Please try again.",
-		});
-
-		return new Response(html, {
-			status: 401,
-			headers: {
-				"Content-Type": "text/html",
-				...Object.fromEntries(headers.entries()),
-			},
-		});
 	}
 
 	return new Response("Not Found", { status: 404 });
