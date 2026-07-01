@@ -9,7 +9,7 @@ services:
         GIT_MESSAGE: ${GIT_MESSAGE:-unknown}
     restart: unless-stopped
     env_file:
-      - .env
+      - ${SILO_ENV_FILE:-.env}
     environment:
       PORT: "3000"
       DISK_CACHE_DIR: "/var/cache/silo-dataplane"
@@ -23,7 +23,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
-      - .env
+      - ${SILO_ENV_FILE:-.env}
     environment:
       DATAPLANE_BIND: "0.0.0.0:3001"
       CONTROL_PLANE_URL: "http://control-plane:3000"

@@ -47,28 +47,40 @@ let gitDate = env.GIT_COMMIT_DATE;
 let gitMessage: string | undefined;
 let buildDate: string | undefined;
 
-if (!gitSha || !gitDate) {
+function knownGitValue(value: unknown): string | undefined {
+	if (typeof value !== "string") return undefined;
+	const trimmed = value.trim();
+	if (!trimmed || trimmed === "unknown") return undefined;
+	return trimmed;
+}
+
+if (!knownGitValue(gitSha) || !knownGitValue(gitDate)) {
 	// 1. Try file first (production build artifact)
 	try {
 		const gitInfo = JSON.parse(readFileSync("src/git-info.json", "utf-8"));
-		if (!gitSha) gitSha = gitInfo.sha;
-		if (!gitDate) gitDate = gitInfo.date;
-		gitMessage = gitInfo.message;
-		buildDate = gitInfo.buildDate;
+		if (!knownGitValue(gitSha)) gitSha = knownGitValue(gitInfo.sha);
+		if (!knownGitValue(gitDate)) gitDate = knownGitValue(gitInfo.date);
+		gitMessage = knownGitValue(gitInfo.message);
+		buildDate = knownGitValue(gitInfo.buildDate);
 	} catch {
 		// 2. If file fails (local dev), try git command directly
 		try {
-			const shaProc = Bun.spawnSync(["git", "rev-parse", "HEAD"]);
-			if (shaProc.success) gitSha = shaProc.stdout.toString().trim();
+			if (!knownGitValue(gitSha)) {
+				const shaProc = Bun.spawnSync(["git", "rev-parse", "HEAD"]);
+				if (shaProc.success) gitSha = knownGitValue(shaProc.stdout.toString());
+			}
 
-			const dateProc = Bun.spawnSync([
-				"git",
-				"show",
-				"-s",
-				"--format=%cI",
-				"HEAD",
-			]);
-			if (dateProc.success) gitDate = dateProc.stdout.toString().trim();
+			if (!knownGitValue(gitDate)) {
+				const dateProc = Bun.spawnSync([
+					"git",
+					"show",
+					"-s",
+					"--format=%cI",
+					"HEAD",
+				]);
+				if (dateProc.success)
+					gitDate = knownGitValue(dateProc.stdout.toString());
+			}
 
 			const msgProc = Bun.spawnSync([
 				"git",
@@ -77,7 +89,8 @@ if (!gitSha || !gitDate) {
 				"--format=%s",
 				"HEAD",
 			]);
-			if (msgProc.success) gitMessage = msgProc.stdout.toString().trim();
+			if (msgProc.success)
+				gitMessage = knownGitValue(msgProc.stdout.toString());
 		} catch {
 			// ignore
 		}

@@ -47,9 +47,12 @@ at the dataplane service.
 1. Copy `.env.production.example` to `.env.production` and fill in the real
    Postgres, Redis, provider S3, Hack Club Auth, Slack, and
    `DATAPLANE_INTERNAL_SECRET` values.
-2. Deploy with `GIT_SHA=$(git rev-parse HEAD) docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build`.
-3. Set `GIT_DATE` and `GIT_MESSAGE` the same way if you want those values in
-   the dashboard build metadata.
+2. Deploy with `bun run prod:up`.
+
+`bun run prod:up` exports `GIT_SHA`, `GIT_DATE`, and `GIT_MESSAGE` from the
+current checkout before running Docker Compose, so the dashboard build metadata
+shows the exact deployed commit instead of `unknown`. For direct Compose usage,
+export those variables yourself or run `bun run prod:compose <compose args>`.
 
 The dataplane exposes `/health` and owns auth, bucket jail enforcement, quota
 checks, provider streaming, Redis metadata cache, and disk object cache.

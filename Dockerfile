@@ -21,6 +21,9 @@ COPY . .
 ARG GIT_SHA=unknown
 ARG GIT_DATE=unknown
 ARG GIT_MESSAGE=unknown
+ENV GIT_SHA=$GIT_SHA
+ENV GIT_DATE=$GIT_DATE
+ENV GIT_MESSAGE=$GIT_MESSAGE
 RUN bun -e 'const fs = require("node:fs"); const info = { sha: process.env.GIT_SHA || "unknown", date: process.env.GIT_DATE || "unknown", message: process.env.GIT_MESSAGE || "unknown", buildDate: new Date().toISOString() }; fs.writeFileSync("src/git-info.json", JSON.stringify(info));'
 RUN bun run build
 
