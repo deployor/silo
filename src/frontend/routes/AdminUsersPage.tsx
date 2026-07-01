@@ -1023,7 +1023,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</button>
 								</div>
 								<p className="text-xs text-text-muted mt-2">
-									Current Month Usage:{" "}
+									Storage Used:{" "}
 									<span className="text-white font-mono">
 										{formatBytes(selected.storageUsageBytes)}
 									</span>

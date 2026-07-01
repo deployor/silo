@@ -84,7 +84,19 @@ function currentAdmissionThreshold(pressure: number) {
 	return BASE_ADMISSION_HITS;
 }
 
-function readDiskEntries() {
+const STATS_CACHE_TTL_MS =
+	Number.parseInt(process.env.DISK_CACHE_STATS_CACHE_TTL_MS || "", 10) ||
+	30_000;
+
+type DiskEntriesSnapshot = Pick<
+	DiskCacheStats,
+	"entryCount" | "totalSizeBytes" | "topHotObjects"
+>;
+let cachedEntries:
+	| { expiresAt: number; snapshot: DiskEntriesSnapshot }
+	| undefined;
+
+function readDiskEntries(): DiskEntriesSnapshot {
 	let entryCount = 0;
 	let totalSizeBytes = 0;
 	const topHotObjects: DiskCacheStats["topHotObjects"] = [];
@@ -143,7 +155,15 @@ export function isDiskCached(bucket: string, key: string): boolean {
 }
 
 export function getDiskCacheStats(): DiskCacheStats {
-	const { entryCount, totalSizeBytes, topHotObjects } = readDiskEntries();
+	const now = Date.now();
+	const snapshot =
+		cachedEntries && cachedEntries.expiresAt > now
+			? cachedEntries.snapshot
+			: readDiskEntries();
+	if (!cachedEntries || cachedEntries.expiresAt <= now) {
+		cachedEntries = { expiresAt: now + STATS_CACHE_TTL_MS, snapshot };
+	}
+	const { entryCount, totalSizeBytes, topHotObjects } = snapshot;
 	const pressure = MAX_TOTAL_SIZE > 0 ? totalSizeBytes / MAX_TOTAL_SIZE : 0;
 
 	return {

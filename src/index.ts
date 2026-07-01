@@ -125,6 +125,7 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 			if (hasAuthHeader || hasAmzParams) return false;
 			return false;
 		}
+		if (hasAuthHeader || hasAmzParams) return false;
 		return apexPublicDashboardPaths.has(path) || path.startsWith("/assets/");
 	}
 
@@ -246,11 +247,14 @@ const server = Bun.serve({
 						}
 					}
 
-					// Rate Limiting
-					if (url.pathname.startsWith("/api/")) {
-						const limitRes = await apiLimiter(req);
-						if (limitRes) return limitRes;
-					}
+				// Rate Limiting (skip dataplane authorize — internal service traffic)
+				if (
+					url.pathname.startsWith("/api/") &&
+					!url.pathname.startsWith("/api/internal/dataplane/")
+				) {
+					const limitRes = await apiLimiter(req);
+					if (limitRes) return limitRes;
+				}
 					if (url.pathname.startsWith("/auth/")) {
 						const limitRes = await authLimiter(req);
 						if (limitRes) return limitRes;

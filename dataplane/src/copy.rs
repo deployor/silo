@@ -92,6 +92,7 @@ pub(crate) async fn fast_copy_object(
         }
     } else {
         invalidate_object_caches(&state, target_bucket, target_key).await;
+        bump_list_cache(&state, target_bucket).await;
         if let Err(error) =
             commit_bucket_delta(&state, target_bucket, source_size, target_size).await
         {
@@ -202,6 +203,14 @@ async fn cached_existing_size(
         return Ok(size);
     }
     head_existing_size(state, path).await
+}
+
+async fn bump_list_cache(state: &AppState, bucket: &AuthBucket) {
+    let mut conn = state.redis.clone();
+    let _: redis::RedisResult<i64> = redis::cmd("INCR")
+        .arg(format!("s3:listver:{}", bucket.id))
+        .query_async(&mut conn)
+        .await;
 }
 
 async fn commit_bucket_delta(

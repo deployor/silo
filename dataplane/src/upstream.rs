@@ -84,8 +84,12 @@ fn preserve_pct_encoded_segment(segment: &str) -> String {
         }
 
         let ch = segment[i..].chars().next().expect("valid char boundary");
-        for encoded in url::form_urlencoded::byte_serialize(ch.to_string().as_bytes()) {
-            out.push_str(encoded);
+        if ch == ' ' {
+            out.push_str("%20");
+        } else {
+            for encoded in url::form_urlencoded::byte_serialize(ch.to_string().as_bytes()) {
+                out.push_str(encoded);
+            }
         }
         i += ch.len_utf8();
     }
@@ -109,17 +113,11 @@ fn filtered_upstream_headers(headers: &HeaderMap) -> BTreeMap<String, String> {
         "if-unmodified-since",
         "x-amz-tagging",
         "x-amz-storage-class",
-        "x-amz-acl",
         "x-amz-copy-source",
         "x-amz-copy-source-if-match",
         "x-amz-copy-source-if-none-match",
         "x-amz-copy-source-if-modified-since",
         "x-amz-copy-source-if-unmodified-since",
-        "x-amz-grant-read",
-        "x-amz-grant-write",
-        "x-amz-grant-read-acp",
-        "x-amz-grant-write-acp",
-        "x-amz-grant-full-control",
         "x-amz-metadata-directive",
         "x-amz-tagging-directive",
     ];

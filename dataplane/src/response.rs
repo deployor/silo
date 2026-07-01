@@ -76,7 +76,7 @@ pub(crate) fn with_s3_headers(res: Response<Body>, auth: &AuthorizeResponse) -> 
     }
 
     if !headers.contains_key(axum::http::header::CACHE_CONTROL) {
-        let value = if auth.user.is_none() {
+        let value = if auth.user.is_none() && parts.status.is_success() {
             HeaderValue::from_static("public, max-age=3600")
         } else {
             HeaderValue::from_static("private, no-cache")
@@ -109,6 +109,9 @@ fn is_dangerous_content_type(headers: &HeaderMap) -> bool {
         "text/xml",
         "application/xml",
         "text/javascript",
+        "application/javascript",
+        "application/ecmascript",
+        "text/ecmascript",
     ]
     .iter()
     .any(|dangerous| content_type.contains(dangerous))

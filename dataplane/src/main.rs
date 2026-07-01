@@ -652,6 +652,12 @@ async fn fast_put_object(
     } else if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref()) {
         record_ingress(&state, &auth, content_length).await;
         invalidate_object_caches(&state, bucket, key).await;
+        if let Some(user) = &auth.user {
+            let shrink = existing_size.saturating_sub(content_length);
+            if shrink > 0 {
+                let _ = release_storage(&state, &user.id, shrink).await;
+            }
+        }
         if let Err(error) = commit_object_change(
             &state,
             bucket,

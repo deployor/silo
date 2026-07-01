@@ -2,7 +2,10 @@ use std::{
     collections::{BTreeMap, HashMap},
     env, fs, io,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -36,6 +39,8 @@ const DEMAND_DECAY_INTERVAL: Duration = Duration::from_secs(600);
 const EVICTION_LOW_WATERMARK: f64 = 0.70;
 const MAX_DEMAND_ENTRIES: usize = 50_000;
 const DISK_READ_BUFFER_BYTES: usize = 256 * 1024;
+
+static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone)]
 pub(crate) struct DiskCache {
@@ -314,8 +319,14 @@ impl DiskCache {
         let hash = hash_key(&bucket.id, key);
         let blob_path = self.blob_path(&hash);
         let meta_path = self.meta_path(&hash);
-        let tmp_blob = blob_path.with_extension(format!("blob.tmp.{}", now_ms()));
-        let tmp_meta = meta_path.with_extension(format!("meta.tmp.{}", now_ms()));
+        let tmp_suffix = format!(
+            "{}.{}.{}",
+            std::process::id(),
+            now_ms(),
+            TMP_COUNTER.fetch_add(1, Ordering::Relaxed),
+        );
+        let tmp_blob = blob_path.with_extension(format!("blob.tmp.{tmp_suffix}"));
+        let tmp_meta = meta_path.with_extension(format!("meta.tmp.{tmp_suffix}"));
         ensure_parent_dir(&blob_path).await?;
 
         let (tx, rx) = mpsc::channel::<Result<Bytes, io::Error>>(32);
