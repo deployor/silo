@@ -88,76 +88,75 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 			const userId = userData.sub;
 			const slackId = userData.slack_id;
 
-			const existingUser = await db
-				.select()
-				.from(users)
-				.where(eq(users.id, userId))
-				.limit(1);
+		const existingUser = await db
+			.select()
+			.from(users)
+			.where(eq(users.id, userId))
+			.limit(1);
 
-			if (existingUser.length === 0) {
 		await db
-				.insert(users)
-				.values({
-					id: userId,
+			.insert(users)
+			.values({
+				id: userId,
+				email: userData.email,
+				slackId: slackId,
+			})
+			.onConflictDoUpdate({
+				target: users.id,
+				set: {
 					email: userData.email,
 					slackId: slackId,
-				})
-				.onConflictDoUpdate({
-					target: users.id,
-					set: {
-						email: userData.email,
-						slackId: slackId,
-					},
-				});
-
-			const sessionId = randomUUID();
-			const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days
-
-			await db.insert(sessions).values({
-				id: sessionId,
-				userId: userId,
-				expiresAt: expiresAt,
-				accessToken: tokenData.access_token,
-				refreshToken: tokenData.refresh_token,
-				tokenExpiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
-				scope: tokenData.scope,
-				userAgent: req.headers.get("user-agent"),
-				ipAddress:
-					req.headers.get("x-forwarded-for") ||
-					req.headers.get("cf-connecting-ip") ||
-					null,
+				},
 			});
 
-			const headers = new Headers();
-			headers.append(
-				"Set-Cookie",
-				`silo_session=${sessionId}; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Expires=${expiresAt.toUTCString()}`,
-			);
-			headers.append(
-				"Set-Cookie",
-				`silo_oauth_state=; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Max-Age=0`,
-			);
+		const sessionId = randomUUID();
+	const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days
 
-			if (source === "slack") {
-				const { getAppSettings } = await import(
-					"../../services/settings-service"
-				);
-				const { formatBytes } = await import("../../lib/format");
-				const settings = await getAppSettings();
-				headers.set("Content-Type", "text/html");
-				const html = await render("slack-success", {
-					title: "Silo - Account Linked",
-					layout: "blank",
-					defaultStorageLimitHuman: formatBytes(
-						settings.defaultStorageLimitBytes,
-					),
-				});
-				return new Response(html, { headers });
-			}
+	await db.insert(sessions).values({
+		id: sessionId,
+		userId: userId,
+		expiresAt: expiresAt,
+		accessToken: tokenData.access_token,
+		refreshToken: tokenData.refresh_token,
+		tokenExpiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
+		scope: tokenData.scope,
+		userAgent: req.headers.get("user-agent"),
+		ipAddress:
+			req.headers.get("x-forwarded-for") ||
+			req.headers.get("cf-connecting-ip") ||
+			null,
+	});
 
-			headers.set("Location", "/");
+	const headers = new Headers();
+	headers.append(
+		"Set-Cookie",
+		`silo_session=${sessionId}; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Expires=${expiresAt.toUTCString()}`,
+	);
+	headers.append(
+		"Set-Cookie",
+		`silo_oauth_state=; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Max-Age=0`,
+	);
 
-			return new Response(null, { status: 302, headers });
+	if (source === "slack") {
+		const { getAppSettings } = await import(
+			"../../services/settings-service"
+		);
+		const { formatBytes } = await import("../../lib/format");
+		const settings = await getAppSettings();
+		headers.set("Content-Type", "text/html");
+		const html = await render("slack-success", {
+			title: "Silo - Account Linked",
+			layout: "blank",
+			defaultStorageLimitHuman: formatBytes(
+				settings.defaultStorageLimitBytes,
+			),
+		});
+		return new Response(html, { headers });
+	}
+
+	headers.set("Location", "/");
+
+	return new Response(null, { status: 302, headers });
 		} catch (e) {
 			console.error("Auth Error:", e);
 			return new Response("Authentication Failed", { status: 500 });
