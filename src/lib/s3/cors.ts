@@ -92,7 +92,17 @@ export function getCorsHeaders(
 			"Access-Control-Request-Headers",
 		);
 		if (requestedHeaders) {
-			corsHeaders.set("Access-Control-Allow-Headers", requestedHeaders);
+			const lowerRequested = requestedHeaders
+				.toLowerCase()
+				.split(",")
+				.map((h) => h.trim());
+			if (
+				rule.AllowedHeaders?.some(
+					(h) => h === "*" || lowerRequested.every((rh) => h.toLowerCase() === rh),
+				)
+			) {
+				corsHeaders.set("Access-Control-Allow-Headers", requestedHeaders);
+			}
 		} else if (rule.AllowedHeaders?.length) {
 			corsHeaders.set(
 				"Access-Control-Allow-Headers",

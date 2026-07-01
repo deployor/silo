@@ -133,7 +133,9 @@ export async function handleDataplaneAuthorize(
 	if (
 		mode === "public" &&
 		![
+			S3Action.GetBucketLocation,
 			S3Action.GetObject,
+			S3Action.HeadBucket,
 			S3Action.HeadObject,
 			S3Action.ListObjectsV2,
 			S3Action.Options,
