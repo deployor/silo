@@ -149,9 +149,9 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 
 try {
 	await migrate(db, { migrationsFolder: "./drizzle" });
-	console.log("[migrate] migrations applied successfully");
+	console.log("[migrate] ok");
 } catch (err) {
-	console.error("[migrate] migration error (continuing):", err);
+	console.error("[migrate] continuing:", err);
 }
 
 const server = Bun.serve({
