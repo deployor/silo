@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { config } from "./config";
 import { db } from "./db";
 import { handleSlackRequest } from "./integrations/slack";
@@ -145,6 +146,8 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 
 	return false;
 }
+
+await migrate(db, { migrationsFolder: "./drizzle" });
 
 const server = Bun.serve({
 	port: process.env.PORT || 3000,
