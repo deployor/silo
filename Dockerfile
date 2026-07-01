@@ -8,11 +8,11 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /temp/dev
 COPY package.json bun.lock /temp/dev/
-RUN cd /temp/dev && bun install --frozen-lockfile && bun pm trust @mongodb-js/zstd
+RUN cd /temp/dev && bun install --frozen-lockfile && bun pm trust @mongodb-js/zstd || true
 
 RUN mkdir -p /temp/prod
 COPY package.json bun.lock /temp/prod/
-RUN cd /temp/prod && bun install --frozen-lockfile --production && bun pm trust @mongodb-js/zstd
+RUN cd /temp/prod && bun install --frozen-lockfile --production && bun pm trust @mongodb-js/zstd || true
 
 FROM base AS prerelease
 COPY --from=install /temp/dev/node_modules node_modules
@@ -30,8 +30,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 COPY --from=install /temp/prod/node_modules node_modules
 COPY --from=prerelease /usr/src/app/src src
+COPY --from=prerelease /usr/src/app/drizzle drizzle
 COPY --from=prerelease /usr/src/app/package.json .
-COPY --from=prerelease /usr/src/app/drizzle.config.ts .
 ENV DISK_CACHE_DIR=/tmp/s3-disk-cache
 
 USER bun
