@@ -147,7 +147,12 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 	return false;
 }
 
-await migrate(db, { migrationsFolder: "./drizzle" });
+try {
+	await migrate(db, { migrationsFolder: "./drizzle" });
+	console.log("[migrate] migrations applied successfully");
+} catch (err) {
+	console.error("[migrate] migration error (continuing):", err);
+}
 
 const server = Bun.serve({
 	port: process.env.PORT || 3000,
