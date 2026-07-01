@@ -8,13 +8,12 @@ use axum::{
 use tracing::warn;
 
 use crate::{
-    quota::reserve_egress, response::s3_error, stats::record_egress, AppState, AuthBucket,
-    AuthorizeResponse,
+    AppState, AuthBucket, AuthorizeResponse,
 };
 
 pub(crate) async fn try_redis_object_cache(
     state: &AppState,
-    auth: &AuthorizeResponse,
+    _auth: &AuthorizeResponse,
     headers: &HeaderMap,
     bucket: &AuthBucket,
     key: &str,
@@ -65,16 +64,6 @@ pub(crate) async fn try_redis_object_cache(
             ));
         };
         let bytes_to_send = range.end - range.start + 1;
-        if let Some(user) = &auth.user {
-            if reserve_egress(state, user, bytes_to_send).await.is_err() {
-                return Ok(Some(s3_error(
-                    StatusCode::FORBIDDEN,
-                    "QuotaExceeded",
-                    "You have exceeded your egress quota.",
-                )));
-            }
-        }
-        record_egress(state, auth, bytes_to_send).await;
 
         let sliced = body[range.start as usize..=range.end as usize].to_vec();
         let mut builder = Response::builder()
@@ -93,20 +82,6 @@ pub(crate) async fn try_redis_object_cache(
         }
         return Ok(Some(builder.body(Body::from(sliced))?));
     }
-
-    if let Some(user) = &auth.user {
-        if reserve_egress(state, user, body.len() as u64)
-            .await
-            .is_err()
-        {
-            return Ok(Some(s3_error(
-                StatusCode::FORBIDDEN,
-                "QuotaExceeded",
-                "You have exceeded your egress quota.",
-            )));
-        }
-    }
-    record_egress(state, auth, body.len() as u64).await;
 
     let mut builder = Response::builder().status(StatusCode::OK);
     for (key, value) in meta_headers {
