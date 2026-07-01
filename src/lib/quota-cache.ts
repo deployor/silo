@@ -237,6 +237,8 @@ export async function consumeEgressQuota(
 			String(seed),
 		)) as [number, number];
 
+		redis.expire(EGRESS_KEY(user.id), 90 * 24 * 60 * 60).catch(() => {});
+
 		return Number(result?.[0]) === 1;
 	} catch (error) {
 		console.error("[quota] egress reservation failed (fail-closed)", error);

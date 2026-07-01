@@ -151,8 +151,6 @@ fn rewrite_list_xml_prefixes(xml: &str, root_prefix: &str) -> String {
         "Marker",
         "NextMarker",
         "StartAfter",
-        "ContinuationToken",
-        "NextContinuationToken",
         "Key",
     ] {
         rewritten = strip_prefix_from_xml_tag(&rewritten, tag, root_prefix);
