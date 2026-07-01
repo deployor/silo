@@ -291,18 +291,55 @@ fn ensure_no_traversal(value: &str) -> Result<()> {
     if lower.contains("%2e%2e") || lower.contains("%2e.") || lower.contains(".%2e") {
         return Err(anyhow!("path traversal denied"));
     }
-    let decoded = percent_decode(value);
+    let decoded = decode_repeated(value, 3);
     if decoded.split('/').any(|part| part == "..") {
         return Err(anyhow!("path traversal denied"));
     }
     Ok(())
 }
 
-fn percent_decode(value: &str) -> String {
-    url::form_urlencoded::parse(value.as_bytes())
-        .next()
-        .map(|(value, _)| value.into_owned())
-        .unwrap_or_else(|| value.to_string())
+fn decode_repeated(value: &str, rounds: usize) -> String {
+    let mut out = value.to_string();
+    for _ in 0..rounds {
+        match percent_decode(&out) {
+            Some(decoded) => out = decoded,
+            None => break,
+        }
+    }
+    out
+}
+
+fn percent_decode(value: &str) -> Option<String> {
+    let bytes = value.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut changed = false;
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let (Some(high), Some(low)) = (hex_value(bytes[i + 1]), hex_value(bytes[i + 2])) {
+                out.push((high << 4) | low);
+                i += 3;
+                changed = true;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    if changed {
+        String::from_utf8(out).ok()
+    } else {
+        Some(value.to_string())
+    }
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
 }
 
 fn xml_escape(input: &str) -> String {

@@ -76,8 +76,9 @@ export async function handleDataplaneAuthorize(
 		return errorResponse("Invalid dataplane authorization request", 400);
 	}
 
+	const method = body.method.toUpperCase();
 	const s3Req = new Request(body.url, {
-		method: body.method,
+		method,
 		headers: normalizeHeaders(body.headers),
 	});
 	const url = new URL(s3Req.url);
@@ -108,7 +109,7 @@ export async function handleDataplaneAuthorize(
 	}
 
 	const action = determineAction(
-		body.method,
+		method,
 		key,
 		url.searchParams,
 		s3Req.headers,
@@ -135,6 +136,7 @@ export async function handleDataplaneAuthorize(
 			S3Action.GetObject,
 			S3Action.HeadObject,
 			S3Action.ListObjectsV2,
+			S3Action.Options,
 		].includes(action)
 	) {
 		return jsonResponse({
@@ -179,21 +181,21 @@ export async function handleDataplaneAuthorize(
 		});
 	}
 
-		const internalPath = getInternalPath(key, user, bucket);
-		const rootPrefix = getInternalPath("", user, bucket);
-		const cleanUrl = stripAuthQueryParams(url);
-		const queryStr = cleanUrl.searchParams.toString();
-		const pathWithQuery = queryStr ? `${internalPath}?${queryStr}` : internalPath;
+	const internalPath = getInternalPath(key, user, bucket);
+	const rootPrefix = getInternalPath("", user, bucket);
+	const cleanUrl = stripAuthQueryParams(url);
+	const queryStr = cleanUrl.searchParams.toString();
+	const pathWithQuery = queryStr ? `${internalPath}?${queryStr}` : internalPath;
 
 	return jsonResponse({
 		allowed: true,
 		fastPath: true,
 		action,
 		mode,
-			key,
-			internalPath,
-			rootPrefix,
-			pathWithQuery,
+		key,
+		internalPath,
+		rootPrefix,
+		pathWithQuery,
 		corsHeaders: Object.fromEntries(getCorsHeaders(s3Req, bucket).entries()),
 		partNumber: url.searchParams.get("partNumber"),
 		uploadId: url.searchParams.get("uploadId"),
