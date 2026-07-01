@@ -1,7 +1,7 @@
 import { and, eq, lte } from "drizzle-orm";
-import { deleteBucketContents, getInternalPath } from "../src/core/s3/utils";
 import { db } from "../src/db";
 import { bucketKeys, buckets, users } from "../src/db/schema";
+import { deleteBucketContents, getInternalPath } from "../src/lib/s3/paths";
 
 async function processAgedUsers() {
 	console.log("Starting aged user processing...");

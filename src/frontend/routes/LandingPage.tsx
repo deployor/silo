@@ -23,10 +23,13 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					</h1>
 					<h2 className="sr-only">Free S3 Compatible Object Storage</h2>
 					<p className="text-xl md:text-3xl text-text-muted mb-10 max-w-3xl mx-auto font-light leading-tight md:leading-tight">
-						Free S3 storage for teens.
+						Free S3 storage for Hack Clubbers.
 						<br />
 						<span className="text-white font-normal">
-							Get buckets for free and use them from other programs.
+							Every Hack Clubber gets 5GB for free.
+						</span>
+						<span className="mt-3 block text-sm md:text-base text-text-muted">
+							Need more? Get more storage with no limit from programs.
 						</span>
 					</p>
 
@@ -51,26 +54,6 @@ export function LandingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						>
 							GitHub
 						</a>
-					</div>
-
-					<div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-4 text-left max-w-4xl mx-auto">
-						<div className="silo-stat-card p-5">
-							<h3 className="font-mono text-hc-red mb-2">01 / COMPATIBLE</h3>
-							<p className="text-sm text-text-muted">
-								Full S3 API compatibility. Use the AWS SDK, Rclone, or any
-								S3-compatible thing.
-							</p>
-						</div>
-						<div className="silo-stat-card p-5">
-							<h3 className="font-mono text-hc-red mb-2">02 / FAST</h3>
-							<p className="text-sm text-text-muted">Built on Cloudflare R2.</p>
-						</div>
-						<div className="silo-stat-card p-5">
-							<h3 className="font-mono text-hc-red mb-2">03 / FREE</h3>
-							<p className="text-sm text-text-muted">
-								Start with free object storage and keep your projects portable.
-							</p>
-						</div>
 					</div>
 				</div>
 			</div>
