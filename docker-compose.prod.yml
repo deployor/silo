@@ -13,13 +13,8 @@ services:
         required: false
     environment:
       PORT: "3000"
-    expose:
-      - "3000"
     volumes:
       - dataplane-cache:/var/cache/silo-dataplane:ro
-    ports:
-      # Point dashboard.${S3_DOMAIN} at this service in production.
-      - "3000:3000"
 
   dataplane:
     build:
@@ -39,11 +34,6 @@ services:
         condition: service_healthy
     volumes:
       - dataplane-cache:/var/cache/silo-dataplane
-    expose:
-      - "3001"
-    ports:
-      # Point ${S3_DOMAIN} at this service in production.
-      - "3001:3001"
 
 volumes:
   dataplane-cache:
