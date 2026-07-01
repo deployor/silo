@@ -1,2 +1,2 @@
 ALTER TABLE "bucket_keys"
-ADD COLUMN "note" text;
+ADD COLUMN IF NOT EXISTS "note" text;

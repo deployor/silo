@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS "sessions" (
 	"scope" text
 );
 --> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "onboarded" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "onboarded" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 DO $$ BEGIN
  ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE cascade ON UPDATE no action;
 EXCEPTION

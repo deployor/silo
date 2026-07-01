@@ -14,11 +14,11 @@ CREATE TABLE IF NOT EXISTS "request_logs" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "bucket_keys" ADD COLUMN "is_paused" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "bucket_keys" ADD COLUMN "pause_reason" text;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "slack_id" text;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "is_admin" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-ALTER TABLE "users" ADD COLUMN "is_locked" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "bucket_keys" ADD COLUMN IF NOT EXISTS "is_paused" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "bucket_keys" ADD COLUMN IF NOT EXISTS "pause_reason" text;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "slack_id" text;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_admin" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_locked" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "log_owner_idx" ON "request_logs" ("owner_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "log_bucket_idx" ON "request_logs" ("bucket_id");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "log_created_at_idx" ON "request_logs" ("created_at");--> statement-breakpoint

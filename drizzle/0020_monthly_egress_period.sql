@@ -1,4 +1,4 @@
-ALTER TABLE "users" ADD COLUMN "egress_period" text;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "egress_period" text;
 
 UPDATE "users"
 SET
