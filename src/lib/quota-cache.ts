@@ -10,10 +10,13 @@ type QuotaUser = {
 	isImmortal: boolean;
 	storageLimitBytes: number | null;
 	egressLimitBytes: number | null;
+	egressPeriod?: string | null;
 };
 
 const STORAGE_KEY = (userId: string) => `quota:storage:${userId}`;
-const EGRESS_KEY = (userId: string) => `quota:egress:${userId}`;
+const currentEgressPeriod = () => new Date().toISOString().slice(0, 7);
+const EGRESS_KEY = (userId: string) =>
+	`quota:egress:${userId}:${currentEgressPeriod()}`;
 const MPU_KEY = (userId: string, bucketId: string, uploadId: string) =>
 	`quota:mpu:${userId}:${bucketId}:${uploadId}`;
 const MPU_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -212,6 +215,10 @@ export async function consumeEgressQuota(
 
 	const egressLimit = computeEgressLimitBytes(user);
 	if (egressLimit === null) return true;
+	const seed =
+		user.egressPeriod === currentEgressPeriod()
+			? Math.max(0, Math.floor(currentEgressBytes))
+			: 0;
 
 	try {
 		const result = (await (
@@ -227,7 +234,7 @@ export async function consumeEgressQuota(
 			EGRESS_KEY(user.id),
 			String(Math.floor(bytesToAdd)),
 			String(Math.floor(egressLimit)),
-			String(Math.max(0, Math.floor(currentEgressBytes))),
+			String(seed),
 		)) as [number, number];
 
 		return Number(result?.[0]) === 1;

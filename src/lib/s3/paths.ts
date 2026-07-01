@@ -1,12 +1,8 @@
 import { createHash } from "node:crypto";
-import { eq } from "drizzle-orm";
 import { config } from "../../config";
-import { db } from "../../db";
-import { buckets, type users } from "../../db/schema";
-import { diskCacheInvalidate } from "../../lib/disk-cache";
-import { redis } from "../../lib/redis";
-import { s3Client } from "../../lib/s3-client";
-import { createS3XmlParser } from "../../lib/s3-xml";
+import type { buckets, users } from "../../db/schema";
+import { s3Client } from "../s3-client";
+import { createS3XmlParser } from "../s3-xml";
 
 const PATH_TRAVERSAL_ERROR = "Invalid Key: Path traversal detected";
 const USER_ID_SAFE_CHARS = /[^a-zA-Z0-9-]/g;
@@ -27,76 +23,9 @@ const AUTH_QUERY_PARAMS = [
 	"X-Amz-Expires",
 	"x-amz-expires",
 ] as const;
-const UPSTREAM_HEADER_ALLOWLIST = new Set([
-	"content-type",
-	"content-length",
-	"content-md5",
-	"cache-control",
-	"content-disposition",
-	"content-encoding",
-	"content-language",
-	"expires",
-	"range",
-	"if-match",
-	"if-none-match",
-	"if-modified-since",
-	"if-unmodified-since",
-	"x-amz-tagging",
-	"x-amz-storage-class",
-	"x-amz-acl",
-	"x-amz-grant-read",
-	"x-amz-grant-write",
-	"x-amz-grant-read-acp",
-	"x-amz-grant-write-acp",
-	"x-amz-grant-full-control",
-]);
-
 const listDeleteParser = createS3XmlParser({
 	isArray: (name: string) => name === "Contents",
 });
-
-export function getObjectCacheKeys(bucketId: string, key: string) {
-	return {
-		body: `s3:body:${bucketId}:${key}`,
-		meta: `s3:meta:${bucketId}:${key}`,
-	};
-}
-
-export function getListCacheVersionKey(bucketId: string) {
-	return `s3:listver:${bucketId}`;
-}
-
-export async function getListCacheVersion(bucketId: string) {
-	try {
-		return (await redis.get(getListCacheVersionKey(bucketId))) || "0";
-	} catch (error) {
-		console.error("Failed to read list cache version:", error);
-		return "0";
-	}
-}
-
-export function bumpListCacheVersion(bucketId: string) {
-	return redis.incr(getListCacheVersionKey(bucketId)).catch((error) => {
-		console.error("Failed to bump list cache version:", error);
-	});
-}
-
-export function invalidateObjectCaches(
-	bucketId: string,
-	_bucketName: string,
-	key: string,
-) {
-	const cacheKeys = getObjectCacheKeys(bucketId, key);
-	redis
-		.pipeline()
-		.del(cacheKeys.body, cacheKeys.meta)
-		.incr(getListCacheVersionKey(bucketId))
-		.exec()
-		.catch((error) => {
-			console.error("Failed to invalidate object cache:", error);
-		});
-	diskCacheInvalidate(bucketId, key);
-}
 
 function decodeRepeated(input: string, rounds: number) {
 	let out = input;
@@ -186,21 +115,6 @@ export function stripAuthQueryParams(url: URL): URL {
 	return newUrl;
 }
 
-export function filterUpstreamHeaders(reqHeaders: Headers): Headers {
-	const upstreamHeaders = new Headers();
-	reqHeaders.forEach((value, key) => {
-		const lowerKey = key.toLowerCase();
-		if (
-			UPSTREAM_HEADER_ALLOWLIST.has(lowerKey) ||
-			lowerKey.startsWith("x-amz-meta-")
-		) {
-			upstreamHeaders.set(key, value);
-		}
-	});
-
-	return upstreamHeaders;
-}
-
 export function isReservedBucketName(name: string): boolean {
 	return RESERVED_BUCKET_NAME.test(name);
 }
@@ -253,66 +167,4 @@ export async function deleteBucketContents(prefix: string) {
 
 		continuationToken = result.NextContinuationToken;
 	} while (continuationToken);
-}
-
-export async function rewriteCopySourceHeader(
-	_req: Request,
-	headerValue: string,
-	currentUser: typeof users.$inferSelect,
-	targetBucket: typeof buckets.$inferSelect,
-): Promise<string | null> {
-	// Used for auth: when copying across buckets, only allow copying from public buckets
-	// (unless you own the bucket). We'll use the current user's id later in the function.
-	const requesterId = currentUser.id;
-
-	const clean = headerValue.startsWith("/")
-		? headerValue.slice(1)
-		: headerValue;
-
-	const firstSlash = clean.indexOf("/");
-	if (firstSlash === -1) return null;
-
-	const bucketName = clean.slice(0, firstSlash);
-	const key = clean.slice(firstSlash + 1);
-
-	let sourceBucket: typeof buckets.$inferSelect;
-
-	if (bucketName === targetBucket.name) {
-		sourceBucket = targetBucket;
-	} else {
-		const bucketResult = await db
-			.select()
-			.from(buckets)
-			.where(eq(buckets.name, bucketName))
-			.limit(1);
-		if (bucketResult.length === 0) return null;
-		sourceBucket = bucketResult[0];
-	}
-
-	// Security Check:
-	// 1. Same bucket (Self-Copy) -> Allowed
-	// 2. Different bucket -> Allowed only if:
-	//    - source bucket is public, OR
-	//    - requester owns the source bucket
-	if (sourceBucket.id !== targetBucket.id) {
-		const requesterOwnsSourceBucket = sourceBucket.userId === requesterId;
-		if (!sourceBucket.isPublic && !requesterOwnsSourceBucket) {
-			return null;
-		}
-	}
-
-	let internalPath: string;
-
-	if (sourceBucket.isSystem && !sourceBucket.userId) {
-		internalPath = `system/${sourceBucket.name}/${key}`;
-	} else {
-		if (!sourceBucket.userId) return null;
-		const sanitizedUserId = sourceBucket.userId.replace(
-			USER_ID_SAFE_CHARS,
-			"_",
-		);
-		internalPath = `users/${sanitizedUserId}/${sourceBucket.name}/${key}`;
-	}
-
-	return `/${config.s3.bucket}/${internalPath}`;
 }

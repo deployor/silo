@@ -1,10 +1,7 @@
 import { createHmac } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { config } from "../../../config";
-import { getCorsHeaders } from "../../../core/s3/cors";
-import { handleGetRequest } from "../../../core/s3/get";
-import { handlePutRequest } from "../../../core/s3/put";
-import { getInternalPath } from "../../../core/s3/utils";
+import { getInternalPath } from "../../../lib/s3/paths";
 import { db } from "../../../db";
 import { buckets, objectStats, type users } from "../../../db/schema";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
@@ -42,6 +39,23 @@ type FolderItem = {
 	name: string;
 	type: "folder";
 	parentPrefix: string;
+};
+
+type S3ListContent = {
+	Key: string;
+	Size?: number;
+	LastModified?: string;
+};
+
+type S3CommonPrefix = {
+	Prefix: string;
+};
+
+type S3ListBucketResult = {
+	Contents?: S3ListContent | S3ListContent[];
+	CommonPrefixes?: S3CommonPrefix | S3CommonPrefix[];
+	NextContinuationToken?: string;
+	IsTruncated?: boolean;
 };
 
 type DirectoryTotals = {
@@ -248,7 +262,8 @@ async function listDirectoryPage(params: {
 	}
 
 	const xml = await s3Res.text();
-	const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
+	const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(xml)
+		.ListBucketResult;
 
 	const contents = result.Contents
 		? Array.isArray(result.Contents)
@@ -321,7 +336,8 @@ async function countDirectoryTotals(params: {
 		}
 
 		const xml = await s3Res.text();
-		const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
+		const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(xml)
+			.ListBucketResult;
 		const contents = result.Contents
 			? Array.isArray(result.Contents)
 				? result.Contents
@@ -400,7 +416,8 @@ async function searchFiles(params: {
 		}
 
 		const xml = await s3Res.text();
-		const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
+		const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(xml)
+			.ListBucketResult;
 		const contents = result.Contents
 			? Array.isArray(result.Contents)
 				? result.Contents
@@ -485,7 +502,9 @@ async function deletePrefixObjects(params: {
 			}
 
 			const xml = await listRes.text();
-			const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
+			const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
+				xml,
+			).ListBucketResult;
 			const contents = result.Contents
 				? Array.isArray(result.Contents)
 					? result.Contents
@@ -786,17 +805,24 @@ export async function handleFiles(req: Request): Promise<Response> {
 		);
 
 		try {
-			const corsHeaders = getCorsHeaders(req, bucketData.bucket);
-			const response = await handleGetRequest(
-				req,
-				bucketData.owner,
-				bucketData.bucket,
-				safeKey,
-				internalKey,
-				url,
-				corsHeaders,
-				{ consumeQuota: false },
-			);
+			const response = await s3Client.fetch(internalKey, {
+				method: "GET",
+				headers: {
+					...(req.headers.get("range")
+						? { range: req.headers.get("range") as string }
+						: {}),
+					...(req.headers.get("if-none-match")
+						? { "if-none-match": req.headers.get("if-none-match") as string }
+						: {}),
+					...(req.headers.get("if-modified-since")
+						? {
+								"if-modified-since": req.headers.get(
+									"if-modified-since",
+								) as string,
+							}
+						: {}),
+				},
+			});
 
 			if (!response.ok) {
 				if (response.status === 404)
@@ -1143,8 +1169,23 @@ export async function handleFiles(req: Request): Promise<Response> {
 						bucketData.owner,
 						bucketData.bucket,
 					);
-					const uploadReq = new Request(
-						`https://${config.s3Domain}/${bucketName}/${destinationKey}`,
+					const before = await s3Client.fetch(internalKey, { method: "HEAD" });
+					const existingSize = before.ok
+						? Number(before.headers.get("content-length") || 0)
+						: 0;
+					const delta = Math.max(0, size - existingSize);
+					const limit = bucketData.owner.storageLimitBytes;
+					if (
+						!bucketData.owner.isImmortal &&
+						limit !== null &&
+						BigInt(bucketData.owner.storageUsageBytes) + BigInt(delta) >
+							BigInt(limit)
+					) {
+						return errorResponse("Storage quota exceeded", 403);
+					}
+
+					const uploadRes = await s3Client.fetch(
+						internalKey,
 						{
 							method: "PUT",
 							headers: {
@@ -1154,14 +1195,6 @@ export async function handleFiles(req: Request): Promise<Response> {
 							body: file.stream(),
 							duplex: "half",
 						} as RequestInit,
-					);
-					const uploadRes = await handlePutRequest(
-						uploadReq,
-						bucketData.owner,
-						bucketData.bucket,
-						destinationKey,
-						internalKey,
-						new URL(uploadReq.url),
 					);
 
 					if (!uploadRes.ok) {
@@ -1176,6 +1209,10 @@ export async function handleFiles(req: Request): Promise<Response> {
 						.update(buckets)
 						.set({
 							totalRequests: sql`${buckets.totalRequests} + 1`,
+							totalBytes:
+								size >= existingSize
+									? sql`${buckets.totalBytes} + ${size - existingSize}`
+									: sql`GREATEST(0, ${buckets.totalBytes} - ${existingSize - size})`,
 						})
 						.where(eq(buckets.id, bucketData.bucket.id));
 

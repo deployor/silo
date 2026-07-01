@@ -20,7 +20,6 @@ import {
 } from "react-icons/md";
 import { AppShell } from "../components/AppShell";
 import { Modal } from "../components/ui/Modal";
-import { PhIcon } from "../components/ui/PhIcon";
 import { fetchJson, fetchText } from "../shared/api/http";
 import type { AppBootstrap, FrontendUser } from "../shared/types/app";
 import { formatBytes } from "../shared/utils/format";
@@ -1293,7 +1292,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 				<div className="bg-hc-dark rounded-3xl p-6 border border-white/10 card-shadow">
 					<h3 className="text-text-muted text-sm font-bold uppercase tracking-wider mb-2">
-						Total Traffic
+						Traffic
 					</h3>
 					<div className="flex justify-between text-sm">
 						<span className="text-emerald-400">Ingress (In)</span>
@@ -1302,7 +1301,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</span>
 					</div>
 					<div className="flex justify-between text-sm mt-2">
-						<span className="text-hc-red">Egress (Out)</span>
+						<span className="text-hc-red">Egress This Month</span>
 						<span className="text-white">
 							{formatBytes(stats?.user.egressBytes || 0)}
 						</span>

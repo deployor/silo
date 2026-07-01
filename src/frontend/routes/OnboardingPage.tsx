@@ -33,8 +33,8 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						{step === 1 && (
 						<Panel
 							icon="ph-hand-waving text-hc-red"
-							title="Welcome to Cargo!"
-							content="Cargo is Hack Club's S3 gateway for bucket storage and file serving."
+							title="Welcome to Silo!"
+							content="Silo is Hack Club's new S3 provider."
 							right={
 									<button
 										type="button"
@@ -52,7 +52,6 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<Panel
 								icon="ph-rocket-launch text-red-500"
 								title="Free Storage."
-								subtitle="For Projects That Need Buckets."
 								content={
 									<>
 										Use Silo when your project needs S3-compatible storage
@@ -62,36 +61,6 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											Create buckets, generate keys, and start uploading.
 										</span>
 									</>
-								}
-								extra={
-									<div className="bg-white/5 rounded-xl p-6 mb-12 max-w-2xl mx-auto border border-white/10 flex flex-col gap-4 text-left">
-										<div className="flex items-start gap-4">
-											<div className="bg-red-500/20 p-2 rounded-lg">
-												<PhIcon className="ph-bold ph-check text-hc-red text-xl" />
-											</div>
-											<div>
-												<h3 className="text-white font-bold text-lg">
-													You get storage
-												</h3>
-												<p className="text-text-muted">
-													Your account starts with free object storage.
-												</p>
-											</div>
-										</div>
-										<div className="flex items-start gap-4">
-											<div className="bg-red-500/20 p-2 rounded-lg">
-												<PhIcon className="ph-bold ph-hard-drives text-red-500 text-xl" />
-											</div>
-											<div>
-												<h3 className="text-white font-bold text-lg">
-													You stay portable
-												</h3>
-												<p className="text-text-muted">
-													Use standard S3 tools and move your data elsewhere any time.
-												</p>
-											</div>
-										</div>
-									</div>
 								}
 								left={
 									<button
@@ -122,7 +91,7 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								title="We Log Requests"
 								content={
 									<>
-										To keep Cargo safe and fast, we log all requests (User
+										To keep Silo safe and fast, we log all requests (User
 										Agent, Path etc).
 										<br />
 										<br />

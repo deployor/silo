@@ -12,9 +12,9 @@
 
 ## What is this?
 
-Silo is a high-performance S3 gateway that provides free object storage for Hack Club members. It proxies requests to a unified backend while managing authentication, quotas, and permissions, giving you a standard S3 API experience without the complexity or cost of enterprise cloud providers.
+Silo is a high-performance S3-compatible object storage service for Hack Club members. The Rust data plane owns S3 authentication, quota enforcement, caching, and object transfer against the backing provider; the Bun app owns the dashboard, account management, and internal control-plane APIs.
 
-This repository contains the source code for the Silo gateway, dashboard, and API.
+This repository contains the Silo Rust data plane, dashboard, and control-plane API.
 
 ## Documentation
 
@@ -33,6 +33,26 @@ For full documentation on how to use Silo, including SDK examples, configuration
 - Start local development (backend + React asset watcher): `bun dev`
 - Build production assets: `bun run build`
 - Start production server: `bun run start`
+- Check the Rust S3 data plane: `bun run dataplane:check`
+- Rust owns the Redis and disk object caches; Bun only reads cache stats for
+  admin/health pages.
+
+## Production
+
+Production runs as two services: the Bun control plane for the dashboard and
+account APIs, and the Rust data plane for all S3-compatible object traffic.
+Point `dashboard.${S3_DOMAIN}` at the control-plane service and `${S3_DOMAIN}`
+at the dataplane service.
+
+1. Copy `.env.production.example` to `.env.production` and fill in the real
+   Postgres, Redis, provider S3, Hack Club Auth, Slack, and
+   `DATAPLANE_INTERNAL_SECRET` values.
+2. Deploy with `GIT_SHA=$(git rev-parse HEAD) docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build`.
+3. Set `GIT_DATE` and `GIT_MESSAGE` the same way if you want those values in
+   the dashboard build metadata.
+
+The dataplane exposes `/health` and owns auth, bucket jail enforcement, quota
+checks, provider streaming, Redis metadata cache, and disk object cache.
 
 ## Cloudflare for SaaS setup
 

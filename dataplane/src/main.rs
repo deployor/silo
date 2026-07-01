@@ -1,0 +1,903 @@
+use std::{
+    collections::BTreeMap,
+    env,
+    net::SocketAddr,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
+
+use anyhow::{anyhow, Context, Result};
+use axum::{
+    body::Body,
+    extract::State,
+    http::{HeaderMap, Method, Request, Response, StatusCode, Uri},
+    routing::{any, get},
+    Router,
+};
+use futures_util::StreamExt;
+use reqwest::header::HOST;
+use serde::{Deserialize, Serialize};
+use tower_http::trace::TraceLayer;
+use tracing::{error, info, warn};
+
+mod auth;
+mod aws_chunked;
+mod bucket;
+mod cache;
+mod copy;
+mod delete;
+mod disk_cache;
+mod list;
+mod multipart;
+mod quota;
+mod response;
+mod security;
+mod stats;
+mod upstream;
+
+use auth::authorize_direct;
+use aws_chunked::{decoded_content_length, is_aws_chunked, AwsChunkedDecoder};
+use bucket::{
+    fast_delete_bucket_cors, fast_get_bucket_cors, fast_list_buckets, fast_options,
+    fast_put_bucket_cors,
+};
+use cache::{
+    buffer_small_get_and_cache, cache_object_meta, has_conditional_headers,
+    invalidate_object_caches, try_redis_object_cache, try_redis_object_meta, try_redis_object_size,
+};
+use copy::fast_copy_object;
+use delete::fast_delete_objects;
+use disk_cache::DiskCache;
+use list::{fast_bucket_location, fast_list_objects};
+use multipart::{
+    fast_abort_multipart_upload, fast_complete_multipart_upload, fast_create_multipart_upload,
+    fast_list_multipart_uploads, fast_list_parts,
+};
+use quota::{
+    release_multipart_part, release_storage, reserve_egress, reserve_multipart_part,
+    reserve_storage,
+};
+use response::{reqwest_to_s3_response, s3_error, s3_passthrough_error, with_s3_headers};
+use security::authorized_path_is_jailed;
+use stats::{record_egress, record_ingress, record_request};
+use upstream::signed_upstream_request;
+
+#[derive(Clone)]
+struct AppState {
+    cfg: Arc<Config>,
+    http: reqwest::Client,
+    redis: redis::aio::MultiplexedConnection,
+    pg: sqlx::PgPool,
+    signing_keys: Arc<RwLock<BTreeMap<String, Vec<u8>>>>,
+    disk_cache: DiskCache,
+}
+
+#[derive(Clone)]
+struct Config {
+    bind: String,
+    control_plane_url: String,
+    internal_secret: String,
+    public_scheme: String,
+    s3_domain: String,
+    custom_domains_enabled: bool,
+    deep_freeze_enabled: bool,
+    s3_access_key: String,
+    s3_secret_key: String,
+    s3_region: String,
+    s3_endpoint: String,
+    s3_bucket: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthorizeResponse {
+    allowed: bool,
+    status: Option<u16>,
+    body: Option<String>,
+    fast_path: Option<bool>,
+    action: Option<String>,
+    key: Option<String>,
+    path_with_query: Option<String>,
+    root_prefix: Option<String>,
+    part_number: Option<String>,
+    upload_id: Option<String>,
+    cors_headers: Option<BTreeMap<String, String>>,
+    bucket: Option<AuthBucket>,
+    user: Option<AuthUser>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct AuthBucket {
+    id: String,
+    name: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthUser {
+    id: String,
+    is_immortal: bool,
+    storage_limit_bytes: Option<i64>,
+    storage_usage_bytes: i64,
+    egress_limit_bytes: Option<i64>,
+    egress_bytes: i64,
+    egress_period: Option<String>,
+}
+
+#[derive(Serialize)]
+struct AuthorizeRequest {
+    method: String,
+    url: String,
+    headers: Vec<(String, String)>,
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(env::var("RUST_LOG").unwrap_or_else(|_| "info,tower_http=warn".into()))
+        .init();
+
+    let cfg = Arc::new(Config::from_env()?);
+    let http = reqwest::Client::builder()
+        .tcp_nodelay(true)
+        .pool_idle_timeout(Duration::from_secs(90))
+        .pool_max_idle_per_host(
+            env::var("DATAPLANE_HTTP_POOL_MAX_IDLE_PER_HOST")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(128),
+        )
+        .tcp_keepalive(Duration::from_secs(60))
+        .http2_adaptive_window(true)
+        .http2_keep_alive_interval(Duration::from_secs(30))
+        .http2_keep_alive_timeout(Duration::from_secs(10))
+        .http2_keep_alive_while_idle(true)
+        .build()?;
+    let redis_client = redis::Client::open(
+        env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6379".into()),
+    )?;
+    let redis = redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .context("failed to connect to Redis")?;
+    let pg = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(
+            env::var("DATAPLANE_DATABASE_MAX_CONNECTIONS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(16),
+        )
+        .connect(&env::var("DATABASE_URL").context("DATABASE_URL is required")?)
+        .await
+        .context("failed to connect to Postgres")?;
+    let disk_cache = DiskCache::from_env()?;
+    disk_cache.start_background_tasks();
+
+    let state = AppState {
+        cfg: cfg.clone(),
+        http,
+        redis,
+        pg,
+        signing_keys: Arc::new(RwLock::new(BTreeMap::new())),
+        disk_cache,
+    };
+    let app = Router::new()
+        .route("/health", get(health))
+        .fallback(any(handle_request))
+        .layer(TraceLayer::new_for_http())
+        .with_state(state);
+
+    let addr: SocketAddr = cfg.bind.parse().context("invalid DATAPLANE_BIND")?;
+    info!("silo rust dataplane listening on {addr}");
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async {
+            let _ = tokio::signal::ctrl_c().await;
+        })
+        .await?;
+    Ok(())
+}
+
+async fn health(State(state): State<AppState>) -> Response<Body> {
+    let postgres_ok = sqlx::query_scalar::<_, i32>("SELECT 1")
+        .fetch_one(&state.pg)
+        .await
+        .is_ok();
+    let redis_ok = {
+        let mut conn = state.redis.clone();
+        let result: redis::RedisResult<String> = redis::cmd("PING").query_async(&mut conn).await;
+        result.is_ok_and(|value| value == "PONG")
+    };
+    let ok = postgres_ok && redis_ok;
+    let body = serde_json::json!({
+        "status": if ok { "ok" } else { "degraded" },
+        "postgres": postgres_ok,
+        "redis": redis_ok,
+    })
+    .to_string();
+
+    Response::builder()
+        .status(if ok {
+            StatusCode::OK
+        } else {
+            StatusCode::SERVICE_UNAVAILABLE
+        })
+        .header("content-type", "application/json")
+        .body(Body::from(body))
+        .unwrap_or_else(|_| Response::new(Body::empty()))
+}
+
+impl Config {
+    fn from_env() -> Result<Self> {
+        let internal_secret = env::var("DATAPLANE_INTERNAL_SECRET")
+            .context("DATAPLANE_INTERNAL_SECRET is required")?;
+        if internal_secret.len() < 24 {
+            return Err(anyhow!(
+                "DATAPLANE_INTERNAL_SECRET must be at least 24 chars"
+            ));
+        }
+
+        Ok(Self {
+            bind: env::var("DATAPLANE_BIND").unwrap_or_else(|_| "0.0.0.0:3001".into()),
+            control_plane_url: env::var("CONTROL_PLANE_URL")
+                .unwrap_or_else(|_| "http://127.0.0.1:3000".into()),
+            internal_secret,
+            public_scheme: env::var("DATAPLANE_PUBLIC_SCHEME").unwrap_or_else(|_| "https".into()),
+            s3_domain: env::var("S3_DOMAIN").context("S3_DOMAIN is required")?,
+            custom_domains_enabled: env_bool("DOMAINS"),
+            deep_freeze_enabled: env_bool("DEEP_FREEZE"),
+            s3_access_key: env::var("S3_ACCESS_KEY_ID").context("S3_ACCESS_KEY_ID is required")?,
+            s3_secret_key: env::var("S3_SECRET_ACCESS_KEY")
+                .context("S3_SECRET_ACCESS_KEY is required")?,
+            s3_region: env::var("S3_REGION").unwrap_or_else(|_| "auto".into()),
+            s3_endpoint: env::var("S3_ENDPOINT")
+                .context("S3_ENDPOINT is required")?
+                .trim_end_matches('/')
+                .trim_start_matches("https://")
+                .trim_start_matches("http://")
+                .to_string(),
+            s3_bucket: env::var("S3_BUCKET_NAME").context("S3_BUCKET_NAME is required")?,
+        })
+    }
+}
+
+fn env_bool(name: &str) -> bool {
+    matches!(
+        env::var(name).ok().as_deref(),
+        Some("1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON")
+    )
+}
+
+async fn handle_request(State(state): State<AppState>, req: Request<Body>) -> Response<Body> {
+    match handle_request_inner(state, req).await {
+        Ok(res) => res,
+        Err(err) => {
+            error!(error = %err, "dataplane request failed");
+            s3_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "InternalError",
+                "Internal Server Error",
+            )
+        }
+    }
+}
+
+async fn handle_request_inner(state: AppState, req: Request<Body>) -> Result<Response<Body>> {
+    let (parts, body) = req.into_parts();
+    let method = parts.method.clone();
+    let headers = parts.headers.clone();
+    let url = reconstruct_url(&state.cfg, &parts.uri, &headers)?;
+
+    if parts.uri.path() == "/" {
+        let accept = headers
+            .get(axum::http::header::ACCEPT)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        if accept.contains("text/html") {
+            let location = format!(
+                "{}://dashboard.{}/",
+                state.cfg.public_scheme, state.cfg.s3_domain
+            );
+            return Ok(Response::builder()
+                .status(StatusCode::FOUND)
+                .header(axum::http::header::LOCATION, location)
+                .body(Body::empty())?);
+        }
+    }
+
+    let auth = authorize(&state, &method, &url, &headers).await?;
+    if !auth.allowed {
+        return Ok(s3_passthrough_error(auth));
+    }
+    if auth.fast_path != Some(true) {
+        return Ok(s3_error(
+            StatusCode::NOT_IMPLEMENTED,
+            "NotImplemented",
+            "A header or query you requested is not implemented.",
+        ));
+    }
+    let action = auth.action.as_deref().unwrap_or("");
+    if action != "ListBuckets" && !authorized_path_is_jailed(&auth) {
+        warn!(
+            path = ?auth.path_with_query,
+            root_prefix = ?auth.root_prefix,
+            "dataplane authorization returned path outside bucket jail"
+        );
+        return Ok(s3_error(
+            StatusCode::FORBIDDEN,
+            "AccessDenied",
+            "Access Denied",
+        ));
+    }
+
+    record_request(&state, &auth).await;
+    match (method.as_str(), action) {
+        ("GET", "ListBuckets") => fast_list_buckets(state, auth).await,
+        ("GET", "GetBucketLocation") => fast_bucket_location(state, auth).await,
+        ("GET", "GetBucketCors") => fast_get_bucket_cors(state, auth).await,
+        ("GET", "GetObject") => fast_get(state, auth, &headers).await,
+        ("GET", "ListMultipartUploads") => fast_list_multipart_uploads(state, auth, &headers).await,
+        ("GET", "ListObjectsV2") => fast_list_objects(state, auth, &headers).await,
+        ("GET", "ListParts") => fast_list_parts(state, auth, &headers).await,
+        ("HEAD", "HeadBucket") => Ok(with_s3_headers(
+            Response::builder()
+                .status(StatusCode::OK)
+                .body(Body::empty())?,
+            &auth,
+        )),
+        ("HEAD", "HeadObject") => fast_head(state, auth, &headers).await,
+        ("OPTIONS", "Options") => fast_options(state, auth, &headers).await,
+        ("POST", "CreateMultipartUpload") => {
+            fast_create_multipart_upload(state, auth, &headers).await
+        }
+        ("POST", "CompleteMultipartUpload") => {
+            fast_complete_multipart_upload(state, auth, &headers, body).await
+        }
+        ("POST", "DeleteObjects") => fast_delete_objects(state, auth, &headers, body).await,
+        ("DELETE", "AbortMultipartUpload") => {
+            fast_abort_multipart_upload(state, auth, &headers).await
+        }
+        ("DELETE", "DeleteBucketCors") => fast_delete_bucket_cors(state, auth).await,
+        ("DELETE", "DeleteObject") => fast_delete_object(state, auth, &headers).await,
+        ("PUT", "CopyObject") => fast_copy_object(state, auth, &headers).await,
+        ("PUT", "PutBucketCors") => fast_put_bucket_cors(state, auth, body).await,
+        ("PUT", "PutObject") => fast_put_object(state, auth, &headers, body).await,
+        ("PUT", "UploadPart") => fast_upload_part(state, auth, &headers, body).await,
+        _ => Ok(s3_error(
+            StatusCode::NOT_IMPLEMENTED,
+            "NotImplemented",
+            "A header or query you requested is not implemented.",
+        )),
+    }
+}
+
+fn reconstruct_url(cfg: &Config, uri: &Uri, headers: &HeaderMap) -> Result<String> {
+    if uri.scheme().is_some() && uri.authority().is_some() {
+        return Ok(uri.to_string());
+    }
+    let host = headers
+        .get(HOST)
+        .and_then(|h| h.to_str().ok())
+        .ok_or_else(|| anyhow!("missing Host header"))?;
+    Ok(format!("{}://{}{}", cfg.public_scheme, host, uri))
+}
+
+async fn authorize(
+    state: &AppState,
+    method: &Method,
+    url: &str,
+    headers: &HeaderMap,
+) -> Result<AuthorizeResponse> {
+    if let Some(auth) = authorize_direct(state, method, url, headers).await? {
+        return Ok(auth);
+    }
+
+    let req = AuthorizeRequest {
+        method: method.as_str().to_string(),
+        url: url.to_string(),
+        headers: headers_to_vec(headers),
+    };
+
+    let res = state
+        .http
+        .post(format!(
+            "{}/api/internal/dataplane/authorize",
+            state.cfg.control_plane_url
+        ))
+        .header("x-dataplane-secret", &state.cfg.internal_secret)
+        .json(&req)
+        .send()
+        .await
+        .context("control-plane authorization request failed")?;
+
+    if !res.status().is_success() {
+        return Err(anyhow!(
+            "control-plane authorization returned {}",
+            res.status()
+        ));
+    }
+    Ok(res.json::<AuthorizeResponse>().await?)
+}
+
+fn headers_to_vec(headers: &HeaderMap) -> Vec<(String, String)> {
+    headers
+        .iter()
+        .filter_map(|(k, v)| {
+            v.to_str()
+                .ok()
+                .map(|value| (k.as_str().to_string(), value.to_string()))
+        })
+        .collect()
+}
+
+async fn fast_head(
+    state: AppState,
+    auth: AuthorizeResponse,
+    headers: &HeaderMap,
+) -> Result<Response<Body>> {
+    if !has_conditional_headers(headers) {
+        if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref()) {
+            if let Some(res) = try_redis_object_meta(&state, bucket, key).await? {
+                return Ok(with_s3_headers(res, &auth));
+            }
+            if let Some(res) = state.disk_cache.get_meta_response(bucket, key).await? {
+                return Ok(with_s3_headers(res, &auth));
+            }
+        }
+    }
+
+    let upstream = signed_upstream_request(
+        &state,
+        Method::HEAD,
+        auth.path_with_query.as_deref().unwrap_or(""),
+        headers,
+        None,
+    )?;
+    let res = upstream.send().await?;
+    let status = res.status();
+    let response = reqwest_to_s3_response(res, &auth).await?;
+    if status == reqwest::StatusCode::OK {
+        if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref()) {
+            cache_object_meta(&state, bucket, key, response.headers(), 21_600).await?;
+        }
+    }
+    Ok(response)
+}
+
+async fn fast_get(
+    state: AppState,
+    auth: AuthorizeResponse,
+    headers: &HeaderMap,
+) -> Result<Response<Body>> {
+    if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref()) {
+        state.disk_cache.record_demand(&bucket.id, key, 0).await;
+        if let Some(res) = try_redis_object_cache(&state, &auth, headers, bucket, key).await? {
+            return Ok(with_s3_headers(res, &auth));
+        }
+        if let Some(res) = state
+            .disk_cache
+            .get_response(&state, &auth, headers, bucket, key)
+            .await?
+        {
+            return Ok(with_s3_headers(res, &auth));
+        }
+    }
+
+    let has_range = headers.contains_key(axum::http::header::RANGE);
+
+    let upstream = signed_upstream_request(
+        &state,
+        Method::GET,
+        auth.path_with_query.as_deref().unwrap_or(""),
+        headers,
+        None,
+    )?;
+    let res = upstream.send().await?;
+    let status = res.status();
+    let content_length_header = res.headers().get(reqwest::header::CONTENT_LENGTH);
+    let content_length = content_length_header
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
+    if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref()) {
+        state
+            .disk_cache
+            .record_demand(&bucket.id, key, content_length)
+            .await;
+    }
+
+    if status.is_success()
+        && status != reqwest::StatusCode::NO_CONTENT
+        && status != reqwest::StatusCode::NOT_MODIFIED
+    {
+        if let Some(user) = &auth.user {
+            if content_length_header.is_none() && !user.is_immortal {
+                return Ok(with_s3_headers(
+                    s3_error(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidRequest",
+                        "Upstream response is missing Content-Length for quota enforcement.",
+                    ),
+                    &auth,
+                ));
+            }
+            if content_length > 0 && reserve_egress(&state, user, content_length).await.is_err() {
+                return Ok(with_s3_headers(
+                    s3_error(
+                        StatusCode::FORBIDDEN,
+                        "QuotaExceeded",
+                        "You have exceeded your egress quota.",
+                    ),
+                    &auth,
+                ));
+            }
+        }
+        record_egress(&state, &auth, content_length).await;
+    }
+
+    if !has_range && status.is_success() && content_length > 0 && content_length < 10 * 1024 * 1024
+    {
+        if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref()) {
+            return Ok(with_s3_headers(
+                buffer_small_get_and_cache(&state, res, bucket, key).await?,
+                &auth,
+            ));
+        }
+    }
+
+    if !has_range && status.is_success() && content_length >= state.disk_cache.min_size() {
+        if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref()) {
+            if state
+                .disk_cache
+                .should_admit(&bucket.id, key, content_length)
+                .await
+            {
+                return Ok(with_s3_headers(
+                    state
+                        .disk_cache
+                        .stream_and_cache_response(res, bucket, key, content_length)
+                        .await?,
+                    &auth,
+                ));
+            }
+        }
+    }
+
+    reqwest_to_s3_response(res, &auth).await
+}
+
+async fn fast_put_object(
+    state: AppState,
+    auth: AuthorizeResponse,
+    headers: &HeaderMap,
+    body: Body,
+) -> Result<Response<Body>> {
+    let content_length = match upload_content_length(headers) {
+        Ok(content_length) => content_length,
+        Err(_) => {
+            return Ok(with_s3_headers(
+                s3_error(
+                    StatusCode::BAD_REQUEST,
+                    "InvalidRequest",
+                    "Missing or invalid Content-Length header",
+                ),
+                &auth,
+            ));
+        }
+    };
+    let existing_size = if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref())
+    {
+        cached_existing_size(
+            &state,
+            bucket,
+            key,
+            auth.path_with_query.as_deref().unwrap_or(""),
+        )
+        .await
+        .unwrap_or(0)
+    } else {
+        head_existing_size(&state, auth.path_with_query.as_deref().unwrap_or(""))
+            .await
+            .unwrap_or(0)
+    };
+    let mut reserved_delta = 0;
+
+    if let Some(user) = &auth.user {
+        let delta = content_length.saturating_sub(existing_size);
+        if delta > 0 {
+            if reserve_storage(&state, user, delta).await.is_err() {
+                return Ok(with_s3_headers(
+                    s3_error(
+                        StatusCode::FORBIDDEN,
+                        "QuotaExceeded",
+                        "You have exceeded your storage quota.",
+                    ),
+                    &auth,
+                ));
+            }
+            reserved_delta = delta;
+        }
+    }
+
+    let upstream = signed_upstream_request(
+        &state,
+        Method::PUT,
+        auth.path_with_query.as_deref().unwrap_or(""),
+        headers,
+        Some(content_length),
+    )?
+    .body(upload_body(headers, body));
+
+    let res = match upstream.send().await {
+        Ok(res) => res,
+        Err(error) => {
+            if reserved_delta > 0 {
+                if let Some(user) = &auth.user {
+                    let _ = release_storage(&state, &user.id, reserved_delta).await;
+                }
+            }
+            return Err(error.into());
+        }
+    };
+    let status = res.status();
+    let status_u16 = status.as_u16();
+
+    if !status.is_success() {
+        if let Some(user) = &auth.user {
+            let delta = content_length.saturating_sub(existing_size);
+            if delta > 0 {
+                let _ = release_storage(&state, &user.id, delta).await;
+            }
+        }
+    } else if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref()) {
+        record_ingress(&state, &auth, content_length).await;
+        invalidate_object_caches(&state, bucket, key).await;
+        if let Err(error) = commit_object_change(
+            &state,
+            bucket,
+            "PUT",
+            status_u16,
+            content_length,
+            existing_size,
+        )
+        .await
+        {
+            warn!(error = %error, "dataplane bucket byte commit failed after successful PUT");
+        }
+    }
+
+    reqwest_to_s3_response(res, &auth).await
+}
+
+async fn fast_delete_object(
+    state: AppState,
+    auth: AuthorizeResponse,
+    headers: &HeaderMap,
+) -> Result<Response<Body>> {
+    let existing_size = if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref())
+    {
+        cached_existing_size(
+            &state,
+            bucket,
+            key,
+            auth.path_with_query.as_deref().unwrap_or(""),
+        )
+        .await
+        .unwrap_or(0)
+    } else {
+        head_existing_size(&state, auth.path_with_query.as_deref().unwrap_or(""))
+            .await
+            .unwrap_or(0)
+    };
+    let upstream = signed_upstream_request(
+        &state,
+        Method::DELETE,
+        auth.path_with_query.as_deref().unwrap_or(""),
+        headers,
+        None,
+    )?;
+    let res = upstream.send().await?;
+    let status = res.status();
+    let status_u16 = status.as_u16();
+    let should_invalidate = status.is_success() || status == reqwest::StatusCode::NOT_FOUND;
+
+    if should_invalidate {
+        if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref()) {
+            invalidate_object_caches(&state, bucket, key).await;
+            if status.is_success() && existing_size > 0 {
+                if let Some(user) = &auth.user {
+                    let _ = release_storage(&state, &user.id, existing_size).await;
+                }
+                if let Err(error) =
+                    commit_object_change(&state, bucket, "DELETE", status_u16, 0, existing_size)
+                        .await
+                {
+                    warn!(error = %error, "dataplane bucket byte commit failed after successful DELETE");
+                }
+            }
+        }
+    }
+
+    reqwest_to_s3_response(res, &auth).await
+}
+
+async fn fast_upload_part(
+    state: AppState,
+    auth: AuthorizeResponse,
+    headers: &HeaderMap,
+    body: Body,
+) -> Result<Response<Body>> {
+    let content_length = match upload_content_length(headers) {
+        Ok(content_length) => content_length,
+        Err(_) => {
+            return Ok(with_s3_headers(
+                s3_error(
+                    StatusCode::BAD_REQUEST,
+                    "InvalidRequest",
+                    "Missing or invalid Content-Length header",
+                ),
+                &auth,
+            ));
+        }
+    };
+    let mut reserved_part: Option<(String, String, String, String)> = None;
+    if let Some(user) = &auth.user {
+        let bucket_id = auth.bucket.as_ref().map(|b| b.id.as_str()).unwrap_or("");
+        let upload_id = auth.upload_id.as_deref().unwrap_or("");
+        let part_number = auth.part_number.as_deref().unwrap_or("");
+        if reserve_multipart_part(
+            &state,
+            user,
+            bucket_id,
+            upload_id,
+            part_number,
+            content_length,
+        )
+        .await
+        .is_err()
+        {
+            return Ok(with_s3_headers(
+                s3_error(
+                    StatusCode::FORBIDDEN,
+                    "QuotaExceeded",
+                    "You have exceeded your storage quota.",
+                ),
+                &auth,
+            ));
+        }
+        if !user.is_immortal {
+            reserved_part = Some((
+                user.id.clone(),
+                bucket_id.to_string(),
+                upload_id.to_string(),
+                part_number.to_string(),
+            ));
+        }
+    }
+
+    let upstream = signed_upstream_request(
+        &state,
+        Method::PUT,
+        auth.path_with_query.as_deref().unwrap_or(""),
+        headers,
+        Some(content_length),
+    )?
+    .body(upload_body(headers, body));
+
+    let res = match upstream.send().await {
+        Ok(res) => res,
+        Err(error) => {
+            if let Some((user_id, bucket_id, upload_id, part_number)) = reserved_part.as_ref() {
+                let _ = release_multipart_part(&state, user_id, bucket_id, upload_id, part_number)
+                    .await;
+            }
+            return Err(error.into());
+        }
+    };
+    if !res.status().is_success() {
+        if let Some((user_id, bucket_id, upload_id, part_number)) = reserved_part.as_ref() {
+            let _ =
+                release_multipart_part(&state, user_id, bucket_id, upload_id, part_number).await;
+        }
+    } else {
+        record_ingress(&state, &auth, content_length).await;
+    }
+    reqwest_to_s3_response(res, &auth).await
+}
+
+fn required_content_length(headers: &HeaderMap) -> Result<u64> {
+    headers
+        .get(axum::http::header::CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<u64>().ok())
+        .ok_or_else(|| anyhow!("missing valid Content-Length"))
+}
+
+fn upload_content_length(headers: &HeaderMap) -> Result<u64> {
+    if is_aws_chunked(headers) {
+        return decoded_content_length(headers)
+            .ok_or_else(|| anyhow!("missing x-amz-decoded-content-length"));
+    }
+    required_content_length(headers)
+}
+
+fn upload_body(headers: &HeaderMap, body: Body) -> reqwest::Body {
+    let stream = body
+        .into_data_stream()
+        .map(|r| r.map_err(std::io::Error::other));
+    if is_aws_chunked(headers) {
+        return reqwest::Body::wrap_stream(AwsChunkedDecoder::new(stream));
+    }
+    reqwest::Body::wrap_stream(stream)
+}
+
+async fn head_existing_size(state: &AppState, path: &str) -> Result<u64> {
+    let empty = HeaderMap::new();
+    let req = signed_upstream_request(state, Method::HEAD, path, &empty, None)?;
+    let res = req.send().await?;
+    if !res.status().is_success() {
+        return Ok(0);
+    }
+    Ok(res
+        .headers()
+        .get(reqwest::header::CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0))
+}
+
+async fn cached_existing_size(
+    state: &AppState,
+    bucket: &AuthBucket,
+    key: &str,
+    path: &str,
+) -> Result<u64> {
+    if let Some(size) = try_redis_object_size(state, bucket, key).await {
+        return Ok(size);
+    }
+    if let Some(size) = state.disk_cache.object_size(bucket, key).await {
+        return Ok(size);
+    }
+    head_existing_size(state, path).await
+}
+
+async fn commit_object_change(
+    state: &AppState,
+    bucket: &AuthBucket,
+    method: &str,
+    status: u16,
+    actual_size: u64,
+    existing_size: u64,
+) -> Result<()> {
+    if !(200..300).contains(&status) {
+        return Ok(());
+    }
+
+    let delta = match method {
+        "PUT" => i128::from(actual_size) - i128::from(existing_size),
+        "DELETE" => -i128::from(existing_size),
+        _ => 0,
+    };
+    if delta == 0 {
+        return Ok(());
+    }
+
+    if delta > 0 {
+        let delta = i64::try_from(delta).context("bucket byte delta exceeds bigint")?;
+        sqlx::query("UPDATE buckets SET total_bytes = total_bytes + $1 WHERE id = $2::uuid")
+            .bind(delta)
+            .bind(&bucket.id)
+            .execute(&state.pg)
+            .await?;
+    } else {
+        let delta = i64::try_from(-delta).context("bucket byte delta exceeds bigint")?;
+        sqlx::query(
+            "UPDATE buckets SET total_bytes = GREATEST(0, total_bytes - $1) WHERE id = $2::uuid",
+        )
+        .bind(delta)
+        .bind(&bucket.id)
+        .execute(&state.pg)
+        .await?;
+    }
+    Ok(())
+}

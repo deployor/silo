@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { config } from "../config";
-import { getInternalPath } from "../core/s3/utils";
+import { getInternalPath } from "../lib/s3/paths";
 import { db } from "../db";
 import { buckets, users } from "../db/schema";
 import { s3Client } from "../lib/s3-client";
