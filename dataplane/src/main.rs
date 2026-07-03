@@ -30,6 +30,7 @@ mod disk_cache;
 mod list;
 mod multipart;
 mod quota;
+mod rate_limit;
 mod response;
 mod security;
 mod stats;
@@ -57,12 +58,13 @@ use multipart::{
     fast_list_multipart_uploads, fast_list_parts,
 };
 use quota::{
-    release_multipart_part, release_storage, reserve_egress, reserve_multipart_part,
+    release_multipart_part, release_storage, reserve_multipart_part, reserve_served_egress,
     reserve_storage,
 };
+use rate_limit::{check_client_request_rate, check_ingress_bytes, check_request_rate};
 use response::{reqwest_to_s3_response, s3_error, s3_passthrough_error, with_s3_headers};
 use security::authorized_path_is_jailed;
-use stats::{record_egress, record_ingress, record_request};
+use stats::{record_ingress, record_request};
 use upstream::signed_upstream_request;
 
 #[derive(Clone)]
@@ -384,6 +386,11 @@ async fn handle_request_inner(state: AppState, req: Request<Body>) -> Result<Res
         }
     }
 
+    let client_id = rate_limit::client_identity(&headers);
+    if let Some(res) = check_client_request_rate(&state, &client_id).await? {
+        return Ok(res);
+    }
+
     let auth = authorize(&state, &method, &url, &headers).await?;
     if !auth.allowed {
         return Ok(s3_passthrough_error(auth));
@@ -407,6 +414,10 @@ async fn handle_request_inner(state: AppState, req: Request<Body>) -> Result<Res
             "AccessDenied",
             "Access Denied",
         ));
+    }
+
+    if let Some(res) = check_request_rate(&state, &auth).await? {
+        return Ok(with_s3_headers(res, &auth));
     }
 
     record_request(&state, &auth).await;
@@ -688,18 +699,10 @@ async fn fast_get(
                     &auth,
                 ));
             }
-            if content_length > 0 && reserve_egress(&state, user, content_length).await.is_err() {
-                return Ok(with_s3_headers(
-                    s3_error(
-                        StatusCode::FORBIDDEN,
-                        "QuotaExceeded",
-                        "You have exceeded your egress quota.",
-                    ),
-                    &auth,
-                ));
-            }
         }
-        record_egress(&state, &auth, content_length).await;
+        if let Some(res) = reserve_served_egress(&state, &auth, content_length).await? {
+            return Ok(with_s3_headers(res, &auth));
+        }
     }
 
     if !has_range && status.is_success() && content_length > 0 && content_length < 10 * 1024 * 1024
@@ -768,6 +771,10 @@ async fn fast_put_object(
             .unwrap_or(0)
     };
     let mut reserved_delta = 0;
+
+    if let Some(res) = check_ingress_bytes(&state, &auth, content_length).await? {
+        return Ok(with_s3_headers(res, &auth));
+    }
 
     if let Some(user) = &auth.user {
         let delta = content_length.saturating_sub(existing_size);
@@ -914,6 +921,11 @@ async fn fast_upload_part(
         }
     };
     let mut reserved_part: Option<(String, String, String, String)> = None;
+
+    if let Some(res) = check_ingress_bytes(&state, &auth, content_length).await? {
+        return Ok(with_s3_headers(res, &auth));
+    }
+
     if let Some(user) = &auth.user {
         let bucket_id = auth.bucket.as_ref().map(|b| b.id.as_str()).unwrap_or("");
         let upload_id = auth.upload_id.as_deref().unwrap_or("");

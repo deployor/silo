@@ -91,6 +91,20 @@ Rust-only:
 - `DISK_CACHE_MAX_FILE_SIZE`: defaults to `2147483648` (2 GiB).
 - `DISK_CACHE_ADMISSION_HITS`: defaults to `2`.
 - `DISK_CACHE_MAX_ENTRY_AGE_MS`: defaults to `43200000` (12 hours).
+- `DATAPLANE_RL_ENABLED`: enables Redis-backed S3 data-plane rate limits,
+  defaults to `true`.
+- `DATAPLANE_RL_CLIENT_REQUESTS_PER_MINUTE`: pre-auth request limit per
+  client IP, defaults to `12000`.
+- `DATAPLANE_RL_BUCKET_REQUESTS_PER_MINUTE`: request limit per bucket, defaults
+  to `60000`.
+- `DATAPLANE_RL_BUCKET_INGRESS_BYTES_PER_MINUTE`: upload admission per bucket,
+  defaults to `549755813888` (512 GiB).
+- `DATAPLANE_RL_BUCKET_EGRESS_BYTES_PER_MINUTE`: download admission per bucket,
+  defaults to `1099511627776` (1 TiB).
+- `DATAPLANE_RL_USER_REQUESTS_PER_MINUTE`,
+  `DATAPLANE_RL_USER_INGRESS_BYTES_PER_MINUTE`, and
+  `DATAPLANE_RL_USER_EGRESS_BYTES_PER_MINUTE`: optional per-user limits,
+  default to `0` (disabled).
 
 ## Local Commands
 

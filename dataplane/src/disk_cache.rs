@@ -27,10 +27,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::io::ReaderStream;
 use tracing::{info, warn};
 
-use crate::{
-    quota::reserve_egress, response::s3_error, stats::record_egress, AppState, AuthBucket,
-    AuthorizeResponse,
-};
+use crate::{quota::reserve_served_egress, AppState, AuthBucket, AuthorizeResponse};
 
 const REDIS_OBJECT_LIMIT_BYTES: u64 = 10 * 1024 * 1024;
 const META_WRITEBACK_MIN_INTERVAL: Duration = Duration::from_secs(30);
@@ -486,7 +483,7 @@ impl DiskCache {
         blob_path: &Path,
         meta: &CacheMeta,
     ) -> Result<Response<Body>> {
-        if let Some(quota_response) = reserve_disk_hit_egress(state, auth, meta.size).await {
+        if let Some(quota_response) = reserve_disk_hit_egress(state, auth, meta.size).await? {
             return Ok(quota_response);
         }
         let file = File::open(blob_path).await?;
@@ -519,7 +516,7 @@ impl DiskCache {
                 .body(Body::empty())?);
         };
         let bytes_to_send = range.end - range.start + 1;
-        if let Some(quota_response) = reserve_disk_hit_egress(state, auth, bytes_to_send).await {
+        if let Some(quota_response) = reserve_disk_hit_egress(state, auth, bytes_to_send).await? {
             return Ok(quota_response);
         }
         let mut file = File::open(blob_path).await?;
@@ -807,18 +804,8 @@ pub(crate) async fn reserve_disk_hit_egress(
     state: &crate::AppState,
     auth: &AuthorizeResponse,
     bytes: u64,
-) -> Option<Response<Body>> {
-    if let Some(user) = &auth.user {
-        if reserve_egress(state, user, bytes).await.is_err() {
-            return Some(s3_error(
-                StatusCode::FORBIDDEN,
-                "QuotaExceeded",
-                "You have exceeded your egress quota.",
-            ));
-        }
-    }
-    record_egress(state, auth, bytes).await;
-    None
+) -> Result<Option<Response<Body>>> {
+    reserve_served_egress(state, auth, bytes).await
 }
 
 fn response_headers(headers: &reqwest::header::HeaderMap) -> BTreeMap<String, String> {

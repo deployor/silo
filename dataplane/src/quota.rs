@@ -1,8 +1,15 @@
 use anyhow::{anyhow, Result};
+use axum::{
+    body::Body,
+    http::{Response, StatusCode},
+};
 use chrono::{Datelike, Utc};
 use std::collections::HashMap;
 
-use crate::{AppState, AuthUser};
+use crate::{
+    rate_limit::check_egress_bytes, response::s3_error, stats::record_egress, AppState, AuthUser,
+    AuthorizeResponse,
+};
 
 const STORAGE_QUOTA_LUA: &str = r#"
 local key = KEYS[1]
@@ -185,6 +192,34 @@ pub(crate) async fn reserve_egress(state: &AppState, user: &AuthUser, delta: u64
         .query_async(&mut conn)
         .await;
     Ok(())
+}
+
+pub(crate) async fn reserve_served_egress(
+    state: &AppState,
+    auth: &AuthorizeResponse,
+    bytes: u64,
+) -> Result<Option<Response<Body>>> {
+    if bytes == 0 {
+        record_egress(state, auth, bytes).await;
+        return Ok(None);
+    }
+
+    if let Some(res) = check_egress_bytes(state, auth, bytes).await? {
+        return Ok(Some(res));
+    }
+
+    if let Some(user) = &auth.user {
+        if reserve_egress(state, user, bytes).await.is_err() {
+            return Ok(Some(s3_error(
+                StatusCode::FORBIDDEN,
+                "QuotaExceeded",
+                "You have exceeded your egress quota.",
+            )));
+        }
+    }
+
+    record_egress(state, auth, bytes).await;
+    Ok(None)
 }
 
 fn current_egress_period() -> String {

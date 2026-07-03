@@ -7,13 +7,11 @@ use axum::{
 };
 use tracing::warn;
 
-use crate::{
-    AppState, AuthBucket, AuthorizeResponse,
-};
+use crate::{quota::reserve_served_egress, AppState, AuthBucket, AuthorizeResponse};
 
 pub(crate) async fn try_redis_object_cache(
     state: &AppState,
-    _auth: &AuthorizeResponse,
+    auth: &AuthorizeResponse,
     headers: &HeaderMap,
     bucket: &AuthBucket,
     key: &str,
@@ -64,6 +62,9 @@ pub(crate) async fn try_redis_object_cache(
             ));
         };
         let bytes_to_send = range.end - range.start + 1;
+        if let Some(res) = reserve_served_egress(state, auth, bytes_to_send).await? {
+            return Ok(Some(res));
+        }
 
         let sliced = body[range.start as usize..=range.end as usize].to_vec();
         let mut builder = Response::builder()
@@ -81,6 +82,10 @@ pub(crate) async fn try_redis_object_cache(
             }
         }
         return Ok(Some(builder.body(Body::from(sliced))?));
+    }
+
+    if let Some(res) = reserve_served_egress(state, auth, body.len() as u64).await? {
+        return Ok(Some(res));
     }
 
     let mut builder = Response::builder().status(StatusCode::OK);
