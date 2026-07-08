@@ -1,5 +1,15 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, count, desc, eq, gt, or, sql } from "drizzle-orm";
+import {
+	and,
+	count,
+	desc,
+	eq,
+	gt,
+	inArray,
+	isNull,
+	or,
+	sql,
+} from "drizzle-orm";
 import { db } from "../db";
 import {
 	redemptionCodes,
@@ -11,6 +21,7 @@ import {
 
 const MAX_PROGRAM_GRANT_BYTES = 100 * 1024 ** 4;
 const MAX_CODES_PER_BATCH = 1000;
+const IDENTITY_USER_ID_RE = /^ident![a-zA-Z0-9_-]{3,128}$/;
 
 function hashApiKey(apiKey: string) {
 	return createHash("sha256").update(apiKey).digest("hex");
@@ -23,6 +34,19 @@ function assertGrantAmount(amountBytes: number) {
 	if (amountBytes > MAX_PROGRAM_GRANT_BYTES) {
 		throw new Error("Grant amount is too large.");
 	}
+}
+
+function normalizeOptionalText(value?: string) {
+	const trimmed = value?.trim();
+	return trimmed || undefined;
+}
+
+function normalizeEmail(value?: string) {
+	return normalizeOptionalText(value)?.toLowerCase();
+}
+
+function isIdentityUserId(userId: string) {
+	return IDENTITY_USER_ID_RE.test(userId);
 }
 
 // --- Programs ---
@@ -311,6 +335,8 @@ export async function grantProgramStorage(params: {
 	externalId?: string;
 	reason?: string;
 	ipAddress?: string;
+	apiKeySuffix?: string | null;
+	userAgent?: string | null;
 }) {
 	assertGrantAmount(params.amountBytes);
 
@@ -318,11 +344,13 @@ export async function grantProgramStorage(params: {
 	if (!program) throw new Error("Program not found");
 	if (!program.isActive) throw new Error("Program is not active.");
 
+	const targetUserId = normalizeOptionalText(params.userId);
+	const targetEmail = normalizeEmail(params.email);
+	const targetSlackId = normalizeOptionalText(params.slackId);
 	const conditions = [];
-	if (params.userId) conditions.push(eq(users.id, params.userId));
-	if (params.email)
-		conditions.push(eq(users.email, params.email.toLowerCase()));
-	if (params.slackId) conditions.push(eq(users.slackId, params.slackId));
+	if (targetUserId) conditions.push(eq(users.id, targetUserId));
+	if (targetEmail) conditions.push(eq(users.email, targetEmail));
+	if (targetSlackId) conditions.push(eq(users.slackId, targetSlackId));
 	if (!conditions.length) {
 		throw new Error("Provide userId, email, or slackId.");
 	}
@@ -333,7 +361,9 @@ export async function grantProgramStorage(params: {
 		.where(conditions.length === 1 ? conditions[0] : or(...conditions))
 		.limit(1);
 
-	if (!targetUser) throw new Error("User not found.");
+	if (!targetUser && (!targetUserId || !isIdentityUserId(targetUserId))) {
+		throw new Error("User not found.");
+	}
 
 	return db.transaction(async (tx) => {
 		if (params.externalId) {
@@ -352,10 +382,40 @@ export async function grantProgramStorage(params: {
 				return {
 					transaction: existing,
 					program,
-					user: targetUser,
+					user: targetUser || null,
+					status: existing.userId ? "applied" : "pending",
 					duplicate: true,
 				};
 			}
+		}
+
+		if (!targetUser) {
+			const [transaction] = await tx
+				.insert(redemptionTransactions)
+				.values({
+					programId: params.programId,
+					userId: null,
+					targetUserId,
+					targetEmail,
+					targetSlackId,
+					actorUserId: params.actorUserId,
+					source: params.source,
+					externalId: params.externalId,
+					amountBytes: params.amountBytes,
+					reason: params.reason,
+					ipAddress: params.ipAddress,
+					apiKeySuffix: params.apiKeySuffix,
+					requestUserAgent: params.userAgent,
+				})
+				.returning();
+
+			return {
+				transaction,
+				program,
+				user: null,
+				status: "pending",
+				duplicate: false,
+			};
 		}
 
 		await grantStorageToUser(tx, targetUser.id, params.amountBytes);
@@ -365,12 +425,18 @@ export async function grantProgramStorage(params: {
 			.values({
 				programId: params.programId,
 				userId: targetUser.id,
+				targetUserId: targetUser.id,
+				targetEmail: targetEmail ?? targetUser.email,
+				targetSlackId: targetSlackId ?? targetUser.slackId,
 				actorUserId: params.actorUserId,
 				source: params.source,
 				externalId: params.externalId,
 				amountBytes: params.amountBytes,
 				reason: params.reason,
 				ipAddress: params.ipAddress,
+				apiKeySuffix: params.apiKeySuffix,
+				requestUserAgent: params.userAgent,
+				fulfilledAt: new Date(),
 			})
 			.returning();
 
@@ -378,8 +444,68 @@ export async function grantProgramStorage(params: {
 			transaction,
 			program,
 			user: targetUser,
+			status: "applied",
 			duplicate: false,
 		};
+	});
+}
+
+export async function applyPendingProgramGrants(userId: string) {
+	if (!isIdentityUserId(userId)) return [];
+
+	return db.transaction(async (tx) => {
+		const fulfilledAt = new Date();
+		const applied = await tx
+			.update(redemptionTransactions)
+			.set({
+				userId,
+				fulfilledAt,
+			})
+			.where(
+				and(
+					eq(redemptionTransactions.targetUserId, userId),
+					isNull(redemptionTransactions.userId),
+					isNull(redemptionTransactions.fulfilledAt),
+				),
+			)
+			.returning({
+				id: redemptionTransactions.id,
+				programId: redemptionTransactions.programId,
+				amountBytes: redemptionTransactions.amountBytes,
+				externalId: redemptionTransactions.externalId,
+				reason: redemptionTransactions.reason,
+				createdAt: redemptionTransactions.createdAt,
+				fulfilledAt: redemptionTransactions.fulfilledAt,
+			});
+
+		if (!applied.length) return [];
+
+		const totalBytes = applied.reduce(
+			(total, transaction) => total + transaction.amountBytes,
+			0,
+		);
+		await grantStorageToUser(tx, userId, totalBytes);
+
+		const programs = await tx
+			.select({
+				id: redemptionPrograms.id,
+				name: redemptionPrograms.name,
+				prefix: redemptionPrograms.prefix,
+			})
+			.from(redemptionPrograms)
+			.where(
+				inArray(redemptionPrograms.id, [
+					...new Set(applied.map((transaction) => transaction.programId)),
+				]),
+			);
+		const programById = new Map(
+			programs.map((program) => [program.id, program]),
+		);
+
+		return applied.map((transaction) => ({
+			...transaction,
+			program: programById.get(transaction.programId) || null,
+		}));
 	});
 }
 
@@ -484,12 +610,14 @@ export async function redeemCode(
 			await tx.insert(redemptionTransactions).values({
 				programId: foundCode.program.id,
 				userId,
+				targetUserId: userId,
 				actorUserId: userId,
 				source: "code",
 				codeId: foundCode.code.id,
 				amountBytes: creditBytes,
 				reason: "Code redemption",
 				ipAddress,
+				fulfilledAt: new Date(),
 			});
 		});
 

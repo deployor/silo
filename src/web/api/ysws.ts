@@ -111,26 +111,38 @@ export async function handleYswsApiRequest(req: Request): Promise<Response> {
 				typeof body.externalId === "string" ? body.externalId : undefined,
 			reason: typeof body.reason === "string" ? body.reason : undefined,
 			ipAddress: getClientIp(req),
+			apiKeySuffix: program.apiKeySuffix,
+			userAgent: req.headers.get("user-agent"),
 		});
 
 		return json({
 			ok: true,
+			status: result.status,
 			duplicate: result.duplicate,
 			program: {
 				id: result.program.id,
 				name: result.program.name,
 				prefix: result.program.prefix,
 			},
-			user: {
-				id: result.user.id,
-				email: result.user.email,
-				slackId: result.user.slackId,
-			},
+			user: result.user
+				? {
+						id: result.user.id,
+						email: result.user.email,
+						slackId: result.user.slackId,
+					}
+				: null,
+			pendingFor:
+				result.status === "pending"
+					? {
+							userId: result.transaction.targetUserId,
+						}
+					: null,
 			grant: {
 				id: result.transaction.id,
 				bytes: result.transaction.amountBytes,
 				externalId: result.transaction.externalId,
 				createdAt: result.transaction.createdAt,
+				fulfilledAt: result.transaction.fulfilledAt,
 			},
 		});
 	} catch (error) {

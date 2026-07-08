@@ -195,6 +195,13 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 		title: "Dashboard - Silo",
 		user: viewUser,
 		s3Domain: config.s3Domain,
+		creditedStorage:
+			url.searchParams.has("credited") && url.searchParams.has("from")
+				? {
+						amount: url.searchParams.get("credited"),
+						from: url.searchParams.get("from"),
+					}
+				: null,
 	});
 
 	return new Response(html, {

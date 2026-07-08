@@ -15,6 +15,13 @@
       "when": 1782938962805,
       "tag": "0001_spooky_sway",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1783550040940,
+      "tag": "0002_audit_redemptions",
+      "breakpoints": true
     }
   ]
 }

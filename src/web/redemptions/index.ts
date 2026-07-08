@@ -177,6 +177,7 @@ export async function handleAdminRedemptionsRequest(
 			actorUserId: user.id,
 			reason: String(formData.get("reason") || "") || undefined,
 			ipAddress: getClientIp(req),
+			userAgent: req.headers.get("user-agent"),
 		});
 
 		return new Response(null, {

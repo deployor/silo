@@ -214,9 +214,12 @@ function formatDurationEstimate(totalSeconds: number | null | undefined) {
 export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const p = bootstrap.props as {
 		user?: FrontendUser | null;
+		creditedStorage?: {
+			amount?: string | null;
+			from?: string | null;
+		} | null;
 	};
-	const customDomainsEnabled =
-		bootstrap.config?.customDomainsEnabled === true;
+	const customDomainsEnabled = bootstrap.config?.customDomainsEnabled === true;
 	const deepFreezeEnabled = bootstrap.config?.deepFreezeEnabled === true;
 	const customDomainTargetHostname =
 		bootstrap.config?.cloudflareForSaas?.targetHostname || "silo.deployor.dev";
@@ -255,8 +258,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [inviteModal, setInviteModal] = useState<InviteModalState | null>(null);
 	const [deepFreezeModal, setDeepFreezeModal] =
 		useState<DeepFreezeModalState | null>(null);
-	const [domainModal, setDomainModal] =
-		useState<BucketDomainModalState | null>(null);
+	const [domainModal, setDomainModal] = useState<BucketDomainModalState | null>(
+		null,
+	);
 
 	const buttonBase =
 		"inline-flex items-center justify-center gap-2 rounded-xl border text-sm font-bold transition-colors";
@@ -340,8 +344,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		[stats?.buckets],
 	);
 
-	const deepFreezeModalBucket =
-		deepFreezeEnabled ? deepFreezeModal?.bucket || null : null;
+	const deepFreezeModalBucket = deepFreezeEnabled
+		? deepFreezeModal?.bucket || null
+		: null;
 	const deepFreezeSnapshot = deepFreezeModalBucket?.deepFreeze;
 
 	const collaborationPermissionState = (permissions?: string[] | null) => ({
@@ -605,22 +610,25 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			prev ? { ...prev, loading: true, error: null } : prev,
 		);
 		try {
-			await fetchJson(`/api/dashboard/buckets/${domainModal.bucket.name}/domains`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					domain: domainModal.newDomain,
-					makePrimary: domainModal.makePrimary,
-				}),
-			});
+			await fetchJson(
+				`/api/dashboard/buckets/${domainModal.bucket.name}/domains`,
+				{
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({
+						domain: domainModal.newDomain,
+						makePrimary: domainModal.makePrimary,
+					}),
+				},
+			);
 			setDomainModal((prev) =>
 				prev
 					? {
-						...prev,
-						newDomain: "",
-						makePrimary: false,
-						loading: false,
-					}
+							...prev,
+							newDomain: "",
+							makePrimary: false,
+							loading: false,
+						}
 					: prev,
 			);
 			await refreshBucketInDomainModal(domainModal.bucket.name);
@@ -628,13 +636,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			setDomainModal((prev) =>
 				prev
 					? {
-						...prev,
-						loading: false,
-						error:
-							error instanceof Error
-								? error.message
-								: "Failed to add custom domain",
-					}
+							...prev,
+							loading: false,
+							error:
+								error instanceof Error
+									? error.message
+									: "Failed to add custom domain",
+						}
 					: prev,
 			);
 		}
@@ -650,21 +658,19 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ action: "verify", domain }),
 			});
-			setDomainModal((prev) =>
-				prev ? { ...prev, loading: false } : prev,
-			);
+			setDomainModal((prev) => (prev ? { ...prev, loading: false } : prev));
 			await refreshBucketInDomainModal(bucketName);
 		} catch (error) {
 			setDomainModal((prev) =>
 				prev
 					? {
-						...prev,
-						loading: false,
-						error:
-							error instanceof Error
-								? error.message
-								: "Failed to verify custom domain",
-					}
+							...prev,
+							loading: false,
+							error:
+								error instanceof Error
+									? error.message
+									: "Failed to verify custom domain",
+						}
 					: prev,
 			);
 		}
@@ -680,21 +686,19 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ action: "set-primary", domain }),
 			});
-			setDomainModal((prev) =>
-				prev ? { ...prev, loading: false } : prev,
-			);
+			setDomainModal((prev) => (prev ? { ...prev, loading: false } : prev));
 			await refreshBucketInDomainModal(bucketName);
 		} catch (error) {
 			setDomainModal((prev) =>
 				prev
 					? {
-						...prev,
-						loading: false,
-						error:
-							error instanceof Error
-								? error.message
-								: "Failed to set primary custom domain",
-					}
+							...prev,
+							loading: false,
+							error:
+								error instanceof Error
+									? error.message
+									: "Failed to set primary custom domain",
+						}
 					: prev,
 			);
 		}
@@ -710,21 +714,19 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ domain }),
 			});
-			setDomainModal((prev) =>
-				prev ? { ...prev, loading: false } : prev,
-			);
+			setDomainModal((prev) => (prev ? { ...prev, loading: false } : prev));
 			await refreshBucketInDomainModal(bucketName);
 		} catch (error) {
 			setDomainModal((prev) =>
 				prev
 					? {
-						...prev,
-						loading: false,
-						error:
-							error instanceof Error
-								? error.message
-								: "Failed to delete custom domain",
-					}
+							...prev,
+							loading: false,
+							error:
+								error instanceof Error
+									? error.message
+									: "Failed to delete custom domain",
+						}
 					: prev,
 			);
 		}
@@ -1266,6 +1268,38 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				</div>
 			) : null}
 
+			{p.creditedStorage?.amount ? (
+				<div className="bg-emerald-500/10 border border-emerald-500/25 rounded-3xl p-5 mb-8 card-shadow flex flex-col md:flex-row md:items-center justify-between gap-4">
+					<div className="flex items-start gap-4">
+						<div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-300">
+							<MdCheckCircle className="text-xl" />
+						</div>
+						<div>
+							<h3 className="text-white font-bold text-lg">
+								Storage credit applied.
+							</h3>
+							<p className="text-text-muted text-sm mt-1">
+								You received{" "}
+								<span className="text-white font-bold">
+									{p.creditedStorage.amount}
+								</span>{" "}
+								from{" "}
+								<span className="text-white font-bold">
+									{p.creditedStorage.from || "a program"}
+								</span>
+								.
+							</p>
+						</div>
+					</div>
+					<a
+						href="/"
+						className="text-xs font-bold uppercase tracking-wider text-emerald-300 hover:text-white transition-colors"
+					>
+						Dismiss
+					</a>
+				</div>
+			) : null}
+
 			<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 				<div className="bg-hc-dark rounded-3xl p-6 border border-white/10 card-shadow">
 					<h3 className="text-text-muted text-sm font-bold uppercase tracking-wider mb-2">
@@ -1333,9 +1367,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			<div className="bg-hc-dark rounded-3xl border border-white/10 overflow-hidden card-shadow">
 				<div className="p-6 border-b border-white/10 flex justify-between items-center">
 					<div>
-						<h2 className="text-xl font-bold text-white">
-							Your buckets
-						</h2>
+						<h2 className="text-xl font-bold text-white">Your buckets</h2>
 						<p className="text-text-muted text-sm mt-1">
 							{ownedBucketCount} /{" "}
 							{stats?.limits.maxBucketsPerUser === -1
@@ -1371,13 +1403,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</thead>
 						<tbody className="divide-y divide-white/5">
 							{sortedBuckets.map((bucket) =>
-														(() => {
-															const isCollaborative = !!bucket.isCollaborative;
-															const isSharing =
-																!isCollaborative && (bucket.collaborators?.length || 0) > 0;
-															const permissions = collaborationPermissionState(
-																bucket.collaborationPermissions,
-															);
+								(() => {
+									const isCollaborative = !!bucket.isCollaborative;
+									const isSharing =
+										!isCollaborative && (bucket.collaborators?.length || 0) > 0;
+									const permissions = collaborationPermissionState(
+										bucket.collaborationPermissions,
+									);
 									const canManageKeys =
 										!isCollaborative || permissions.manageKeys;
 									const canManageCors =
@@ -1393,42 +1425,43 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									return (
 										<tr
 											key={bucket.name}
-										 className={`transition-colors group ${
+											className={`transition-colors group ${
 												deepFreezeState === "frozen"
 													? "bg-sky-500/[0.09] hover:bg-sky-500/[0.13]"
 													: deepFreezeState === "freezing" ||
-													  deepFreezeState === "unfreezing"
+															deepFreezeState === "unfreezing"
 														? "bg-cyan-500/[0.07] hover:bg-cyan-500/[0.11]"
-																	: isCollaborative
-																		? "bg-yellow-400/[0.04] hover:bg-yellow-400/[0.08]"
-																		: isSharing
-																			? "bg-violet-400/[0.05] hover:bg-violet-400/[0.09]"
-																		: "hover:bg-white/5"
+														: isCollaborative
+															? "bg-yellow-400/[0.04] hover:bg-yellow-400/[0.08]"
+															: isSharing
+																? "bg-violet-400/[0.05] hover:bg-violet-400/[0.09]"
+																: "hover:bg-white/5"
 											}`}
 										>
 											<td className="px-6 py-4 font-medium text-white font-mono">
 												{bucket.name}
-													{bucket.isCollaborative ? (
-														<span className="ml-2 bg-yellow-400/15 text-yellow-200 px-1.5 py-0.5 rounded text-[10px] font-bold border border-yellow-400/30 uppercase tracking-wider">
-															Shared
-														</span>
-													) : null}
-													{!bucket.isCollaborative && (bucket.collaborators?.length || 0) > 0 ? (
-														<span className="ml-2 bg-violet-400/15 text-violet-100 px-1.5 py-0.5 rounded text-[10px] font-bold border border-violet-400/30 uppercase tracking-wider">
-															Sharing
-														</span>
-													) : null}
-{bucket.isPaused ? (
+												{bucket.isCollaborative ? (
+													<span className="ml-2 bg-yellow-400/15 text-yellow-200 px-1.5 py-0.5 rounded text-[10px] font-bold border border-yellow-400/30 uppercase tracking-wider">
+														Shared
+													</span>
+												) : null}
+												{!bucket.isCollaborative &&
+												(bucket.collaborators?.length || 0) > 0 ? (
+													<span className="ml-2 bg-violet-400/15 text-violet-100 px-1.5 py-0.5 rounded text-[10px] font-bold border border-violet-400/30 uppercase tracking-wider">
+														Sharing
+													</span>
+												) : null}
+												{bucket.isPaused ? (
 													<span className="ml-2 bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-500/30">
 														PAUSED
 													</span>
 												) : null}
 												{deepFreezeState !== "active" ? (
 													<span
-													 className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${
+														className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${
 															deepFreezeState === "frozen"
-																	? "bg-sky-500/20 text-sky-300 border-sky-400/30"
-																	: "bg-cyan-500/20 text-cyan-200 border-cyan-400/30"
+																? "bg-sky-500/20 text-sky-300 border-sky-400/30"
+																: "bg-cyan-500/20 text-cyan-200 border-cyan-400/30"
 														}`}
 													>
 														{deepFreezeState === "frozen"
@@ -1446,10 +1479,10 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													</span>
 												) : (
 													<button
-													 type="button"
-													 onClick={() => setActiveBucket(bucket)}
-													 disabled={bucketBusy}
-													 className={`${buttonBase} ${buttonNeutral} text-xs px-3 py-1.5 rounded-lg`}
+														type="button"
+														onClick={() => setActiveBucket(bucket)}
+														disabled={bucketBusy}
+														className={`${buttonBase} ${buttonNeutral} text-xs px-3 py-1.5 rounded-lg`}
 													>
 														<MdKey className="text-sm mr-1" />{" "}
 														{bucket.keys.length} Keys
@@ -1471,30 +1504,28 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													</span>
 												) : (
 													<button
-													 type="button"
-													role="switch"
-													aria-checked={bucket.isPublic}
-													disabled={!!bucket.isPaused || visibilityBusy}
-													 onClick={() =>
+														type="button"
+														role="switch"
+														aria-checked={bucket.isPublic}
+														disabled={!!bucket.isPaused || visibilityBusy}
+														onClick={() =>
 															togglePublic(bucket.name, !bucket.isPublic)
 														}
-													 className={`inline-flex items-center gap-2 px-1 py-1 transition-colors ${
-														(bucket.isPaused ||
-															isDeepFrozen ||
-															visibilityBusy)
+														className={`inline-flex items-center gap-2 px-1 py-1 transition-colors ${
+															bucket.isPaused || isDeepFrozen || visibilityBusy
 																? "opacity-50 cursor-not-allowed"
 																: "hover:opacity-90"
 														}`}
 													>
 														<span
-														 className={`relative h-6 w-11 rounded-full border transition-colors ${
+															className={`relative h-6 w-11 rounded-full border transition-colors ${
 																bucket.isPublic
 																	? "bg-hc-red/80 border-hc-red"
 																	: "bg-white/10 border-white/20"
 															}`}
 														>
 															<span
-															 className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+																className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
 																	bucket.isPublic
 																		? "translate-x-5"
 																		: "translate-x-0"
@@ -1516,11 +1547,11 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											</td>
 											<td className="px-6 py-4 text-right flex justify-end items-center gap-1.5">
 												{canOpenFiles && !isDeepFrozen ? (
-													 <a
+													<a
 														href={`/dashboard/buckets/${bucket.name}`}
 														aria-label="Open bucket files"
 														title="Open bucket files"
-													 className={`${iconActionBase} group text-blue-400 hover:text-blue-300 hover:bg-blue-500/10`}
+														className={`${iconActionBase} group text-blue-400 hover:text-blue-300 hover:bg-blue-500/10`}
 													>
 														<MdFolderOpen className="text-base" />
 														<span className={iconActionTooltip}>
@@ -1565,7 +1596,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														className={`${iconActionBase} group text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10`}
 													>
 														<MdPublic className="text-base" />
-														<span className={iconActionTooltip}>Custom domains</span>
+														<span className={iconActionTooltip}>
+															Custom domains
+														</span>
 													</button>
 												) : null}
 												{!isCollaborative && deepFreezeEnabled ? (
@@ -1581,7 +1614,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														disabled={bucketBusy}
 														aria-label="Deep Freeze"
 														title="Deep Freeze"
-													 className={`${iconActionBase} group ${
+														className={`${iconActionBase} group ${
 															deepFreezeState === "active"
 																? "text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
 																: "text-slate-300 hover:text-slate-200 hover:bg-slate-500/10"
@@ -1601,9 +1634,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												{!isCollaborative ? (
 													<button
 														type="button"
-														onClick={() =>
-															deleteBucket(bucket.name, true)
-														}
+														onClick={() => deleteBucket(bucket.name, true)}
 														disabled={bucketBusy || isDeepFrozen}
 														aria-label="Empty bucket"
 														title="Empty bucket"
@@ -1618,9 +1649,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												{!isCollaborative ? (
 													<button
 														type="button"
-														onClick={() =>
-															deleteBucket(bucket.name, false)
-														}
+														onClick={() => deleteBucket(bucket.name, false)}
 														disabled={bucketBusy || isDeepFrozen}
 														aria-label="Delete bucket"
 														title="Delete bucket"
@@ -1632,7 +1661,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														</span>
 													</button>
 												) : null}
-</td>
+											</td>
 										</tr>
 									);
 								})(),
@@ -1669,14 +1698,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										)
 									}
 									placeholder="Search people"
-								 className="w-full md:w-64 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-300"
+									className="w-full md:w-64 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-300"
 								/>
 								<button
 									type="button"
 									onClick={() =>
 										openInviteModal(collaborationModal.bucket.name)
 									}
-									 className={`${buttonBase} bg-yellow-400 hover:bg-yellow-300 border-yellow-400 text-black px-4 py-3`}
+									className={`${buttonBase} bg-yellow-400 hover:bg-yellow-300 border-yellow-400 text-black px-4 py-3`}
 								>
 									Invite
 								</button>
@@ -1696,61 +1725,58 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</p>
 								) : (
 									collaborationEntries.map((collaborator) => {
-											const permissionState = collaborationPermissionState(
-												collaborator.permissions,
-											);
-											const avatarUrl = collaboratorAvatarUrl(
-												collaborator.user.slackId,
-											);
-											return (
-												<div
-												 key={collaborator.id}
-												 className="rounded-2xl border border-white/10 bg-black/20 p-4"
-												>
-													<div className="flex items-start justify-between gap-4">
-														<div className="flex items-center gap-3 min-w-0">
-															{avatarUrl ? (
-																<img
-																	src={avatarUrl}
-																	alt={collaborator.user.id}
-																 className="w-10 h-10 rounded-full"
-																/>
-															) : (
-																<div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-sm font-black text-white">
-																	{collaborator.user.id
-																		.slice(0, 1)
-																		.toUpperCase()}
-																</div>
-															)}
-															<div className="min-w-0">
-																<p className="text-white font-mono text-sm truncate">
-																	{collaborator.user.id}
-																</p>
-																{collaborator.user.email ? (
-																	<p className="text-text-muted text-xs truncate">
-																		{collaborator.user.email}
-																	</p>
-																) : null}
-																<p className="text-[11px] uppercase tracking-wider text-yellow-200 mt-1">
-																	{collaborator.status === "accepted"
-																		? "Collaborator"
-																		: "Invited"}
-																</p>
+										const permissionState = collaborationPermissionState(
+											collaborator.permissions,
+										);
+										const avatarUrl = collaboratorAvatarUrl(
+											collaborator.user.slackId,
+										);
+										return (
+											<div
+												key={collaborator.id}
+												className="rounded-2xl border border-white/10 bg-black/20 p-4"
+											>
+												<div className="flex items-start justify-between gap-4">
+													<div className="flex items-center gap-3 min-w-0">
+														{avatarUrl ? (
+															<img
+																src={avatarUrl}
+																alt={collaborator.user.id}
+																className="w-10 h-10 rounded-full"
+															/>
+														) : (
+															<div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-sm font-black text-white">
+																{collaborator.user.id.slice(0, 1).toUpperCase()}
 															</div>
+														)}
+														<div className="min-w-0">
+															<p className="text-white font-mono text-sm truncate">
+																{collaborator.user.id}
+															</p>
+															{collaborator.user.email ? (
+																<p className="text-text-muted text-xs truncate">
+																	{collaborator.user.email}
+																</p>
+															) : null}
+															<p className="text-[11px] uppercase tracking-wider text-yellow-200 mt-1">
+																{collaborator.status === "accepted"
+																	? "Collaborator"
+																	: "Invited"}
+															</p>
 														</div>
+													</div>
 													<button
 														type="button"
 														onClick={() =>
 															void removeCollaborator(
-															collaborationModal.bucket.name,
-															collaborator.id,
-														)
-													}
-															disabled={
-																collaborationModal.deletingId ===
-																collaborator.id
-															}
-													 className="text-hc-red hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold uppercase tracking-wider"
+																collaborationModal.bucket.name,
+																collaborator.id,
+															)
+														}
+														disabled={
+															collaborationModal.deletingId === collaborator.id
+														}
+														className="text-hc-red hover:text-red-300 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold uppercase tracking-wider"
 													>
 														{collaborationModal.deletingId === collaborator.id
 															? "Removing..."
@@ -1758,64 +1784,64 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																? "Cancel invite"
 																: "Remove"}
 													</button>
-													</div>
-													<div className="mt-4 grid sm:grid-cols-2 gap-3">
-														{[
-															["manageKeys", "Manage keys"],
-															["manageCors", "Manage CORS"],
-															["filesRead", "File explorer read"],
-															["filesWrite", "File explorer write"],
-														].map(([key, label]) => (
-															<label
-																key={String(key)}
-															 className="rounded-xl border border-white/10 bg-black/20 px-3 py-3 flex items-center gap-3"
-															>
-																<input
-																	type="checkbox"
-																	checked={
-																		permissionState[
-																			key as keyof InviteModalState["permissions"]
-																		]
-																	}
-																	onChange={(event) => {
-																		const nextState = applyPermissionToggle(
-																			permissionState,
-																			key as keyof InviteModalState["permissions"],
-																			event.target.checked,
-																		);
-																		void updateCollaboratorPermissions(
-																			collaborationModal.bucket.name,
-																			collaborator.id,
-																			collaborationPermissionList(nextState),
-																		);
-																	}}
-																	disabled={
-																		collaborationModal.savingId ===
-																		collaborator.id
-																	}
-																/>
-																<span className="text-sm text-white">
-																	{label}
-																</span>
-															</label>
-														))}
-													</div>
-													{collaborationModal.savingId === collaborator.id ? (
-														<p className="mt-3 text-xs text-text-muted">
-															Updating permissions…
-														</p>
-													) : null}
 												</div>
-											);
-										})
+												<div className="mt-4 grid sm:grid-cols-2 gap-3">
+													{[
+														["manageKeys", "Manage keys"],
+														["manageCors", "Manage CORS"],
+														["filesRead", "File explorer read"],
+														["filesWrite", "File explorer write"],
+													].map(([key, label]) => (
+														<label
+															key={String(key)}
+															className="rounded-xl border border-white/10 bg-black/20 px-3 py-3 flex items-center gap-3"
+														>
+															<input
+																type="checkbox"
+																checked={
+																	permissionState[
+																		key as keyof InviteModalState["permissions"]
+																	]
+																}
+																onChange={(event) => {
+																	const nextState = applyPermissionToggle(
+																		permissionState,
+																		key as keyof InviteModalState["permissions"],
+																		event.target.checked,
+																	);
+																	void updateCollaboratorPermissions(
+																		collaborationModal.bucket.name,
+																		collaborator.id,
+																		collaborationPermissionList(nextState),
+																	);
+																}}
+																disabled={
+																	collaborationModal.savingId ===
+																	collaborator.id
+																}
+															/>
+															<span className="text-sm text-white">
+																{label}
+															</span>
+														</label>
+													))}
+												</div>
+												{collaborationModal.savingId === collaborator.id ? (
+													<p className="mt-3 text-xs text-text-muted">
+														Updating permissions…
+													</p>
+												) : null}
+											</div>
+										);
+									})
 								)}
 							</div>
 						</div>
 						<div className="flex justify-end gap-3">
 							<button
 								type="button"
-							 onClick={() => setCollaborationModal(null)}
-							 className={`${buttonBase} ${buttonSubtle}`}
+								onClick={() => setCollaborationModal(null)}
+								className={`${buttonBase} ${buttonSubtle}`}
 							>
 								Close
 							</button>
@@ -1824,210 +1850,272 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				) : null}
 			</Modal>
 
-			{customDomainsEnabled ? <Modal
-				open={!!domainModal}
-				onClose={() => setDomainModal(null)}
-				title="Custom Domains"
-				className="max-w-2xl p-8"
-			>
-				{domainModal ? (
-					<div className="space-y-6">
-						<div>
-							<p className="text-sm font-mono text-text-muted">
-								{domainModal.bucket.name}
-							</p>
-							<p className="mt-2 text-sm text-text-muted">
-								Limit 10 custom domains per bucket.
-							</p>
-						</div>
+			{customDomainsEnabled ? (
+				<Modal
+					open={!!domainModal}
+					onClose={() => setDomainModal(null)}
+					title="Custom Domains"
+					className="max-w-2xl p-8"
+				>
+					{domainModal ? (
+						<div className="space-y-6">
+							<div>
+								<p className="text-sm font-mono text-text-muted">
+									{domainModal.bucket.name}
+								</p>
+								<p className="mt-2 text-sm text-text-muted">
+									Limit 10 custom domains per bucket.
+								</p>
+							</div>
 
-						<div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
-							<p className="text-sm font-bold text-white">Enter domain</p>
-							<div className="mt-4 flex flex-col gap-3 lg:flex-row">
-								<input
-									type="text"
-									value={domainModal.newDomain}
-									onChange={(event) =>
-										setDomainModal((prev) =>
-											prev
-												? {
-													...prev,
-													newDomain: event.target.value,
-													error: null,
-												}
-												: prev,
-										)
-									}
-									placeholder="assets.example.com"
-									className="flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-white focus:outline-none focus:border-violet-300"
-								/>
-								<label className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white">
+							<div className="rounded-[28px] border border-white/10 bg-black/20 p-5">
+								<p className="text-sm font-bold text-white">Enter domain</p>
+								<div className="mt-4 flex flex-col gap-3 lg:flex-row">
 									<input
-										type="checkbox"
-										checked={domainModal.makePrimary}
+										type="text"
+										value={domainModal.newDomain}
 										onChange={(event) =>
 											setDomainModal((prev) =>
 												prev
-													? { ...prev, makePrimary: event.target.checked }
+													? {
+															...prev,
+															newDomain: event.target.value,
+															error: null,
+														}
 													: prev,
 											)
 										}
+										placeholder="assets.example.com"
+										className="flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-3 font-mono text-white focus:outline-none focus:border-violet-300"
 									/>
-									Make primary after verify
-								</label>
-								<button
-									type="button"
-									onClick={() => void addCustomDomain()}
-									disabled={domainModal.loading}
-									className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
-								>
-									{domainModal.loading ? "Saving..." : "Add domain"}
-								</button>
-							</div>
-							<p className="mt-4 text-xs text-text-muted">
-								After adding a domain, complete every DNS record shown below. Some hostnames need both the ownership TXT and one or more `_acme-challenge` SSL validation TXT records before HTTPS will issue.
-							</p>
-							</div>
-
-						{domainModal.error ? (
-							<p className="text-sm text-red-400">{domainModal.error}</p>
-						) : null}
-
-						{(domainModal.bucket.customDomains || []).length === 0 ? (
-							<div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-sm text-text-muted">
-								No custom domains configured yet.
-							</div>
-						) : (
-							<div className="space-y-3">
-								{(domainModal.bucket.customDomains || []).map((domain) => (
-									<div
-										key={domain.domain}
-										className="rounded-[28px] border border-white/10 bg-black/20 p-5"
+									<label className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white">
+										<input
+											type="checkbox"
+											checked={domainModal.makePrimary}
+											onChange={(event) =>
+												setDomainModal((prev) =>
+													prev
+														? { ...prev, makePrimary: event.target.checked }
+														: prev,
+												)
+											}
+										/>
+										Make primary after verify
+									</label>
+									<button
+										type="button"
+										onClick={() => void addCustomDomain()}
+										disabled={domainModal.loading}
+										className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
 									>
-										<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-											<div className="min-w-0">
-												<div className="flex flex-wrap items-center gap-2">
-													<p className="break-all font-mono text-white">{domain.domain}</p>
-													{domain.primary ? (
-														<span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
-															Primary
+										{domainModal.loading ? "Saving..." : "Add domain"}
+									</button>
+								</div>
+								<p className="mt-4 text-xs text-text-muted">
+									After adding a domain, complete every DNS record shown below.
+									Some hostnames need both the ownership TXT and one or more
+									`_acme-challenge` SSL validation TXT records before HTTPS will
+									issue.
+								</p>
+							</div>
+
+							{domainModal.error ? (
+								<p className="text-sm text-red-400">{domainModal.error}</p>
+							) : null}
+
+							{(domainModal.bucket.customDomains || []).length === 0 ? (
+								<div className="rounded-2xl border border-white/10 bg-black/20 p-5 text-sm text-text-muted">
+									No custom domains configured yet.
+								</div>
+							) : (
+								<div className="space-y-3">
+									{(domainModal.bucket.customDomains || []).map((domain) => (
+										<div
+											key={domain.domain}
+											className="rounded-[28px] border border-white/10 bg-black/20 p-5"
+										>
+											<div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+												<div className="min-w-0">
+													<div className="flex flex-wrap items-center gap-2">
+														<p className="break-all font-mono text-white">
+															{domain.domain}
+														</p>
+														{domain.primary ? (
+															<span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
+																Primary
+															</span>
+														) : null}
+														<span
+															className={`rounded-full border px-2 py-1 text-[11px] font-bold uppercase tracking-wider ${domain.verified ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300" : "border-yellow-400/30 bg-yellow-400/10 text-yellow-100"}`}
+														>
+															{domain.verified ? "Verified" : "Pending"}
 														</span>
-													) : null}
-													<span className={`rounded-full border px-2 py-1 text-[11px] font-bold uppercase tracking-wider ${domain.verified ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300" : "border-yellow-400/30 bg-yellow-400/10 text-yellow-100"}`}>
-														{domain.verified ? "Verified" : "Pending"}
-													</span>
+													</div>
+													<div className="mt-3 space-y-2 text-xs text-text-muted">
+														<div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)]">
+															<span>Type</span>
+															<span className="font-mono text-white">
+																CNAME / ALIAS
+															</span>
+															<span>Name</span>
+															<span className="font-mono text-white">
+																{domain.domain}
+															</span>
+															<span>Value</span>
+															<span className="font-mono text-white">
+																{customDomainTargetHostname}
+															</span>
+														</div>
+														<div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)] pt-2">
+															<span>Ownership</span>
+															<span className="font-mono text-white">TXT</span>
+															<span>Name</span>
+															<span className="font-mono text-white">
+																{domain.ownershipVerification?.name ||
+																	`_cf-custom-hostname.${domain.domain}`}
+															</span>
+															<span>Value</span>
+															<div className="flex items-center gap-2 min-w-0">
+																<span className="break-all font-mono text-white">
+																	{domain.ownershipVerification?.value ||
+																		domain.verificationToken}
+																</span>
+																<button
+																	type="button"
+																	onClick={() =>
+																		copyText(
+																			domain.ownershipVerification?.value ||
+																				domain.verificationToken,
+																		)
+																	}
+																	className="text-text-muted hover:text-white"
+																	title="Copy token"
+																>
+																	<MdContentCopy className="text-sm" />
+																</button>
+															</div>
+														</div>
+														{(domain.sslValidationRecords || []).length > 0 ? (
+															<div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-yellow-100">
+																Cloudflare is also requesting SSL/DCV TXT
+																records. Add every `_acme-challenge` record
+																shown below before expecting HTTPS to work.
+															</div>
+														) : null}
+														{(domain.sslValidationRecords || []).length > 0 ? (
+															<div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)] pt-2">
+																<span>SSL DCV</span>
+																<div className="space-y-2">
+																	{(domain.sslValidationRecords || []).map(
+																		(record) => (
+																			<div
+																				key={`${record.txtName}:${record.txtValue}`}
+																				className="rounded-xl border border-white/10 bg-black/20 p-3"
+																			>
+																				<div className="font-mono text-white break-all">
+																					{record.txtName}
+																				</div>
+																				<div className="mt-1 font-mono text-white/80 break-all">
+																					{record.txtValue}
+																				</div>
+																				<div className="mt-1 uppercase tracking-wider text-[10px] text-text-muted">
+																					{record.status}
+																				</div>
+																			</div>
+																		),
+																	)}
+																</div>
+															</div>
+														) : null}
+														{(domain.verificationErrors || []).length > 0 ? (
+															<div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-red-200">
+																{domain.verificationErrors?.join(" • ")}
+															</div>
+														) : null}
+														{!bootstrap.config?.cloudflareForSaas
+															?.configured ? (
+															<div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-yellow-100">
+																Cloudflare for SaaS is not fully configured on
+																this deployment yet.
+															</div>
+														) : null}
+														{!domain.verified ? (
+															<p className="text-[11px] text-text-muted">
+																If Cloudflare shows `_acme-challenge.
+																{domain.domain}`, that record is mandatory too.
+																The ownership TXT by itself is not enough to
+																finish SSL issuance.
+															</p>
+														) : null}
+														<p className="font-mono text-white/80">
+															https://{domain.domain}/file.png
+														</p>
+														<p className="text-[11px] uppercase tracking-wider text-text-muted">
+															Hostname status: {domain.status || "pending"} ·
+															SSL: {domain.sslStatus || "pending"}
+														</p>
+													</div>
 												</div>
-											<div className="mt-3 space-y-2 text-xs text-text-muted">
-												<div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)]">
-													<span>Type</span>
-													<span className="font-mono text-white">CNAME / ALIAS</span>
-													<span>Name</span>
-													<span className="font-mono text-white">{domain.domain}</span>
-													<span>Value</span>
-													<span className="font-mono text-white">{customDomainTargetHostname}</span>
-												</div>
-												<div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)] pt-2">
-													<span>Ownership</span>
-													<span className="font-mono text-white">TXT</span>
-													<span>Name</span>
-													<span className="font-mono text-white">{domain.ownershipVerification?.name || `_cf-custom-hostname.${domain.domain}`}</span>
-													<span>Value</span>
-													<div className="flex items-center gap-2 min-w-0">
-														<span className="break-all font-mono text-white">{domain.ownershipVerification?.value || domain.verificationToken}</span>
+												<div className="flex flex-wrap gap-2">
+													{!domain.verified ? (
 														<button
 															type="button"
 															onClick={() =>
-																copyText(domain.ownershipVerification?.value || domain.verificationToken)
+																void verifyCustomDomain(
+																	domainModal.bucket.name,
+																	domain.domain,
+																)
 															}
-															className="text-text-muted hover:text-white"
-															title="Copy token"
+															disabled={domainModal.loading}
+															className={`${buttonBase} ${buttonNeutral}`}
 														>
-																<MdContentCopy className="text-sm" />
-															</button>
-														</div>
-													</div>
-													{(domain.sslValidationRecords || []).length > 0 ? (
-														<div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-yellow-100">
-															Cloudflare is also requesting SSL/DCV TXT records. Add every `_acme-challenge` record shown below before expecting HTTPS to work.
-														</div>
+															Check DNS + verify
+														</button>
 													) : null}
-													{(domain.sslValidationRecords || []).length > 0 ? (
-														<div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)] pt-2">
-															<span>SSL DCV</span>
-															<div className="space-y-2">
-																{(domain.sslValidationRecords || []).map((record) => (
-																	<div key={`${record.txtName}:${record.txtValue}`} className="rounded-xl border border-white/10 bg-black/20 p-3">
-																	<div className="font-mono text-white break-all">{record.txtName}</div>
-																	<div className="mt-1 font-mono text-white/80 break-all">{record.txtValue}</div>
-																	<div className="mt-1 uppercase tracking-wider text-[10px] text-text-muted">{record.status}</div>
-																</div>
-																))}
-															</div>
-														</div>
+													{domain.verified && !domain.primary ? (
+														<button
+															type="button"
+															onClick={() =>
+																void setPrimaryCustomDomain(
+																	domainModal.bucket.name,
+																	domain.domain,
+																)
+															}
+															disabled={domainModal.loading}
+															className={`${buttonBase} ${buttonNeutral}`}
+														>
+															Set primary
+														</button>
 													) : null}
-													{(domain.verificationErrors || []).length > 0 ? (
-														<div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-red-200">
-															{domain.verificationErrors?.join(" • ")}
-														</div>
-													) : null}
-													{!bootstrap.config?.cloudflareForSaas?.configured ? (
-														<div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-yellow-100">
-															Cloudflare for SaaS is not fully configured on this deployment yet.
-														</div>
-													) : null}
-													{!domain.verified ? (
-														<p className="text-[11px] text-text-muted">
-															If Cloudflare shows `_acme-challenge.{domain.domain}`, that record is mandatory too. The ownership TXT by itself is not enough to finish SSL issuance.
-														</p>
-													) : null}
-													<p className="font-mono text-white/80">https://{domain.domain}/file.png</p>
-													<p className="text-[11px] uppercase tracking-wider text-text-muted">Hostname status: {domain.status || "pending"} · SSL: {domain.sslStatus || "pending"}</p>
+													<button
+														type="button"
+														onClick={() =>
+															void deleteCustomDomain(
+																domainModal.bucket.name,
+																domain.domain,
+															)
+														}
+														disabled={domainModal.loading}
+														className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-bold text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+													>
+														Remove
+													</button>
 												</div>
 											</div>
-											<div className="flex flex-wrap gap-2">
-												{!domain.verified ? (
-													<button
-														type="button"
-														onClick={() => void verifyCustomDomain(domainModal.bucket.name, domain.domain)}
-														disabled={domainModal.loading}
-														className={`${buttonBase} ${buttonNeutral}`}
-													>
-														Check DNS + verify
-													</button>
-												) : null}
-												{domain.verified && !domain.primary ? (
-													<button
-														type="button"
-														onClick={() => void setPrimaryCustomDomain(domainModal.bucket.name, domain.domain)}
-														disabled={domainModal.loading}
-														className={`${buttonBase} ${buttonNeutral}`}
-													>
-														Set primary
-													</button>
-												) : null}
-												<button
-													type="button"
-													onClick={() => void deleteCustomDomain(domainModal.bucket.name, domain.domain)}
-													disabled={domainModal.loading}
-													className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-bold text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50"
-												>
-													Remove
-												</button>
-											</div>
 										</div>
-									</div>
-								))}
-							</div>
-						)}
-					</div>
-				) : null}
-			</Modal> : null}
+									))}
+								</div>
+							)}
+						</div>
+					) : null}
+				</Modal>
+			) : null}
 
 			<Modal
 				open={!!inviteModal}
 				onClose={() => setInviteModal(null)}
 				title="Invite Collaborator"
-			 className="max-w-2xl p-8"
+				className="max-w-2xl p-8"
 			>
 				{inviteModal ? (
 					<div className="space-y-5">
@@ -2051,13 +2139,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									)
 								}
 								placeholder="Enter user ID"
-							 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-300"
+								className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-300"
 							/>
 							<button
 								type="button"
-							 onClick={() => void lookupCollaborator()}
-							 disabled={inviteModal.lookup.loading}
-							 className={`${buttonBase} ${buttonNeutral}`}
+								onClick={() => void lookupCollaborator()}
+								disabled={inviteModal.lookup.loading}
+								className={`${buttonBase} ${buttonNeutral}`}
 							>
 								{inviteModal.lookup.loading ? "Checking..." : "Check user"}
 							</button>
@@ -2071,7 +2159,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<img
 										src={inviteModal.lookup.user.avatarUrl}
 										alt={inviteModal.lookup.user.id}
-									 className="w-10 h-10 rounded-full"
+										className="w-10 h-10 rounded-full"
 									/>
 								) : null}
 								<div>
@@ -2108,7 +2196,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								].map(([key, label, hint]) => (
 									<label
 										key={String(key)}
-									 className="rounded-2xl border border-white/10 bg-black/20 p-4 flex items-start gap-3"
+										className="rounded-2xl border border-white/10 bg-black/20 p-4 flex items-start gap-3"
 									>
 										<input
 											type="checkbox"
@@ -2147,16 +2235,16 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div className="flex justify-end gap-3">
 							<button
 								type="button"
-							 onClick={() => setInviteModal(null)}
-							 className={`${buttonBase} ${buttonSubtle}`}
+								onClick={() => setInviteModal(null)}
+								className={`${buttonBase} ${buttonSubtle}`}
 							>
 								Cancel
 							</button>
 							<button
 								type="button"
-							 onClick={() => void saveCollaborationInvite()}
-							 disabled={inviteModal.saving || !inviteModal.lookup.user}
-							 className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
+								onClick={() => void saveCollaborationInvite()}
+								disabled={inviteModal.saving || !inviteModal.lookup.user}
+								className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
 							>
 								{inviteModal.saving ? "Sending..." : "Send invite"}
 							</button>
@@ -2169,7 +2257,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!bucketCreateModal}
 				onClose={() => setBucketCreateModal(null)}
 				title={undefined}
-			 className="max-w-md p-8"
+				className="max-w-md p-8"
 			>
 				{bucketCreateModal ? (
 					<div className="space-y-5">
@@ -2177,7 +2265,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div>
 							<label
 								htmlFor="create-bucket-name"
-							 className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
+								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
 							>
 								Bucket Name
 							</label>
@@ -2193,7 +2281,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									)
 								}
 								placeholder="my-awesome-project"
-							 className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red font-mono placeholder-white/20 transition-colors"
+								className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red font-mono placeholder-white/20 transition-colors"
 							/>
 							<p className="text-xs text-text-muted mt-2">
 								Only lowercase letters, numbers, and hyphens. Minimum 3
@@ -2206,7 +2294,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div>
 							<label
 								htmlFor="create-bucket-note"
-							 className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
+								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
 							>
 								Default Key Note
 							</label>
@@ -2221,7 +2309,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									)
 								}
 								placeholder="Optional note for the first key"
-							 className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red transition-colors resize-y"
+								className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red transition-colors resize-y"
 							/>
 						</div>
 						{bucketCreateModal.error ? (
@@ -2231,7 +2319,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<button
 								type="button"
 								onClick={() => setBucketCreateModal(null)}
-							 className={`${buttonBase} ${buttonSubtle}`}
+								className={`${buttonBase} ${buttonSubtle}`}
 							>
 								Cancel
 							</button>
@@ -2239,7 +2327,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								type="button"
 								onClick={submitCreateBucket}
 								disabled={bucketCreateModal.loading}
-							 className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
+								className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
 							>
 								{bucketCreateModal.loading ? "Creating..." : "Create Bucket"}
 							</button>
@@ -2252,7 +2340,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!activeBucket}
 				onClose={() => setActiveBucket(null)}
 				title="Manage Keys"
-			 className="max-w-4xl p-8"
+				className="max-w-4xl p-8"
 			>
 				{activeBucket ? (
 					<>
@@ -2274,7 +2362,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										activeBucket.keys.map((k) => (
 											<tr
 												key={k.id}
-											 className="hover:bg-white/5 transition-colors"
+												className="hover:bg-white/5 transition-colors"
 											>
 												<td className="px-4 py-3 font-mono text-white">
 													{k.accessKey}
@@ -2285,14 +2373,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 															<input
 																type="text"
 																value={editingKeyNote.value}
-															 onChange={(e) =>
+																onChange={(e) =>
 																	setEditingKeyNote((prev) =>
 																		prev
 																			? { ...prev, value: e.target.value }
 																			: prev,
 																	)
 																}
-															 onKeyDown={(e) => {
+																onKeyDown={(e) => {
 																	if (e.key === "Enter") {
 																		e.preventDefault();
 																		void saveInlineKeyNote(activeBucket.name);
@@ -2301,71 +2389,71 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																		setEditingKeyNote(null);
 																	}
 																}}
-															 className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-hc-red"
+																className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-hc-red"
 															/>
 															<button
-															 type="button"
-															 onClick={() =>
+																type="button"
+																onClick={() =>
 																	void saveInlineKeyNote(activeBucket.name)
 																}
-															 disabled={editingKeyNote.saving}
-															 className="text-emerald-400 hover:text-emerald-300"
+																disabled={editingKeyNote.saving}
+																className="text-emerald-400 hover:text-emerald-300"
 															>
 																<MdCheck className="text-base" />
 															</button>
 														</div>
-												 ) : k.note ? (
+													) : k.note ? (
 														<div className="flex items-center gap-2">
 															<span className="text-white/80" title={k.note}>
 																{k.note}
 															</span>
 															<button
-															 type="button"
-															 onClick={() => startEditingKeyNote(k)}
-															 className="text-text-muted hover:text-white"
-															 title="Edit note"
+																type="button"
+																onClick={() => startEditingKeyNote(k)}
+																className="text-text-muted hover:text-white"
+																title="Edit note"
 															>
 																<MdEdit className="text-sm" />
 															</button>
 														</div>
-												 ) : (
+													) : (
 														<button
 															type="button"
-														 onClick={() => startEditingKeyNote(k)}
-														 className="inline-flex items-center gap-2 italic hover:not-italic text-text-muted hover:text-white"
+															onClick={() => startEditingKeyNote(k)}
+															className="inline-flex items-center gap-2 italic hover:not-italic text-text-muted hover:text-white"
 														>
 															No note <MdEdit className="text-sm" />
 														</button>
-												 )}
+													)}
 												</td>
 												<td className="px-4 py-3">
 													{k.isPaused ? (
 														<div className="inline-flex items-center gap-2 text-red-300">
 															<span
-															 className="inline-flex h-3 w-3 rounded-full bg-red-400 ring-2 ring-red-400/20 shrink-0"
-															 title={k.pauseReason || k.note || "Deactivated"}
+																className="inline-flex h-3 w-3 rounded-full bg-red-400 ring-2 ring-red-400/20 shrink-0"
+																title={k.pauseReason || k.note || "Deactivated"}
 															/>
 															<span className="text-xs font-bold uppercase tracking-wider">
 																Off
 															</span>
 														</div>
-												 ) : (
+													) : (
 														<div className="inline-flex items-center gap-2 text-emerald-300">
 															<span
-															 className="inline-flex h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-emerald-400/20 shrink-0"
-															 title="Active"
+																className="inline-flex h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-emerald-400/20 shrink-0"
+																title="Active"
 															/>
 															<span className="text-xs font-bold uppercase tracking-wider">
 																On
 															</span>
 														</div>
-												 )}
+													)}
 												</td>
 												<td className="px-4 py-3 text-right">
 													<div className="flex justify-end gap-2">
 														<button
-														 type="button"
-														 onClick={() =>
+															type="button"
+															onClick={() =>
 																k.isPaused
 																	? void setKeyPaused(
 																			activeBucket.name,
@@ -2373,16 +2461,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																			null,
 																			false,
 																		)
-																	: openDeactivateKeyModal(
-																			activeBucket.name,
-																			k,
-																		)
+																	: openDeactivateKeyModal(activeBucket.name, k)
 															}
 															disabled={
 																pendingActionKey ===
 																`dashboard-key-toggle:${activeBucket.name}:${k.id}`
 															}
-														 className={`text-xs font-bold uppercase tracking-wider ${k.isPaused ? "text-emerald-400 hover:text-emerald-300" : "text-yellow-300 hover:text-yellow-200"}`}
+															className={`text-xs font-bold uppercase tracking-wider ${k.isPaused ? "text-emerald-400 hover:text-emerald-300" : "text-yellow-300 hover:text-yellow-200"}`}
 														>
 															{pendingActionKey ===
 															`dashboard-key-toggle:${activeBucket.name}:${k.id}`
@@ -2392,11 +2477,11 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 																	: "Deactivate"}
 														</button>
 														<button
-														 type="button"
-														 onClick={() => deleteKey(activeBucket.name, k.id)}
-														 aria-label="Delete key"
-														 title="Delete key"
-														 className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10 ml-auto`}
+															type="button"
+															onClick={() => deleteKey(activeBucket.name, k.id)}
+															aria-label="Delete key"
+															title="Delete key"
+															className={`${iconActionBase} group text-hc-red hover:text-red-400 hover:bg-hc-red/10 ml-auto`}
 														>
 															<MdDeleteForever className="text-base" />
 															<span className={iconActionTooltip}>
@@ -2411,7 +2496,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<tr>
 											<td
 												colSpan={4}
-											 className="px-4 py-8 text-center text-text-muted italic"
+												className="px-4 py-8 text-center text-text-muted italic"
 											>
 												No keys found for this bucket.
 											</td>
@@ -2432,7 +2517,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<button
 								type="button"
 								onClick={() => openGenerateKeyModal(activeBucket.name)}
-							 className={`${buttonBase} ${buttonPrimaryBlue}`}
+								className={`${buttonBase} ${buttonPrimaryBlue}`}
 							>
 								+ Generate New Key
 							</button>
@@ -2445,7 +2530,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!keyDeactivateModal}
 				onClose={() => setKeyDeactivateModal(null)}
 				title="Deactivate Key"
-			 className="max-w-md p-8"
+				className="max-w-md p-8"
 			>
 				{keyDeactivateModal ? (
 					<div className="space-y-5">
@@ -2455,14 +2540,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div>
 							<label
 								htmlFor="deactivate-key-note"
-							 className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
+								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
 							>
 								Deactivate Note
 							</label>
 							<textarea
 								id="deactivate-key-note"
 								value={keyDeactivateModal.note}
-							 onChange={(e) =>
+								onChange={(e) =>
 									setKeyDeactivateModal((prev) =>
 										prev
 											? { ...prev, note: e.target.value, error: null }
@@ -2470,7 +2555,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									)
 								}
 								placeholder="Optional note shown when hovering the red status dot"
-							 className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red transition-colors resize-y"
+								className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red transition-colors resize-y"
 							/>
 						</div>
 						{keyDeactivateModal.error ? (
@@ -2479,17 +2564,17 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div className="flex justify-end gap-3">
 							<button
 								type="button"
-							 onClick={() => setKeyDeactivateModal(null)}
-							 disabled={keyDeactivateModal.loading}
-							 className={`${buttonBase} ${buttonSubtle}`}
+								onClick={() => setKeyDeactivateModal(null)}
+								disabled={keyDeactivateModal.loading}
+								className={`${buttonBase} ${buttonSubtle}`}
 							>
 								Cancel
 							</button>
 							<button
 								type="button"
-							 onClick={submitDeactivateKey}
-							 disabled={keyDeactivateModal.loading}
-							 className={`${buttonBase} ${buttonPrimaryRed} disabled:opacity-50`}
+								onClick={submitDeactivateKey}
+								disabled={keyDeactivateModal.loading}
+								className={`${buttonBase} ${buttonPrimaryRed} disabled:opacity-50`}
 							>
 								{keyDeactivateModal.loading
 									? "Deactivating..."
@@ -2504,7 +2589,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!keyCreateModal}
 				onClose={() => setKeyCreateModal(null)}
 				title={undefined}
-			 className="max-w-md p-8"
+				className="max-w-md p-8"
 			>
 				{keyCreateModal ? (
 					<div className="space-y-5">
@@ -2519,7 +2604,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div>
 							<label
 								htmlFor="generate-key-note"
-							 className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
+								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
 							>
 								Key Note
 							</label>
@@ -2534,7 +2619,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									)
 								}
 								placeholder="Optional note for this key"
-							 className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red transition-colors resize-y"
+								className="w-full min-h-24 bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-hc-red focus:ring-1 focus:ring-hc-red transition-colors resize-y"
 							/>
 						</div>
 						{keyCreateModal.error ? (
@@ -2543,16 +2628,16 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div className="flex justify-end gap-3">
 							<button
 								type="button"
-							 onClick={() => setKeyCreateModal(null)}
-							 className={`${buttonBase} ${buttonSubtle}`}
+								onClick={() => setKeyCreateModal(null)}
+								className={`${buttonBase} ${buttonSubtle}`}
 							>
 								Cancel
 							</button>
 							<button
 								type="button"
-							 onClick={submitGenerateKey}
-							 disabled={keyCreateModal.loading}
-							 className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
+								onClick={submitGenerateKey}
+								disabled={keyCreateModal.loading}
+								className={`${buttonBase} ${buttonPrimaryBlue} disabled:opacity-50`}
 							>
 								{keyCreateModal.loading ? "Generating..." : "Generate Key"}
 							</button>
@@ -2565,7 +2650,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!corsBucket}
 				onClose={() => setCorsBucket(null)}
 				title="CORS Configuration"
-			 className="max-w-3xl p-8"
+				className="max-w-3xl p-8"
 			>
 				{corsBucket ? (
 					<>
@@ -2589,7 +2674,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									setCorsEditor(e.target.value);
 									setCorsError(null);
 								}}
-							 className="w-full h-64 bg-black/40 p-4 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-hc-red/40 resize-none"
+								className="w-full h-64 bg-black/40 p-4 text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-hc-red/40 resize-none"
 							/>
 						</div>
 
@@ -2603,7 +2688,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							<button
 								type="button"
 								onClick={resetCors}
-							 className={`${buttonBase} bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300 px-4 py-2.5`}
+								className={`${buttonBase} bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/30 text-amber-300 px-4 py-2.5`}
 							>
 								Reset CORS
 							</button>
@@ -2611,14 +2696,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<button
 									type="button"
 									onClick={() => setCorsBucket(null)}
-								 className={`${buttonBase} ${buttonSubtle}`}
+									className={`${buttonBase} ${buttonSubtle}`}
 								>
 									Cancel
 								</button>
 								<button
 									type="button"
 									onClick={saveCors}
-								 className={`${buttonBase} ${buttonPrimaryBlue}`}
+									className={`${buttonBase} ${buttonPrimaryBlue}`}
 								>
 									Save Configuration
 								</button>
@@ -2632,7 +2717,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!credentialModal}
 				onClose={() => setCredentialModal(null)}
 				title={undefined}
-			 className="max-w-md p-8"
+				className="max-w-md p-8"
 			>
 				{credentialModal ? (
 					<>
@@ -2662,9 +2747,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</div>
 									<button
 										type="button"
-									 onClick={() => copyText(credentialModal.accessKey)}
-									 className="text-text-muted hover:text-white transition-colors p-1"
-									 title="Copy"
+										onClick={() => copyText(credentialModal.accessKey)}
+										className="text-text-muted hover:text-white transition-colors p-1"
+										title="Copy"
 									>
 										<MdContentCopy className="text-lg" />
 									</button>
@@ -2681,9 +2766,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</div>
 									<button
 										type="button"
-									 onClick={() => copyText(credentialModal.secretKey)}
-									 className="text-text-muted hover:text-white transition-colors p-1"
-									 title="Copy"
+										onClick={() => copyText(credentialModal.secretKey)}
+										className="text-text-muted hover:text-white transition-colors p-1"
+										title="Copy"
 									>
 										<MdContentCopy className="text-lg" />
 									</button>
@@ -2706,7 +2791,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</div>
 									<button
 										type="button"
-									 onClick={() =>
+										onClick={() =>
 											copyText(
 												(() => {
 													try {
@@ -2717,8 +2802,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												})(),
 											)
 										}
-									 className="text-text-muted hover:text-white transition-colors p-1"
-									 title="Copy"
+										className="text-text-muted hover:text-white transition-colors p-1"
+										title="Copy"
 									>
 										<MdContentCopy className="text-lg" />
 									</button>
@@ -2735,9 +2820,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</div>
 									<button
 										type="button"
-									 onClick={() => copyText(credentialModal.publicUrl)}
-									 className="text-text-muted hover:text-white transition-colors p-1"
-									 title="Copy"
+										onClick={() => copyText(credentialModal.publicUrl)}
+										className="text-text-muted hover:text-white transition-colors p-1"
+										title="Copy"
 									>
 										<MdContentCopy className="text-lg" />
 									</button>
@@ -2747,8 +2832,8 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 						<button
 							type="button"
-						 onClick={() => setCredentialModal(null)}
-						 className="w-full bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors border border-white/5 hover:border-white/20"
+							onClick={() => setCredentialModal(null)}
+							className="w-full bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded-xl text-sm font-bold transition-colors border border-white/5 hover:border-white/20"
 						>
 							I have saved my keys
 						</button>
@@ -2802,7 +2887,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<div className="mt-4 space-y-4 text-sm leading-7 text-white/80">
 												<p>1. The whole bucket is packed into one archive.</p>
 												<p>2. Files become unavailable while frozen.</p>
-												<p>3. You can restore it later by unfreezing the bucket.</p>
+												<p>
+													3. You can restore it later by unfreezing the bucket.
+												</p>
 											</div>
 										</div>
 										<div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
@@ -2811,17 +2898,33 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											</p>
 											<div className="mt-5 space-y-4">
 												<div className="rounded-2xl border border-white/10 bg-hc-dark p-4">
-													<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Bucket size</div>
-													<div className="mt-2 text-3xl font-black">{formatBytes(deepFreezeModalBucket.totalBytes)}</div>
+													<div className="text-xs uppercase tracking-[0.18em] text-text-muted">
+														Bucket size
+													</div>
+													<div className="mt-2 text-3xl font-black">
+														{formatBytes(deepFreezeModalBucket.totalBytes)}
+													</div>
 												</div>
 												<div className="grid gap-4 sm:grid-cols-2">
 													<div className="rounded-2xl border border-white/10 bg-hc-dark p-4">
-														<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Freeze ETA</div>
-														<div className="mt-2 text-2xl font-black">{formatDurationEstimate(deepFreezeSnapshot?.estimatedFreezeSeconds)}</div>
+														<div className="text-xs uppercase tracking-[0.18em] text-text-muted">
+															Freeze ETA
+														</div>
+														<div className="mt-2 text-2xl font-black">
+															{formatDurationEstimate(
+																deepFreezeSnapshot?.estimatedFreezeSeconds,
+															)}
+														</div>
 													</div>
 													<div className="rounded-2xl border border-white/10 bg-hc-dark p-4">
-														<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Unfreeze ETA</div>
-														<div className="mt-2 text-2xl font-black">{formatDurationEstimate(deepFreezeSnapshot?.estimatedUnfreezeSeconds)}</div>
+														<div className="text-xs uppercase tracking-[0.18em] text-text-muted">
+															Unfreeze ETA
+														</div>
+														<div className="mt-2 text-2xl font-black">
+															{formatDurationEstimate(
+																deepFreezeSnapshot?.estimatedUnfreezeSeconds,
+															)}
+														</div>
 													</div>
 												</div>
 											</div>
@@ -2841,7 +2944,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											disabled={deepFreezeModal?.submitting}
 											className={`${buttonBase} rounded-2xl border-white bg-white px-6 py-3 text-black hover:bg-white/90 disabled:opacity-50`}
 										>
-											{deepFreezeModal?.submitting ? <><MdSync className="animate-spin" /> Starting…</> : <>Confirm freeze</>}
+											{deepFreezeModal?.submitting ? (
+												<>
+													<MdSync className="animate-spin" /> Starting…
+												</>
+											) : (
+												<>Confirm freeze</>
+											)}
 										</button>
 									</div>
 								</div>
@@ -2849,21 +2958,44 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<div className="space-y-8">
 									<div className="grid gap-4 sm:grid-cols-2">
 										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
-											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Size</div>
-											<div className="mt-2 text-3xl font-black">{formatBytes(deepFreezeModalBucket.totalBytes)}</div>
+											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">
+												Size
+											</div>
+											<div className="mt-2 text-3xl font-black">
+												{formatBytes(deepFreezeModalBucket.totalBytes)}
+											</div>
 										</div>
 										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
-											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">ETA</div>
-											<div className="mt-2 text-3xl font-black">{deepFreezeSnapshot.etaSeconds !== null ? formatDurationEstimate(deepFreezeSnapshot.etaSeconds) : "Calculating"}</div>
+											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">
+												ETA
+											</div>
+											<div className="mt-2 text-3xl font-black">
+												{deepFreezeSnapshot.etaSeconds !== null
+													? formatDurationEstimate(
+															deepFreezeSnapshot.etaSeconds,
+														)
+													: "Calculating"}
+											</div>
 										</div>
 									</div>
 									<div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
 										<div className="mb-3 flex items-center justify-between text-xs font-black uppercase tracking-[0.18em] text-text-muted">
 											<span>Real-time progress</span>
-											<span className="rounded-full border border-white/10 px-3 py-1 text-white">{Math.max(0, Math.round(deepFreezeSnapshot.progressPercent || 0))}%</span>
+											<span className="rounded-full border border-white/10 px-3 py-1 text-white">
+												{Math.max(
+													0,
+													Math.round(deepFreezeSnapshot.progressPercent || 0),
+												)}
+												%
+											</span>
 										</div>
 										<div className="h-6 overflow-hidden rounded-full bg-white/10 p-1">
-											<div className="h-full rounded-full bg-white transition-all duration-500" style={{ width: `${Math.max(3, Math.round(deepFreezeSnapshot.progressPercent || 0))}%` }} />
+											<div
+												className="h-full rounded-full bg-white transition-all duration-500"
+												style={{
+													width: `${Math.max(3, Math.round(deepFreezeSnapshot.progressPercent || 0))}%`,
+												}}
+											/>
 										</div>
 									</div>
 								</div>
@@ -2871,20 +3003,38 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<div className="space-y-8">
 									<div className="grid gap-6 lg:grid-cols-[1.15fr_1fr]">
 										<div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
-											<p className="text-xs font-black uppercase tracking-[0.22em] text-text-muted">Frozen state</p>
+											<p className="text-xs font-black uppercase tracking-[0.22em] text-text-muted">
+												Frozen state
+											</p>
 											<p className="mt-4 text-sm leading-7 text-white/80">
-												This bucket is archived in colder storage. It stays locked until you unfreeze it, then the files are restored back into normal access.
+												This bucket is archived in colder storage. It stays
+												locked until you unfreeze it, then the files are
+												restored back into normal access.
 											</p>
 										</div>
 										<div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
 											<div className="space-y-4">
 												<div className="rounded-2xl border border-white/10 bg-hc-dark p-4">
-													<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Archived size</div>
-													<div className="mt-2 text-3xl font-black">{formatBytes((deepFreezeSnapshot?.archiveBytes || 0) || deepFreezeModalBucket.totalBytes)}</div>
+													<div className="text-xs uppercase tracking-[0.18em] text-text-muted">
+														Archived size
+													</div>
+													<div className="mt-2 text-3xl font-black">
+														{formatBytes(
+															deepFreezeSnapshot?.archiveBytes ||
+																0 ||
+																deepFreezeModalBucket.totalBytes,
+														)}
+													</div>
 												</div>
 												<div className="rounded-2xl border border-white/10 bg-hc-dark p-4">
-													<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Estimated unfreeze time</div>
-													<div className="mt-2 text-3xl font-black">{formatDurationEstimate(deepFreezeSnapshot?.estimatedUnfreezeSeconds)}</div>
+													<div className="text-xs uppercase tracking-[0.18em] text-text-muted">
+														Estimated unfreeze time
+													</div>
+													<div className="mt-2 text-3xl font-black">
+														{formatDurationEstimate(
+															deepFreezeSnapshot?.estimatedUnfreezeSeconds,
+														)}
+													</div>
 												</div>
 											</div>
 										</div>
@@ -2903,7 +3053,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											disabled={deepFreezeModal?.submitting}
 											className={`${buttonBase} rounded-2xl border-white bg-white px-6 py-3 text-black hover:bg-white/90 disabled:opacity-50`}
 										>
-											{deepFreezeModal?.submitting ? <><MdSync className="animate-spin" /> Starting…</> : <>Unfreeze bucket</>}
+											{deepFreezeModal?.submitting ? (
+												<>
+													<MdSync className="animate-spin" /> Starting…
+												</>
+											) : (
+												<>Unfreeze bucket</>
+											)}
 										</button>
 									</div>
 								</div>
@@ -2911,21 +3067,49 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								<div className="space-y-8">
 									<div className="grid gap-4 sm:grid-cols-2">
 										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
-											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">Size</div>
-											<div className="mt-2 text-3xl font-black">{formatBytes((deepFreezeSnapshot?.archiveBytes || 0) || deepFreezeModalBucket.totalBytes)}</div>
+											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">
+												Size
+											</div>
+											<div className="mt-2 text-3xl font-black">
+												{formatBytes(
+													deepFreezeSnapshot?.archiveBytes ||
+														0 ||
+														deepFreezeModalBucket.totalBytes,
+												)}
+											</div>
 										</div>
 										<div className="rounded-[24px] border border-white/10 bg-black/20 p-5">
-											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">ETA</div>
-											<div className="mt-2 text-3xl font-black">{deepFreezeSnapshot?.etaSeconds !== null && deepFreezeSnapshot?.etaSeconds !== undefined ? formatDurationEstimate(deepFreezeSnapshot.etaSeconds) : "Calculating"}</div>
+											<div className="text-xs uppercase tracking-[0.18em] text-text-muted">
+												ETA
+											</div>
+											<div className="mt-2 text-3xl font-black">
+												{deepFreezeSnapshot?.etaSeconds !== null &&
+												deepFreezeSnapshot?.etaSeconds !== undefined
+													? formatDurationEstimate(
+															deepFreezeSnapshot.etaSeconds,
+														)
+													: "Calculating"}
+											</div>
 										</div>
 									</div>
 									<div className="rounded-[28px] border border-white/10 bg-black/20 p-6">
 										<div className="mb-3 flex items-center justify-between text-xs font-black uppercase tracking-[0.18em] text-text-muted">
 											<span>Real-time progress</span>
-											<span className="rounded-full border border-white/10 px-3 py-1 text-white">{Math.max(0, Math.round(deepFreezeSnapshot?.progressPercent || 0))}%</span>
+											<span className="rounded-full border border-white/10 px-3 py-1 text-white">
+												{Math.max(
+													0,
+													Math.round(deepFreezeSnapshot?.progressPercent || 0),
+												)}
+												%
+											</span>
 										</div>
 										<div className="h-6 overflow-hidden rounded-full bg-white/10 p-1">
-											<div className="h-full rounded-full bg-white transition-all duration-500" style={{ width: `${Math.max(3, Math.round(deepFreezeSnapshot?.progressPercent || 0))}%` }} />
+											<div
+												className="h-full rounded-full bg-white transition-all duration-500"
+												style={{
+													width: `${Math.max(3, Math.round(deepFreezeSnapshot?.progressPercent || 0))}%`,
+												}}
+											/>
 										</div>
 									</div>
 								</div>
@@ -2943,7 +3127,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!confirmDialog}
 				onClose={confirmLoading ? undefined : () => setConfirmDialog(null)}
 				title={confirmDialog?.title}
-			 className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "!max-w-2xl bg-[#16090a]" : ""}`}
+				className={`max-w-md p-8 ${confirmDialog?.publicRiskWarning ? "!max-w-2xl bg-[#16090a]" : ""}`}
 			>
 				{confirmDialog ? (
 					<>
@@ -2968,9 +3152,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										const complete = publicWarningStep > idx;
 										return (
 											<div
-											 key={step.label}
-											 className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
-												 active
+												key={step.label}
+												className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
+													active
 														? "border-hc-red bg-hc-red/20 text-red-200"
 														: complete
 															? "border-hc-red/40 bg-hc-red/10 text-red-200"
@@ -3087,10 +3271,10 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												<input
 													type="checkbox"
 													checked={dontShowPublicWarningAgain}
-												 onChange={(e) =>
+													onChange={(e) =>
 														setDontShowPublicWarningAgain(e.target.checked)
 													}
-												 className="mt-1 h-4 w-4 rounded border-white/30 bg-black/20 text-hc-red focus:ring-hc-red/40"
+													className="mt-1 h-4 w-4 rounded border-white/30 bg-black/20 text-hc-red focus:ring-hc-red/40"
 												/>
 												<span className="text-sm text-white/90 leading-relaxed">
 													Don&apos;t show this 3-step warning again on this
@@ -3110,7 +3294,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								type="button"
 								disabled={confirmLoading}
 								onClick={() => setConfirmDialog(null)}
-							 className={`${buttonBase} ${buttonSubtle} disabled:opacity-50`}
+								className={`${buttonBase} ${buttonSubtle} disabled:opacity-50`}
 							>
 								Cancel
 							</button>
@@ -3123,7 +3307,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											onClick={() =>
 												setPublicWarningStep((s) => Math.max(0, s - 1))
 											}
-										 className={`${buttonBase} ${buttonSubtle}`}
+											className={`${buttonBase} ${buttonSubtle}`}
 										>
 											Back
 										</button>
@@ -3136,7 +3320,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											onClick={() =>
 												setPublicWarningStep((s) => Math.min(2, s + 1))
 											}
-										 className={`${buttonBase} ${buttonPrimaryRed} disabled:opacity-50`}
+											className={`${buttonBase} ${buttonPrimaryRed} disabled:opacity-50`}
 										>
 											{confirmDelayRemaining > 0
 												? `Next (${confirmDelayRemaining}s)`
@@ -3146,7 +3330,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<button
 											type="button"
 											disabled={confirmLoading || confirmDelayRemaining > 0}
-										 onClick={() => {
+											onClick={() => {
 												if (
 													dontShowPublicWarningAgain &&
 													typeof window !== "undefined"
@@ -3158,7 +3342,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												}
 												runConfirmDialog();
 											}}
-										 className={`${buttonBase} px-6 py-3 ${confirmDialog.confirmClassName || buttonPrimaryRed} disabled:opacity-50`}
+											className={`${buttonBase} px-6 py-3 ${confirmDialog.confirmClassName || buttonPrimaryRed} disabled:opacity-50`}
 										>
 											{confirmLoading
 												? "Working..."
@@ -3173,7 +3357,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									type="button"
 									disabled={confirmLoading || confirmDelayRemaining > 0}
 									onClick={runConfirmDialog}
-								 className={`${buttonBase} px-6 py-3 ${confirmDialog.confirmClassName || buttonPrimaryRed} disabled:opacity-50`}
+									className={`${buttonBase} px-6 py-3 ${confirmDialog.confirmClassName || buttonPrimaryRed} disabled:opacity-50`}
 								>
 									{confirmLoading
 										? "Working..."

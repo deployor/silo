@@ -373,11 +373,14 @@ export const redemptionTransactions = pgTable(
 	{
 		id: uuid("id").defaultRandom().primaryKey(),
 		programId: uuid("program_id")
-			.references(() => redemptionPrograms.id, { onDelete: "cascade" })
+			.references(() => redemptionPrograms.id, { onDelete: "restrict" })
 			.notNull(),
 		userId: text("user_id").references(() => users.id, {
 			onDelete: "set null",
 		}),
+		targetUserId: text("target_user_id"),
+		targetEmail: text("target_email"),
+		targetSlackId: text("target_slack_id"),
 		actorUserId: text("actor_user_id").references(() => users.id, {
 			onDelete: "set null",
 		}),
@@ -389,6 +392,9 @@ export const redemptionTransactions = pgTable(
 		amountBytes: bigint("amount_bytes", { mode: "number" }).notNull(),
 		reason: text("reason"),
 		ipAddress: text("ip_address"),
+		apiKeySuffix: text("api_key_suffix"),
+		requestUserAgent: text("request_user_agent"),
+		fulfilledAt: timestamp("fulfilled_at"),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},
 	(table) => {
@@ -397,6 +403,9 @@ export const redemptionTransactions = pgTable(
 				table.programId,
 			),
 			userIdIdx: index("redemption_transaction_user_id_idx").on(table.userId),
+			targetUserIdIdx: index("redemption_transaction_target_user_id_idx").on(
+				table.targetUserId,
+			),
 			createdAtIdx: index("redemption_transaction_created_at_idx").on(
 				table.createdAt,
 			),

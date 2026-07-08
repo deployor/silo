@@ -4,7 +4,14 @@ import type { AppBootstrap } from "../shared/types/app";
 export function SlackSuccessPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const p = bootstrap.props as {
 		defaultStorageLimitHuman?: string;
+		pendingGrantTotalHuman?: string | null;
+		pendingGrants?: Array<{
+			id?: string;
+			amountHuman: string;
+			programName: string;
+		}>;
 	};
+	const pendingGrants = p.pendingGrants || [];
 
 	return (
 		<AppShell
@@ -30,6 +37,30 @@ export function SlackSuccessPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					You can now head back to Slack for bucket management, or open your
 					dashboard to manage buckets on the web.
 				</p>
+
+				{pendingGrants.length ? (
+					<div className="mb-12 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-5 text-left">
+						<p className="text-sm font-bold uppercase tracking-wider text-emerald-300">
+							Storage credited
+						</p>
+						<p className="mt-2 text-lg font-bold text-white">
+							{p.pendingGrantTotalHuman} added to your Silo account.
+						</p>
+						<div className="mt-4 divide-y divide-white/10">
+							{pendingGrants.map((grant) => (
+								<div
+									key={grant.id || `${grant.programName}-${grant.amountHuman}`}
+									className="flex items-center justify-between gap-4 py-3 text-sm"
+								>
+									<span className="text-text-muted">{grant.programName}</span>
+									<span className="font-mono font-bold text-white">
+										{grant.amountHuman}
+									</span>
+								</div>
+							))}
+						</div>
+					</div>
+				) : null}
 
 				<div className="flex items-center justify-center gap-6 text-sm font-bold uppercase tracking-wider">
 					<a

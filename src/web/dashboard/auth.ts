@@ -1,11 +1,11 @@
-import { createHmac, randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import { config } from "../../config";
 import { db } from "../../db";
 import { sessions, users } from "../../db/schema";
 import { parseCookies } from "../../lib/api-utils";
 import { htmlResponse } from "../../lib/http/html";
 import { render } from "../../lib/view-engine";
+import { applyPendingProgramGrants } from "../../services/redemption-service";
 
 function secureFlag(): string {
 	return config.isProduction ? "; Secure" : "";
@@ -88,75 +88,102 @@ export async function handleAuthRequest(req: Request): Promise<Response> {
 			const userId = userData.sub;
 			const slackId = userData.slack_id;
 
-		const existingUser = await db
-			.select()
-			.from(users)
-			.where(eq(users.id, userId))
-			.limit(1);
-
-		await db
-			.insert(users)
-			.values({
-				id: userId,
-				email: userData.email,
-				slackId: slackId,
-			})
-			.onConflictDoUpdate({
-				target: users.id,
-				set: {
+			await db
+				.insert(users)
+				.values({
+					id: userId,
 					email: userData.email,
 					slackId: slackId,
-				},
+				})
+				.onConflictDoUpdate({
+					target: users.id,
+					set: {
+						email: userData.email,
+						slackId: slackId,
+					},
+				});
+
+			const pendingGrants = await applyPendingProgramGrants(userId);
+
+			const sessionId = randomUUID();
+			const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days
+
+			await db.insert(sessions).values({
+				id: sessionId,
+				userId: userId,
+				expiresAt: expiresAt,
+				accessToken: tokenData.access_token,
+				refreshToken: tokenData.refresh_token,
+				tokenExpiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
+				scope: tokenData.scope,
+				userAgent: req.headers.get("user-agent"),
+				ipAddress:
+					req.headers.get("x-forwarded-for") ||
+					req.headers.get("cf-connecting-ip") ||
+					null,
 			});
 
-		const sessionId = randomUUID();
-	const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7); // 7 days
+			const headers = new Headers();
+			headers.append(
+				"Set-Cookie",
+				`silo_session=${sessionId}; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Expires=${expiresAt.toUTCString()}`,
+			);
+			headers.append(
+				"Set-Cookie",
+				`silo_oauth_state=; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Max-Age=0`,
+			);
 
-	await db.insert(sessions).values({
-		id: sessionId,
-		userId: userId,
-		expiresAt: expiresAt,
-		accessToken: tokenData.access_token,
-		refreshToken: tokenData.refresh_token,
-		tokenExpiresAt: new Date(Date.now() + tokenData.expires_in * 1000),
-		scope: tokenData.scope,
-		userAgent: req.headers.get("user-agent"),
-		ipAddress:
-			req.headers.get("x-forwarded-for") ||
-			req.headers.get("cf-connecting-ip") ||
-			null,
-	});
+			if (source === "slack") {
+				const { getAppSettings } = await import(
+					"../../services/settings-service"
+				);
+				const { formatBytes } = await import("../../lib/format");
+				const settings = await getAppSettings();
+				const pendingGrantTotalBytes = pendingGrants.reduce(
+					(total, grant) => total + grant.amountBytes,
+					0,
+				);
+				headers.set("Content-Type", "text/html");
+				const html = await render("slack-success", {
+					title: "Silo - Account Linked",
+					layout: "blank",
+					defaultStorageLimitHuman: formatBytes(
+						settings.defaultStorageLimitBytes,
+					),
+					pendingGrantTotalHuman:
+						pendingGrantTotalBytes > 0
+							? formatBytes(pendingGrantTotalBytes)
+							: null,
+					pendingGrants: pendingGrants.map((grant) => ({
+						id: grant.id,
+						amountHuman: formatBytes(grant.amountBytes),
+						programName: grant.program?.name || "a program",
+					})),
+				});
+				return new Response(html, { headers });
+			}
 
-	const headers = new Headers();
-	headers.append(
-		"Set-Cookie",
-		`silo_session=${sessionId}; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Expires=${expiresAt.toUTCString()}`,
-	);
-	headers.append(
-		"Set-Cookie",
-		`silo_oauth_state=; Path=/; HttpOnly; SameSite=Lax${secureFlag()}; Max-Age=0`,
-	);
+			if (pendingGrants.length) {
+				const { formatBytes } = await import("../../lib/format");
+				const totalBytes = pendingGrants.reduce(
+					(total, grant) => total + grant.amountBytes,
+					0,
+				);
+				const programNames = [
+					...new Set(
+						pendingGrants.map((grant) => grant.program?.name).filter(Boolean),
+					),
+				].join(", ");
+				const credited = new URLSearchParams({
+					credited: formatBytes(totalBytes),
+					from: programNames || "a program",
+				});
+				headers.set("Location", `/?${credited.toString()}`);
+			} else {
+				headers.set("Location", "/");
+			}
 
-	if (source === "slack") {
-		const { getAppSettings } = await import(
-			"../../services/settings-service"
-		);
-		const { formatBytes } = await import("../../lib/format");
-		const settings = await getAppSettings();
-		headers.set("Content-Type", "text/html");
-		const html = await render("slack-success", {
-			title: "Silo - Account Linked",
-			layout: "blank",
-			defaultStorageLimitHuman: formatBytes(
-				settings.defaultStorageLimitBytes,
-			),
-		});
-		return new Response(html, { headers });
-	}
-
-	headers.set("Location", "/");
-
-	return new Response(null, { status: 302, headers });
+			return new Response(null, { status: 302, headers });
 		} catch (e) {
 			console.error("Auth Error:", e);
 			return new Response("Authentication Failed", { status: 500 });

@@ -31,11 +31,18 @@ type Pagination = {
 type TransactionRow = {
 	id: string;
 	userId?: string | null;
+	targetUserId?: string | null;
+	targetEmail?: string | null;
+	targetSlackId?: string | null;
 	actorUserId?: string | null;
 	source: string;
 	externalId?: string | null;
 	amountBytes: number;
 	reason?: string | null;
+	ipAddress?: string | null;
+	apiKeySuffix?: string | null;
+	requestUserAgent?: string | null;
+	fulfilledAt?: string | null;
 	createdAt?: string | null;
 };
 
@@ -183,7 +190,12 @@ export function AdminRedemptionDetailsPage({
 								<pre className="overflow-x-auto rounded-xl bg-black/30 p-4 text-xs text-text-muted">{`curl -X POST https://silo.deployor.dev/api/ysws/grants \\
   -H "Authorization: Bearer silo_ysws_..." \\
   -H "Content-Type: application/json" \\
-  -d '{"email":"user@example.com","amount":10,"unit":"GB","externalId":"ysws-123"}'`}</pre>
+  -d '{"userId":"ident!abc123","amount":10,"unit":"GB","externalId":"ysws-123"}'`}</pre>
+								<p className="mt-2 text-xs text-text-muted">
+									Unknown valid <code>ident!...</code> users are saved as
+									pending and credited automatically when the account is
+									created.
+								</p>
 							</div>
 							<div>
 								<p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-wider text-text-muted">
@@ -354,9 +366,11 @@ export function AdminRedemptionDetailsPage({
 								<tr>
 									<th className="px-6 py-4">When</th>
 									<th className="px-6 py-4">Source</th>
+									<th className="px-6 py-4">Status</th>
 									<th className="px-6 py-4">User</th>
 									<th className="px-6 py-4">Amount</th>
 									<th className="px-6 py-4">External ID</th>
+									<th className="px-6 py-4">Audit</th>
 									<th className="px-6 py-4">Reason</th>
 								</tr>
 							</thead>
@@ -372,14 +386,49 @@ export function AdminRedemptionDetailsPage({
 											<td className="px-6 py-4 text-white uppercase">
 												{transaction.source}
 											</td>
+											<td className="px-6 py-4">
+												{transaction.userId ? (
+													<span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold border border-emerald-500/30 uppercase tracking-wider">
+														Applied
+													</span>
+												) : (
+													<span className="bg-amber-500/15 text-amber-300 px-2 py-0.5 rounded text-[10px] font-bold border border-amber-500/30 uppercase tracking-wider">
+														Pending
+													</span>
+												)}
+											</td>
 											<td className="px-6 py-4 text-text-muted">
-												{transaction.userId || "-"}
+												<div>
+													{transaction.userId ||
+														transaction.targetUserId ||
+														"-"}
+												</div>
+												{transaction.targetEmail ||
+												transaction.targetSlackId ? (
+													<div className="mt-1 text-[10px] text-text-muted/70">
+														{transaction.targetEmail || ""}
+														{transaction.targetEmail &&
+														transaction.targetSlackId
+															? " / "
+															: ""}
+														{transaction.targetSlackId || ""}
+													</div>
+												) : null}
 											</td>
 											<td className="px-6 py-4 text-white">
 												{formatBytes(transaction.amountBytes)}
 											</td>
 											<td className="px-6 py-4 text-text-muted">
 												{transaction.externalId || "-"}
+											</td>
+											<td className="px-6 py-4 text-text-muted">
+												<div>IP {transaction.ipAddress || "-"}</div>
+												<div className="mt-1 text-[10px] text-text-muted/70">
+													Key{" "}
+													{transaction.apiKeySuffix
+														? `...${transaction.apiKeySuffix}`
+														: "-"}
+												</div>
 											</td>
 											<td className="px-6 py-4 text-text-muted">
 												{transaction.reason || "-"}
@@ -389,7 +438,7 @@ export function AdminRedemptionDetailsPage({
 								) : (
 									<tr>
 										<td
-											colSpan={6}
+											colSpan={8}
 											className="px-6 py-8 text-center text-text-muted italic"
 										>
 											No transactions yet.
