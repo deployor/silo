@@ -26,6 +26,12 @@ Thumbs.db
 
 coverage
 src/assets/styles.css
+src/assets/react/
+.cache_ggshield
+package-lock.json
+s3-bench-results/
+chunked-test.txt
+tmp/
 
 # Disk cache
 .s3-disk-cache/

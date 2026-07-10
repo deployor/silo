@@ -1,96 +1,90 @@
 <div align="center">
 
-# Silo
+<img src="https://silo.deployor.dev/ifyoureadthisyouarecool/404_1x_shots_so.png" alt="Silo homepage and bucket dashboard" width="100%" />
+
+# *SILO*
 
 **Free S3-compatible object storage for Hack Clubbers.**
 
-[Dashboard](https://silo.deployor.dev) • [Docs](https://silo.deployor.dev/docs)
+[go to silo](https://dashboard.silo.deployor.dev) · [read the docs](https://dashboard.silo.deployor.dev/docs) · [meet the dataplane](./dataplane)
 
 </div>
 
----
+> [!NOTE]
+> A tiny project should not need a credit card, six tabs of cloud docs, and a quiet fear of the bill at the end of the month.
 
-## What is this?
+## Put stuff somewhere
 
-Silo is a high-performance S3-compatible object storage service for Hack Club members. The Rust data plane owns S3 authentication, quota enforcement, caching, and object transfer against the backing provider; the Bun app owns the dashboard, account management, and internal control-plane APIs.
+We built Silo because Hack Clubbers needed somewhere good to put files. Not a trial. Not another dashboard to learn. Just a bucket, normal S3 tools, and enough room to make something weird.
 
-This repository contains the Silo Rust data plane, dashboard, and control-plane API.
+Use it for game builds, screenshots, backups, static assets, or that one JSON file your project somehow depends on. Buckets can be public or private; the rest is deliberately unsurprising.
 
-## Documentation
+- [x] public or private
+- [x] works with tools you already know
+- [x] made for real Hack Club projects
+- [x] no desire to become a hyperscaler
 
-For full documentation on how to use Silo, including SDK examples, configuration guides, and API references, please visit our **[Documentation Site](https://silo.deployor.dev/docs)**.
+## One bucket underneath, lots on top
 
-## Key Features
+The trick is small: Silo is an S3-shaped proxy in front of one big backing bucket. Hack Clubbers create ordinary buckets; Silo checks each request, applies limits, and routes every file into that bucket's own fenced-off corner.
 
-- **S3 Compatibility**: Works with standard tools like AWS CLI, Rclone, and official AWS SDKs.
-- **Instant Provisioning**: Log in with Hack Club Auth and get credentials immediately.
-- **Public & Private Buckets**: Host static assets publicly or keep backups private.
-- **CORS Support**: Configurable Cross-Origin Resource Sharing for web applications.
-- **Cloudflare for SaaS custom domains**: Managed SSL/TLS and hostname onboarding for bucket domains.
+```mermaid
+flowchart LR
+    subgraph people["lots of people · lots of Silo buckets"]
+        direction TB
+        game["you · game-assets"]
+        site["another person · website"]
+        backups["someone else · backups"]
+    end
 
-## Development
+    game <--> silo["Silo proxy · checks · limits · routes"]
+    site <--> silo
+    backups <--> silo
+    silo <-->|"hot reads"| cache[("hot cache · popular files stay close")]
+    silo <-->|"misses + writes"| backing[("one backing bucket · one provider bill")]
 
-- Start local development (backend + React asset watcher): `bun dev`
-- Build production assets: `bun run build`
-- Start production server: `bun run start`
-- Check the Rust S3 data plane: `bun run dataplane:check`
-- Rust owns the Redis and disk object caches; Bun only reads cache stats for
-  admin/health pages.
+    style silo fill:#ec3750,color:#fff,stroke:#ec3750
+    style cache fill:#f1c40f,color:#111,stroke:#f1c40f
+    style backing fill:#338eda,color:#fff,stroke:#338eda
+    style people fill:#17171d,color:#fff,stroke:#8492a6,stroke-width:1px,stroke-dasharray:5 5
+    classDef bucket fill:#f8fafc,color:#111827,stroke:#8492a6,stroke-width:1px
+    class game,site,backups bucket
+    linkStyle default stroke:#8492a6,stroke-width:1.5px
+```
 
-## Production
+Hot reads can turn around from the cache without bothering the backing store. Misses and writes keep their fenced-off route into the shared bucket. To each person, it feels like their own patch of S3; to the storage provider, it is one bucket and one bill. That is how one cloud account can quietly become storage for a lot of people.
 
-Production runs as two services: the Bun control plane for the dashboard and
-account APIs, and the Rust data plane for all S3-compatible object traffic.
-Point `dashboard.${S3_DOMAIN}` at the control-plane service and `${S3_DOMAIN}`
-at the dataplane service.
+## Fast, by accident and then on purpose
 
-1. Copy `.env.production.example` to `.env.production` and fill in the real
-   Postgres, Redis, provider S3, Hack Club Auth, Slack, and
-   `DATAPLANE_INTERNAL_SECRET` values.
-2. Deploy with `docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build`.
+Once Silo worked, we got a little carried away with making it quick. In our mixed-action benchmarks it reached **10 Gb/s** and finished ahead of every other S3 provider we tested—AWS S3 included.
 
-The Docker build reads git metadata from the checkout and bakes it into the
-dashboard, so the nav shows the deployed commit instead of `unknown`. If you
-build from a Git worktree or another source without a real `.git` directory,
-use `bun run prod:up` or export `GIT_SHA`, `GIT_DATE`, and `GIT_MESSAGE`
-yourself before running Compose.
+<sub>That number is a snapshot from our test, not a law of physics. Region, object size, concurrency, and a warm cache can all move it.</sub>
 
-The dataplane exposes `/health` and owns auth, bucket jail enforcement, quota
-checks, provider streaming, Redis metadata cache, and disk object cache.
+<details>
+<summary><strong>Okay, but what is actually in this repo?</strong></summary>
 
-## Cloudflare for SaaS setup
+A Bun app looks after the friendly parts: the dashboard, accounts, and buckets. A Rust [dataplane](./dataplane) moves the bytes. The rest is deliberately small.
 
-Custom-domain support is currently feature-flagged. It is disabled unless `DOMAINS=true` is explicitly set in the environment.
-Deep Freeze is also feature-flagged. It is disabled unless `DEEP_FREEZE=true` is explicitly set in the environment.
+That is the technical overview on purpose.
 
-Custom domains now assume Cloudflare for SaaS is the source of truth for SSL issuance and hostname validation.
+</details>
 
-Required environment variables:
+## Come poke at it
 
-- `DOMAINS` — set to `true` to enable all custom-domain UI/API/runtime behavior.
-- `DEEP_FREEZE` — set to `true` to enable all Deep Freeze UI/API/runtime behavior.
-- `CF_API_TOKEN` — Cloudflare API token with custom hostname permissions for the zone.
-- `CF_ZONE_ID` — Zone ID for the SaaS zone.
-- `CF_SAAS_FALLBACK_ORIGIN` — Origin hostname Cloudflare should send traffic to.
-- `CF_SAAS_TARGET` — Hostname customers should CNAME to. Defaults to `S3_DOMAIN`.
-- `CF_SAAS_MIN_TLS` — Optional minimum TLS version. Defaults to `1.2`.
+Silo holds real projects, but it is also a project made by people figuring things out as they go. Issues, tiny fixes, big ideas, and “why on earth does it work like that?” questions are all welcome.
 
-Expected flow:
+Please be kind—and please do not use production as your test suite.
 
-1. Add a domain in the dashboard.
-2. The backend creates a Cloudflare custom hostname.
-3. The dashboard shows the ownership TXT record and any SSL/DCV records returned by Cloudflare.
-4. The user points their hostname at the Cloudflare SaaS target and adds the TXT records.
-5. Silo verifies by polling Cloudflare hostname status instead of doing direct DNS checks itself.
+## The boring important bit
 
-Important: if Cloudflare returns an `_acme-challenge` TXT record, you must add that too. Ownership TXT alone is not always enough for HTTPS issuance.
-
-The frontend is rendered via React and bundled with Vite into [`src/assets/react/app.js`](src/assets/react/app.js) and [`src/assets/react/app.css`](src/assets/react/app.css).
+Silo is [MIT licensed](LICENSE). If you find a security problem, please read [SECURITY.md](SECURITY.md) instead of opening a public issue. If you want to help, [CONTRIBUTING.md](CONTRIBUTING.md) is short on purpose.
 
 ---
 
 <div align="center">
 
-Made with love for <a href="https://hackclub.com/">Hack Club</a>
+<sub>made with love for <a href="https://hackclub.com/">Hack Club</a></sub>
+
+<a href="https://hackclub.com/"><img src="https://silo.deployor.dev/ifyoureadthisyouarecool/flag-standalone.png" alt="Hack Club" width="160" /></a>
 
 </div>
