@@ -14,16 +14,21 @@ services:
       PORT: "3000"
       DISK_CACHE_DIR: "/var/cache/silo-dataplane"
       DATAPLANE_URL: "http://dataplane:3001"
-      REDIS_URL: "redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in the deployment environment}@dragonflydb:6379"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in the deployment environment}@silo-dragonfly:6379"
     depends_on:
-      dragonflydb:
+      silo-dragonfly:
         condition: service_started
     volumes:
       - dataplane-cache:/var/cache/silo-dataplane:ro
+    # The PostgreSQL database is a separate Dokploy service. This keeps its
+    # internal hostname reachable while the default network remains private.
+    networks:
+      - default
+      - dokploy-network
 
   # Private, in-stack Redis-compatible cache. It is intentionally not exposed
   # on a host port: the control-plane reaches it over Docker's default network.
-  dragonflydb:
+  silo-dragonfly:
     image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
     restart: unless-stopped
     ulimits:
@@ -56,3 +61,7 @@ services:
 volumes:
   dataplane-cache:
   dragonflydata:
+
+networks:
+  dokploy-network:
+    external: true
