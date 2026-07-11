@@ -52,6 +52,7 @@ services:
       CONTROL_PLANE_URL: "http://control-plane:3000"
       DATAPLANE_PUBLIC_SCHEME: "https"
       DISK_CACHE_DIR: "/var/cache/silo-dataplane"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in the deployment environment}@silo-dragonfly:6379"
     depends_on:
       control-plane:
         condition: service_healthy
