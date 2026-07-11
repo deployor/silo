@@ -1,15 +1,16 @@
 import { timingSafeEqual } from "node:crypto";
 import { config } from "../../../config";
+import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import { getCorsHeaders } from "../../../lib/s3/cors";
-import { determineAction, S3Action } from "../../../lib/s3/protocol";
 import {
 	getInternalPath,
 	getKeyFromRequest,
 	stripAuthQueryParams,
 } from "../../../lib/s3/paths";
-import { errorResponse, jsonResponse } from "../../../lib/api-utils";
+import { determineAction, S3Action } from "../../../lib/s3/protocol";
 import { S3Errors } from "../../../lib/s3-errors";
 import { authenticate } from "../../../middleware/auth";
+import { getAppSettings } from "../../../services/settings-service";
 
 type HeaderTuple = [string, string];
 
@@ -108,12 +109,7 @@ export async function handleDataplaneAuthorize(
 		);
 	}
 
-	const action = determineAction(
-		method,
-		key,
-		url.searchParams,
-		s3Req.headers,
-	);
+	const action = determineAction(method, key, url.searchParams, s3Req.headers);
 	if (action === S3Action.Unknown) {
 		return jsonResponse({
 			allowed: false,
@@ -188,6 +184,11 @@ export async function handleDataplaneAuthorize(
 	const cleanUrl = stripAuthQueryParams(url);
 	const queryStr = cleanUrl.searchParams.toString();
 	const pathWithQuery = queryStr ? `${internalPath}?${queryStr}` : internalPath;
+	const effectiveStorageLimitBytes = user
+		? Number(user.storageLimitBytes ?? 0) > 0
+			? Number(user.storageLimitBytes)
+			: (await getAppSettings()).defaultStorageLimitBytes
+		: null;
 
 	return jsonResponse({
 		allowed: true,
@@ -211,7 +212,7 @@ export async function handleDataplaneAuthorize(
 			? {
 					id: user.id,
 					isImmortal: user.isImmortal,
-					storageLimitBytes: user.storageLimitBytes,
+					storageLimitBytes: effectiveStorageLimitBytes,
 					storageUsageBytes: user.storageUsageBytes,
 					egressLimitBytes: user.egressLimitBytes,
 					egressBytes: user.egressBytes,

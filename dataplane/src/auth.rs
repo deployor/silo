@@ -399,7 +399,9 @@ async fn get_signed_auth_context(
           b.id::text AS bucket_id, b.name AS bucket_name, b.user_id, b.is_public, b.is_system,
           b.is_paused AS bucket_is_paused, b.pause_reason AS bucket_pause_reason,
           b.deep_freeze_state, b.deep_freeze_reason, b.cors_config,
-          u.id AS user_id, u.storage_limit_bytes, u.storage_usage_bytes, u.egress_limit_bytes,
+          u.id AS user_id,
+          COALESCE(NULLIF(u.storage_limit_bytes, 0), (SELECT default_storage_limit_bytes FROM app_settings LIMIT 1), 1073741824) AS storage_limit_bytes,
+          u.storage_usage_bytes, u.egress_limit_bytes,
           u.egress_bytes, u.egress_period, u.is_immortal, u.is_locked, u.marked_as_over_age,
           u.data_exported, u.files_deleted,
           k.secret_key, k.is_paused AS key_is_paused, k.pause_reason AS key_pause_reason
@@ -447,7 +449,9 @@ async fn get_public_auth_context(
           b.id::text AS bucket_id, b.name AS bucket_name, b.user_id, b.is_public, b.is_system,
           b.is_paused AS bucket_is_paused, b.pause_reason AS bucket_pause_reason,
           b.deep_freeze_state, b.deep_freeze_reason, b.cors_config,
-          u.id AS user_id, u.storage_limit_bytes, u.storage_usage_bytes, u.egress_limit_bytes,
+          u.id AS user_id,
+          COALESCE(NULLIF(u.storage_limit_bytes, 0), (SELECT default_storage_limit_bytes FROM app_settings LIMIT 1), 1073741824) AS storage_limit_bytes,
+          u.storage_usage_bytes, u.egress_limit_bytes,
           u.egress_bytes, u.egress_period, u.is_immortal, u.is_locked, u.marked_as_over_age,
           u.data_exported, u.files_deleted
         FROM buckets b

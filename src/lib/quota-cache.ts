@@ -1,3 +1,4 @@
+import { getAppSettings } from "../services/settings-service";
 import { redis } from "./redis";
 
 // TEMP BENCH SWITCH:
@@ -27,7 +28,15 @@ function parseQuotaNumber(value: string | null | undefined) {
 	return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
-function computeEgressLimitBytes(user: QuotaUser): number | null {
+async function effectiveStorageLimitBytes(user: QuotaUser): Promise<number> {
+	const storageLimit = Number(user.storageLimitBytes ?? 0);
+	if (Number.isFinite(storageLimit) && storageLimit > 0) return storageLimit;
+	return (await getAppSettings()).defaultStorageLimitBytes;
+}
+
+async function computeEgressLimitBytes(
+	user: QuotaUser,
+): Promise<number | null> {
 	if (user.isImmortal) return null;
 
 	if (user.egressLimitBytes !== null && user.egressLimitBytes !== undefined) {
@@ -35,8 +44,7 @@ function computeEgressLimitBytes(user: QuotaUser): number | null {
 		return Number(user.egressLimitBytes);
 	}
 
-	const storageLimit = Number(user.storageLimitBytes ?? 0);
-	if (storageLimit <= 0) return 10 * 1024 * 1024 * 1024;
+	const storageLimit = await effectiveStorageLimitBytes(user);
 
 	const calculated = storageLimit * 3;
 	const minLimit = 10 * 1024 * 1024 * 1024;
@@ -52,10 +60,9 @@ export async function consumeStorageQuota(
 	if (user.isImmortal) return true;
 	if (bytesToAdd <= 0) return true;
 
-	const storageLimit = Number(user.storageLimitBytes ?? 0);
-	if (!Number.isFinite(storageLimit) || storageLimit <= 0) return false;
-
 	try {
+		const storageLimit = await effectiveStorageLimitBytes(user);
+		if (!Number.isFinite(storageLimit) || storageLimit <= 0) return false;
 		const result = (await (
 			redis as unknown as {
 				checkAndIncrQuota: (
@@ -111,7 +118,7 @@ export async function reserveMultipartPartQuota(params: {
 
 	const key = MPU_KEY(params.user.id, params.bucketId, params.uploadId);
 	try {
-		const storageLimit = Number(params.user.storageLimitBytes ?? 0);
+		const storageLimit = await effectiveStorageLimitBytes(params.user);
 		if (!Number.isFinite(storageLimit) || storageLimit <= 0) return false;
 		const result = (await (
 			redis as unknown as {
@@ -213,7 +220,7 @@ export async function consumeEgressQuota(
 	if (user.isImmortal) return true;
 	if (bytesToAdd <= 0) return true;
 
-	const egressLimit = computeEgressLimitBytes(user);
+	const egressLimit = await computeEgressLimitBytes(user);
 	if (egressLimit === null) return true;
 	const period = currentEgressPeriod();
 	const seed =

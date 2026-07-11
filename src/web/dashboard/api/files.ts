@@ -24,6 +24,7 @@ import {
 	getBucketAccessForUser,
 } from "../../../services/collaboration-service";
 import { getBucketDeepFreezeMessage } from "../../../services/deep-freeze-service";
+import { getAppSettings } from "../../../services/settings-service";
 
 type BucketRecord = typeof buckets.$inferSelect;
 type UserRecord = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
@@ -1244,6 +1245,8 @@ export async function handleFiles(req: Request): Promise<Response> {
 					status: "uploaded";
 				}> = [];
 				let pendingStorageDelta = 0;
+				const defaultStorageLimitBytes = (await getAppSettings())
+					.defaultStorageLimitBytes;
 
 				for (const [, file] of entries) {
 					const relativePathValue = formData.get(
@@ -1274,10 +1277,15 @@ export async function handleFiles(req: Request): Promise<Response> {
 						? Number(before.headers.get("content-length") || 0)
 						: 0;
 					const delta = Math.max(0, size - existingSize);
-					const limit = bucketData.owner.storageLimitBytes;
+					const configuredLimit = Number(
+						bucketData.owner.storageLimitBytes ?? 0,
+					);
+					const limit =
+						Number.isFinite(configuredLimit) && configuredLimit > 0
+							? configuredLimit
+							: defaultStorageLimitBytes;
 					if (
 						!bucketData.owner.isImmortal &&
-						limit !== null &&
 						BigInt(bucketData.owner.storageUsageBytes) +
 							BigInt(pendingStorageDelta) +
 							BigInt(delta) >

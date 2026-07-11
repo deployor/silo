@@ -3,8 +3,6 @@ import { AwsClient } from "aws4fetch";
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { config } from "../../config";
-import { buildCorsConfig } from "../../lib/s3/cors";
-import { deleteBucketContents, getInternalPath } from "../../lib/s3/paths";
 import { db } from "../../db";
 import {
 	bucketKeys,
@@ -16,6 +14,8 @@ import {
 import { jsonResponse } from "../../lib/api-utils";
 import { getDiskCacheStats } from "../../lib/disk-cache";
 import { redis } from "../../lib/redis";
+import { buildCorsConfig } from "../../lib/s3/cors";
+import { deleteBucketContents, getInternalPath } from "../../lib/s3/paths";
 import { s3Client } from "../../lib/s3-client";
 import { parseS3Xml } from "../../lib/s3-xml";
 import { getCurrentUser } from "../../lib/session";
@@ -267,7 +267,11 @@ async function listUsers(url: URL, user: typeof users.$inferSelect) {
 			id: users.id,
 			email: users.email,
 			slackId: users.slackId,
-			storageLimitBytes: users.storageLimitBytes,
+			storageLimitBytes:
+				sql<number>`COALESCE(NULLIF(${users.storageLimitBytes}, 0), (SELECT default_storage_limit_bytes FROM app_settings LIMIT 1), 1073741824)`.mapWith(
+					Number,
+				),
+			usesDefaultStorageLimit: sql<boolean>`${users.storageLimitBytes} IS NULL OR ${users.storageLimitBytes} <= 0`,
 			storageUsageBytes:
 				sql<number>`COALESCE(sum(${buckets.totalBytes}), 0)`.mapWith(Number),
 			egressLimitBytes: users.egressLimitBytes,
@@ -1169,7 +1173,8 @@ async function updateUserQuota(userId: string, req: Request) {
 	> = {};
 
 	if (typeof body.storageLimitBytes === "number") {
-		updateData.storageLimitBytes = body.storageLimitBytes;
+		updateData.storageLimitBytes =
+			body.storageLimitBytes > 0 ? body.storageLimitBytes : null;
 	}
 	if (typeof body.egressLimitBytes === "number") {
 		updateData.egressLimitBytes = body.egressLimitBytes;
@@ -1928,15 +1933,13 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		// Global Settings API
 		if (path === "/api/admin/settings" && req.method === "GET") {
 			const user = await getCurrentUser(req);
-			if (!user?.isAdmin)
-				return new Response("Forbidden", { status: 403 });
+			if (!user?.isAdmin) return new Response("Forbidden", { status: 403 });
 			return jsonResponse(await getAppSettings());
 		}
 
 		if (path === "/api/admin/settings" && req.method === "POST") {
 			const user = await getCurrentUser(req);
-			if (!user?.isAdmin)
-				return new Response("Forbidden", { status: 403 });
+			if (!user?.isAdmin) return new Response("Forbidden", { status: 403 });
 
 			const schema = z.object({
 				defaultStorageLimitBytes: z.number().int().min(0),

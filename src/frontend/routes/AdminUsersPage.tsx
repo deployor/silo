@@ -1,5 +1,12 @@
 import type { ReactElement } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	useCallback,
+	useEffect,
+	useId,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { MdDeleteForever, MdOpenInNew } from "react-icons/md";
 import { AdminSubnav } from "../components/AdminSubnav";
 import { AppShell } from "../components/AppShell";
@@ -13,6 +20,7 @@ type UserRow = {
 	email: string;
 	slackId?: string | null;
 	storageLimitBytes: number;
+	usesDefaultStorageLimit: boolean;
 	storageUsageBytes: number;
 	egressLimitBytes: number | null;
 	egressBytes: number;
@@ -321,6 +329,7 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		null,
 	);
 	const [keyNoteLoading, setKeyNoteLoading] = useState(false);
+	const reasonInputId = useId();
 
 	const limit = 50;
 
@@ -501,7 +510,11 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		if (!selected) return;
 		const next = toBytes(storageAmount, storageUnit);
 		await patchUser("quota", { storageLimitBytes: next });
-		window.alert(`Storage quota updated to ${formatBytes(next)}`);
+		window.alert(
+			next > 0
+				? `Storage quota updated to ${formatBytes(next)}`
+				: "Storage quota reset to default",
+		);
 	};
 
 	const updateEgressQuota = async () => {
@@ -905,7 +918,10 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											</span>
 											<span className="text-text-muted">
 												{" "}
-												/ {formatBytes(u.storageLimitBytes)}
+												/{" "}
+												{u.usesDefaultStorageLimit
+													? `Default (${formatBytes(u.storageLimitBytes)})`
+													: formatBytes(u.storageLimitBytes)}
 											</span>
 										</div>
 										<div className="w-24 bg-white/10 rounded-full h-1.5 mt-1 overflow-hidden">
@@ -1027,6 +1043,15 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<span className="text-white font-mono">
 										{formatBytes(selected.storageUsageBytes)}
 									</span>
+								</p>
+								<p className="text-xs text-text-muted mt-1">
+									Limit:{" "}
+									<span className="text-white font-mono">
+										{selected.usesDefaultStorageLimit
+											? `Default (${formatBytes(selected.storageLimitBytes)})`
+											: formatBytes(selected.storageLimitBytes)}
+									</span>
+									<span> - enter 0 to use the default.</span>
 								</p>
 								<div className="w-full bg-white/10 rounded-full h-1.5 mt-2 overflow-hidden">
 									<div
@@ -1179,7 +1204,9 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										</span>
 									) : null}
 								</button>
-								<p className="text-[11px] text-red-300/60 mt-2">Starts offboarding.</p>
+								<p className="text-[11px] text-red-300/60 mt-2">
+									Starts offboarding.
+								</p>
 							</div>
 						</div>
 
@@ -1462,13 +1489,13 @@ export function AdminUsersPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					<div className="space-y-5">
 						<div>
 							<label
-								htmlFor="admin-reason-modal-input"
+								htmlFor={reasonInputId}
 								className="text-xs font-bold uppercase tracking-wider text-text-muted"
 							>
 								{reasonModal.label}
 							</label>
 							<textarea
-								id="admin-reason-modal-input"
+								id={reasonInputId}
 								value={reasonValue}
 								onChange={(e) => setReasonValue(e.target.value)}
 								placeholder={reasonModal.placeholder}

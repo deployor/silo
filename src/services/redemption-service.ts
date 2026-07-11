@@ -319,7 +319,7 @@ async function grantStorageToUser(
 	await tx
 		.update(users)
 		.set({
-			storageLimitBytes: sql`COALESCE(${users.storageLimitBytes}, (SELECT default_storage_limit_bytes FROM app_settings LIMIT 1)) + ${amountBytes}`,
+			storageLimitBytes: sql`COALESCE(NULLIF(${users.storageLimitBytes}, 0), (SELECT default_storage_limit_bytes FROM app_settings LIMIT 1), 1073741824) + ${amountBytes}`,
 		})
 		.where(eq(users.id, userId));
 }
