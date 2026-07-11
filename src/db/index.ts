@@ -9,6 +9,20 @@ if (!connectionString) {
 	throw new Error("DATABASE_URL environment variable is missing");
 }
 
+/** Safe to log: deliberately excludes the database username and password. */
+export function databaseTarget() {
+	try {
+		const url = new URL(connectionString);
+		return {
+			host: url.hostname || "(missing host)",
+			port: url.port || "5432",
+			database: url.pathname.replace(/^\//, "") || "(missing database)",
+		};
+	} catch {
+		return { host: "(invalid DATABASE_URL)", port: "-", database: "-" };
+	}
+}
+
 const client = postgres(connectionString, {
 	prepare: false,
 	max: Number(process.env.DB_POOL_MAX ?? "20"),

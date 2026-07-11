@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { config } from "./config";
-import { db } from "./db";
+import { databaseTarget, db } from "./db";
 import { handleSlackRequest } from "./integrations/slack";
 import { errorResponse } from "./lib/api-utils";
 import { context } from "./lib/context";
@@ -100,9 +100,13 @@ async function healthResponse() {
 		try {
 			await db.execute(sql`SELECT 1`);
 			checks.postgres = "connected";
-		} catch {
+		} catch (error) {
 			checks.postgres = "disconnected";
 			healthy = false;
+			console.error("Health check: PostgreSQL unavailable", {
+				target: databaseTarget(),
+				error: error instanceof Error ? error.message : String(error),
+			});
 		}
 
 		const diskStats = getDiskCacheStats();
@@ -195,7 +199,17 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 	return false;
 }
 
-await migrate(db, { migrationsFolder: "./drizzle" });
+console.log("Connecting to PostgreSQL", databaseTarget());
+try {
+	await migrate(db, { migrationsFolder: "./drizzle" });
+	console.log("PostgreSQL migrations complete");
+} catch (error) {
+	console.error("PostgreSQL startup failed", {
+		target: databaseTarget(),
+		error: error instanceof Error ? error.message : String(error),
+	});
+	throw error;
+}
 
 const server = Bun.serve({
 	port: process.env.PORT || 3000,
