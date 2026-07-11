@@ -14,8 +14,26 @@ services:
       PORT: "3000"
       DISK_CACHE_DIR: "/var/cache/silo-dataplane"
       DATAPLANE_URL: "http://dataplane:3001"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in the deployment environment}@dragonflydb:6379"
+    depends_on:
+      dragonflydb:
+        condition: service_started
     volumes:
       - dataplane-cache:/var/cache/silo-dataplane:ro
+
+  # Private, in-stack Redis-compatible cache. It is intentionally not exposed
+  # on a host port: the control-plane reaches it over Docker's default network.
+  dragonflydb:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+    restart: unless-stopped
+    ulimits:
+      memlock: -1
+    command:
+      - --requirepass=${REDIS_PASSWORD:?Set REDIS_PASSWORD in the deployment environment}
+      - --maxmemory=8gb
+      - --cache_mode=true
+    volumes:
+      - dragonflydata:/data
 
   dataplane:
     build:
@@ -37,3 +55,4 @@ services:
 
 volumes:
   dataplane-cache:
+  dragonflydata:
