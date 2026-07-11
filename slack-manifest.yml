@@ -21,7 +21,7 @@ oauth_config:
       - groups:history
 settings:
   event_subscriptions:
-    request_url: https://dashboard.silo.deployor.dev/api/slack/events
+    request_url: https://dash.onsilo.dev/api/slack/events
     bot_events:
       - app_home_opened
       - message.im
@@ -29,7 +29,7 @@ settings:
       - message.groups
   interactivity:
     is_enabled: true
-    request_url: https://dashboard.silo.deployor.dev/api/slack/events
+    request_url: https://dash.onsilo.dev/api/slack/events
   org_deploy_enabled: false
   socket_mode_enabled: false
   token_rotation_enabled: false

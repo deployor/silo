@@ -50,7 +50,7 @@ export function normalizeCustomDomain(input: string): string {
 	if (!trimmed.includes(".")) {
 		throw new Error("Custom domain must include a valid hostname");
 	}
-	if (trimmed === config.s3Domain || trimmed === `dashboard.${config.s3Domain}`) {
+	if (trimmed === config.s3Domain || trimmed === config.dashboardDomain) {
 		throw new Error("This domain is reserved by Silo");
 	}
 	if (trimmed.endsWith(`.${config.s3Domain}`)) {

@@ -187,7 +187,7 @@ export function AdminRedemptionDetailsPage({
 								<p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-wider text-text-muted">
 									Direct grant
 								</p>
-								<pre className="overflow-x-auto rounded-xl bg-black/30 p-4 text-xs text-text-muted">{`curl -X POST https://silo.deployor.dev/api/ysws/grants \\
+								<pre className="overflow-x-auto rounded-xl bg-black/30 p-4 text-xs text-text-muted">{`curl -X POST https://dash.onsilo.dev/api/ysws/grants \\
   -H "Authorization: Bearer silo_ysws_..." \\
   -H "Content-Type: application/json" \\
   -d '{"userId":"ident!abc123","amount":10,"unit":"GB","externalId":"ysws-123"}'`}</pre>
@@ -201,7 +201,7 @@ export function AdminRedemptionDetailsPage({
 								<p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-wider text-text-muted">
 									Create codes
 								</p>
-								<pre className="overflow-x-auto rounded-xl bg-black/30 p-4 text-xs text-text-muted">{`curl -X POST https://silo.deployor.dev/api/ysws/codes \\
+								<pre className="overflow-x-auto rounded-xl bg-black/30 p-4 text-xs text-text-muted">{`curl -X POST https://dash.onsilo.dev/api/ysws/codes \\
   -H "Authorization: Bearer silo_ysws_..." \\
   -H "Content-Type: application/json" \\
   -d '{"count":25,"amount":5,"unit":"GB","codes":["CUSTOM-ONE"]}'`}</pre>
@@ -341,7 +341,7 @@ export function AdminRedemptionDetailsPage({
 												type="button"
 												onClick={() =>
 													navigator.clipboard.writeText(
-														`https://silo.deployor.dev/redeem?code=${code.code}`,
+														`https://dash.onsilo.dev/redeem?code=${code.code}`,
 													)
 												}
 												className="text-hc-red hover:text-hc-red font-bold uppercase tracking-wider text-[10px]"

@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="https://silo.deployor.dev/ifyoureadthisyouarecool/404_1x_shots_so.png" alt="Silo homepage and bucket dashboard" width="100%" />
+<img src="https://onsilo.dev/ifyoureadthisyouarecool/404_1x_shots_so.png" alt="Silo homepage and bucket dashboard" width="100%" />
 
 # *SILO*
 
 **Free S3-compatible object storage for Hack Clubbers.**
 
-[go to silo](https://dashboard.silo.deployor.dev) · [read the docs](https://dashboard.silo.deployor.dev/docs) · [meet the dataplane](./dataplane)
+[go to silo](https://dash.onsilo.dev) · [read the docs](https://dash.onsilo.dev/docs) · [meet the dataplane](./dataplane)
 
 </div>
 
@@ -85,6 +85,6 @@ Silo is [MIT licensed](LICENSE). If you find a security problem, please read [SE
 
 <sub>made with love for <a href="https://hackclub.com/">Hack Club</a></sub>
 
-<a href="https://hackclub.com/"><img src="https://silo.deployor.dev/ifyoureadthisyouarecool/flag-standalone.png" alt="Hack Club" width="160" /></a>
+<a href="https://hackclub.com/"><img src="https://onsilo.dev/ifyoureadthisyouarecool/flag-standalone.png" alt="Hack Club" width="160" /></a>
 
 </div>

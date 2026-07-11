@@ -285,7 +285,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<ol className="list-decimal list-inside space-y-3 text-text-muted">
 										<li>Add a hostname in the bucket custom-domain modal.</li>
 										<li>
-											Create a CNAME or ALIAS to <code>silo.deployor.dev</code>.
+											Create a CNAME or ALIAS to <code>onsilo.dev</code>.
 										</li>
 										<li>
 											Publish the TXT token at{" "}
@@ -335,7 +335,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									</li>
 									<li>
 										Files are accessible via direct URL:{" "}
-										<code>https://silo.deployor.dev/bucket-name/key</code>.
+										<code>https://onsilo.dev/bucket-name/key</code>.
 									</li>
 									<li>
 										<code>ListObjects</code> and other operations still require
@@ -932,7 +932,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											Endpoint URL
 										</h3>
 										<code className="text-hc-red">
-											https://silo.deployor.dev
+											https://onsilo.dev
 										</code>
 									</div>
 									<div>
@@ -951,7 +951,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													{"// API Endpoint (Authenticated)"}
 												</span>
 												<span className="text-white">
-													https://silo.deployor.dev
+													https://onsilo.dev
 												</span>
 												<span className="text-xs text-text-muted mt-1">
 													No bucket name needed in hostname or path for API
@@ -972,7 +972,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												<span className="text-white">
 													https://
 													<span className="text-hc-red">{"{bucket}"}</span>
-													.silo.deployor.dev/
+													.onsilo.dev/
 													<span className="text-hc-red">{"{key}"}</span>
 												</span>
 											</div>
@@ -981,7 +981,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													{"// Path Style (Public Access)"}
 												</span>
 												<span className="text-white">
-													https://silo.deployor.dev/
+													https://onsilo.dev/
 													<span className="text-hc-red">{"{bucket}"}</span>/
 													<span className="text-hc-red">{"{key}"}</span>
 												</span>
@@ -1042,13 +1042,13 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</h3>
 								<CodeBlock
 									code={`# List Buckets
-aws s3 ls --endpoint-url https://silo.deployor.dev --profile silo
+aws s3 ls --endpoint-url https://onsilo.dev --profile silo
 
 # Upload a file
-aws s3 cp myfile.txt s3://my-bucket/myfile.txt --endpoint-url https://silo.deployor.dev --profile silo
+aws s3 cp myfile.txt s3://my-bucket/myfile.txt --endpoint-url https://onsilo.dev --profile silo
 
 # List Objects
-aws s3 ls s3://my-bucket --endpoint-url https://silo.deployor.dev --profile silo`}
+aws s3 ls s3://my-bucket --endpoint-url https://onsilo.dev --profile silo`}
 								/>
 							</div>
 						) : null}
@@ -1090,7 +1090,7 @@ bun add @aws-sdk/client-s3`}
 // Initialize the client
 const s3 = new S3Client({
   region: "auto",
-  endpoint: "https://silo.deployor.dev",
+  endpoint: "https://onsilo.dev",
   credentials: {
     accessKeyId: process.env.ACCESS_KEY_ID,     // e.g. "23823..."
     secretAccessKey: process.env.SECRET_ACCESS_KEY, // e.g. "82382..."
@@ -1224,7 +1224,7 @@ import os
 
 # Initialize the S3 client
 s3 = boto3.client('s3',
-    endpoint_url='https://silo.deployor.dev',
+    endpoint_url='https://onsilo.dev',
     aws_access_key_id=os.getenv('ACCESS_KEY'),
     aws_secret_access_key=os.getenv('SECRET_KEY'),
     region_name='auto'
@@ -1311,7 +1311,7 @@ func main() {
     // 1. Configure the custom endpoint resolver
  r2Resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
   return aws.Endpoint{
-   URL: "https://silo.deployor.dev",
+   URL: "https://onsilo.dev",
   }, nil
  })
 
@@ -1403,7 +1403,7 @@ func main() {
 									<li>
 										endpoint:{" "}
 										<span className="text-hc-red">
-											https://silo.deployor.dev
+											https://onsilo.dev
 										</span>
 									</li>
 									<li>
@@ -1424,7 +1424,7 @@ provider = Other
 env_auth = false
 access_key_id = YOUR_ACCESS_KEY
 secret_access_key = YOUR_SECRET_KEY
-endpoint = https://silo.deployor.dev
+endpoint = https://onsilo.dev
 region = auto
 acl = private`}
 								/>

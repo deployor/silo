@@ -134,7 +134,7 @@ async function healthResponse() {
  * Determines if a request is intended for the dashboard or the S3 gateway.
  *
  * Logic:
- * 1. If the host starts with "dashboard.", it's a dashboard request.
+ * 1. If the host matches DASHBOARD_DOMAIN, it's a dashboard request.
  * 2. If the host matches the S3 domain (or localhost):
  *    - If the request has S3 auth headers or params, it's an S3 request.
  *    - If the path matches known dashboard routes, it's a dashboard request.
@@ -165,7 +165,7 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 	}
 
 	// 2. Apex only serves the public landing page from the dashboard app. All
-	// authenticated dashboard routes live on dashboard.<domain> so uploaded public
+	// authenticated dashboard routes live on DASHBOARD_DOMAIN so uploaded public
 	// objects never share the dashboard cookie origin.
 	if (host === S3_DOMAIN) {
 		if (DASHBOARD_HOST === S3_DOMAIN) {

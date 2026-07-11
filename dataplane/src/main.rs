@@ -84,6 +84,7 @@ struct Config {
     internal_secret: String,
     public_scheme: String,
     s3_domain: String,
+    dashboard_domain: String,
     custom_domains_enabled: bool,
     deep_freeze_enabled: bool,
     s3_access_key: String,
@@ -315,12 +316,22 @@ impl Config {
             .trim_end_matches('/')
             .to_string();
 
+        let s3_domain = env::var("S3_DOMAIN").context("S3_DOMAIN is required")?;
+        let dashboard_domain = env::var("DASHBOARD_DOMAIN").unwrap_or_else(|_| {
+            if s3_domain == "localhost:3000" {
+                s3_domain.clone()
+            } else {
+                format!("dash.{s3_domain}")
+            }
+        });
+
         Ok(Self {
             bind: env::var("DATAPLANE_BIND").unwrap_or_else(|_| "0.0.0.0:3001".into()),
             control_plane_url,
             internal_secret,
             public_scheme: env::var("DATAPLANE_PUBLIC_SCHEME").unwrap_or_else(|_| "https".into()),
-            s3_domain: env::var("S3_DOMAIN").context("S3_DOMAIN is required")?,
+            s3_domain,
+            dashboard_domain,
             custom_domains_enabled: env_bool("DOMAINS"),
             deep_freeze_enabled: env_bool("DEEP_FREEZE"),
             s3_access_key: env::var("S3_ACCESS_KEY_ID").context("S3_ACCESS_KEY_ID is required")?,
@@ -376,8 +387,8 @@ async fn handle_request_inner(state: AppState, req: Request<Body>) -> Result<Res
             .unwrap_or("");
         if accept.contains("text/html") {
             let location = format!(
-                "{}://dashboard.{}/",
-                state.cfg.public_scheme, state.cfg.s3_domain
+                "{}://{}/",
+                state.cfg.public_scheme, state.cfg.dashboard_domain
             );
             return Ok(Response::builder()
                 .status(StatusCode::FOUND)
@@ -470,7 +481,7 @@ fn is_dashboard_host(cfg: &Config, headers: &HeaderMap) -> bool {
         .map(|(host, _)| host)
         .unwrap_or(host)
         .to_ascii_lowercase();
-    host == format!("dashboard.{}", cfg.s3_domain).to_ascii_lowercase()
+    host == cfg.dashboard_domain.to_ascii_lowercase()
 }
 
 async fn proxy_control_plane(

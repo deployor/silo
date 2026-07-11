@@ -222,7 +222,9 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const customDomainsEnabled = bootstrap.config?.customDomainsEnabled === true;
 	const deepFreezeEnabled = bootstrap.config?.deepFreezeEnabled === true;
 	const customDomainTargetHostname =
-		bootstrap.config?.cloudflareForSaas?.targetHostname || "silo.deployor.dev";
+		bootstrap.config?.cloudflareForSaas?.targetHostname ||
+		bootstrap.config?.s3Domain ||
+		"onsilo.dev";
 
 	const [stats, setStats] = useState<DashboardStats | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -2785,7 +2787,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											try {
 												return new URL(credentialModal.publicUrl).origin;
 											} catch {
-												return "https://silo.deployor.dev";
+												return `https://${bootstrap.config?.s3Domain || "onsilo.dev"}`;
 											}
 										})()}
 									</div>
@@ -2797,7 +2799,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													try {
 														return new URL(credentialModal.publicUrl).origin;
 													} catch {
-														return "https://silo.deployor.dev";
+														return `https://${bootstrap.config?.s3Domain || "onsilo.dev"}`;
 													}
 												})(),
 											)

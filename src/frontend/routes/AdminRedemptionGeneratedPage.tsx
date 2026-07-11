@@ -37,7 +37,7 @@ export function AdminRedemptionGeneratedPage({
 	const links = useMemo(
 		() =>
 			codeRows
-				.map((entry) => `https://silo.deployor.dev/redeem?code=${entry.code}`)
+				.map((entry) => `https://dash.onsilo.dev/redeem?code=${entry.code}`)
 				.join("\n"),
 		[codeRows],
 	);

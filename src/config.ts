@@ -3,6 +3,7 @@ import { z } from "zod";
 
 const envSchema = z.object({
 	S3_DOMAIN: z.string().default("localhost:3000"),
+	DASHBOARD_DOMAIN: z.string().optional(),
 	DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
 	S3_ACCESS_KEY_ID: z.string().min(1, "S3_ACCESS_KEY_ID is required"),
 	S3_SECRET_ACCESS_KEY: z.string().min(1, "S3_SECRET_ACCESS_KEY is required"),
@@ -38,9 +39,10 @@ const envSchema = z.object({
 
 const env = envSchema.parse(process.env);
 const dashboardDomain =
-	env.S3_DOMAIN === "localhost:3000"
+	env.DASHBOARD_DOMAIN ||
+	(env.S3_DOMAIN === "localhost:3000"
 		? env.S3_DOMAIN
-		: `dashboard.${env.S3_DOMAIN}`;
+		: `dash.${env.S3_DOMAIN}`);
 
 let gitSha = env.GIT_COMMIT_SHA;
 let gitDate = env.GIT_COMMIT_DATE;

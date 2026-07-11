@@ -148,7 +148,7 @@ export const homeView = (
 					]
 				: [],
 			Context().elements(
-				`Last updated: ${new Date().toLocaleTimeString()} :ms-tick:  |  <https://silo.deployor.dev/docs|Documentation :ms-info:>`,
+				`Last updated: ${new Date().toLocaleTimeString()} :ms-tick:  |  <https://dash.onsilo.dev/docs|Documentation :ms-info:>`,
 			),
 		)
 		.buildToObject();

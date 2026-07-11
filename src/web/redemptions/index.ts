@@ -207,7 +207,7 @@ export async function handleAdminRedemptionsRequest(
 
 		let csv = "Code,Link,CreditBytes,Status,RedeemedBy,RedeemedAt\n";
 		for (const c of codes) {
-			const link = `https://silo.deployor.dev/redeem?code=${c.code}`;
+			const link = `https://dash.onsilo.dev/redeem?code=${c.code}`;
 			const creditBytes = c.quotaCreditBytes || program.quotaCreditBytes;
 			const status = c.isRedeemed ? "REDEEMED" : "AVAILABLE";
 			const redeemedBy = c.redeemedBy || "";

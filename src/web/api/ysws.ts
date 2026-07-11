@@ -85,7 +85,7 @@ export async function handleYswsApiRequest(req: Request): Promise<Response> {
 				codes: codes.map((code) => ({
 					code: code.code,
 					creditBytes: code.quotaCreditBytes ?? program.quotaCreditBytes,
-					url: `https://silo.deployor.dev/redeem?code=${encodeURIComponent(code.code)}`,
+					url: `https://dash.onsilo.dev/redeem?code=${encodeURIComponent(code.code)}`,
 				})),
 			});
 		} catch (error) {
