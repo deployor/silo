@@ -1035,19 +1035,6 @@ select {
   color: #6ee7b7;
 }
 
-.silo-redeem-tag {
-  flex: none;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid var(--color-line);
-  border-radius: 0.4rem;
-  color: var(--color-text-muted);
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-}
-
 .silo-redeem-form {
   display: flex;
   flex-direction: column;

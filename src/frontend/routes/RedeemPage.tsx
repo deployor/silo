@@ -45,7 +45,6 @@ export function RedeemPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<p className="silo-redeem-eyebrow">Silo</p>
 						<h1>Redeem storage</h1>
 					</div>
-					<span className="silo-redeem-tag">YSWS</span>
 				</header>
 
 				{p.success ? (
@@ -95,7 +94,6 @@ export function RedeemPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 				<footer className="silo-redeem-footer">
 					<span>Signed in as {p.user?.id || "user"}</span>
-					<span>Storage credit</span>
 				</footer>
 			</div>
 		</AppShell>
