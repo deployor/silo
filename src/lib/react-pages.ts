@@ -21,6 +21,7 @@ export const REACT_PAGE_IDS = [
 	"onboarding",
 	"locked",
 	"aged-out",
+	"maintenance",
 ] as const;
 
 export type ReactPageId = (typeof REACT_PAGE_IDS)[number];

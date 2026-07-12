@@ -4,33 +4,63 @@ import archiver from "archiver";
 import { AwsClient } from "aws4fetch";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { config } from "../../config";
-import { getInternalPath } from "../../lib/s3/paths";
 import { db } from "../../db";
 import { buckets, offboardingExportSessions, users } from "../../db/schema";
 import {
-	OFFBOARDING_EXPORT_TTL_MS,
 	buildOffboardingAllowedPrefix,
 	buildOffboardingRcloneCommand,
 	createOffboardingExportAccessKey,
 	deriveOffboardingExportSecret,
 	expireOffboardingExportSessions,
 	hashOffboardingExportSecret,
+	OFFBOARDING_EXPORT_TTL_MS,
 } from "../../lib/offboarding-export";
+import { getInternalPath } from "../../lib/s3/paths";
 import { s3Client } from "../../lib/s3-client";
 import { parseS3Xml } from "../../lib/s3-xml";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
+import {
+	getMaintenanceStatus,
+	MAINTENANCE_ERROR,
+} from "../../services/maintenance-service";
 
 // Simple in-memory rate limiting (use Redis in production)
 const EXPORT_LIMITS = new Map<string, number[]>();
 const MAX_EXPORTS_PER_HOUR = 3;
 const MIGRATION_LOCKS = new Set<string>();
 
+type S3Object = {
+	Key: string;
+	Size?: number | string;
+};
+
+type S3ListBucketResult = {
+	Contents?: S3Object | S3Object[];
+	NextContinuationToken?: string;
+};
+
+type S3BucketListResult = {
+	Buckets?: { Bucket?: { Name: string } | Array<{ Name: string }> };
+};
+
+type S3TaggingResult = {
+	Tagging?: {
+		TagSet?: {
+			Tag?:
+				| { Key: string; Value: string }
+				| Array<{ Key: string; Value: string }>;
+		};
+	};
+};
+
 async function getS3Error(res: Response): Promise<string> {
 	try {
 		const text = await res.text();
 		if (text.includes("<?xml") || text.includes("<Error>")) {
-			const parsed = parseS3Xml<{ Error?: { Code?: string; Message?: string } }>(text);
+			const parsed = parseS3Xml<{
+				Error?: { Code?: string; Message?: string };
+			}>(text);
 			if (parsed.Error) {
 				return `${parsed.Error.Code}: ${parsed.Error.Message}`;
 			}
@@ -60,6 +90,10 @@ function checkExportRateLimit(userId: string): boolean {
 export async function handleOffboardingRequest(
 	req: Request,
 ): Promise<Response> {
+	const maintenance = await getMaintenanceStatus();
+	if (maintenance.s3MaintenanceMode || maintenance.fullMaintenanceMode) {
+		return new Response(MAINTENANCE_ERROR, { status: 503 });
+	}
 	const user = await getCurrentUser(req);
 	if (!user) {
 		return Response.redirect("/auth/login");
@@ -294,7 +328,9 @@ async function getBucketObjectCount(
 		if (!listRes.ok) break;
 
 		const xml = await listRes.text();
-		const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
+		const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
+			xml,
+		).ListBucketResult;
 		const contents = result.Contents
 			? Array.isArray(result.Contents)
 				? result.Contents
@@ -406,7 +442,9 @@ async function analyzeMigration(
 		}
 
 		const xml = await listRes.text();
-		const result = parseS3Xml<{ ListAllMyBucketsResult?: any }>(xml).ListAllMyBucketsResult;
+		const result = parseS3Xml<{ ListAllMyBucketsResult?: S3BucketListResult }>(
+			xml,
+		).ListAllMyBucketsResult;
 
 		const remoteBuckets = new Set<string>();
 		if (result.Buckets?.Bucket) {
@@ -726,7 +764,9 @@ async function migrateUserData(
 						}
 
 						const xml = await listRes.text();
-						const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
+						const result = parseS3Xml<{
+							ListBucketResult?: S3ListBucketResult;
+						}>(xml).ListBucketResult;
 
 						const contents = result.Contents
 							? Array.isArray(result.Contents)
@@ -809,7 +849,7 @@ async function migrateUserData(
 									});
 									if (tagRes.ok) {
 										const tXml = await tagRes.text();
-							const tRes = parseS3Xml<any>(tXml);
+										const tRes = parseS3Xml<S3TaggingResult>(tXml);
 										const tagSet = tRes.Tagging?.TagSet?.Tag;
 										if (tagSet) {
 											const tagArray = Array.isArray(tagSet)
@@ -946,7 +986,9 @@ async function streamUserData(user: typeof users.$inferSelect) {
 					if (!listRes.ok) break;
 
 					const xml = await listRes.text();
-					const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
+					const result = parseS3Xml<{
+						ListBucketResult?: S3ListBucketResult;
+					}>(xml).ListBucketResult;
 
 					const contents = result.Contents
 						? Array.isArray(result.Contents)
@@ -969,7 +1011,7 @@ async function streamUserData(user: typeof users.$inferSelect) {
 							});
 							if (taggingRes.ok) {
 								const xml = await taggingRes.text();
-								const r = parseS3Xml<any>(xml);
+								const r = parseS3Xml<S3TaggingResult>(xml);
 								const tagSet = r.Tagging?.TagSet?.Tag;
 								if (tagSet) {
 									const tagArray = Array.isArray(tagSet) ? tagSet : [tagSet];

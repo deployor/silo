@@ -41,7 +41,12 @@ export function normalizeCustomDomain(input: string): string {
 	if (!trimmed) {
 		throw new Error("Custom domain is required");
 	}
-	if (trimmed.includes("://") || trimmed.includes("/") || trimmed.includes("?") || trimmed.includes("#")) {
+	if (
+		trimmed.includes("://") ||
+		trimmed.includes("/") ||
+		trimmed.includes("?") ||
+		trimmed.includes("#")
+	) {
 		throw new Error("Enter only a hostname, without protocol or path");
 	}
 	if (trimmed.length > 253) {
@@ -58,14 +63,20 @@ export function normalizeCustomDomain(input: string): string {
 	}
 	const labels = trimmed.split(".");
 	for (const label of labels) {
-		if (!/^[a-z0-9-]{1,63}$/.test(label) || label.startsWith("-") || label.endsWith("-")) {
+		if (
+			!/^[a-z0-9-]{1,63}$/.test(label) ||
+			label.startsWith("-") ||
+			label.endsWith("-")
+		) {
 			throw new Error("Custom domain must be a valid DNS hostname");
 		}
 	}
 	return trimmed;
 }
 
-export function parseBucketCustomDomains(raw: string | null | undefined): BucketCustomDomain[] {
+export function parseBucketCustomDomains(
+	raw: string | null | undefined,
+): BucketCustomDomain[] {
 	if (!raw) return [];
 	try {
 		const parsed = JSON.parse(raw);
@@ -88,30 +99,37 @@ export function parseBucketCustomDomains(raw: string | null | undefined): Bucket
 					: [],
 				ownershipVerification: entry?.ownershipVerification
 					? {
-						type: String(entry.ownershipVerification.type || "txt"),
-						name: String(entry.ownershipVerification.name || ""),
-						value: String(entry.ownershipVerification.value || ""),
-					}
+							type: String(entry.ownershipVerification.type || "txt"),
+							name: String(entry.ownershipVerification.name || ""),
+							value: String(entry.ownershipVerification.value || ""),
+						}
 					: null,
 				sslValidationRecords: Array.isArray(entry?.sslValidationRecords)
 					? entry.sslValidationRecords.map((record: unknown) => {
-						const typed = record as Record<string, unknown>;
-						return {
-							txtName: String(typed.txtName || typed.txt_name || ""),
-							txtValue: String(typed.txtValue || typed.txt_value || ""),
-							status: String(typed.status || "pending"),
-						};
-					})
+							const typed = record as Record<string, unknown>;
+							return {
+								txtName: String(typed.txtName || typed.txt_name || ""),
+								txtValue: String(typed.txtValue || typed.txt_value || ""),
+								status: String(typed.status || "pending"),
+							};
+						})
 					: [],
-				lastCheckedAt: entry?.lastCheckedAt ? String(entry.lastCheckedAt) : null,
+				lastCheckedAt: entry?.lastCheckedAt
+					? String(entry.lastCheckedAt)
+					: null,
 			}))
-			.filter((entry) => Boolean(entry.domain) && entry.verificationToken.length >= 16);
+			.filter(
+				(entry) =>
+					Boolean(entry.domain) && entry.verificationToken.length >= 16,
+			);
 	} catch {
 		return [];
 	}
 }
 
-export function serializeBucketCustomDomains(domains: BucketCustomDomain[]): string {
+export function serializeBucketCustomDomains(
+	domains: BucketCustomDomain[],
+): string {
 	return JSON.stringify(domains);
 }
 
@@ -138,7 +156,9 @@ export function createCustomDomainRecord(domain: string): BucketCustomDomain {
 	};
 }
 
-export function sanitizeBucketCustomDomains(domains: BucketCustomDomain[]): BucketCustomDomain[] {
+export function sanitizeBucketCustomDomains(
+	domains: BucketCustomDomain[],
+): BucketCustomDomain[] {
 	const unique = new Map<string, BucketCustomDomain>();
 	for (const domain of domains) {
 		const hostname = normalizeCustomDomain(domain.domain);
@@ -154,18 +174,30 @@ export function sanitizeBucketCustomDomains(domains: BucketCustomDomain[]): Buck
 		});
 	}
 	if (unique.size > MAX_CUSTOM_DOMAINS_PER_BUCKET) {
-		throw new Error(`A bucket can only have ${MAX_CUSTOM_DOMAINS_PER_BUCKET} custom domains`);
+		throw new Error(
+			`A bucket can only have ${MAX_CUSTOM_DOMAINS_PER_BUCKET} custom domains`,
+		);
 	}
 	const values = Array.from(unique.values());
-	const verifiedPrimary = values.find((entry) => entry.primary && entry.verified);
+	const verifiedPrimary = values.find(
+		(entry) => entry.primary && entry.verified,
+	);
 	return values.map((entry, index) => ({
 		...entry,
-		primary: verifiedPrimary ? verifiedPrimary.domain === entry.domain : index === 0 && entry.verified,
+		primary: verifiedPrimary
+			? verifiedPrimary.domain === entry.domain
+			: index === 0 && entry.verified,
 	}));
 }
 
-export function getPrimaryVerifiedCustomDomain(domains: BucketCustomDomain[]): BucketCustomDomain | null {
-	return domains.find((entry) => entry.primary && entry.verified) || domains.find((entry) => entry.verified) || null;
+export function getPrimaryVerifiedCustomDomain(
+	domains: BucketCustomDomain[],
+): BucketCustomDomain | null {
+	return (
+		domains.find((entry) => entry.primary && entry.verified) ||
+		domains.find((entry) => entry.verified) ||
+		null
+	);
 }
 
 export function buildBucketObjectUrl(params: {
@@ -210,21 +242,33 @@ export async function resolveBucketByHostname(hostname: string) {
 		const cached = await redis.get(cacheKey);
 		if (cached) {
 			const bucketId = String(cached);
-			const rows = await db.select().from(buckets).where(eq(buckets.id, bucketId)).limit(1);
+			const rows = await db
+				.select()
+				.from(buckets)
+				.where(eq(buckets.id, bucketId))
+				.limit(1);
 			return rows[0] || null;
 		}
 	} catch (error) {
 		console.error("custom domain cache lookup failed", error);
 	}
 
-	const rows = await db.select().from(buckets).where(isNotNull(buckets.customDomains));
+	const rows = await db
+		.select()
+		.from(buckets)
+		.where(isNotNull(buckets.customDomains));
 	for (const bucket of rows) {
 		const match = parseBucketCustomDomains(bucket.customDomains).find(
 			(entry) => entry.verified && entry.domain === normalized,
 		);
 		if (!match) continue;
 		try {
-			await redis.set(cacheKey, bucket.id, "EX", CUSTOM_DOMAIN_CACHE_TTL_SECONDS);
+			await redis.set(
+				cacheKey,
+				bucket.id,
+				"EX",
+				CUSTOM_DOMAIN_CACHE_TTL_SECONDS,
+			);
 		} catch (error) {
 			console.error("custom domain cache write failed", error);
 		}
@@ -234,7 +278,9 @@ export async function resolveBucketByHostname(hostname: string) {
 	return null;
 }
 
-export async function invalidateBucketCustomDomainCache(domains: BucketCustomDomain[]) {
+export async function invalidateBucketCustomDomainCache(
+	domains: BucketCustomDomain[],
+) {
 	await Promise.allSettled(
 		domains.map((entry) => redis.del(`bucket:custom-domain:${entry.domain}`)),
 	);

@@ -7,6 +7,7 @@ import {
 	listPendingInviteCount,
 } from "../../services/collaboration-service";
 import { getBucketDeepFreezeMessage } from "../../services/deep-freeze-service";
+import { getMaintenanceStatus } from "../../services/maintenance-service";
 import { getAppSettings } from "../../services/settings-service";
 import { handleApiRequest } from "./api/index";
 import { handleAuthRequest } from "./auth";
@@ -161,6 +162,17 @@ export async function handleDashboardRequest(req: Request): Promise<Response> {
 
 	const fileExplorerMatch = path.match(/^\/dashboard\/buckets\/([a-z0-9-]+)$/);
 	if (fileExplorerMatch) {
+		if ((await getMaintenanceStatus()).s3MaintenanceMode) {
+			const html = await render("maintenance", {
+				title: "Storage Maintenance - Silo",
+				user: viewUser,
+				storageOnly: true,
+			});
+			return new Response(html, {
+				status: 503,
+				headers: { "Content-Type": "text/html", "Retry-After": "300" },
+			});
+		}
 		const bucketName = fileExplorerMatch[1];
 		const access = await getBucketAccessForUser({
 			bucketName,

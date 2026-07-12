@@ -1,6 +1,10 @@
-import { getClientIp, errorResponse, jsonResponse } from "../../../lib/api-utils";
-import { takedownReportSchema } from "../../../lib/validation";
 import { postMessage } from "../../../integrations/slack/message-handler";
+import {
+	errorResponse,
+	getClientIp,
+	jsonResponse,
+} from "../../../lib/api-utils";
+import { takedownReportSchema } from "../../../lib/validation";
 
 const TAKEDOWN_REPORT_RECIPIENT = "U078PH0GBEH";
 const REPORT_WINDOW_MS = 15 * 60 * 1000;
@@ -41,7 +45,10 @@ export async function handleTakedownReport(req: Request): Promise<Response> {
 	const body = await req.json().catch(() => null);
 	const parsed = takedownReportSchema.safeParse(body);
 	if (!parsed.success) {
-		return errorResponse(parsed.error.issues[0]?.message || "Invalid report", 400);
+		return errorResponse(
+			parsed.error.issues[0]?.message || "Invalid report",
+			400,
+		);
 	}
 
 	const { url, title, description, email, website } = parsed.data;

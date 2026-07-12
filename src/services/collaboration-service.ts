@@ -438,7 +438,9 @@ export async function revokeCollaborationInvite(params: {
 
 	if (!rows[0]) throw new Error("Invite not found");
 
-	await db.delete(bucketCollaborators).where(eq(bucketCollaborators.id, rows[0].id));
+	await db
+		.delete(bucketCollaborators)
+		.where(eq(bucketCollaborators.id, rows[0].id));
 }
 
 export async function respondToCollaborationInvite(params: {

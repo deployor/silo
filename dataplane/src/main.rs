@@ -253,6 +253,10 @@ async fn internal_dashboard_list(
             .unwrap_or_else(|_| Response::new(Body::empty()));
     }
 
+    if s3_maintenance_active(&state).await {
+        return maintenance_s3_response();
+    }
+
     match fast_internal_list_objects(state, request).await {
         Ok(response) => response,
         Err(error) => {
@@ -276,6 +280,10 @@ async fn internal_dashboard_list_cache_invalidate(
             .status(StatusCode::UNAUTHORIZED)
             .body(Body::from("Unauthorized"))
             .unwrap_or_else(|_| Response::new(Body::empty()));
+    }
+
+    if s3_maintenance_active(&state).await {
+        return maintenance_s3_response();
     }
 
     match invalidate_list_cache(&state, &request.bucket_id).await {
@@ -380,6 +388,12 @@ async fn handle_request_inner(state: AppState, req: Request<Body>) -> Result<Res
         return proxy_control_plane(state, method, parts.uri, headers, body).await;
     }
 
+    // This is the outermost S3 trust boundary: it covers signed, public,
+    // custom-domain, and cached requests before authorization or upstream I/O.
+    if s3_maintenance_active(&state).await {
+        return Ok(maintenance_s3_response());
+    }
+
     if parts.uri.path() == "/" {
         let accept = headers
             .get(header::ACCEPT)
@@ -470,6 +484,29 @@ async fn handle_request_inner(state: AppState, req: Request<Body>) -> Result<Res
             "A header or query you requested is not implemented.",
         )),
     }
+}
+
+async fn s3_maintenance_active(state: &AppState) -> bool {
+    sqlx::query_scalar::<_, bool>(
+        "SELECT COALESCE(s3_maintenance_mode OR full_maintenance_mode, false) FROM app_settings WHERE id = 'global'",
+    )
+    .fetch_optional(&state.pg)
+    .await
+    .map(|value| value.unwrap_or(false))
+    .unwrap_or_else(|error| {
+        // Failing closed prevents a database outage from silently bypassing a
+        // requested maintenance window.
+        error!(error = %error, "failed to read maintenance status");
+        true
+    })
+}
+
+fn maintenance_s3_response() -> Response<Body> {
+    s3_error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "ServiceUnavailable",
+        "Storage service is temporarily unavailable due to planned maintenance.",
+    )
 }
 
 fn is_dashboard_host(cfg: &Config, headers: &HeaderMap) -> bool {

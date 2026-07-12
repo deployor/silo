@@ -21,6 +21,10 @@ import { parseS3Xml } from "../../lib/s3-xml";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
 import {
+	getMaintenanceStatus,
+	MAINTENANCE_ERROR,
+} from "../../services/maintenance-service";
+import {
 	getAppSettings,
 	updateAppSettings,
 } from "../../services/settings-service";
@@ -1685,6 +1689,24 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	}
 
 	const path = url.pathname;
+	const maintenance = await getMaintenanceStatus();
+	if (
+		maintenance.fullMaintenanceMode &&
+		path !== "/admin/settings" &&
+		path !== "/api/admin/settings"
+	) {
+		return new Response(MAINTENANCE_ERROR, { status: 503 });
+	}
+	const isAdminS3Route =
+		(path.match(/^\/api\/admin\/buckets\/[a-z0-9-]+$/) &&
+			(req.method === "GET" || req.method === "DELETE")) ||
+		(/^\/api\/admin\/buckets\/[a-z0-9-]+\/files\/preview$/.test(path) &&
+			req.method === "GET") ||
+		(/^\/api\/admin\/buckets\/[a-z0-9-]+\/cors$/.test(path) &&
+			req.method === "DELETE");
+	if (maintenance.s3MaintenanceMode && isAdminS3Route) {
+		return new Response(MAINTENANCE_ERROR, { status: 503 });
+	}
 
 	if (!user.isAdmin) {
 		return new Response("Forbidden", { status: 403 });
@@ -1923,6 +1945,9 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 		}
 
 		if (path === "/api/admin/speedtest/run" && req.method === "POST") {
+			if (maintenance.s3MaintenanceMode || maintenance.fullMaintenanceMode) {
+				return new Response(MAINTENANCE_ERROR, { status: 503 });
+			}
 			return runAdminSpeedtest(req);
 		}
 
@@ -1947,6 +1972,8 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 				minEgressBytes: z.number().int().min(0),
 				defaultMaxBucketsPerUser: z.number().int().min(1).max(10000),
 				defaultMaxKeysPerBucket: z.number().int().min(1).max(10000),
+				s3MaintenanceMode: z.boolean(),
+				fullMaintenanceMode: z.boolean(),
 			});
 
 			const body = await req.json().catch(() => null);

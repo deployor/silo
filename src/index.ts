@@ -15,6 +15,10 @@ import { bucketUsageReconciliationService } from "./services/bucket-usage-reconc
 import { customDomainRevalidationService } from "./services/custom-domain-revalidation-service";
 import { deepFreezeWorkerService } from "./services/deep-freeze-worker-service";
 import { logService } from "./services/log-service";
+import {
+	getMaintenanceStatus,
+	MAINTENANCE_ERROR,
+} from "./services/maintenance-service";
 import { statsService } from "./services/stats-service";
 import { handleAdminRequest } from "./web/admin";
 import { handleRevocationRequest } from "./web/api/revocation";
@@ -81,6 +85,27 @@ function s3DataplaneOnlyResponse() {
 				"x-content-type-options": "nosniff",
 			},
 		},
+	);
+}
+
+function maintenanceResponse(req: Request): Response {
+	if (req.headers.get("accept")?.includes("text/html")) {
+		return new Response(
+			`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Maintenance</title></head><body style="margin:0;background:#101114;color:#f5f5f5;font:16px monospace;display:grid;place-items:center;min-height:100vh"><main style="max-width:34rem;padding:3rem;border:1px solid #444;text-align:center"><div style="font-size:4rem">🔧</div><h1 style="font-size:2.5rem;margin:1rem 0">Maintenance</h1><p>The application is temporarily unavailable due to planned maintenance. Please check back shortly.</p></main></body></html>`,
+			{
+				status: 503,
+				headers: { "Content-Type": "text/html", "Retry-After": "300" },
+			},
+		);
+	}
+	return errorResponse(MAINTENANCE_ERROR, 503);
+}
+
+function isFullMaintenanceException(path: string): boolean {
+	return (
+		path === "/admin/settings" ||
+		path === "/api/admin/settings" ||
+		path.startsWith("/assets/")
 	);
 }
 
@@ -239,6 +264,19 @@ const server = Bun.serve({
 
 				if (url.pathname === "/health") {
 					return healthResponse();
+				}
+
+				const maintenance = await getMaintenanceStatus();
+				if (
+					maintenance.fullMaintenanceMode &&
+					!isFullMaintenanceException(url.pathname)
+				) {
+					return maintenanceResponse(req);
+				}
+				if (url.pathname === "/api/maintenance-status") {
+					return new Response(JSON.stringify(maintenance), {
+						headers: { "Content-Type": "application/json" },
+					});
 				}
 
 				if (

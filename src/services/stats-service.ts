@@ -3,6 +3,7 @@ import { db } from "../db";
 import { buckets, users } from "../db/schema";
 import { getContext } from "../lib/context";
 import { redis } from "../lib/redis";
+import { getMaintenanceStatus } from "./maintenance-service";
 
 const FLUSH_INTERVAL_MS = 30_000; // 30 seconds
 const KEY_PREFIX_USER = "stats:user:";
@@ -53,6 +54,7 @@ class StatsService {
 	 * Uses active-id sets to avoid scanning the full Redis keyspace.
 	 */
 	public async flushToDatabase() {
+		if ((await getMaintenanceStatus()).fullMaintenanceMode) return;
 		try {
 			const [[userSetError, userIdsResult], [bucketSetError, bucketIdsResult]] =
 				(await redis

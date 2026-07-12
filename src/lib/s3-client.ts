@@ -1,5 +1,9 @@
 import { AwsClient } from "aws4fetch";
 import { config } from "../config";
+import {
+	getMaintenanceStatus,
+	MAINTENANCE_ERROR,
+} from "../services/maintenance-service";
 
 const S3_TIMEOUT_MS = Number(process.env.S3_TIMEOUT_MS ?? "30000");
 const S3_MULTIPART_UPLOAD_TIMEOUT_MS = Number(
@@ -55,6 +59,10 @@ export class HetznerS3Client {
 		init?: RequestInit,
 		retries = 3,
 	): Promise<Response> {
+		const maintenance = await getMaintenanceStatus();
+		if (maintenance.s3MaintenanceMode || maintenance.fullMaintenanceMode) {
+			throw new Error(MAINTENANCE_ERROR);
+		}
 		// Circuit breaker: fail fast if upstream is consistently failing
 		if (this.consecutiveFailures >= HetznerS3Client.CIRCUIT_THRESHOLD) {
 			if (Date.now() < this.circuitOpenUntil) {
@@ -142,6 +150,10 @@ export class HetznerS3Client {
 	}
 
 	async sign(url: string, init?: RequestInit): Promise<Request> {
+		const maintenance = await getMaintenanceStatus();
+		if (maintenance.s3MaintenanceMode || maintenance.fullMaintenanceMode) {
+			throw new Error(MAINTENANCE_ERROR);
+		}
 		return this.client.sign(url, init);
 	}
 
@@ -149,6 +161,10 @@ export class HetznerS3Client {
 		path: string,
 		_expiresIn: number = 3600,
 	): Promise<string> {
+		const maintenance = await getMaintenanceStatus();
+		if (maintenance.s3MaintenanceMode || maintenance.fullMaintenanceMode) {
+			throw new Error(MAINTENANCE_ERROR);
+		}
 		const baseUrl = new URL(this.bucketBaseUrl);
 		const relative = path.startsWith("/") ? path.slice(1) : path;
 		const url = new URL(relative, baseUrl.toString());

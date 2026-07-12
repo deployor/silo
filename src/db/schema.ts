@@ -301,6 +301,10 @@ export const appSettings = pgTable("app_settings", {
 	})
 		.notNull()
 		.default(20),
+	s3MaintenanceMode: boolean("s3_maintenance_mode").notNull().default(false),
+	fullMaintenanceMode: boolean("full_maintenance_mode")
+		.notNull()
+		.default(false),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

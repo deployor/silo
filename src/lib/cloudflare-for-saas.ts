@@ -69,7 +69,10 @@ async function cloudflareRequest<T>(
 	const payload = (await response.json()) as CloudflareResponse<T>;
 	if (!response.ok || !payload.success) {
 		throw new Error(
-			payload.errors?.map((error) => error.message).filter(Boolean).join(", ") ||
+			payload.errors
+				?.map((error) => error.message)
+				.filter(Boolean)
+				.join(", ") ||
 				`Cloudflare API request failed with status ${response.status}`,
 		);
 	}
@@ -195,8 +198,7 @@ export function applyCloudflareHostnameState(
 			domain.verificationToken,
 		),
 		verificationToken:
-			result.ownership_verification?.value ||
-			domain.verificationToken,
+			result.ownership_verification?.value || domain.verificationToken,
 		sslValidationRecords: mergeSslValidationRecords(result),
 		lastCheckedAt: new Date().toISOString(),
 	};

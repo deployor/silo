@@ -1,3 +1,5 @@
+import { AccountDeletedPage } from "../routes/AccountDeletedPage";
+import { AccountPage } from "../routes/AccountPage";
 import { AdminBucketsPage } from "../routes/AdminBucketsPage";
 import { AdminCachePage } from "../routes/AdminCachePage";
 import { AdminLogsPage } from "../routes/AdminLogsPage";
@@ -8,13 +10,12 @@ import { AdminSettingsPage } from "../routes/AdminSettingsPage";
 import { AdminSpeedtestPage } from "../routes/AdminSpeedtestPage";
 import { AdminUsersPage } from "../routes/AdminUsersPage";
 import { AgedOutPage } from "../routes/AgedOutPage";
-import { AccountPage } from "../routes/AccountPage";
-import { AccountDeletedPage } from "../routes/AccountDeletedPage";
 import { DashboardPage } from "../routes/DashboardPage";
 import { DocsPage } from "../routes/DocsPage";
 import { FilesPage } from "../routes/FilesPage";
 import { LandingPage } from "../routes/LandingPage";
 import { LockedPage } from "../routes/LockedPage";
+import { MaintenancePage } from "../routes/MaintenancePage";
 import { OffboardingPage } from "../routes/OffboardingPage";
 import { OnboardingPage } from "../routes/OnboardingPage";
 import { RedeemPage } from "../routes/RedeemPage";
@@ -70,6 +71,8 @@ export function App({ bootstrap }: Props) {
 			return <LockedPage bootstrap={bootstrap} />;
 		case "aged-out":
 			return <AgedOutPage bootstrap={bootstrap} />;
+		case "maintenance":
+			return <MaintenancePage bootstrap={bootstrap} />;
 		default:
 			return (
 				<div className="min-h-screen flex items-center justify-center text-white">

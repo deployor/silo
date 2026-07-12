@@ -243,9 +243,9 @@ export function AdminBucketsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							{rows.map((row) => (
 								<tr key={row.id} className="hover:bg-white/5 transition-colors">
 									<td className="px-6 py-4">
-									<div className="font-mono text-white flex items-center gap-2">
-										{row.name}
-									</div>
+										<div className="font-mono text-white flex items-center gap-2">
+											{row.name}
+										</div>
 										<div className="text-[11px] text-text-muted font-mono">
 											{row.id}
 										</div>

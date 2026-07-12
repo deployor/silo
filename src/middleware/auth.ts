@@ -1,7 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { config } from "../config";
-import { getKeyFromRequest } from "../lib/s3/paths";
 import { db } from "../db";
 import {
 	bucketKeys,
@@ -18,6 +17,7 @@ import {
 	getOffboardingExportBucketForUser,
 } from "../lib/offboarding-export";
 import { redis } from "../lib/redis";
+import { getKeyFromRequest } from "../lib/s3/paths";
 import { S3Errors } from "../lib/s3-errors";
 import { getBucketDeepFreezeMessage } from "../services/deep-freeze-service";
 

@@ -145,8 +145,7 @@ export async function deleteBucketContents(prefix: string) {
 		// Wait for previous delete batch to finish before starting next
 		if (pendingDelete) {
 			const prev = await pendingDelete;
-			if (!prev.ok)
-				throw new Error(`Failed to delete objects: ${prev.status}`);
+			if (!prev.ok) throw new Error(`Failed to delete objects: ${prev.status}`);
 		}
 
 		if (!contents || contents.length === 0) break;

@@ -58,10 +58,23 @@ export function AppShell({
 	const [inviteBusyId, setInviteBusyId] = useState<string | null>(null);
 	const [inviteError, setInviteError] = useState<string | null>(null);
 	const [invites, setInvites] = useState<CollaborationInvite[]>([]);
+	const [maintenance, setMaintenance] = useState<{
+		s3MaintenanceMode: boolean;
+		fullMaintenanceMode: boolean;
+	} | null>(null);
 
 	useEffect(() => {
 		setInviteCount(user?.pendingCollaborationInvites || 0);
 	}, [user?.pendingCollaborationInvites]);
+
+	useEffect(() => {
+		void fetchJson<{
+			s3MaintenanceMode: boolean;
+			fullMaintenanceMode: boolean;
+		}>("/api/maintenance-status")
+			.then(setMaintenance)
+			.catch(() => undefined);
+	}, []);
 
 	const loadInvites = async () => {
 		if (!user) return;
@@ -192,10 +205,7 @@ export function AppShell({
 										</span>
 									</button>
 								) : null}
-								<a
-									href="/docs"
-									className="silo-nav-link"
-								>
+								<a href="/docs" className="silo-nav-link">
 									Docs
 								</a>
 								<div className="flex items-center gap-2 min-w-0">
@@ -220,10 +230,7 @@ export function AppShell({
 									</div>
 								</div>
 								{user.isAdmin ? (
-									<a
-										href="/admin/users"
-										className="silo-nav-link"
-									>
+									<a href="/admin/users" className="silo-nav-link">
 										Admin
 									</a>
 								) : null}
@@ -252,6 +259,14 @@ export function AppShell({
 					) : null}
 				</div>
 			</nav>
+			{maintenance?.s3MaintenanceMode || maintenance?.fullMaintenanceMode ? (
+				<div className="w-full bg-amber-400 text-black px-6 py-2 text-center text-xs font-black tracking-[0.18em] uppercase">
+					Planned Maintenance —{" "}
+					{maintenance.fullMaintenanceMode
+						? "Application unavailable"
+						: "Storage service unavailable"}
+				</div>
+			) : null}
 			<main className={`max-w-7xl mx-auto w-full px-6 py-8 ${mainClass || ""}`}>
 				{title ? <h1 className="sr-only">{title}</h1> : null}
 				{children}

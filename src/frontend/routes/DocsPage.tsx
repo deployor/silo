@@ -931,9 +931,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										<h3 className="text-lg font-bold text-white mb-2">
 											Endpoint URL
 										</h3>
-										<code className="text-hc-red">
-											https://onsilo.dev
-										</code>
+										<code className="text-hc-red">https://onsilo.dev</code>
 									</div>
 									<div>
 										<h3 className="text-lg font-bold text-white mb-2">
@@ -950,9 +948,7 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												<span className="text-text-muted">
 													{"// API Endpoint (Authenticated)"}
 												</span>
-												<span className="text-white">
-													https://onsilo.dev
-												</span>
+												<span className="text-white">https://onsilo.dev</span>
 												<span className="text-xs text-text-muted mt-1">
 													No bucket name needed in hostname or path for API
 													calls.
@@ -1402,9 +1398,7 @@ func main() {
 									</li>
 									<li>
 										endpoint:{" "}
-										<span className="text-hc-red">
-											https://onsilo.dev
-										</span>
+										<span className="text-hc-red">https://onsilo.dev</span>
 									</li>
 									<li>
 										acl: <span className="text-hc-red">private</span>

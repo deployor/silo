@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import { objectStats, requestLogs } from "../db/schema";
 import { getContext } from "../lib/context";
+import { getMaintenanceStatus } from "./maintenance-service";
 
 interface LogEntry {
 	id: string;
@@ -76,6 +77,7 @@ class LogService {
 
 	private async flush() {
 		if (this.queue.length === 0) return;
+		if ((await getMaintenanceStatus()).fullMaintenanceMode) return;
 
 		if (this.flushTimer) {
 			clearTimeout(this.flushTimer);

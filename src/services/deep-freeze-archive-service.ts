@@ -5,8 +5,8 @@ import { gunzip, gzip } from "node:zlib";
 import { compress, decompress } from "@mongodb-js/zstd";
 import tar from "tar-stream";
 import { config } from "../config";
-import { getInternalPath } from "../lib/s3/paths";
 import type { buckets, users } from "../db/schema";
+import { getInternalPath } from "../lib/s3/paths";
 import { s3Client } from "../lib/s3-client";
 import { parseS3Xml } from "../lib/s3-xml";
 

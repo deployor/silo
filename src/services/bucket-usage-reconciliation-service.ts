@@ -1,12 +1,18 @@
 import { eq } from "drizzle-orm";
 import { config } from "../config";
-import { getInternalPath } from "../lib/s3/paths";
 import { db } from "../db";
 import { buckets, users } from "../db/schema";
+import { getInternalPath } from "../lib/s3/paths";
 import { s3Client } from "../lib/s3-client";
 import { parseS3Xml } from "../lib/s3-xml";
+import { getMaintenanceStatus } from "./maintenance-service";
 
 const PAGE_SIZE = 1000;
+
+type S3ListBucketResult = {
+	Contents?: { Size?: number | string } | Array<{ Size?: number | string }>;
+	NextContinuationToken?: string;
+};
 
 async function sumPrefixBytes(prefix: string): Promise<number> {
 	let continuationToken: string | null = null;
@@ -25,11 +31,15 @@ async function sumPrefixBytes(prefix: string): Promise<number> {
 			method: "GET",
 		});
 		if (!response.ok) {
-			throw new Error(`Failed to reconcile usage: upstream returned ${response.status}`);
+			throw new Error(
+				`Failed to reconcile usage: upstream returned ${response.status}`,
+			);
 		}
 
 		const xml = await response.text();
-		const result = parseS3Xml<{ ListBucketResult?: any }>(xml).ListBucketResult;
+		const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
+			xml,
+		).ListBucketResult;
 		const contents = result?.Contents
 			? Array.isArray(result.Contents)
 				? result.Contents
@@ -52,7 +62,10 @@ export class BucketUsageReconciliationService {
 
 	start() {
 		if (this.timer) return;
-		const intervalMs = Math.max(60_000, config.bucketUsageReconcileIntervalMs || 0);
+		const intervalMs = Math.max(
+			60_000,
+			config.bucketUsageReconcileIntervalMs || 0,
+		);
 		this.timer = setInterval(() => {
 			void this.reconcileAllBuckets();
 		}, intervalMs);
@@ -67,6 +80,9 @@ export class BucketUsageReconciliationService {
 
 	async reconcileAllBuckets() {
 		if (this.running) return;
+		const maintenance = await getMaintenanceStatus();
+		if (maintenance.fullMaintenanceMode || maintenance.s3MaintenanceMode)
+			return;
 		this.running = true;
 		try {
 			const allBuckets = await db.select().from(buckets);
@@ -86,6 +102,9 @@ export class BucketUsageReconciliationService {
 	}
 
 	async reconcileBucket(bucketId: string) {
+		const maintenance = await getMaintenanceStatus();
+		if (maintenance.fullMaintenanceMode || maintenance.s3MaintenanceMode)
+			return;
 		const bucketRows = await db
 			.select()
 			.from(buckets)

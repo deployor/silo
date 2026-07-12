@@ -31,11 +31,11 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						className="w-full"
 					>
 						{step === 1 && (
-						<Panel
-							icon="ph-hand-waving text-hc-red"
-							title="Welcome to Silo!"
-							content="Silo is Hack Club's new S3 provider."
-							right={
+							<Panel
+								icon="ph-hand-waving text-hc-red"
+								title="Welcome to Silo!"
+								content="Silo is Hack Club's new S3 provider."
+								right={
 									<button
 										type="button"
 										onClick={() => setStep(2)}
@@ -91,8 +91,8 @@ export function OnboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								title="We Log Requests"
 								content={
 									<>
-										To keep Silo safe and fast, we log all requests (User
-										Agent, Path etc).
+										To keep Silo safe and fast, we log all requests (User Agent,
+										Path etc).
 										<br />
 										<br />
 										<span className="text-white font-bold">

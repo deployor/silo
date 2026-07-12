@@ -52,7 +52,9 @@ export function Modal({
 			>
 				{title ? (
 					<div className="silo-modal-header flex justify-between items-center mb-6 pb-4 border-b border-white/10">
-						<h3 id={titleId} className="text-2xl font-bold text-white">{title}</h3>
+						<h3 id={titleId} className="text-2xl font-bold text-white">
+							{title}
+						</h3>
 						{onClose ? (
 							<button
 								type="button"

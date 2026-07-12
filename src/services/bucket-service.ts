@@ -1,11 +1,5 @@
 import { eq } from "drizzle-orm";
 import { config } from "../config";
-import { buildCorsConfig } from "../lib/s3/cors";
-import {
-	deleteBucketContents,
-	getInternalPath,
-	isReservedBucketName,
-} from "../lib/s3/paths";
 import { db } from "../db";
 import { bucketKeys, buckets, users } from "../db/schema";
 import {
@@ -25,6 +19,12 @@ import {
 	isCloudflareForSaasConfigured,
 } from "../lib/cloudflare-for-saas";
 import { redis } from "../lib/redis";
+import { buildCorsConfig } from "../lib/s3/cors";
+import {
+	deleteBucketContents,
+	getInternalPath,
+	isReservedBucketName,
+} from "../lib/s3/paths";
 import {
 	assertBucketCollaborationAllowed,
 	assertCanManageCors,

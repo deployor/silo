@@ -9,6 +9,7 @@ import {
 	readDeepFreezeManifest,
 	restoreDeepFreezeArchive,
 } from "./deep-freeze-archive-service";
+import { getMaintenanceStatus } from "./maintenance-service";
 
 type DeepFreezeJobRecord = typeof deepFreezeJobs.$inferSelect;
 
@@ -40,6 +41,9 @@ export class DeepFreezeWorkerService {
 
 	private async tick() {
 		if (this.active) return;
+		const maintenance = await getMaintenanceStatus();
+		if (maintenance.fullMaintenanceMode || maintenance.s3MaintenanceMode)
+			return;
 		this.active = true;
 		try {
 			await this.requeueStaleJobs();

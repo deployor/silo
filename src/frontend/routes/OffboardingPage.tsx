@@ -69,11 +69,14 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [downloadModalOpen, setDownloadModalOpen] = useState(false);
 	const [downloadBusy, setDownloadBusy] = useState(false);
 	const [downloadError, setDownloadError] = useState<string | null>(null);
-	const [exportCommand, setExportCommand] =
-		useState<ExportCommandState | null>(null);
+	const [exportCommand, setExportCommand] = useState<ExportCommandState | null>(
+		null,
+	);
 	const [exportSpeedMode, setExportSpeedMode] =
 		useState<ExportSpeedMode>("balanced");
-	const [selectedExportBuckets, setSelectedExportBuckets] = useState<string[]>([]);
+	const [selectedExportBuckets, setSelectedExportBuckets] = useState<string[]>(
+		[],
+	);
 
 	const isLargeDownload = (p.totalStorageBytes || 0) > 5 * 1024 * 1024 * 1024;
 
@@ -248,7 +251,9 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			setSelectedExportBuckets(data.bucketNames || []);
 		} catch (error) {
 			setDownloadError(
-				error instanceof Error ? error.message : "Failed to create export command",
+				error instanceof Error
+					? error.message
+					: "Failed to create export command",
 			);
 		} finally {
 			setDownloadBusy(false);
@@ -329,7 +334,9 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 								<div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
 									<div className="bg-hc-dark border border-white/10 rounded-3xl p-8 card-shadow flex flex-col items-center text-center">
-										<div className={`h-20 w-20 rounded-full flex items-center justify-center mb-6 text-4xl ${isLargeDownload ? "bg-red-500/10 text-hc-red" : "bg-white/10 text-white"}`}>
+										<div
+											className={`h-20 w-20 rounded-full flex items-center justify-center mb-6 text-4xl ${isLargeDownload ? "bg-red-500/10 text-hc-red" : "bg-white/10 text-white"}`}
+										>
 											<PhIcon
 												className={`text-5xl ${isLargeDownload ? "ph-duotone ph-download" : "ph-duotone ph-file-zip"}`}
 											/>
@@ -354,7 +361,9 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 													onClick={() => void handleDownloadArchive()}
 													className="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-4 rounded-xl transition-all"
 												>
-													{isLargeDownload ? "Download on this device" : "Download Archive"}
+													{isLargeDownload
+														? "Download on this device"
+														: "Download Archive"}
 												</button>
 												{isLargeDownload ? (
 													<p className="mt-3 text-xs text-text-muted">
@@ -735,17 +744,31 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			>
 				<div className="space-y-6">
 					<div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
-						Your export is currently <span className="font-bold text-white">{p.totalStorageFormatted}</span>. Downloads this large can fail or be painfully slow in the browser. We strongly recommend using the terminal command below so every object downloads directly and reliably.
+						Your export is currently{" "}
+						<span className="font-bold text-white">
+							{p.totalStorageFormatted}
+						</span>
+						. Downloads this large can fail or be painfully slow in the browser.
+						We strongly recommend using the terminal command below so every
+						object downloads directly and reliably.
 					</div>
 
 					<div className="grid gap-4 md:grid-cols-2">
 						<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-							<div className="text-xs uppercase tracking-wider text-text-muted mb-2">Export size</div>
-							<div className="text-lg font-bold text-white">{p.totalStorageFormatted}</div>
+							<div className="text-xs uppercase tracking-wider text-text-muted mb-2">
+								Export size
+							</div>
+							<div className="text-lg font-bold text-white">
+								{p.totalStorageFormatted}
+							</div>
 						</div>
 						<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-							<div className="text-xs uppercase tracking-wider text-text-muted mb-2">Save destination</div>
-							<div className="text-sm text-white font-mono break-all">./silo-export</div>
+							<div className="text-xs uppercase tracking-wider text-text-muted mb-2">
+								Save destination
+							</div>
+							<div className="text-sm text-white font-mono break-all">
+								./silo-export
+							</div>
 						</div>
 					</div>
 
@@ -778,7 +801,11 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										onChange={(event) => {
 											const value = Number(event.target.value);
 											setExportSpeedMode(
-												value === 0 ? "safe" : value === 2 ? "fast" : "balanced",
+												value === 0
+													? "safe"
+													: value === 2
+														? "fast"
+														: "balanced",
 											);
 										}}
 										className="w-full"
@@ -792,14 +819,20 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							) : null}
 
 							<div className="flex items-center justify-between gap-3 mb-2">
-								<h3 className="text-lg font-bold text-white">Recommended terminal command</h3>
+								<h3 className="text-lg font-bold text-white">
+									Recommended terminal command
+								</h3>
 								<button
 									type="button"
 									onClick={() => void createRcloneExport()}
 									disabled={downloadBusy}
 									className="text-sm text-text-muted hover:text-white disabled:opacity-50"
 								>
-									{downloadBusy ? "Generating..." : exportCommand ? "Refresh" : "Generate"}
+									{downloadBusy
+										? "Generating..."
+										: exportCommand
+											? "Refresh"
+											: "Generate"}
 								</button>
 							</div>
 							{downloadError ? (
@@ -815,12 +848,17 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										className="min-h-40 w-full rounded-2xl border border-white/10 bg-black/30 p-4 font-mono text-sm text-white focus:outline-none"
 									/>
 									<p className="mt-2 text-xs text-text-muted">
-										Valid until {new Date(exportCommand.expiresAt).toLocaleString()}. Change the final path from <span className="font-mono text-white">./silo-export</span> to anywhere you want on your machine before you run it.
+										Valid until{" "}
+										{new Date(exportCommand.expiresAt).toLocaleString()}. Change
+										the final path from{" "}
+										<span className="font-mono text-white">./silo-export</span>{" "}
+										to anywhere you want on your machine before you run it.
 									</p>
 								</>
 							) : (
 								<div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-text-muted">
-									Generate the export command, then paste it into your terminal. It will download all buckets and folders directly.
+									Generate the export command, then paste it into your terminal.
+									It will download all buckets and folders directly.
 								</div>
 							)}
 						</div>
@@ -829,7 +867,9 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							{exportCommand ? (
 								<div className="rounded-2xl border border-white/10 bg-black/20 p-4">
 									<div className="mb-3 flex items-center justify-between gap-4">
-										<h4 className="text-sm font-bold text-white">Buckets to download</h4>
+										<h4 className="text-sm font-bold text-white">
+											Buckets to download
+										</h4>
 										<button
 											type="button"
 											onClick={() =>
@@ -841,7 +881,8 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											}
 											className="text-xs text-text-muted hover:text-white"
 										>
-											{selectedExportBuckets.length === exportCommand.bucketNames.length
+											{selectedExportBuckets.length ===
+											exportCommand.bucketNames.length
 												? "Clear all"
 												: "Select all"}
 										</button>
@@ -855,7 +896,9 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												<div className="flex items-start gap-3">
 													<input
 														type="checkbox"
-														checked={selectedExportBuckets.includes(bucket.name)}
+														checked={selectedExportBuckets.includes(
+															bucket.name,
+														)}
 														onChange={(event) => {
 															setSelectedExportBuckets((prev) =>
 																event.target.checked
@@ -866,9 +909,12 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 														className="mt-1"
 													/>
 													<div className="min-w-0 flex-1">
-														<div className="font-mono break-all text-white">{bucket.name}</div>
+														<div className="font-mono break-all text-white">
+															{bucket.name}
+														</div>
 														<div className="mt-1 text-xs text-text-muted">
-															{bucket.objectCount.toLocaleString()} objects • {formatBytes(bucket.totalBytes)}
+															{bucket.objectCount.toLocaleString()} objects •{" "}
+															{formatBytes(bucket.totalBytes)}
 														</div>
 													</div>
 												</div>
@@ -884,7 +930,9 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						{exportCommand ? (
 							<button
 								type="button"
-								onClick={() => void navigator.clipboard.writeText(renderedExportCommand)}
+								onClick={() =>
+									void navigator.clipboard.writeText(renderedExportCommand)
+								}
 								className="rounded-xl bg-hc-red px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-red-600"
 							>
 								Copy command

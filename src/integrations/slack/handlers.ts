@@ -9,10 +9,10 @@ import {
 	Section,
 } from "slack-block-builder";
 import { config } from "../../config";
-import { buildCorsConfig } from "../../lib/s3/cors";
-import { isReservedBucketName } from "../../lib/s3/paths";
 import { db } from "../../db";
 import { bucketKeys, buckets } from "../../db/schema";
+import { buildCorsConfig } from "../../lib/s3/cors";
+import { isReservedBucketName } from "../../lib/s3/paths";
 import { createKey } from "../../services/key-service";
 import { getAppSettings } from "../../services/settings-service";
 import { getStorageUsage, getUserBySlackId } from "../../services/user-service";

@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { appSettings } from "../db/schema";
+import { invalidateMaintenanceStatusCache } from "./maintenance-service";
 
 export type AppSettings = {
 	defaultStorageLimitBytes: number;
@@ -8,6 +9,8 @@ export type AppSettings = {
 	minEgressBytes: number;
 	defaultMaxBucketsPerUser: number;
 	defaultMaxKeysPerBucket: number;
+	s3MaintenanceMode: boolean;
+	fullMaintenanceMode: boolean;
 };
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -16,6 +19,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 	minEgressBytes: 10 * 1024 * 1024 * 1024, // 10GB
 	defaultMaxBucketsPerUser: 50,
 	defaultMaxKeysPerBucket: 20,
+	s3MaintenanceMode: false,
+	fullMaintenanceMode: false,
 };
 
 let cached: { value: AppSettings; fetchedAtMs: number } | null = null;
@@ -33,6 +38,8 @@ async function ensureRowExists() {
 			minEgressBytes: DEFAULT_APP_SETTINGS.minEgressBytes,
 			defaultMaxBucketsPerUser: DEFAULT_APP_SETTINGS.defaultMaxBucketsPerUser,
 			defaultMaxKeysPerBucket: DEFAULT_APP_SETTINGS.defaultMaxKeysPerBucket,
+			s3MaintenanceMode: false,
+			fullMaintenanceMode: false,
 		})
 		.onConflictDoNothing();
 }
@@ -54,6 +61,8 @@ export async function getAppSettings(force = false): Promise<AppSettings> {
 				minEgressBytes: Number(row.minEgressBytes),
 				defaultMaxBucketsPerUser: Number(row.defaultMaxBucketsPerUser),
 				defaultMaxKeysPerBucket: Number(row.defaultMaxKeysPerBucket),
+				s3MaintenanceMode: row.s3MaintenanceMode,
+				fullMaintenanceMode: row.fullMaintenanceMode,
 			}
 		: DEFAULT_APP_SETTINGS;
 
@@ -77,11 +86,14 @@ export async function updateAppSettings(patch: Partial<AppSettings>) {
 			minEgressBytes: next.minEgressBytes,
 			defaultMaxBucketsPerUser: next.defaultMaxBucketsPerUser,
 			defaultMaxKeysPerBucket: next.defaultMaxKeysPerBucket,
+			s3MaintenanceMode: next.s3MaintenanceMode,
+			fullMaintenanceMode: next.fullMaintenanceMode,
 			updatedAt: new Date(),
 		})
 		.where(eq(appSettings.id, "global"));
 
 	cached = { value: next, fetchedAtMs: Date.now() };
+	invalidateMaintenanceStatusCache();
 	return next;
 }
 

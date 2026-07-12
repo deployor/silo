@@ -1,7 +1,8 @@
+import { config } from "../config";
 import { db } from "../db";
 import { buckets } from "../db/schema";
-import { config } from "../config";
 import { revalidateVerifiedCustomDomainsForBucket } from "./bucket-service";
+import { getMaintenanceStatus } from "./maintenance-service";
 
 export class CustomDomainRevalidationService {
 	private timer: ReturnType<typeof setInterval> | null = null;
@@ -27,6 +28,7 @@ export class CustomDomainRevalidationService {
 
 	async revalidateAll() {
 		if (this.running) return;
+		if ((await getMaintenanceStatus()).fullMaintenanceMode) return;
 		this.running = true;
 		try {
 			const allBuckets = await db.select({ id: buckets.id }).from(buckets);

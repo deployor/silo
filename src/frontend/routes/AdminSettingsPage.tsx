@@ -10,6 +10,8 @@ type SettingsPayload = {
 	minEgressBytes: number;
 	defaultMaxBucketsPerUser: number;
 	defaultMaxKeysPerBucket: number;
+	s3MaintenanceMode: boolean;
+	fullMaintenanceMode: boolean;
 };
 
 const UNITS = [
@@ -55,6 +57,8 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 	const [maxBuckets, setMaxBuckets] = useState(1);
 	const [maxKeys, setMaxKeys] = useState(2);
+	const [s3MaintenanceMode, setS3MaintenanceMode] = useState(false);
+	const [fullMaintenanceMode, setFullMaintenanceMode] = useState(false);
 
 	const loadSettings = useCallback(async () => {
 		setLoading(true);
@@ -74,6 +78,8 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 			setMaxBuckets(data.defaultMaxBucketsPerUser);
 			setMaxKeys(data.defaultMaxKeysPerBucket);
+			setS3MaintenanceMode(data.s3MaintenanceMode);
+			setFullMaintenanceMode(data.fullMaintenanceMode);
 
 			setStatus("Loaded");
 		} catch (e) {
@@ -100,6 +106,8 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				minEgressBytes: toBytes(minEgressAmount, minEgressUnit),
 				defaultMaxBucketsPerUser: maxBuckets,
 				defaultMaxKeysPerBucket: maxKeys,
+				s3MaintenanceMode,
+				fullMaintenanceMode,
 			};
 
 			await fetchText("/api/admin/settings", {
@@ -155,6 +163,51 @@ export function AdminSettingsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				<div className="p-6">
 					<div className="text-xs text-text-muted font-mono mb-4">{status}</div>
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+						<div className="bg-amber-500/10 p-6 rounded-xl border border-amber-400/30 md:col-span-2">
+							<h4 className="text-white font-bold mb-1">Planned Maintenance</h4>
+							<p className="text-xs text-text-muted mb-5 max-w-2xl">
+								S3 maintenance stops every storage operation. Full maintenance
+								stops all application changes and replaces the app with a
+								maintenance page; this settings page remains available so it can
+								be disabled.
+							</p>
+							<div className="grid gap-3">
+								<label className="flex items-start gap-3 rounded-lg border border-white/10 bg-black/20 p-4 cursor-pointer">
+									<input
+										type="checkbox"
+										checked={s3MaintenanceMode}
+										onChange={(e) => setS3MaintenanceMode(e.target.checked)}
+										className="mt-1 h-4 w-4 accent-amber-400"
+									/>
+									<span>
+										<span className="block text-sm font-bold text-white">
+											S3 maintenance mode
+										</span>
+										<span className="block text-xs text-text-muted mt-1">
+											Storage, file browsing, metadata, links, and all S3 API
+											operations are unavailable.
+										</span>
+									</span>
+								</label>
+								<label className="flex items-start gap-3 rounded-lg border border-red-400/30 bg-red-500/10 p-4 cursor-pointer">
+									<input
+										type="checkbox"
+										checked={fullMaintenanceMode}
+										onChange={(e) => setFullMaintenanceMode(e.target.checked)}
+										className="mt-1 h-4 w-4 accent-red-500"
+									/>
+									<span>
+										<span className="block text-sm font-bold text-white">
+											Full application maintenance mode
+										</span>
+										<span className="block text-xs text-text-muted mt-1">
+											Blocks application data changes and all storage traffic.
+											Only this settings page stays available.
+										</span>
+									</span>
+								</label>
+							</div>
+						</div>
 						<div className="bg-black/30 p-6 rounded-xl border border-white/10">
 							<h4 className="text-white font-bold mb-1">
 								Default Storage Quota

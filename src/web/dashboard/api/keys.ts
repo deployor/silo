@@ -1,11 +1,13 @@
 import { eq } from "drizzle-orm";
-import { config } from "../../../config";
 import { db } from "../../../db";
 import { bucketKeys, buckets } from "../../../db/schema";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
+import {
+	buildBucketUrlExample,
+	parseBucketCustomDomains,
+} from "../../../lib/bucket-domains";
 import { getCurrentUser } from "../../../lib/session";
 import { bucketNameSchema } from "../../../lib/validation";
-import { buildBucketUrlExample, parseBucketCustomDomains } from "../../../lib/bucket-domains";
 import {
 	assertCanManageKeys,
 	getBucketAccessForUser,

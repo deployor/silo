@@ -1,6 +1,6 @@
 {
-	"id": "c6803ed0-b477-49c1-a69e-38e6d747f4ae",
-	"prevId": "c2985b0b-ef9b-44ba-a274-57cb13065906",
+	"id": "fbd862fa-f6d6-44fd-928d-79d75aa3acfe",
+	"prevId": "3462825e-d0e2-4a1f-8ca0-8e8b048a20f7",
 	"version": "5",
 	"dialect": "pg",
 	"tables": {
@@ -49,6 +49,20 @@
 					"primaryKey": false,
 					"notNull": true,
 					"default": 20
+				},
+				"s3_maintenance_mode": {
+					"name": "s3_maintenance_mode",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": true,
+					"default": false
+				},
+				"full_maintenance_mode": {
+					"name": "full_maintenance_mode",
+					"type": "boolean",
+					"primaryKey": false,
+					"notNull": true,
+					"default": false
 				},
 				"updated_at": {
 					"name": "updated_at",
@@ -1195,6 +1209,24 @@
 					"primaryKey": false,
 					"notNull": false
 				},
+				"target_user_id": {
+					"name": "target_user_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"target_email": {
+					"name": "target_email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"target_slack_id": {
+					"name": "target_slack_id",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
 				"actor_user_id": {
 					"name": "actor_user_id",
 					"type": "text",
@@ -1237,6 +1269,24 @@
 					"primaryKey": false,
 					"notNull": false
 				},
+				"api_key_suffix": {
+					"name": "api_key_suffix",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"request_user_agent": {
+					"name": "request_user_agent",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false
+				},
+				"fulfilled_at": {
+					"name": "fulfilled_at",
+					"type": "timestamp",
+					"primaryKey": false,
+					"notNull": false
+				},
 				"created_at": {
 					"name": "created_at",
 					"type": "timestamp",
@@ -1254,6 +1304,11 @@
 				"redemption_transaction_user_id_idx": {
 					"name": "redemption_transaction_user_id_idx",
 					"columns": ["user_id"],
+					"isUnique": false
+				},
+				"redemption_transaction_target_user_id_idx": {
+					"name": "redemption_transaction_target_user_id_idx",
+					"columns": ["target_user_id"],
 					"isUnique": false
 				},
 				"redemption_transaction_created_at_idx": {
@@ -1274,7 +1329,7 @@
 					"tableTo": "redemption_programs",
 					"columnsFrom": ["program_id"],
 					"columnsTo": ["id"],
-					"onDelete": "cascade",
+					"onDelete": "restrict",
 					"onUpdate": "no action"
 				},
 				"redemption_transactions_user_id_users_id_fk": {

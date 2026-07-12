@@ -1,15 +1,21 @@
 import { config } from "../../../config";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
+import {
+	buildBucketUrlExample,
+	parseBucketCustomDomains,
+} from "../../../lib/bucket-domains";
 import { getCurrentUser } from "../../../lib/session";
 import {
 	createBucketSchema,
+	customDomainInputSchema,
+	setPrimaryCustomDomainSchema,
 	updateBucketVisibilitySchema,
 } from "../../../lib/validation";
 import {
+	addBucketCustomDomain,
 	createBucket,
 	deleteBucket,
 	emptyBucket,
-	addBucketCustomDomain,
 	listBucketCustomDomains,
 	removeBucketCustomDomain,
 	setPrimaryBucketCustomDomain,
@@ -17,14 +23,6 @@ import {
 	verifyBucketCustomDomain,
 } from "../../../services/bucket-service";
 import { createKey } from "../../../services/key-service";
-import {
-	buildBucketUrlExample,
-	parseBucketCustomDomains,
-} from "../../../lib/bucket-domains";
-import {
-	customDomainInputSchema,
-	setPrimaryCustomDomainSchema,
-} from "../../../lib/validation";
 
 export async function handleBuckets(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
@@ -77,7 +75,9 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 	const url = new URL(req.url);
 	const path = url.pathname;
 	const bucketName = path.split("/")[4]; // /api/dashboard/buckets/:name
-	const domainRouteMatch = path.match(/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/domains$/);
+	const domainRouteMatch = path.match(
+		/^\/api\/dashboard\/buckets\/([a-z0-9-]+)\/domains$/,
+	);
 
 	if (!bucketName) return errorResponse("Invalid bucket name", 400);
 
@@ -117,7 +117,10 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 				const body = await req.json();
 				const parsed = customDomainInputSchema.safeParse(body);
 				if (!parsed.success) {
-					return errorResponse(parsed.error.issues[0]?.message || "Invalid request", 400);
+					return errorResponse(
+						parsed.error.issues[0]?.message || "Invalid request",
+						400,
+					);
 				}
 				const domains = await addBucketCustomDomain({
 					bucketName,
@@ -139,7 +142,10 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 				if (body?.action === "set-primary") {
 					const parsed = setPrimaryCustomDomainSchema.safeParse(body);
 					if (!parsed.success) {
-						return errorResponse(parsed.error.issues[0]?.message || "Invalid request", 400);
+						return errorResponse(
+							parsed.error.issues[0]?.message || "Invalid request",
+							400,
+						);
 					}
 					const domains = await setPrimaryBucketCustomDomain({
 						bucketName,
@@ -152,7 +158,10 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 				if (body?.action === "verify") {
 					const parsed = setPrimaryCustomDomainSchema.safeParse(body);
 					if (!parsed.success) {
-						return errorResponse(parsed.error.issues[0]?.message || "Invalid request", 400);
+						return errorResponse(
+							parsed.error.issues[0]?.message || "Invalid request",
+							400,
+						);
 					}
 					const domains = await verifyBucketCustomDomain({
 						bucketName,
@@ -172,7 +181,10 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 		if (req.method === "DELETE") {
 			try {
 				const body = await req.json().catch(() => null);
-				const domain = typeof body?.domain === "string" ? body.domain : url.searchParams.get("domain");
+				const domain =
+					typeof body?.domain === "string"
+						? body.domain
+						: url.searchParams.get("domain");
 				if (!domain) return errorResponse("Custom domain is required", 400);
 				const domains = await removeBucketCustomDomain({
 					bucketName,
@@ -193,7 +205,7 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 	// NOTE: Dashboard UI sends:
 	// - DELETE /api/dashboard/buckets/:name           => delete bucket
 	// - DELETE /api/dashboard/buckets/:name?empty=true => empty bucket (delete all files only)
-		if (req.method === "DELETE") {
+	if (req.method === "DELETE") {
 		if (user.dataExported) {
 			return errorResponse(
 				"Account is frozen. Buckets cannot be deleted.",
@@ -240,7 +252,10 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 			}).catch(() => parseBucketCustomDomains(null));
 			return jsonResponse({
 				message: "Updated",
-				publicUrl: buildBucketUrlExample({ bucketName, customDomains: bucketRows }),
+				publicUrl: buildBucketUrlExample({
+					bucketName,
+					customDomains: bucketRows,
+				}),
 			});
 		} catch (e: unknown) {
 			const message = e instanceof Error ? e.message : "Internal Error";
