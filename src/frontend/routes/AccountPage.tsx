@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
-import { MdDeleteForever, MdDevices, MdLogout, MdSecurity } from "react-icons/md";
+import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { Modal } from "../components/ui/Modal";
 import { fetchJson } from "../shared/api/http";
@@ -12,7 +11,6 @@ type SessionItem = {
 	isCurrent: boolean;
 	userAgent: string;
 	ipAddress: string | null;
-	lastActiveLabel: string;
 };
 
 type DeleteState = {
@@ -39,11 +37,6 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		confirmDelayRemaining: 10,
 	});
 
-	const currentSession = useMemo(
-		() => sessions.find((session) => session.isCurrent) || null,
-		[sessions],
-	);
-
 	useEffect(() => {
 		if (!deleteState.open || deleteState.busy) return;
 		setDeleteState((prev) => ({ ...prev, confirmDelayRemaining: 10 }));
@@ -63,7 +56,7 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		return () => window.clearInterval(timer);
 	}, [deleteState.open, deleteState.busy]);
 
-	const loadSessions = async () => {
+	const loadSessions = useCallback(async () => {
 		setLoading(true);
 		setError(null);
 		try {
@@ -72,15 +65,17 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			);
 			setSessions(result.sessions || []);
 		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : "Failed to load sessions");
+			setError(
+				cause instanceof Error ? cause.message : "Failed to load sessions",
+			);
 		} finally {
 			setLoading(false);
 		}
-	};
+	}, []);
 
 	useEffect(() => {
 		void loadSessions();
-	}, []);
+	}, [loadSessions]);
 
 	const signOutSession = async (sessionId: string) => {
 		setBusy(sessionId);
@@ -100,7 +95,9 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			}
 			await loadSessions();
 		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : "Failed to sign out session");
+			setError(
+				cause instanceof Error ? cause.message : "Failed to sign out session",
+			);
 		} finally {
 			setBusy(null);
 		}
@@ -115,7 +112,11 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			});
 			window.location.href = "/auth/logout";
 		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : "Failed to sign out everywhere");
+			setError(
+				cause instanceof Error
+					? cause.message
+					: "Failed to sign out everywhere",
+			);
 			setBusy(null);
 		}
 	};
@@ -132,14 +133,14 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		setDeleteState((prev) => ({
 			...prev,
 			busy: true,
-			stage: "Deleting buckets and account data...",
+			stage: "Deleting buckets and account data…",
 			error: null,
 		}));
 		try {
 			await fetchJson("/api/dashboard/account/delete", { method: "POST" });
 			setDeleteState((prev) => ({
 				...prev,
-				stage: "Thanks for being here with us. Finishing account deletion...",
+				stage: "Finishing account deletion…",
 			}));
 			window.location.href = "/account/deleted";
 		} catch (cause) {
@@ -153,194 +154,183 @@ export function AccountPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	};
 
 	return (
-		<AppShell title={bootstrap.title} user={p.user || null} config={bootstrap.config}>
-			<div className="mx-auto max-w-4xl space-y-6">
-				<div className="rounded-[28px] border border-white/10 bg-hc-dark p-8 card-shadow">
-					<div className="flex items-center gap-3">
-						<MdSecurity className="text-2xl text-white" />
-						<div>
-							<h1 className="text-3xl font-black text-white">Account</h1>
-							<p className="mt-1 text-sm text-text-muted">
-								Manage sessions and delete your account.
-							</p>
-						</div>
-					</div>
-					{currentSession ? (
-						<p className="mt-4 text-sm text-text-muted">
-							Current session: {currentSession.userAgent}
-						</p>
-					) : null}
-				</div>
+		<AppShell
+			title={bootstrap.title}
+			user={p.user || null}
+			config={bootstrap.config}
+		>
+			<div className="silo-account">
+				<header className="silo-account-page-header">
+					<h1>Account</h1>
+				</header>
 
-				<div className="rounded-[28px] border border-white/10 bg-hc-dark p-8 card-shadow">
-					<div className="flex items-center justify-between gap-4">
-						<div className="flex items-center gap-3">
-							<MdDevices className="text-2xl text-white" />
-							<div>
-								<h2 className="text-xl font-bold text-white">Active sessions</h2>
-								<p className="mt-1 text-sm text-text-muted">
-									See where you are signed in and sign out of everywhere.
-								</p>
-							</div>
+				<section className="silo-account-sessions">
+					<header className="silo-account-section-header">
+						<div className="flex items-baseline gap-3">
+							<h2>Sessions</h2>
+							{!loading && sessions.length > 0 ? (
+								<span>{sessions.length} active</span>
+							) : null}
 						</div>
 						<button
 							type="button"
 							onClick={() => void signOutEverywhere()}
 							disabled={busy === "everywhere"}
-							className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-white/10 disabled:opacity-50"
+							className="silo-account-action"
 						>
-							<MdLogout className="text-base" />
-							{busy === "everywhere" ? "Signing out..." : "Sign out everywhere"}
+							{busy === "everywhere" ? "Signing out…" : "Sign out all"}
 						</button>
-					</div>
+					</header>
 
-					{error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
+					{error ? (
+						<p className="silo-account-state is-error" role="alert">
+							{error}
+						</p>
+					) : null}
 
-					<div className="mt-5 space-y-3">
+					<div className="silo-session-list">
 						{loading ? (
-							<p className="text-sm text-text-muted">Loading sessions...</p>
+							<p className="silo-account-state" aria-live="polite">
+								Loading sessions…
+							</p>
 						) : sessions.length === 0 ? (
-							<p className="text-sm text-text-muted">No active sessions found.</p>
+							<p className="silo-account-state">No active sessions.</p>
 						) : (
 							sessions.map((session) => (
-								<div
-									key={session.id}
-									className="rounded-2xl border border-white/10 bg-black/20 p-4"
-								>
-									<div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-										<div className="min-w-0">
-											<div className="flex flex-wrap items-center gap-2">
-												<p className="text-sm font-bold text-white">
-													{session.isCurrent ? "Current session" : "Session"}
-												</p>
-												{session.isCurrent ? (
-													<span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-300">
-														Current
-													</span>
-												) : null}
-											</div>
-											<p className="mt-2 break-all text-xs text-text-muted">
-												{session.userAgent}
-											</p>
-											<div className="mt-3 flex flex-wrap gap-4 text-xs text-text-muted">
-												<span>Signed in {new Date(session.createdAt).toLocaleString()}</span>
-												<span>Expires {new Date(session.expiresAt).toLocaleString()}</span>
-												<span>{session.ipAddress || "Unknown IP"}</span>
-											</div>
+								<article key={session.id} className="silo-session-row">
+									<div className="silo-session-identity">
+										<div className="silo-session-title-line">
+											<h3 title={session.userAgent}>{session.userAgent}</h3>
+											{session.isCurrent ? <span>Current</span> : null}
 										</div>
-										<button
-											type="button"
-											onClick={() => void signOutSession(session.id)}
-											disabled={busy === session.id}
-											className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-white/10 disabled:opacity-50"
-										>
-											<MdLogout className="text-base" />
-											{busy === session.id ? "Signing out..." : "Sign out"}
-										</button>
+										<div className="silo-session-facts">
+											<span>{session.ipAddress || "Unknown IP"}</span>
+											<span>
+												Signed in {new Date(session.createdAt).toLocaleString()}
+											</span>
+											<span>
+												Expires {new Date(session.expiresAt).toLocaleString()}
+											</span>
+										</div>
 									</div>
-								</div>
+									<button
+										type="button"
+										onClick={() => void signOutSession(session.id)}
+										disabled={busy === session.id}
+										aria-label={
+											session.isCurrent
+												? "Sign out current session"
+												: `Sign out session from ${session.ipAddress || "unknown IP"}, signed in ${new Date(session.createdAt).toLocaleString()}`
+										}
+										className="silo-account-action is-compact"
+									>
+										{busy === session.id ? "Signing out…" : "Sign out"}
+									</button>
+								</article>
 							))
 						)}
 					</div>
-				</div>
+				</section>
 
-				<div className="rounded-[28px] border border-white/10 bg-hc-dark p-8 card-shadow">
-					<div className="flex items-center justify-between gap-4">
-						<div className="flex items-center gap-3">
-							<MdDeleteForever className="text-2xl text-hc-red" />
-							<div>
-								<h2 className="text-xl font-bold text-white">Delete account</h2>
-								<p className="mt-1 text-sm text-text-muted">
-									Delete your account, buckets, sessions, and stored data.
-								</p>
-							</div>
-						</div>
-						<button
-							type="button"
-							onClick={() =>
-								setDeleteState({
-									open: true,
-									busy: false,
-									stage: "",
-									error: null,
-									confirmText: "",
-									confirmDelayRemaining: 10,
-								})
-							}
-							className="inline-flex items-center gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm font-bold text-red-300 transition-colors hover:bg-red-500/20"
-						>
-							<MdDeleteForever className="text-base" />
-							Delete account
-						</button>
+				<section className="silo-account-danger">
+					<div>
+						<h2>Delete account</h2>
+						<p>
+							Permanently deletes your buckets, files, sessions, and account.
+						</p>
 					</div>
-				</div>
+					<button
+						type="button"
+						onClick={() =>
+							setDeleteState({
+								open: true,
+								busy: false,
+								stage: "",
+								error: null,
+								confirmText: "",
+								confirmDelayRemaining: 10,
+							})
+						}
+						className="silo-account-danger-action"
+					>
+						Delete account
+					</button>
+				</section>
 
 				<Modal
 					open={deleteState.open}
-					onClose={deleteState.busy ? undefined : () =>
-						setDeleteState((prev) => ({ ...prev, open: false }))
+					onClose={
+						deleteState.busy
+							? undefined
+							: () => setDeleteState((prev) => ({ ...prev, open: false }))
 					}
 					title="Delete account"
-					className="max-w-xl p-8"
+					className="max-w-lg p-8"
 				>
-					<div className="space-y-5">
-						<p className="text-sm text-text-muted">
-							Delete account and all data.
+					<div className="silo-account-delete-modal">
+						<p className="silo-account-delete-warning">
+							This permanently deletes every bucket, file, session, and account
+							record. It cannot be undone.
 						</p>
-						<p className="text-sm text-text-muted">
-							Wait 10 seconds, type DELETE, then confirm.
-						</p>
-						<input
-							type="text"
-							value={deleteState.confirmText}
-							onChange={(event) =>
-								setDeleteState((prev) => ({
-									...prev,
-									confirmText: event.target.value,
-									error: null,
-								}))
-							}
-							placeholder="Type DELETE to confirm"
-							className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white focus:outline-none focus:border-red-400"
-						/>
+						<label className="silo-account-delete-field">
+							<span>Type DELETE to confirm</span>
+							<input
+								type="text"
+								value={deleteState.confirmText}
+								onChange={(event) =>
+									setDeleteState((prev) => ({
+										...prev,
+										confirmText: event.target.value,
+										error: null,
+									}))
+								}
+								disabled={deleteState.busy}
+								placeholder="DELETE"
+								autoComplete="off"
+								spellCheck={false}
+							/>
+						</label>
 						{deleteState.stage ? (
-							<div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white">
+							<p className="silo-account-modal-state" role="status">
 								{deleteState.stage}
-							</div>
+							</p>
 						) : null}
 						{!deleteState.busy && deleteState.confirmDelayRemaining > 0 ? (
-							<div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-text-muted">
-								Confirm available in {deleteState.confirmDelayRemaining}s
-							</div>
+							<p className="silo-account-modal-state">
+								Available in {deleteState.confirmDelayRemaining}s
+							</p>
 						) : null}
 						{deleteState.error ? (
-							<p className="text-sm text-red-400">{deleteState.error}</p>
+							<p className="silo-account-modal-error" role="alert">
+								{deleteState.error}
+							</p>
 						) : null}
-						<div className="flex justify-end gap-3">
+						<footer className="silo-account-modal-footer">
 							<button
 								type="button"
 								onClick={() =>
 									setDeleteState((prev) => ({ ...prev, open: false }))
 								}
 								disabled={deleteState.busy}
-								className="px-4 py-2 text-sm font-bold text-text-muted transition-colors hover:text-white disabled:opacity-50"
+								className="silo-account-modal-cancel"
 							>
 								Cancel
 							</button>
 							<button
 								type="button"
 								onClick={() => void deleteAccount()}
-								disabled={deleteState.busy || deleteState.confirmDelayRemaining > 0}
-								className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-3 text-sm font-bold text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+								disabled={
+									deleteState.busy || deleteState.confirmDelayRemaining > 0
+								}
+								className="silo-account-danger-action is-solid"
 							>
-								<MdDeleteForever className="text-base" />
 								{deleteState.busy
-									? "Deleting..."
+									? "Deleting…"
 									: deleteState.confirmDelayRemaining > 0
 										? `Delete account (${deleteState.confirmDelayRemaining}s)`
 										: "Delete account"}
 							</button>
-						</div>
+						</footer>
 					</div>
 				</Modal>
 			</div>
