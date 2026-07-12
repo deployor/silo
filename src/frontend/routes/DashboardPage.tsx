@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import {
+	MdAdd,
 	MdArrowForward,
 	MdCheck,
 	MdCheckCircle,
@@ -11,7 +12,7 @@ import {
 	MdFolderOpen,
 	MdGroups,
 	MdInfoOutline,
-	MdKey,
+	MdMoreHoriz,
 	MdPublic,
 	MdSevereCold,
 	MdSync,
@@ -211,7 +212,18 @@ function formatDurationEstimate(totalSeconds: number | null | undefined) {
 	return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`;
 }
 
+function closeBucketActions(button: HTMLButtonElement) {
+	const menu = button.closest("details");
+	if (menu) menu.open = false;
+}
+
 export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
+	const storageOverviewId = useId();
+	const bucketsId = useId();
+	const createBucketNameId = useId();
+	const createBucketNoteId = useId();
+	const deactivateKeyNoteId = useId();
+	const generateKeyNoteId = useId();
 	const p = bootstrap.props as {
 		user?: FrontendUser | null;
 		creditedStorage?: {
@@ -1251,427 +1263,332 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			config={bootstrap.config}
 		>
 			{p.user?.markedAsOverAge ? (
-				<div className="bg-hc-dark border border-white/10 rounded-3xl p-6 mb-8 card-shadow flex flex-col md:flex-row items-center justify-between gap-6">
-					<div>
-						<h3 className="text-white font-bold text-lg">
-							Your account is closing soon.
-						</h3>
-						<p className="text-text-muted text-sm mt-1 max-w-xl">
-							Since you're 18, you've aged out of Silo. Existing data will be
-							permanently deleted in 2 months.
-						</p>
-					</div>
-					<a
-						href="/dashboard/offboarding"
-						className="shrink-0 bg-hc-red hover:bg-red-600 text-white px-6 py-3 rounded-xl text-sm font-bold transition-all card-shadow whitespace-nowrap"
-					>
-						Start Migration <MdArrowForward className="inline text-base" />
+				<div className="silo-dashboard-notice is-critical">
+					<p>
+						<strong>Account closes in 2 months.</strong>
+						<span>
+							You've aged out of Silo; your data will be deleted then.
+						</span>
+					</p>
+					<a href="/dashboard/offboarding">
+						Start migration <MdArrowForward aria-hidden="true" />
 					</a>
 				</div>
 			) : null}
 
 			{p.creditedStorage?.amount ? (
-				<div className="bg-emerald-500/10 border border-emerald-500/25 rounded-3xl p-5 mb-8 card-shadow flex flex-col md:flex-row md:items-center justify-between gap-4">
-					<div className="flex items-start gap-4">
-						<div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-300">
-							<MdCheckCircle className="text-xl" />
-						</div>
-						<div>
-							<h3 className="text-white font-bold text-lg">
-								Storage credit applied.
-							</h3>
-							<p className="text-text-muted text-sm mt-1">
-								You received{" "}
-								<span className="text-white font-bold">
-									{p.creditedStorage.amount}
-								</span>{" "}
-								from{" "}
-								<span className="text-white font-bold">
-									{p.creditedStorage.from || "a program"}
-								</span>
-								.
-							</p>
-						</div>
-					</div>
-					<a
-						href="/"
-						className="text-xs font-bold uppercase tracking-wider text-emerald-300 hover:text-white transition-colors"
-					>
-						Dismiss
-					</a>
+				<div className="silo-dashboard-notice is-success">
+					<p>
+						<MdCheckCircle aria-hidden="true" />
+						<span>
+							<strong>{p.creditedStorage.amount}</strong> added by{" "}
+							{p.creditedStorage.from || "a program"}.
+						</span>
+					</p>
+					<a href="/">Dismiss</a>
 				</div>
 			) : null}
 
-			<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-				<div className="bg-hc-dark rounded-3xl p-6 border border-white/10 card-shadow">
-					<h3 className="text-text-muted text-sm font-bold uppercase tracking-wider mb-2">
-						Storage Usage
-					</h3>
-					<div className="flex items-baseline gap-2">
-						<span className="text-3xl font-bold text-white">
-							{formatBytes(stats?.user.storageUsage || 0)}
-						</span>
-						<span className="text-text-muted text-sm font-mono">
-							/
+			<section
+				className="silo-dashboard-overview"
+				aria-labelledby={storageOverviewId}
+				aria-busy={loading && !stats}
+			>
+				<div className="silo-dashboard-storage">
+					<h2 id={storageOverviewId}>Storage</h2>
+					<p>
+						<strong>
+							{stats ? formatBytes(stats.user.storageUsage) : "—"}
+						</strong>
+						<span>
+							{" / "}
 							{stats?.user.isImmortal
 								? "∞"
-								: ` ${formatBytes(stats?.user.storageLimit || 0)}`}
+								: stats
+									? formatBytes(stats.user.storageLimit)
+									: "—"}
 						</span>
-					</div>
-					<div className="w-full bg-white/5 rounded-full h-2 mt-4 overflow-hidden">
-						<div
-							className={`${stats?.user.isImmortal ? "bg-amber-400" : "bg-hc-red"} h-2 rounded-full transition-all duration-500`}
-							style={{ width: `${storagePercent}%` }}
-						/>
-					</div>
-				</div>
-
-				<div className="bg-hc-dark rounded-3xl p-6 border border-white/10 card-shadow">
-					<h3 className="text-text-muted text-sm font-bold uppercase tracking-wider mb-2">
-						Traffic
-					</h3>
-					<div className="flex justify-between text-sm">
-						<span className="text-emerald-400">Ingress (In)</span>
-						<span className="text-white">
-							{formatBytes(stats?.user.ingressBytes || 0)}
-						</span>
-					</div>
-					<div className="flex justify-between text-sm mt-2">
-						<span className="text-hc-red">Egress This Month</span>
-						<span className="text-white">
-							{formatBytes(stats?.user.egressBytes || 0)}
-						</span>
-					</div>
-					<div className="text-xs text-text-muted mt-1">
-						/
-						{egressLimitBytes === Number.POSITIVE_INFINITY
-							? " ∞"
-							: ` ${formatBytes(egressLimitBytes)}`}
-					</div>
-				</div>
-
-				<div className="bg-hc-dark rounded-3xl p-6 border border-white/10 card-shadow">
-					<h3 className="text-text-muted text-sm font-bold uppercase tracking-wider mb-2">
-						API Requests
-					</h3>
-					<div className="flex items-baseline gap-2">
-						<span className="text-3xl font-bold text-white">
-							{(stats?.user.totalRequests || 0).toLocaleString()}
-						</span>
-						<span className="text-text-muted text-sm">requests</span>
-					</div>
-					<p className="text-xs text-text-muted mt-2">
-						Lifetime total across all buckets
 					</p>
 				</div>
-			</div>
 
-			<div className="bg-hc-dark rounded-3xl border border-white/10 overflow-hidden card-shadow">
-				<div className="p-6 border-b border-white/10 flex justify-between items-center">
+				<dl className="silo-dashboard-metrics">
 					<div>
-						<h2 className="text-xl font-bold text-white">Your buckets</h2>
-						<p className="text-text-muted text-sm mt-1">
-							{ownedBucketCount} /{" "}
-							{stats?.limits.maxBucketsPerUser === -1
-								? "∞"
-								: stats?.limits.maxBucketsPerUser || 0}{" "}
-							owned buckets utilized
-						</p>
+						<dt>Ingress</dt>
+						<dd>{stats ? formatBytes(stats.user.ingressBytes) : "—"}</dd>
+					</div>
+					<div>
+						<dt>Egress this month</dt>
+						<dd>
+							{stats ? formatBytes(stats.user.egressBytes) : "—"}
+							{stats ? (
+								<span>
+									{" / "}
+									{egressLimitBytes === Number.POSITIVE_INFINITY
+										? "∞"
+										: formatBytes(egressLimitBytes)}
+								</span>
+							) : null}
+						</dd>
+					</div>
+					<div>
+						<dt>Lifetime requests</dt>
+						<dd>{stats ? stats.user.totalRequests.toLocaleString() : "—"}</dd>
+					</div>
+				</dl>
+
+				<div className="silo-dashboard-meter" aria-hidden="true">
+					<span
+						className={stats?.user.isImmortal ? "is-immortal" : undefined}
+						style={{ width: `${storagePercent}%` }}
+					/>
+				</div>
+			</section>
+
+			<section className="silo-buckets" aria-labelledby={bucketsId}>
+				<header className="silo-buckets-header">
+					<div className="flex items-baseline gap-3">
+						<h2 id={bucketsId}>Buckets</h2>
+						{stats ? (
+							<span>
+								{ownedBucketCount} /{" "}
+								{stats.limits.maxBucketsPerUser === -1
+									? "∞"
+									: stats.limits.maxBucketsPerUser}{" "}
+								owned
+							</span>
+						) : null}
 					</div>
 					<button
 						type="button"
 						onClick={handleCreateBucket}
 						disabled={loading}
-						className={`${buttonBase} ${buttonNeutral} px-6 py-3`}
+						className="silo-dashboard-primary"
 					>
-						+ New Bucket
+						<MdAdd aria-hidden="true" />
+						New bucket
 					</button>
-				</div>
+				</header>
 
-				{loading ? <p className="px-6 py-4 text-text-muted">Loading…</p> : null}
-				{error ? <p className="px-6 py-4 text-red-400">{error}</p> : null}
+				{loading && !stats ? (
+					<p className="silo-dashboard-state">Loading buckets…</p>
+				) : null}
+				{error ? (
+					<p className="silo-dashboard-state is-error">{error}</p>
+				) : null}
+				{stats && sortedBuckets.length === 0 ? (
+					<div className="silo-dashboard-empty">
+						<p>No buckets yet.</p>
+						<button type="button" onClick={handleCreateBucket}>
+							Create one
+						</button>
+					</div>
+				) : null}
 
-				<div className="overflow-x-auto">
-					<table className="w-full text-left text-sm">
-						<thead className="bg-white/5 text-text-muted font-bold uppercase text-xs tracking-wider">
-							<tr>
-								<th className="px-6 py-4">Name</th>
-								<th className="px-6 py-4">Keys</th>
-								<th className="px-6 py-4">Usage</th>
-								<th className="px-6 py-4">Visibility</th>
-								<th className="px-6 py-4">Created</th>
-								<th className="px-6 py-4 text-right">Actions</th>
-							</tr>
-						</thead>
-						<tbody className="divide-y divide-white/5">
-							{sortedBuckets.map((bucket) =>
-								(() => {
-									const isCollaborative = !!bucket.isCollaborative;
-									const isSharing =
-										!isCollaborative && (bucket.collaborators?.length || 0) > 0;
-									const permissions = collaborationPermissionState(
-										bucket.collaborationPermissions,
-									);
-									const canManageKeys =
-										!isCollaborative || permissions.manageKeys;
-									const canManageCors =
-										!isCollaborative || permissions.manageCors;
-									const canOpenFiles =
-										!isCollaborative || permissions.filesRead;
-									const visibilityBusy =
-										pendingActionKey === `visibility:${bucket.name}`;
-									const bucketBusy =
-										pendingActionKey === `bucket:${bucket.name}`;
-									const deepFreezeState = bucket.deepFreeze?.state || "active";
-									const isDeepFrozen = !!bucket.deepFreeze?.isLocked;
-									return (
-										<tr
-											key={bucket.name}
-											className={`transition-colors group ${
-												deepFreezeState === "frozen"
-													? "bg-sky-500/[0.09] hover:bg-sky-500/[0.13]"
-													: deepFreezeState === "freezing" ||
-															deepFreezeState === "unfreezing"
-														? "bg-cyan-500/[0.07] hover:bg-cyan-500/[0.11]"
-														: isCollaborative
-															? "bg-yellow-400/[0.04] hover:bg-yellow-400/[0.08]"
-															: isSharing
-																? "bg-violet-400/[0.05] hover:bg-violet-400/[0.09]"
-																: "hover:bg-white/5"
-											}`}
-										>
-											<td className="px-6 py-4 font-medium text-white font-mono">
-												{bucket.name}
-												{bucket.isCollaborative ? (
-													<span className="ml-2 bg-yellow-400/15 text-yellow-200 px-1.5 py-0.5 rounded text-[10px] font-bold border border-yellow-400/30 uppercase tracking-wider">
-														Shared
-													</span>
-												) : null}
-												{!bucket.isCollaborative &&
-												(bucket.collaborators?.length || 0) > 0 ? (
-													<span className="ml-2 bg-violet-400/15 text-violet-100 px-1.5 py-0.5 rounded text-[10px] font-bold border border-violet-400/30 uppercase tracking-wider">
-														Sharing
-													</span>
-												) : null}
-												{bucket.isPaused ? (
-													<span className="ml-2 bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded text-[10px] font-bold border border-red-500/30">
-														PAUSED
-													</span>
-												) : null}
-												{deepFreezeState !== "active" ? (
-													<span
-														className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${
-															deepFreezeState === "frozen"
-																? "bg-sky-500/20 text-sky-300 border-sky-400/30"
-																: "bg-cyan-500/20 text-cyan-200 border-cyan-400/30"
-														}`}
-													>
-														{deepFreezeState === "frozen"
-															? "DEEP FREEZE"
-															: deepFreezeState === "freezing"
-																? "FREEZING"
-																: "UNFREEZING"}
-													</span>
-												) : null}
-											</td>
-											<td className="px-6 py-4">
-												{!canManageKeys ? (
-													<span className="text-text-muted italic">
-														No access
-													</span>
-												) : (
-													<button
-														type="button"
-														onClick={() => setActiveBucket(bucket)}
-														disabled={bucketBusy}
-														className={`${buttonBase} ${buttonNeutral} text-xs px-3 py-1.5 rounded-lg`}
-													>
-														<MdKey className="text-sm mr-1" />{" "}
-														{bucket.keys.length} Keys
-													</button>
-												)}
-											</td>
-											<td className="px-6 py-4 text-text-main">
-												<div className="text-xs font-mono">
-													<div>{formatBytes(bucket.totalBytes)}</div>
-													<div className="text-text-muted">
-														{bucket.totalRequests.toLocaleString()} reqs
-													</div>
-												</div>
-											</td>
-											<td className="px-6 py-4">
-												{isCollaborative ? (
-													<span className="text-text-muted text-xs italic">
-														Owner only
-													</span>
-												) : (
-													<button
-														type="button"
-														role="switch"
-														aria-checked={bucket.isPublic}
-														disabled={!!bucket.isPaused || visibilityBusy}
-														onClick={() =>
-															togglePublic(bucket.name, !bucket.isPublic)
-														}
-														className={`inline-flex items-center gap-2 px-1 py-1 transition-colors ${
-															bucket.isPaused || isDeepFrozen || visibilityBusy
-																? "opacity-50 cursor-not-allowed"
-																: "hover:opacity-90"
-														}`}
-													>
-														<span
-															className={`relative h-6 w-11 rounded-full border transition-colors ${
-																bucket.isPublic
-																	? "bg-hc-red/80 border-hc-red"
-																	: "bg-white/10 border-white/20"
-															}`}
+				<div className="silo-bucket-list">
+					{sortedBuckets.map((bucket) =>
+						(() => {
+							const isCollaborative = !!bucket.isCollaborative;
+							const isSharing =
+								!isCollaborative && (bucket.collaborators?.length || 0) > 0;
+							const permissions = collaborationPermissionState(
+								bucket.collaborationPermissions,
+							);
+							const canManageKeys = !isCollaborative || permissions.manageKeys;
+							const canManageCors = !isCollaborative || permissions.manageCors;
+							const canOpenFiles = !isCollaborative || permissions.filesRead;
+							const visibilityBusy =
+								pendingActionKey === `visibility:${bucket.name}`;
+							const bucketBusy = pendingActionKey === `bucket:${bucket.name}`;
+							const deepFreezeState = bucket.deepFreeze?.state || "active";
+							const isDeepFrozen = !!bucket.deepFreeze?.isLocked;
+							return (
+								<article
+									key={bucket.name}
+									className="silo-bucket-row"
+									data-state={deepFreezeState}
+								>
+									<div className="silo-bucket-identity">
+										<h3 className="silo-bucket-title-line">
+											{canOpenFiles && !isDeepFrozen ? (
+												<a href={`/dashboard/buckets/${bucket.name}`}>
+													{bucket.name}
+													<MdArrowForward aria-hidden="true" />
+												</a>
+											) : (
+												<span className="silo-bucket-name">{bucket.name}</span>
+											)}
+											{isCollaborative ? (
+												<span className="silo-bucket-status">Shared</span>
+											) : null}
+											{isSharing ? (
+												<span className="silo-bucket-status">Sharing</span>
+											) : null}
+											{bucket.isPaused ? (
+												<span className="silo-bucket-status is-danger">
+													Paused
+												</span>
+											) : null}
+											{deepFreezeState !== "active" ? (
+												<span className="silo-bucket-status is-cold">
+													{deepFreezeState === "frozen"
+														? "Frozen"
+														: deepFreezeState === "freezing"
+															? "Freezing"
+															: "Unfreezing"}
+												</span>
+											) : null}
+										</h3>
+										<div className="silo-bucket-facts">
+											<span>{formatBytes(bucket.totalBytes)}</span>
+											<span>
+												{bucket.totalRequests.toLocaleString()} requests
+											</span>
+											{canManageKeys ? (
+												<button
+													type="button"
+													onClick={() => setActiveBucket(bucket)}
+													disabled={bucketBusy}
+												>
+													{bucket.keys.length}{" "}
+													{bucket.keys.length === 1 ? "key" : "keys"}
+												</button>
+											) : null}
+										</div>
+									</div>
+									<div className="silo-bucket-visibility">
+										{!isCollaborative ? (
+											<button
+												type="button"
+												role="switch"
+												aria-checked={bucket.isPublic}
+												aria-label={`${bucket.name} visibility`}
+												disabled={
+													!!bucket.isPaused || isDeepFrozen || visibilityBusy
+												}
+												onClick={() =>
+													togglePublic(bucket.name, !bucket.isPublic)
+												}
+												className="silo-visibility-toggle"
+											>
+												<span
+													className="silo-visibility-switch"
+													aria-hidden="true"
+												>
+													<span />
+												</span>
+												<span>
+													{visibilityBusy
+														? "Updating"
+														: bucket.isPublic
+															? "Public"
+															: "Private"}
+												</span>
+											</button>
+										) : null}
+									</div>
+									<div className="silo-bucket-actions">
+										{canOpenFiles && !isDeepFrozen ? (
+											<a
+												href={`/dashboard/buckets/${bucket.name}`}
+												className="silo-bucket-open"
+											>
+												<MdFolderOpen aria-hidden="true" />
+												Open
+											</a>
+										) : null}
+										{!isCollaborative ? (
+											<details className="silo-bucket-menu">
+												<summary aria-label={`More actions for ${bucket.name}`}>
+													<MdMoreHoriz aria-hidden="true" />
+												</summary>
+												<div>
+													{canManageCors ? (
+														<button
+															type="button"
+															onClick={(event) => {
+																closeBucketActions(event.currentTarget);
+																openCorsModal(bucket);
+															}}
 														>
-															<span
-																className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
-																	bucket.isPublic
-																		? "translate-x-5"
-																		: "translate-x-0"
-																}`}
-															/>
-														</span>
-														<span className="text-xs font-semibold text-text-muted min-w-12 text-left">
-															{visibilityBusy
-																? "Updating..."
-																: bucket.isPublic
-																	? "Public"
-																	: "Private"}
-														</span>
-													</button>
-												)}
-											</td>
-											<td className="px-6 py-4 text-text-muted text-xs font-mono">
-												{new Date(bucket.createdAt).toLocaleDateString()}
-											</td>
-											<td className="px-6 py-4 text-right flex justify-end items-center gap-1.5">
-												{canOpenFiles && !isDeepFrozen ? (
-													<a
-														href={`/dashboard/buckets/${bucket.name}`}
-														aria-label="Open bucket files"
-														title="Open bucket files"
-														className={`${iconActionBase} group text-blue-400 hover:text-blue-300 hover:bg-blue-500/10`}
-													>
-														<MdFolderOpen className="text-base" />
-														<span className={iconActionTooltip}>
-															View bucket files
-														</span>
-													</a>
-												) : null}
-												{!isCollaborative && canManageCors ? (
+															<MdCode aria-hidden="true" />
+															CORS
+														</button>
+													) : null}
 													<button
 														type="button"
-														onClick={() => openCorsModal(bucket)}
-														aria-label="Configure CORS"
-														title="Configure CORS"
-														className={`${iconActionBase} group text-orange-400 hover:text-orange-300 hover:bg-orange-500/10`}
+														onClick={(event) => {
+															closeBucketActions(event.currentTarget);
+															openCollaborationModal(bucket);
+														}}
 													>
-														<MdCode className="text-base" />
-														<span className={iconActionTooltip}>
-															Configure CORS rules
-														</span>
+														<MdGroups aria-hidden="true" />
+														Sharing
 													</button>
-												) : null}
-												{!isCollaborative ? (
-													<button
-														type="button"
-														onClick={() => openCollaborationModal(bucket)}
-														aria-label="Manage collaborators"
-														title="Manage collaborators"
-														className={`${iconActionBase} group text-fuchsia-400 hover:text-fuchsia-300 hover:bg-fuchsia-500/10`}
-													>
-														<MdGroups className="text-base" />
-														<span className={iconActionTooltip}>
-															Manage collaboration
-														</span>
-													</button>
-												) : null}
-												{!isCollaborative && customDomainsEnabled ? (
-													<button
-														type="button"
-														onClick={() => openDomainModal(bucket)}
-														aria-label="Manage custom domains"
-														title="Manage custom domains"
-														className={`${iconActionBase} group text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10`}
-													>
-														<MdPublic className="text-base" />
-														<span className={iconActionTooltip}>
-															Custom domains
-														</span>
-													</button>
-												) : null}
-												{!isCollaborative && deepFreezeEnabled ? (
-													<button
-														type="button"
-														onClick={() =>
-															setDeepFreezeModal({
-																bucket,
-																submitting: false,
-																error: null,
-															})
-														}
-														disabled={bucketBusy}
-														aria-label="Deep Freeze"
-														title="Deep Freeze"
-														className={`${iconActionBase} group ${
-															deepFreezeState === "active"
-																? "text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
-																: "text-slate-300 hover:text-slate-200 hover:bg-slate-500/10"
-														}`}
-													>
-														<MdSevereCold className="text-base" />
-														<span className={iconActionTooltip}>
+													{customDomainsEnabled ? (
+														<button
+															type="button"
+															onClick={(event) => {
+																closeBucketActions(event.currentTarget);
+																openDomainModal(bucket);
+															}}
+														>
+															<MdPublic aria-hidden="true" />
+															Domains
+														</button>
+													) : null}
+													{deepFreezeEnabled ? (
+														<button
+															type="button"
+															onClick={(event) => {
+																closeBucketActions(event.currentTarget);
+																setDeepFreezeModal({
+																	bucket,
+																	submitting: false,
+																	error: null,
+																});
+															}}
+															disabled={bucketBusy}
+														>
+															<MdSevereCold aria-hidden="true" />
 															{deepFreezeState === "active"
-																? "Move bucket into Deep Freeze"
-																: deepFreezeState === "frozen"
-																	? "Restore bucket from Deep Freeze"
-																	: bucket.deepFreeze?.statusLabel ||
-																		"Deep Freeze in progress"}
-														</span>
-													</button>
-												) : null}
-												{!isCollaborative ? (
+																? "Deep freeze"
+																: "Deep freeze status"}
+														</button>
+													) : null}
+													<hr />
 													<button
 														type="button"
-														onClick={() => deleteBucket(bucket.name, true)}
+														onClick={(event) => {
+															closeBucketActions(event.currentTarget);
+															void deleteBucket(bucket.name, true);
+														}}
 														disabled={bucketBusy || isDeepFrozen}
-														aria-label="Empty bucket"
-														title="Empty bucket"
-														className={`${iconActionBase} group text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10`}
 													>
-														<MdDeleteOutline className="text-base" />
-														<span className={iconActionTooltip}>
-															Delete all files in bucket
-														</span>
+														<MdDeleteOutline aria-hidden="true" />
+														Empty bucket
 													</button>
-												) : null}
-												{!isCollaborative ? (
 													<button
 														type="button"
-														onClick={() => deleteBucket(bucket.name, false)}
+														onClick={(event) => {
+															closeBucketActions(event.currentTarget);
+															void deleteBucket(bucket.name, false);
+														}}
 														disabled={bucketBusy || isDeepFrozen}
-														aria-label="Delete bucket"
-														title="Delete bucket"
-														className={`${iconActionBase} group text-red-500 hover:text-red-400 hover:bg-red-500/10`}
+														className="is-danger"
 													>
-														<MdDeleteForever className="text-base" />
-														<span className={iconActionTooltip}>
-															Delete bucket and all files
-														</span>
+														<MdDeleteForever aria-hidden="true" />
+														Delete bucket
 													</button>
-												) : null}
-											</td>
-										</tr>
-									);
-								})(),
-							)}
-						</tbody>
-					</table>
+												</div>
+											</details>
+										) : null}
+									</div>
+								</article>
+							);
+						})(),
+					)}
 				</div>
-			</div>
+			</section>
 
 			<Modal
 				open={!!collaborationModal}
@@ -2266,13 +2183,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<h3 className="text-2xl font-bold text-white">Create New Bucket</h3>
 						<div>
 							<label
-								htmlFor="create-bucket-name"
+								htmlFor={createBucketNameId}
 								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
 							>
 								Bucket Name
 							</label>
 							<input
-								id="create-bucket-name"
+								id={createBucketNameId}
 								type="text"
 								value={bucketCreateModal.name}
 								onChange={(e) =>
@@ -2295,13 +2212,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</div>
 						<div>
 							<label
-								htmlFor="create-bucket-note"
+								htmlFor={createBucketNoteId}
 								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
 							>
 								Default Key Note
 							</label>
 							<textarea
-								id="create-bucket-note"
+								id={createBucketNoteId}
 								value={bucketCreateModal.note}
 								onChange={(e) =>
 									setBucketCreateModal((prev) =>
@@ -2541,13 +2458,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</p>
 						<div>
 							<label
-								htmlFor="deactivate-key-note"
+								htmlFor={deactivateKeyNoteId}
 								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
 							>
 								Deactivate Note
 							</label>
 							<textarea
-								id="deactivate-key-note"
+								id={deactivateKeyNoteId}
 								value={keyDeactivateModal.note}
 								onChange={(e) =>
 									setKeyDeactivateModal((prev) =>
@@ -2605,13 +2522,13 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						</div>
 						<div>
 							<label
-								htmlFor="generate-key-note"
+								htmlFor={generateKeyNoteId}
 								className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider"
 							>
 								Key Note
 							</label>
 							<textarea
-								id="generate-key-note"
+								id={generateKeyNoteId}
 								value={keyCreateModal.note}
 								onChange={(e) =>
 									setKeyCreateModal((prev) =>
