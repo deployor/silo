@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101217" />
+    <title>Silo status</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <header class="topbar">
+        <a class="wordmark" href="https://onsilo.dev">SILO<span>/</span>STATUS</a>
+        <p><i id="monitor-light" class="spinner" aria-hidden="true"></i><span id="updated">CHECKING LIVE STATUS</span></p>
+      </header>
+      <section class="hero" aria-live="polite">
+        <div class="hero-mark"><span id="orb" class="orb spinner" aria-hidden="true"></span><span>01</span></div>
+        <div>
+          <p class="eyebrow">SILO / INDEPENDENT SERVICE MONITOR</p>
+          <h1 id="headline">Checking Silo</h1>
+          <p id="summary">We’re asking the independent monitor now.</p>
+        </div>
+      </section>
+      <section id="outage-panel" class="outage-panel" hidden aria-live="polite">
+        <div class="outage-heading"><span class="outage-icon" aria-hidden="true">!</span><div><p class="eyebrow">SERVICE NOTICE</p><h2 id="outage-title">DEGRADED PERFORMANCE</h2></div></div>
+        <p id="outage-copy">We are starting the emergency recovery path now.</p>
+        <ol id="failover-steps" class="failover-steps"></ol>
+      </section>
+      <section class="services" aria-label="What is working">
+        <article>
+          <div><span>S3 STORAGE</span><small>API · UPLOADS · DOWNLOADS · AUTHENTICATION</small></div>
+          <b id="s3Storage" class="checking">CHECKING</b>
+        </article>
+        <article>
+          <div><span>DASHBOARD</span><small>ACCOUNTS · BUCKETS · SETTINGS</small></div>
+          <b id="dashboard" class="checking">CHECKING</b>
+        </article>
+        <article>
+          <div><span>RECOVERY PATH</span><small id="phase-copy">A small temporary S3 server is only created if Silo needs it.</small></div>
+          <b id="phase" class="checking">CHECKING</b>
+        </article>
+      </section>
+      <section class="story">
+        <div>
+          <p class="eyebrow" id="incident-kicker">LATEST UPDATE</p>
+          <h2 id="incident-title">Nothing needs your attention.</h2>
+          <p id="incident-acknowledged" class="incident-acknowledged" hidden>✓ ACKNOWLEDGED BY THE SILO TEAM</p>
+          <ol id="updates"><li>All clear. Silo is operating normally.</li></ol>
+        </div>
+      </section>
+      <section class="history">
+        <div class="history-heading"><p class="eyebrow">RECENT INCIDENTS</p><p id="uptime">90-DAY UPTIME · CALCULATING</p></div>
+        <div id="incidents"><p>No recent incidents.</p></div>
+      </section>
+      <section id="maintenance-section" class="history" hidden>
+        <p class="eyebrow">SCHEDULED MAINTENANCE</p>
+        <div id="maintenance"></div>
+      </section>
+      <footer><span>INDEPENDENT OF SILO PRODUCTION</span><span><a href="./admin.html">INCIDENT DESK</a> · <a href="https://dash.onsilo.dev">OPEN DASHBOARD ↗</a></span></footer>
+    </main>
+    <script src="./status.js"></script>
+  </body>
+</html>

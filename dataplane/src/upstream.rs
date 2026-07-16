@@ -51,9 +51,17 @@ pub(crate) fn signed_upstream_request(
 fn upstream_url(cfg: &Config, path_with_query: &str) -> Result<Url> {
     let host = format!("{}.{}", cfg.s3_bucket, cfg.s3_endpoint);
     let url = if let Some((path, query)) = path_with_query.split_once('?') {
-        format!("https://{host}/{}?{query}", encode_s3_path(path))
+        format!(
+            "{}://{host}/{}?{query}",
+            cfg.s3_endpoint_scheme,
+            encode_s3_path(path)
+        )
     } else {
-        format!("https://{host}/{}", encode_s3_path(path_with_query))
+        format!(
+            "{}://{host}/{}",
+            cfg.s3_endpoint_scheme,
+            encode_s3_path(path_with_query)
+        )
     };
     Ok(Url::parse(&url)?)
 }

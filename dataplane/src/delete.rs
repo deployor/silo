@@ -76,7 +76,9 @@ pub(crate) async fn fast_delete_objects(
             if let Some(user) = auth.user.as_ref() {
                 let _ = release_storage(&state, &user.id, deleted_bytes).await;
             }
-            commit_deleted_bytes(&state, bucket, deleted_bytes).await?;
+            if let Err(error) = commit_deleted_bytes(&state, bucket, deleted_bytes).await {
+                tracing::warn!(error = %error, "bulk delete bucket byte commit failed");
+            }
         }
     }
 
@@ -232,17 +234,13 @@ fn rewrite_delete_result(xml: &str, root_prefix: &str) -> String {
 
 async fn commit_deleted_bytes(state: &AppState, bucket: &AuthBucket, bytes: u64) -> Result<()> {
     let bytes = i64::try_from(bytes)?;
-    sqlx::query(
-        "UPDATE buckets SET total_bytes = GREATEST(0, total_bytes - $1) WHERE id = $2::uuid",
-    )
-    .bind(bytes)
-    .bind(&bucket.id)
-    .execute(&state.pg)
-    .await?;
-    Ok(())
+    crate::usage::commit_bucket_usage_delta(state, bucket, -bytes).await
 }
 
 async fn bump_list_cache(state: &AppState, bucket: &AuthBucket) {
+    if !state.cfg.redis_object_cache_enabled {
+        return;
+    }
     let mut conn = state.redis.clone();
     let _: redis::RedisResult<i64> = redis::cmd("INCR")
         .arg(format!("s3:listver:{}", bucket.id))

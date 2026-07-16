@@ -28,6 +28,10 @@ import { handleRedeemRequest } from "./web/redemptions";
 
 const S3_DOMAIN = config.s3Domain;
 const DASHBOARD_HOST = config.dashboardDomain;
+const DASHBOARD_HOSTS = new Set([
+	DASHBOARD_HOST,
+	...config.dashboardOriginDomains,
+]);
 
 const dashboardPaths = [
 	"/auth/",
@@ -105,6 +109,7 @@ function isFullMaintenanceException(path: string): boolean {
 	return (
 		path === "/admin/settings" ||
 		path === "/api/admin/settings" ||
+		path === "/api/maintenance-status" ||
 		path.startsWith("/assets/")
 	);
 }
@@ -179,7 +184,7 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 	const isBrowserNavigation =
 		req.method === "GET" && accept.includes("text/html");
 	const isDashboardHost =
-		host === DASHBOARD_HOST ||
+		DASHBOARD_HOSTS.has(host) ||
 		(S3_DOMAIN === "localhost:3000" && host.startsWith("localhost"));
 
 	const path = url.pathname;
@@ -189,7 +194,7 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 	}
 
 	// 1. Explicit dashboard subdomain
-	if (host === DASHBOARD_HOST && DASHBOARD_HOST !== S3_DOMAIN) {
+	if (DASHBOARD_HOSTS.has(host) && DASHBOARD_HOST !== S3_DOMAIN) {
 		return true;
 	}
 

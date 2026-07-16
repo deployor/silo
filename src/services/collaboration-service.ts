@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import { bucketCollaborators, buckets, users } from "../db/schema";
 
@@ -134,12 +134,19 @@ export async function getBucketByName(bucketName: string) {
 
 export async function getBucketOwnerById(ownerUserId: string) {
 	const result = await db
-		.select()
+		.select({
+			user: users,
+			storageUsageBytes: sql<number>`COALESCE(sum(${buckets.totalBytes}), 0)`.mapWith(Number),
+		})
 		.from(users)
+		.leftJoin(buckets, eq(buckets.userId, users.id))
 		.where(eq(users.id, ownerUserId))
+		.groupBy(users.id)
 		.limit(1);
 
-	return result[0] || null;
+	return result[0]
+		? { ...result[0].user, storageUsageBytes: result[0].storageUsageBytes }
+		: null;
 }
 
 export async function getAcceptedCollaboratorRecord(

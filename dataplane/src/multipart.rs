@@ -64,6 +64,7 @@ pub(crate) async fn fast_create_multipart_upload(
     state: AppState,
     auth: AuthorizeResponse,
     headers: &HeaderMap,
+    writer_generation: i64,
 ) -> Result<Response<Body>> {
     let lookup_path = auth
         .path_with_query
@@ -92,34 +93,53 @@ pub(crate) async fn fast_create_multipart_upload(
     let xml = res.text().await?;
 
     if status.is_success() {
-        if let (Some(user), Some(bucket), Some(upload_id)) = (
-            auth.user.as_ref(),
-            auth.bucket.as_ref(),
-            extract_first_tag(&xml, "UploadId"),
-        ) {
-            if !user.is_immortal {
-                if let Err(error) = register_multipart_upload(
+        if let (Some(bucket), Some(upload_id)) =
+            (auth.bucket.as_ref(), extract_first_tag(&xml, "UploadId"))
+        {
+            if let Err(error) =
+                crate::writer::register_multipart(&state, &bucket.id, &upload_id, writer_generation)
+                    .await
+            {
+                let root = auth.root_prefix.as_deref().unwrap_or("");
+                let key = auth.key.as_deref().unwrap_or("");
+                let abort_path = format!("{root}{key}?uploadId={upload_id}");
+                let _ = signed_upstream_request(
                     &state,
-                    &user.id,
-                    &bucket.id,
-                    &upload_id,
-                    existing_size,
-                )
-                .await
-                {
-                    let root = auth.root_prefix.as_deref().unwrap_or("");
-                    let key = auth.key.as_deref().unwrap_or("");
-                    let abort_path = format!("{root}{key}?uploadId={upload_id}");
-                    let _ = signed_upstream_request(
+                    Method::DELETE,
+                    &abort_path,
+                    &HeaderMap::new(),
+                    None,
+                )?
+                .send()
+                .await;
+                return Err(anyhow!("failed to fence multipart upload: {error}"));
+            }
+            if let Some(user) = auth.user.as_ref() {
+                if !user.is_immortal {
+                    if let Err(error) = register_multipart_upload(
                         &state,
-                        Method::DELETE,
-                        &abort_path,
-                        &HeaderMap::new(),
-                        None,
-                    )?
-                    .send()
-                    .await;
-                    return Err(anyhow!("failed to register multipart quota: {error}"));
+                        &user.id,
+                        &bucket.id,
+                        &upload_id,
+                        existing_size,
+                    )
+                    .await
+                    {
+                        let root = auth.root_prefix.as_deref().unwrap_or("");
+                        let key = auth.key.as_deref().unwrap_or("");
+                        let abort_path = format!("{root}{key}?uploadId={upload_id}");
+                        let _ = signed_upstream_request(
+                            &state,
+                            Method::DELETE,
+                            &abort_path,
+                            &HeaderMap::new(),
+                            None,
+                        )?
+                        .send()
+                        .await;
+                        let _ = crate::writer::clear_multipart(&state, &upload_id).await;
+                        return Err(anyhow!("failed to register multipart quota: {error}"));
+                    }
                 }
             }
         }
@@ -140,6 +160,7 @@ pub(crate) async fn fast_complete_multipart_upload(
     auth: AuthorizeResponse,
     headers: &HeaderMap,
     body: Body,
+    writer_generation: i64,
 ) -> Result<Response<Body>> {
     let Some(upload_id) = auth.upload_id.as_deref() else {
         return Ok(with_s3_headers(
@@ -151,6 +172,21 @@ pub(crate) async fn fast_complete_multipart_upload(
             &auth,
         ));
     };
+    let bucket_id = auth
+        .bucket
+        .as_ref()
+        .map(|bucket| bucket.id.as_str())
+        .unwrap_or("");
+    if !crate::writer::multipart_matches(&state, bucket_id, upload_id, writer_generation).await? {
+        return Ok(with_s3_headers(
+            s3_error(
+                StatusCode::CONFLICT,
+                "InvalidRequest",
+                "This multipart upload belongs to an earlier failover generation. Restart the multipart upload.",
+            ),
+            &auth,
+        ));
+    }
     let lookup_path = auth
         .path_with_query
         .as_deref()
@@ -186,6 +222,9 @@ pub(crate) async fn fast_complete_multipart_upload(
     let xml = res.text().await?;
 
     if status.is_success() {
+        if let Err(error) = crate::writer::clear_multipart(&state, upload_id).await {
+            warn!(error = %error, "failed to clear multipart writer generation");
+        }
         if let (Some(user), Some(bucket), Some(key)) =
             (auth.user.as_ref(), auth.bucket.as_ref(), auth.key.as_ref())
         {
@@ -204,6 +243,10 @@ pub(crate) async fn fast_complete_multipart_upload(
             let final_size = head_existing_size(&state, path_without_query)
                 .await
                 .unwrap_or(0);
+            let shrink = existing_size.saturating_sub(final_size);
+            if shrink > 0 {
+                let _ = crate::quota::release_storage(&state, &user.id, shrink).await;
+            }
             if let Err(error) = commit_bucket_delta(&state, bucket, final_size, existing_size).await
             {
                 warn!(error = %error, "failed to commit multipart bucket size");
@@ -227,6 +270,7 @@ pub(crate) async fn fast_abort_multipart_upload(
     state: AppState,
     auth: AuthorizeResponse,
     headers: &HeaderMap,
+    writer_generation: i64,
 ) -> Result<Response<Body>> {
     let Some(upload_id) = auth.upload_id.as_deref() else {
         return Ok(with_s3_headers(
@@ -238,6 +282,21 @@ pub(crate) async fn fast_abort_multipart_upload(
             &auth,
         ));
     };
+    let bucket_id = auth
+        .bucket
+        .as_ref()
+        .map(|bucket| bucket.id.as_str())
+        .unwrap_or("");
+    if !crate::writer::multipart_matches(&state, bucket_id, upload_id, writer_generation).await? {
+        return Ok(with_s3_headers(
+            s3_error(
+                StatusCode::CONFLICT,
+                "InvalidRequest",
+                "This multipart upload belongs to an earlier failover generation. Restart the multipart upload.",
+            ),
+            &auth,
+        ));
+    }
     let upstream = signed_upstream_request(
         &state,
         Method::DELETE,
@@ -248,6 +307,9 @@ pub(crate) async fn fast_abort_multipart_upload(
     let res = upstream.send().await?;
     let status = res.status();
     if status.is_success() || status == reqwest::StatusCode::NOT_FOUND {
+        if let Err(error) = crate::writer::clear_multipart(&state, upload_id).await {
+            warn!(error = %error, "failed to clear multipart writer generation");
+        }
         if let (Some(user), Some(bucket)) = (auth.user.as_ref(), auth.bucket.as_ref()) {
             if let Err(error) =
                 release_multipart_upload(&state, &user.id, &bucket.id, upload_id).await
@@ -331,6 +393,9 @@ async fn cached_existing_size(
 }
 
 async fn bump_list_cache(state: &AppState, bucket: &AuthBucket) {
+    if !state.cfg.redis_object_cache_enabled {
+        return;
+    }
     let mut conn = state.redis.clone();
     let _: redis::RedisResult<i64> = redis::cmd("INCR")
         .arg(format!("s3:listver:{}", bucket.id))
@@ -348,24 +413,7 @@ async fn commit_bucket_delta(
     if delta == 0 {
         return Ok(());
     }
-    if delta > 0 {
-        let delta = i64::try_from(delta)?;
-        sqlx::query("UPDATE buckets SET total_bytes = total_bytes + $1 WHERE id = $2::uuid")
-            .bind(delta)
-            .bind(&bucket.id)
-            .execute(&state.pg)
-            .await?;
-    } else {
-        let delta = i64::try_from(-delta)?;
-        sqlx::query(
-            "UPDATE buckets SET total_bytes = GREATEST(0, total_bytes - $1) WHERE id = $2::uuid",
-        )
-        .bind(delta)
-        .bind(&bucket.id)
-        .execute(&state.pg)
-        .await?;
-    }
-    Ok(())
+    crate::usage::commit_bucket_usage_delta(state, bucket, i64::try_from(delta)?).await
 }
 
 fn rewrite_multipart_xml(xml: &str, root_prefix: &str) -> String {

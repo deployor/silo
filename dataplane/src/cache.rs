@@ -16,6 +16,9 @@ pub(crate) async fn try_redis_object_cache(
     bucket: &AuthBucket,
     key: &str,
 ) -> Result<Option<Response<Body>>> {
+    if !state.cfg.redis_object_cache_enabled {
+        return Ok(None);
+    }
     let body_key = object_cache_body_key(&bucket.id, key);
     let meta_key = object_cache_meta_key(&bucket.id, key);
     let mut conn = state.redis.clone();
@@ -104,6 +107,9 @@ pub(crate) async fn try_redis_object_meta(
     bucket: &AuthBucket,
     key: &str,
 ) -> Result<Option<Response<Body>>> {
+    if !state.cfg.redis_object_cache_enabled {
+        return Ok(None);
+    }
     let meta_key = object_cache_meta_key(&bucket.id, key);
     let mut conn = state.redis.clone();
     let meta: Option<String> = match redis::cmd("GET").arg(meta_key).query_async(&mut conn).await {
@@ -130,6 +136,9 @@ pub(crate) async fn try_redis_object_size(
     bucket: &AuthBucket,
     key: &str,
 ) -> Option<u64> {
+    if !state.cfg.redis_object_cache_enabled {
+        return None;
+    }
     let meta_key = object_cache_meta_key(&bucket.id, key);
     let mut conn = state.redis.clone();
     let meta: Option<String> = redis::cmd("GET")
@@ -159,16 +168,18 @@ pub(crate) async fn buffer_small_get_and_cache(
     }
 
     let body = res.bytes().await?;
-    let body_key = object_cache_body_key(&bucket.id, key);
-    let meta_key = object_cache_meta_key(&bucket.id, key);
-    let mut conn = state.redis.clone();
-    let cache_result: redis::RedisResult<()> = redis::pipe()
-        .set_ex(meta_key, serde_json::to_string(&headers)?, 21_600)
-        .set_ex(body_key, body.as_ref(), 21_600)
-        .query_async(&mut conn)
-        .await;
-    if let Err(error) = cache_result {
-        warn!(error = %error, "object cache write failed");
+    if state.cfg.redis_object_cache_enabled {
+        let body_key = object_cache_body_key(&bucket.id, key);
+        let meta_key = object_cache_meta_key(&bucket.id, key);
+        let mut conn = state.redis.clone();
+        let cache_result: redis::RedisResult<()> = redis::pipe()
+            .set_ex(meta_key, serde_json::to_string(&headers)?, 21_600)
+            .set_ex(body_key, body.as_ref(), 21_600)
+            .query_async(&mut conn)
+            .await;
+        if let Err(error) = cache_result {
+            warn!(error = %error, "object cache write failed");
+        }
     }
 
     Ok(builder.body(Body::from(body))?)
@@ -181,6 +192,9 @@ pub(crate) async fn cache_object_meta(
     headers: &HeaderMap,
     ttl_seconds: u64,
 ) -> Result<()> {
+    if !state.cfg.redis_object_cache_enabled {
+        return Ok(());
+    }
     let mut meta = BTreeMap::new();
     for (name, value) in headers {
         if let Ok(value_str) = value.to_str() {
@@ -202,6 +216,10 @@ pub(crate) async fn cache_object_meta(
 
 pub(crate) async fn invalidate_object_caches(state: &AppState, bucket: &AuthBucket, key: &str) {
     state.disk_cache.invalidate(&bucket.id, key).await;
+
+    if !state.cfg.redis_object_cache_enabled {
+        return;
+    }
 
     let mut conn = state.redis.clone();
     let result: redis::RedisResult<()> = redis::pipe()

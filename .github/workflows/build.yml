@@ -1,0 +1,33 @@
+name: Build dataplane image
+
+on:
+  push:
+    branches: [main]
+    paths: [dataplane/**, deploy/emergency/caddy.Dockerfile, .github/workflows/build.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  dataplane:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./dataplane
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/silo-dataplane:latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./deploy/emergency
+          file: ./deploy/emergency/caddy.Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/silo-caddy:latest

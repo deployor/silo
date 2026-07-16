@@ -93,6 +93,10 @@ pub(crate) async fn fast_copy_object(
     } else {
         invalidate_object_caches(&state, target_bucket, target_key).await;
         bump_list_cache(&state, target_bucket).await;
+        let shrink = target_size.saturating_sub(source_size);
+        if shrink > 0 {
+            let _ = release_storage(&state, &user.id, shrink).await;
+        }
         if let Err(error) =
             commit_bucket_delta(&state, target_bucket, source_size, target_size).await
         {
@@ -206,6 +210,9 @@ async fn cached_existing_size(
 }
 
 async fn bump_list_cache(state: &AppState, bucket: &AuthBucket) {
+    if !state.cfg.redis_object_cache_enabled {
+        return;
+    }
     let mut conn = state.redis.clone();
     let _: redis::RedisResult<i64> = redis::cmd("INCR")
         .arg(format!("s3:listver:{}", bucket.id))
@@ -223,24 +230,7 @@ async fn commit_bucket_delta(
     if delta == 0 {
         return Ok(());
     }
-    if delta > 0 {
-        let delta = i64::try_from(delta)?;
-        sqlx::query("UPDATE buckets SET total_bytes = total_bytes + $1 WHERE id = $2::uuid")
-            .bind(delta)
-            .bind(&bucket.id)
-            .execute(&state.pg)
-            .await?;
-    } else {
-        let delta = i64::try_from(-delta)?;
-        sqlx::query(
-            "UPDATE buckets SET total_bytes = GREATEST(0, total_bytes - $1) WHERE id = $2::uuid",
-        )
-        .bind(delta)
-        .bind(&bucket.id)
-        .execute(&state.pg)
-        .await?;
-    }
-    Ok(())
+    crate::usage::commit_bucket_usage_delta(state, bucket, i64::try_from(delta)?).await
 }
 
 fn header_value<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {

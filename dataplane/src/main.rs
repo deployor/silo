@@ -2,7 +2,10 @@ use std::{
     collections::BTreeMap,
     env,
     net::SocketAddr,
-    sync::{Arc, RwLock},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, RwLock,
+    },
     time::Duration,
 };
 
@@ -20,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use tower_http::trace::TraceLayer;
 use tracing::{error, info, warn};
 
+mod accounting;
 mod auth;
 mod aws_chunked;
 mod bucket;
@@ -35,6 +39,8 @@ mod response;
 mod security;
 mod stats;
 mod upstream;
+mod usage;
+mod writer;
 
 use auth::authorize_direct;
 use aws_chunked::{decoded_content_length, is_aws_chunked, AwsChunkedDecoder};
@@ -73,8 +79,13 @@ struct AppState {
     http: reqwest::Client,
     redis: redis::aio::MultiplexedConnection,
     pg: sqlx::PgPool,
+    writer_pg: sqlx::PgPool,
     signing_keys: Arc<RwLock<BTreeMap<String, Vec<u8>>>>,
     disk_cache: DiskCache,
+    maintenance_active: Arc<AtomicBool>,
+    accounting_unsafe: Arc<AtomicBool>,
+    accounting_flush_lock: Arc<tokio::sync::Mutex<()>>,
+    draining: Arc<AtomicBool>,
 }
 
 #[derive(Clone)]
@@ -85,13 +96,21 @@ struct Config {
     public_scheme: String,
     s3_domain: String,
     dashboard_domain: String,
+    origin_domains: Vec<String>,
     custom_domains_enabled: bool,
     deep_freeze_enabled: bool,
     s3_access_key: String,
     s3_secret_key: String,
     s3_region: String,
+    s3_endpoint_scheme: String,
     s3_endpoint: String,
     s3_bucket: String,
+    emergency_mode: bool,
+    redis_object_cache_enabled: bool,
+    writer_instance_id: String,
+    writer_auto_claim: bool,
+    writer_lease_seconds: i32,
+    accounting_unsafe_marker: Option<std::path::PathBuf>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -144,6 +163,7 @@ async fn main() -> Result<()> {
         .init();
 
     let cfg = Arc::new(Config::from_env()?);
+    let emergency_mode = cfg.emergency_mode;
     let http = reqwest::Client::builder()
         .tcp_nodelay(true)
         .pool_idle_timeout(Duration::from_secs(90))
@@ -151,7 +171,7 @@ async fn main() -> Result<()> {
             env::var("DATAPLANE_HTTP_POOL_MAX_IDLE_PER_HOST")
                 .ok()
                 .and_then(|v| v.parse().ok())
-                .unwrap_or(128),
+                .unwrap_or(if emergency_mode { 8 } else { 128 }),
         )
         .tcp_keepalive(Duration::from_secs(60))
         .http2_adaptive_window(true)
@@ -166,29 +186,78 @@ async fn main() -> Result<()> {
         .get_multiplexed_async_connection()
         .await
         .context("failed to connect to Redis")?;
+    let database_url = env::var("DATABASE_URL").context("DATABASE_URL is required")?;
     let pg = sqlx::postgres::PgPoolOptions::new()
         .max_connections(
             env::var("DATAPLANE_DATABASE_MAX_CONNECTIONS")
                 .ok()
                 .and_then(|v| v.parse().ok())
-                .unwrap_or(16),
+                .unwrap_or(if emergency_mode { 4 } else { 16 }),
         )
-        .connect(&env::var("DATABASE_URL").context("DATABASE_URL is required")?)
+        .connect(&database_url)
         .await
         .context("failed to connect to Postgres")?;
-    let disk_cache = DiskCache::from_env()?;
+    // Mutation fences hold a PostgreSQL advisory transaction lock for the
+    // duration of upstream writes. Keep them on a small separate lazy pool so
+    // accounting and multipart metadata cannot deadlock behind fence holders.
+    let writer_pg = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(
+            env::var("DATAPLANE_WRITER_MAX_CONNECTIONS")
+                .ok()
+                .and_then(|value| value.parse().ok())
+                .unwrap_or(if emergency_mode { 4 } else { 8 }),
+        )
+        .connect(&database_url)
+        .await
+        .context("failed to connect writer fence pool to Postgres")?;
+    let disk_cache = DiskCache::from_env(emergency_mode)?;
     disk_cache.start_background_tasks();
+    let maintenance_active = Arc::new(AtomicBool::new(true));
+    refresh_maintenance_state(&pg, &maintenance_active).await;
+    start_maintenance_refresh(pg.clone(), maintenance_active.clone());
 
+    let accounting_unsafe = cfg
+        .accounting_unsafe_marker
+        .as_ref()
+        .is_some_and(|path| path.exists());
+    if accounting_unsafe {
+        warn!("persistent emergency accounting unsafe marker is present; teardown will remain blocked");
+    }
     let state = AppState {
         cfg: cfg.clone(),
         http,
         redis,
         pg,
+        writer_pg,
         signing_keys: Arc::new(RwLock::new(BTreeMap::new())),
         disk_cache,
+        maintenance_active,
+        accounting_unsafe: Arc::new(AtomicBool::new(accounting_unsafe)),
+        accounting_flush_lock: Arc::new(tokio::sync::Mutex::new(())),
+        draining: Arc::new(AtomicBool::new(false)),
     };
+    if state.cfg.writer_auto_claim {
+        match writer::claim_initial(&state).await {
+            Ok(Some(generation)) => info!(generation, "dataplane writer lease initialized"),
+            Ok(None) => {
+                warn!("another dataplane owns the writer lease; mutations will remain fenced")
+            }
+            Err(error) => {
+                warn!(error = %error, "failed to initialize writer lease; mutations will remain fenced")
+            }
+        }
+    }
+    start_writer_renewal(state.clone());
+    accounting::start_background_flush(state.clone());
     let app = Router::new()
         .route("/health", get(health))
+        .route("/ready", get(readiness))
+        .route("/api/internal/writer/claim", post(internal_writer_claim))
+        .route("/api/internal/drain", post(internal_drain))
+        .route(
+            "/api/internal/accounting/flush",
+            post(internal_accounting_flush),
+        )
         .route(
             "/api/internal/dashboard/list",
             post(internal_dashboard_list),
@@ -213,6 +282,28 @@ async fn main() -> Result<()> {
 }
 
 async fn health(State(state): State<AppState>) -> Response<Body> {
+    // Keep the public liveness endpoint intentionally boring. Dependency
+    // names and statuses belong on the authenticated readiness endpoint.
+    let body = r#"{"status":"ok"}"#;
+
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", "application/json")
+        .body(Body::from(body))
+        .unwrap_or_else(|_| Response::new(Body::empty()));
+    with_failover_header(response, state.cfg.emergency_mode)
+}
+
+/// Readiness deliberately checks every dependency required to serve an S3
+/// request. Unlike /health, this is suitable for the failover controller.
+async fn readiness(State(state): State<AppState>, headers: HeaderMap) -> Response<Body> {
+    if !internal_auth_ok(&state.cfg, &headers) {
+        let response = Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .body(Body::empty())
+            .unwrap_or_else(|_| Response::new(Body::empty()));
+        return with_failover_header(response, state.cfg.emergency_mode);
+    }
     let postgres_ok = sqlx::query_scalar::<_, i32>("SELECT 1")
         .fetch_one(&state.pg)
         .await
@@ -222,15 +313,37 @@ async fn health(State(state): State<AppState>) -> Response<Body> {
         let result: redis::RedisResult<String> = redis::cmd("PING").query_async(&mut conn).await;
         result.is_ok_and(|value| value == "PONG")
     };
-    let ok = postgres_ok && redis_ok;
+    // A signed HEAD exercises DNS, TLS, credentials, and the backing object
+    // store without creating or changing an object.
+    let storage_ok =
+        match signed_upstream_request(&state, Method::HEAD, "", &HeaderMap::new(), None) {
+            Ok(request) => request
+                .send()
+                .await
+                .map(|response| response.status().is_success())
+                .unwrap_or(false),
+            Err(error) => {
+                warn!(error = %error, "failed to create backing storage readiness request");
+                false
+            }
+        };
+    let ok = postgres_ok && redis_ok && storage_ok;
+    let active_writer = if postgres_ok {
+        writer::active_generation(&state).await.ok().flatten()
+    } else {
+        None
+    };
     let body = serde_json::json!({
         "status": if ok { "ok" } else { "degraded" },
         "postgres": postgres_ok,
         "redis": redis_ok,
+        "storage": storage_ok,
+        "dataplane": true,
+        "activeWriter": active_writer.is_some(),
+        "writerGeneration": active_writer,
     })
     .to_string();
-
-    Response::builder()
+    let response = Response::builder()
         .status(if ok {
             StatusCode::OK
         } else {
@@ -238,6 +351,92 @@ async fn health(State(state): State<AppState>) -> Response<Body> {
         })
         .header("content-type", "application/json")
         .body(Body::from(body))
+        .unwrap_or_else(|_| Response::new(Body::empty()));
+    with_failover_header(response, state.cfg.emergency_mode)
+}
+
+async fn internal_writer_claim(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Response<Body> {
+    if !internal_auth_ok(&state.cfg, &headers) {
+        return Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .body(Body::empty())
+            .unwrap_or_else(|_| Response::new(Body::empty()));
+    }
+    match writer::claim(&state).await {
+        Ok(generation) => json_response(
+            StatusCode::OK,
+            serde_json::json!({ "ok": true, "generation": generation }),
+        ),
+        Err(error) => {
+            error!(error = %error, "writer lease claim failed");
+            json_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                serde_json::json!({ "ok": false, "error": "writer lease claim failed" }),
+            )
+        }
+    }
+}
+
+async fn internal_accounting_flush(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Response<Body> {
+    if !internal_auth_ok(&state.cfg, &headers) {
+        return Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .body(Body::empty())
+            .unwrap_or_else(|_| Response::new(Body::empty()));
+    }
+    match accounting::flush(&state).await {
+        Ok(result) => json_response(
+            if result.ok {
+                StatusCode::OK
+            } else {
+                StatusCode::SERVICE_UNAVAILABLE
+            },
+            serde_json::to_value(result).unwrap_or_else(|_| serde_json::json!({ "ok": false })),
+        ),
+        Err(error) => {
+            error!(error = %error, "accounting flush failed");
+            json_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                serde_json::json!({ "ok": false, "error": "accounting flush failed" }),
+            )
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct DrainRequest {
+    enabled: bool,
+}
+
+async fn internal_drain(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(request): Json<DrainRequest>,
+) -> Response<Body> {
+    if !internal_auth_ok(&state.cfg, &headers) {
+        return Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .body(Body::empty())
+            .unwrap_or_else(|_| Response::new(Body::empty()));
+    }
+    state.draining.store(request.enabled, Ordering::SeqCst);
+    json_response(
+        StatusCode::OK,
+        serde_json::json!({ "ok": true, "draining": request.enabled }),
+    )
+}
+
+fn json_response(status: StatusCode, value: serde_json::Value) -> Response<Body> {
+    Response::builder()
+        .status(status)
+        .header("content-type", "application/json")
+        .body(Body::from(value.to_string()))
         .unwrap_or_else(|_| Response::new(Body::empty()))
 }
 
@@ -311,6 +510,18 @@ fn internal_auth_ok(cfg: &Config, headers: &HeaderMap) -> bool {
 
 impl Config {
     fn from_env() -> Result<Self> {
+        let emergency_mode = match env::var("DATAPLANE_MODE")
+            .unwrap_or_else(|_| "production".to_string())
+            .as_str()
+        {
+            "production" => false,
+            "emergency" => true,
+            value => {
+                return Err(anyhow!(
+                    "DATAPLANE_MODE must be production or emergency, got {value}"
+                ))
+            }
+        };
         let internal_secret = env::var("DATAPLANE_INTERNAL_SECRET")
             .context("DATAPLANE_INTERNAL_SECRET is required")?;
         if internal_secret.len() < 24 {
@@ -340,12 +551,20 @@ impl Config {
             public_scheme: env::var("DATAPLANE_PUBLIC_SCHEME").unwrap_or_else(|_| "https".into()),
             s3_domain,
             dashboard_domain,
+            origin_domains: env::var("DATAPLANE_ORIGIN_DOMAINS")
+                .unwrap_or_default()
+                .split(',')
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_ascii_lowercase)
+                .collect(),
             custom_domains_enabled: env_bool("DOMAINS"),
             deep_freeze_enabled: env_bool("DEEP_FREEZE"),
             s3_access_key: env::var("S3_ACCESS_KEY_ID").context("S3_ACCESS_KEY_ID is required")?,
             s3_secret_key: env::var("S3_SECRET_ACCESS_KEY")
                 .context("S3_SECRET_ACCESS_KEY is required")?,
             s3_region: env::var("S3_REGION").unwrap_or_else(|_| "auto".into()),
+            s3_endpoint_scheme: env::var("S3_ENDPOINT_SCHEME").unwrap_or_else(|_| "https".into()),
             s3_endpoint: env::var("S3_ENDPOINT")
                 .context("S3_ENDPOINT is required")?
                 .trim_end_matches('/')
@@ -353,6 +572,39 @@ impl Config {
                 .trim_start_matches("http://")
                 .to_string(),
             s3_bucket: env::var("S3_BUCKET_NAME").context("S3_BUCKET_NAME is required")?,
+            emergency_mode,
+            redis_object_cache_enabled: !emergency_mode
+                && env::var("DATAPLANE_REDIS_OBJECT_CACHE_ENABLED")
+                    .map(|value| {
+                        !matches!(
+                            value.as_str(),
+                            "0" | "false" | "FALSE" | "no" | "NO" | "off" | "OFF"
+                        )
+                    })
+                    .unwrap_or(true),
+            writer_instance_id: env::var("DATAPLANE_WRITER_INSTANCE_ID").unwrap_or_else(|_| {
+                if emergency_mode {
+                    "emergency-unconfigured"
+                } else {
+                    "primary"
+                }
+                .into()
+            }),
+            writer_auto_claim: env::var("DATAPLANE_WRITER_AUTO_CLAIM")
+                .map(|value| {
+                    matches!(
+                        value.as_str(),
+                        "1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON"
+                    )
+                })
+                .unwrap_or(!emergency_mode),
+            writer_lease_seconds: env::var("DATAPLANE_WRITER_LEASE_SECONDS")
+                .ok()
+                .and_then(|value| value.parse::<i32>().ok())
+                .filter(|value| (15..=300).contains(value))
+                .unwrap_or(30),
+            accounting_unsafe_marker: env::var_os("DATAPLANE_ACCOUNTING_UNSAFE_MARKER")
+                .map(std::path::PathBuf::from),
         })
     }
 }
@@ -365,7 +617,8 @@ fn env_bool(name: &str) -> bool {
 }
 
 async fn handle_request(State(state): State<AppState>, req: Request<Body>) -> Response<Body> {
-    match handle_request_inner(state, req).await {
+    let emergency_mode = state.cfg.emergency_mode;
+    let response = match handle_request_inner(state, req).await {
         Ok(res) => res,
         Err(err) => {
             error!(error = %err, "dataplane request failed");
@@ -375,7 +628,8 @@ async fn handle_request(State(state): State<AppState>, req: Request<Body>) -> Re
                 "Internal Server Error",
             )
         }
-    }
+    };
+    with_failover_header(response, emergency_mode)
 }
 
 async fn handle_request_inner(state: AppState, req: Request<Body>) -> Result<Response<Body>> {
@@ -384,7 +638,22 @@ async fn handle_request_inner(state: AppState, req: Request<Body>) -> Result<Res
     let headers = parts.headers.clone();
     let url = reconstruct_url(&state.cfg, &parts.uri, &headers)?;
 
+    if state.draining.load(Ordering::SeqCst) {
+        return Ok(s3_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "ServiceUnavailable",
+            "This Silo dataplane is draining for safe failover teardown. Retry against onsilo.dev.",
+        ));
+    }
+
     if is_dashboard_host(&state.cfg, &headers) {
+        if state.cfg.emergency_mode {
+            return Ok(s3_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "ServiceUnavailable",
+                "The Silo dashboard is unavailable while emergency failover is active.",
+            ));
+        }
         return proxy_control_plane(state, method, parts.uri, headers, body).await;
     }
 
@@ -445,8 +714,26 @@ async fn handle_request_inner(state: AppState, req: Request<Body>) -> Result<Res
         return Ok(with_s3_headers(res, &auth));
     }
 
+    let (mutation_fence, writer_generation) = if writer::is_mutation(action) {
+        match writer::begin_mutation(&state).await {
+            Ok((fence, Some(generation))) => (Some(fence), Some(generation)),
+            Ok((_, None)) | Err(_) => {
+                return Ok(with_s3_headers(
+                    s3_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "NotActiveWriter",
+                        "This Silo dataplane is not the active writer. Retry against onsilo.dev.",
+                    ),
+                    &auth,
+                ));
+            }
+        }
+    } else {
+        (None, None)
+    };
+
     record_request(&state, &auth).await;
-    match (method.as_str(), action) {
+    let response = match (method.as_str(), action) {
         ("GET", "ListBuckets") => fast_list_buckets(state, auth).await,
         ("GET", "GetBucketLocation") => fast_bucket_location(state, auth).await,
         ("GET", "GetBucketCors") => fast_get_bucket_cors(state, auth).await,
@@ -463,42 +750,100 @@ async fn handle_request_inner(state: AppState, req: Request<Body>) -> Result<Res
         ("HEAD", "HeadObject") => fast_head(state, auth, &headers).await,
         ("OPTIONS", "Options") => fast_options(state, auth, &headers).await,
         ("POST", "CreateMultipartUpload") => {
-            fast_create_multipart_upload(state, auth, &headers).await
+            fast_create_multipart_upload(state, auth, &headers, writer_generation.unwrap()).await
         }
         ("POST", "CompleteMultipartUpload") => {
-            fast_complete_multipart_upload(state, auth, &headers, body).await
+            fast_complete_multipart_upload(state, auth, &headers, body, writer_generation.unwrap())
+                .await
         }
         ("POST", "DeleteObjects") => fast_delete_objects(state, auth, &headers, body).await,
         ("DELETE", "AbortMultipartUpload") => {
-            fast_abort_multipart_upload(state, auth, &headers).await
+            fast_abort_multipart_upload(state, auth, &headers, writer_generation.unwrap()).await
         }
         ("DELETE", "DeleteBucketCors") => fast_delete_bucket_cors(state, auth).await,
         ("DELETE", "DeleteObject") => fast_delete_object(state, auth, &headers).await,
         ("PUT", "CopyObject") => fast_copy_object(state, auth, &headers).await,
         ("PUT", "PutBucketCors") => fast_put_bucket_cors(state, auth, body).await,
         ("PUT", "PutObject") => fast_put_object(state, auth, &headers, body).await,
-        ("PUT", "UploadPart") => fast_upload_part(state, auth, &headers, body).await,
+        ("PUT", "UploadPart") => {
+            fast_upload_part(state, auth, &headers, body, writer_generation.unwrap()).await
+        }
         _ => Ok(s3_error(
             StatusCode::NOT_IMPLEMENTED,
             "NotImplemented",
             "A header or query you requested is not implemented.",
         )),
+    };
+    if let Some(fence) = mutation_fence {
+        if let Err(error) = fence.rollback().await {
+            warn!(error = %error, "failed to release mutation fence cleanly");
+        }
     }
+    response
+}
+
+fn start_writer_renewal(state: AppState) {
+    tokio::spawn(async move {
+        let renew_every = u64::try_from((state.cfg.writer_lease_seconds / 3).max(5)).unwrap_or(10);
+        let mut interval = tokio::time::interval(Duration::from_secs(renew_every));
+        interval.tick().await;
+        loop {
+            interval.tick().await;
+            match writer::renew(&state).await {
+                Ok(true) => {}
+                Ok(false) => warn!("writer lease is owned by another dataplane"),
+                Err(error) => {
+                    warn!(error = %error, "writer lease renewal failed; mutations will fail closed when it expires")
+                }
+            }
+        }
+    });
 }
 
 async fn s3_maintenance_active(state: &AppState) -> bool {
-    sqlx::query_scalar::<_, bool>(
+    state.maintenance_active.load(Ordering::Relaxed)
+}
+
+async fn refresh_maintenance_state(pg: &sqlx::PgPool, current: &AtomicBool) {
+    match sqlx::query_scalar::<_, bool>(
         "SELECT COALESCE(s3_maintenance_mode OR full_maintenance_mode, false) FROM app_settings WHERE id = 'global'",
     )
-    .fetch_optional(&state.pg)
+    .fetch_optional(pg)
     .await
-    .map(|value| value.unwrap_or(false))
-    .unwrap_or_else(|error| {
-        // Failing closed prevents a database outage from silently bypassing a
-        // requested maintenance window.
-        error!(error = %error, "failed to read maintenance status");
-        true
-    })
+    {
+        Ok(value) => current.store(value.unwrap_or(false), Ordering::Relaxed),
+        Err(error) => {
+            // Keep the last known state. Startup begins fail-closed, so an
+            // unavailable database can never silently bypass maintenance.
+            error!(error = %error, "failed to refresh maintenance status");
+        }
+    }
+}
+
+fn start_maintenance_refresh(pg: sqlx::PgPool, current: Arc<AtomicBool>) {
+    let seconds = env::var("DATAPLANE_MAINTENANCE_REFRESH_SECONDS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| (2..=5).contains(value))
+        .unwrap_or(3);
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(seconds));
+        interval.tick().await;
+        loop {
+            refresh_maintenance_state(&pg, &current).await;
+            interval.tick().await;
+        }
+    });
+}
+
+fn with_failover_header(mut response: Response<Body>, emergency_mode: bool) -> Response<Body> {
+    if emergency_mode {
+        response.headers_mut().insert(
+            axum::http::header::HeaderName::from_static("x-silo-failover"),
+            axum::http::HeaderValue::from_static("active"),
+        );
+    }
+    response
 }
 
 fn maintenance_s3_response() -> Response<Body> {
@@ -618,6 +963,13 @@ async fn authorize(
         return Ok(auth);
     }
 
+    if state.cfg.emergency_mode {
+        // The temporary VM intentionally has no Bun control plane. A request
+        // that cannot be resolved from Aiven metadata is denied instead of
+        // turning an outage into a cross-origin authorization dependency.
+        return Ok(emergency_authorization_denied());
+    }
+
     let req = AuthorizeRequest {
         method: method.as_str().to_string(),
         url: url.to_string(),
@@ -643,6 +995,26 @@ async fn authorize(
         ));
     }
     Ok(res.json::<AuthorizeResponse>().await?)
+}
+
+fn emergency_authorization_denied() -> AuthorizeResponse {
+    AuthorizeResponse {
+        allowed: false,
+        status: Some(StatusCode::FORBIDDEN.as_u16()),
+        body: Some(
+            r#"<?xml version="1.0" encoding="UTF-8"?><Error><Code>AccessDenied</Code><Message>Access Denied</Message></Error>"#.to_string(),
+        ),
+        fast_path: None,
+        action: None,
+        key: None,
+        path_with_query: None,
+        root_prefix: None,
+        part_number: None,
+        upload_id: None,
+        cors_headers: None,
+        bucket: None,
+        user: None,
+    }
 }
 
 fn headers_to_vec(headers: &HeaderMap) -> Vec<(String, String)> {
@@ -753,7 +1125,11 @@ async fn fast_get(
         }
     }
 
-    if !has_range && status.is_success() && content_length > 0 && content_length < 10 * 1024 * 1024
+    if state.cfg.redis_object_cache_enabled
+        && !has_range
+        && status.is_success()
+        && content_length > 0
+        && content_length < 10 * 1024 * 1024
     {
         if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref()) {
             return Ok(with_s3_headers(
@@ -954,7 +1330,24 @@ async fn fast_upload_part(
     auth: AuthorizeResponse,
     headers: &HeaderMap,
     body: Body,
+    writer_generation: i64,
 ) -> Result<Response<Body>> {
+    let bucket_id = auth
+        .bucket
+        .as_ref()
+        .map(|bucket| bucket.id.as_str())
+        .unwrap_or("");
+    let upload_id = auth.upload_id.as_deref().unwrap_or("");
+    if !writer::multipart_matches(&state, bucket_id, upload_id, writer_generation).await? {
+        return Ok(with_s3_headers(
+            s3_error(
+                StatusCode::CONFLICT,
+                "InvalidRequest",
+                "This multipart upload belongs to an earlier failover generation. Restart the multipart upload.",
+            ),
+            &auth,
+        ));
+    }
     let content_length = match upload_content_length(headers) {
         Ok(content_length) => content_length,
         Err(_) => {
@@ -1115,22 +1508,6 @@ async fn commit_object_change(
         return Ok(());
     }
 
-    if delta > 0 {
-        let delta = i64::try_from(delta).context("bucket byte delta exceeds bigint")?;
-        sqlx::query("UPDATE buckets SET total_bytes = total_bytes + $1 WHERE id = $2::uuid")
-            .bind(delta)
-            .bind(&bucket.id)
-            .execute(&state.pg)
-            .await?;
-    } else {
-        let delta = i64::try_from(-delta).context("bucket byte delta exceeds bigint")?;
-        sqlx::query(
-            "UPDATE buckets SET total_bytes = GREATEST(0, total_bytes - $1) WHERE id = $2::uuid",
-        )
-        .bind(delta)
-        .bind(&bucket.id)
-        .execute(&state.pg)
-        .await?;
-    }
-    Ok(())
+    let delta = i64::try_from(delta).context("bucket byte delta exceeds bigint")?;
+    usage::commit_bucket_usage_delta(state, bucket, delta).await
 }

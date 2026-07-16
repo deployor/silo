@@ -29,6 +29,13 @@
 			"when": 1783896019380,
 			"tag": "0003_low_colleen_wing",
 			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "5",
+			"when": 1784232000000,
+			"tag": "0004_failover_fencing",
+			"breakpoints": true
 		}
 	]
 }
