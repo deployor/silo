@@ -98,9 +98,10 @@ struct ByteRange {
 }
 
 impl DiskCache {
-    pub(crate) fn from_env() -> Result<Self> {
+    pub(crate) fn from_env(emergency_mode: bool) -> Result<Self> {
         let cfg = DiskCacheConfig {
-            enabled: env::var("DISK_CACHE_ENABLED").map_or(true, |v| v != "false"),
+            enabled: !emergency_mode
+                && env::var("DISK_CACHE_ENABLED").map_or(true, |v| v != "false"),
             dir: cache_dir(),
             max_total_size: env_u64("DISK_CACHE_MAX_TOTAL_SIZE", 20 * 1024 * 1024 * 1024),
             min_size: env_u64("DISK_CACHE_MIN_SIZE", REDIS_OBJECT_LIMIT_BYTES),

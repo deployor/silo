@@ -4,6 +4,7 @@ import { z } from "zod";
 const envSchema = z.object({
 	S3_DOMAIN: z.string().default("localhost:3000"),
 	DASHBOARD_DOMAIN: z.string().optional(),
+	DASHBOARD_ORIGIN_DOMAINS: z.string().optional(),
 	DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
 	S3_ACCESS_KEY_ID: z.string().min(1, "S3_ACCESS_KEY_ID is required"),
 	S3_SECRET_ACCESS_KEY: z.string().min(1, "S3_SECRET_ACCESS_KEY is required"),
@@ -111,6 +112,10 @@ export const config = {
 	isProduction: env.NODE_ENV === "production",
 	s3Domain: env.S3_DOMAIN,
 	dashboardDomain,
+	dashboardOriginDomains: (env.DASHBOARD_ORIGIN_DOMAINS || "")
+		.split(",")
+		.map((domain) => domain.trim().toLowerCase())
+		.filter(Boolean),
 	dashboardUrl: `${env.NODE_ENV === "production" ? "https" : "http"}://${dashboardDomain}`,
 	databaseUrl: env.DATABASE_URL,
 	redisUrl: env.REDIS_URL,

@@ -1,0 +1,57 @@
+services:
+  caddy:
+    image: ${CADDY_IMAGE:?required}
+    pull_policy: always
+    restart: unless-stopped
+    depends_on:
+      dataplane:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CLOUDFLARE_DNS_API_TOKEN: ${CLOUDFLARE_DNS_API_TOKEN:?required}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    pull_policy: always
+    restart: unless-stopped
+    mem_limit: 512m
+    command: ["valkey-server", "--requirepass", "${EMERGENCY_REDIS_PASSWORD:?required}", "--save", "", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory", "384mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - valkey-data:/data
+
+  dataplane:
+    image: ${DATAPLANE_IMAGE:?required}
+    pull_policy: always
+    restart: unless-stopped
+    env_file: runtime.env
+    environment:
+      DATAPLANE_BIND: "0.0.0.0:3001"
+      DATAPLANE_MODE: emergency
+      DATAPLANE_WRITER_AUTO_CLAIM: "false"
+      DATAPLANE_DATABASE_MAX_CONNECTIONS: "4"
+      DATAPLANE_WRITER_MAX_CONNECTIONS: "4"
+      DATAPLANE_HTTP_POOL_MAX_IDLE_PER_HOST: "8"
+      DATAPLANE_MAINTENANCE_REFRESH_SECONDS: "3"
+      DATAPLANE_ORIGIN_DOMAINS: "emergency-origin.onsilo.dev"
+      DISK_CACHE_ENABLED: "false"
+      DATAPLANE_REDIS_OBJECT_CACHE_ENABLED: "false"
+      DATAPLANE_ACCOUNTING_UNSAFE_MARKER: /var/lib/silo-accounting/unsafe
+      DOMAINS: "false"
+      CLOUDFLARE_DNS_API_TOKEN: ""
+      REDIS_URL: redis://:${EMERGENCY_REDIS_PASSWORD:?required}@valkey:6379
+    depends_on:
+      valkey:
+        condition: service_started
+    volumes:
+      - ./accounting:/var/lib/silo-accounting
+
+volumes:
+  caddy-data:
+  caddy-config:
+  valkey-data:

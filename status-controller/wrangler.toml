@@ -1,0 +1,11 @@
+name = "silo-status-controller"
+main = "src/index.ts"
+compatibility_date = "2026-07-16"
+
+[triggers]
+crons = ["* * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "silo-status"
+database_id = "6190bf13-800b-4f7a-8a4d-e8cb2c5e6e10"

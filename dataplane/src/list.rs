@@ -77,6 +77,9 @@ pub(crate) async fn fast_internal_list_objects(
 }
 
 pub(crate) async fn invalidate_list_cache(state: &AppState, bucket_id: &str) -> Result<()> {
+    if !state.cfg.redis_object_cache_enabled {
+        return Ok(());
+    }
     let mut conn = state.redis.clone();
     let result: redis::RedisResult<()> = redis::cmd("INCR")
         .arg(format!("s3:listver:{bucket_id}"))
@@ -95,8 +98,23 @@ async fn cached_list_objects_response(
     query: &str,
     headers: &HeaderMap,
 ) -> Result<Response<Body>> {
+    if !state.cfg.redis_object_cache_enabled {
+        let upstream =
+            signed_upstream_request(&state, Method::GET, &format!("?{query}"), headers, None)?;
+        let res = upstream.send().await?;
+        let status = res.status();
+        let xml = res.text().await?;
+        let rewritten = rewrite_list_xml_prefixes(&xml, auth.root_prefix.as_deref().unwrap_or(""));
+        return Ok(with_s3_headers(
+            Response::builder()
+                .status(StatusCode::from_u16(status.as_u16())?)
+                .header("content-type", "application/xml")
+                .body(Body::from(rewritten))?,
+            auth,
+        ));
+    }
     let list_version = get_list_cache_version(&state, &bucket.id).await;
-    let list_type = query_param_value(&query, "list-type").unwrap_or_else(|| "1".to_string());
+    let list_type = query_param_value(query, "list-type").unwrap_or_else(|| "1".to_string());
     let cache_key = format!(
         "s3:list:{}:{}:{}:{}",
         bucket.id, list_version, list_type, query
@@ -109,7 +127,7 @@ async fn cached_list_objects_response(
                 .header("content-type", "application/xml")
                 .header("x-cache", "REDIS-HIT")
                 .body(Body::from(cached))?,
-            &auth,
+            auth,
         ));
     }
 
@@ -137,7 +155,7 @@ async fn cached_list_objects_response(
             .status(StatusCode::from_u16(status.as_u16())?)
             .header("content-type", "application/xml")
             .body(Body::from(rewritten))?,
-        &auth,
+        auth,
     ))
 }
 

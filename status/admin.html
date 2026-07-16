@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101217" />
+    <title>Silo incident desk</title>
+    <link rel="stylesheet" href="./admin.css" />
+  </head>
+  <body>
+    <section id="login" class="login-shell">
+      <form id="login-form" class="login-panel">
+        <p class="eyebrow">SILO / RESTRICTED</p>
+        <h1>Incident<br />desk.</h1>
+        <p class="login-copy">Acknowledge incidents and publish short, useful updates to the public status page.</p>
+        <label for="password">INCIDENT PASSWORD</label>
+        <div class="password-row"><input id="password" name="password" type="password" autocomplete="current-password" required autofocus /><button type="submit">UNLOCK →</button></div>
+        <p id="login-error" class="form-error" role="alert"></p>
+      </form>
+    </section>
+
+    <main id="desk" hidden>
+      <header class="desk-header">
+        <a class="wordmark" href="./index.html">SILO<span>/</span>STATUS</a>
+        <div><span id="sync-state"><i class="spinner"></i>SYNCING</span><button id="lock" class="quiet-button" type="button">LOCK</button></div>
+      </header>
+
+      <section class="desk-intro">
+        <p class="eyebrow">INCIDENT OPERATIONS</p>
+        <h1>Say what’s<br />happening.</h1>
+        <p>Human updates sit beside the automatic recovery timeline. Keep them direct, honest, and useful.</p>
+      </section>
+
+      <section class="ops-console" aria-labelledby="ops-title">
+        <div class="ops-heading">
+          <div><p class="eyebrow">MANUAL RECOVERY CONTROL</p><h2 id="ops-title">Operator override.</h2></div>
+          <span id="ops-lock-state" class="ops-lock-state">LOCKED / SAFE</span>
+        </div>
+        <form id="ops-login-form" class="ops-unlock">
+          <div><label for="ops-password">ADMIN SECRET</label><p>Separate from the incident password. Unlocks provisioning, writer transfer, DNS changes, and teardown.</p></div>
+          <div class="password-row"><input id="ops-password" name="password" type="password" autocomplete="current-password" required /><button type="submit">UNLOCK OPS →</button></div>
+          <p id="ops-login-error" class="form-error" role="alert"></p>
+        </form>
+        <div id="ops-panel" hidden>
+          <div class="ops-state">
+            <div><span>RECOVERY PHASE</span><strong id="ops-phase">CHECKING</strong></div>
+            <div><span>CURRENT STEP</span><strong id="ops-step">CHECKING</strong></div>
+            <div><span>AUTOMATION MODE</span><strong id="ops-auto">CHECKING</strong></div>
+            <button id="ops-lock" class="quiet-button" type="button">LOCK OPS</button>
+          </div>
+          <div class="ops-actions">
+            <button type="button" data-ops-action="provision" data-confirm="Provision a temporary Hetzner recovery server now?">PROVISION HETZNER<small>Create the temporary VM without moving S3 traffic.</small></button>
+            <button type="button" data-ops-action="activate" data-confirm="Transfer the writer lease and S3 DNS to the verified Hetzner server?">MOVE S3 TO HETZNER<small>Available only after readiness and signed storage verification.</small></button>
+            <button type="button" data-ops-action="force-failback" data-confirm="Drain Hetzner and return the writer lease and DNS to PawHost?">RETURN TO PAWHOST<small>Runs the primary canary before changing public DNS.</small></button>
+            <button type="button" data-ops-action="disable-auto-recovery" data-confirm="Hold recovery in manual mode until an operator takes the next action?">HOLD MANUAL MODE<small>Stops automatic failback during an active recovery.</small></button>
+            <button class="danger" type="button" data-ops-action="destroy" data-confirm="Request emergency server teardown? Accounting and writer safety checks still cannot be bypassed.">DELETE TEMP VM<small>Safety checks and accounting flush remain mandatory.</small></button>
+          </div>
+          <section class="maintenance-manager">
+            <div class="maintenance-intro"><div><p class="eyebrow">STATUS-ONLY MAINTENANCE</p><h3>Announce a window.</h3></div><p>This suppresses automatic failover and updates the public status page. It does not disable S3 or the dashboard. Use Silo Admin Settings separately if service must actually be stopped.</p></div>
+            <form id="maintenance-form" class="maintenance-form">
+              <label>TITLE<input id="maintenance-title" name="title" maxlength="120" value="Planned maintenance" required /></label>
+              <label>START<input id="maintenance-start" name="startsAt" type="datetime-local" required /></label>
+              <label>END<input id="maintenance-end" name="endsAt" type="datetime-local" required /></label>
+              <label class="maintenance-message">PUBLIC MESSAGE<textarea id="maintenance-message" name="message" maxlength="1000" required>Silo is undergoing planned maintenance. We’ll keep this page updated.</textarea></label>
+              <button type="submit" class="primary-button">PUBLISH WINDOW</button>
+            </form>
+            <div id="maintenance-list" class="maintenance-list"></div>
+          </section>
+          <p id="ops-error" class="form-error" role="alert"></p>
+        </div>
+      </section>
+
+      <div class="desk-grid">
+        <aside>
+          <div class="section-label"><span>INCIDENTS</span><button id="refresh" class="icon-button" type="button" aria-label="Refresh incidents">↻</button></div>
+          <nav id="incident-list" aria-label="Incidents"></nav>
+        </aside>
+
+        <section id="workspace" class="workspace">
+          <div id="empty-state" class="empty-state">No incidents have been recorded yet.</div>
+          <div id="incident-editor" hidden>
+            <div class="incident-heading">
+              <div><p id="incident-status" class="eyebrow"></p><h2 id="incident-name"></h2></div>
+              <time id="incident-time"></time>
+            </div>
+
+            <form id="ack-form" class="operator-block">
+              <div class="block-number">01</div>
+              <div><label for="ack-message">ACKNOWLEDGE INCIDENT</label><p>Tell people a human has seen the alert. You can include the first useful detail.</p><textarea id="ack-message" maxlength="500" placeholder="We’ve confirmed the issue and are checking the primary storage path."></textarea><button type="submit" class="primary-button">ACKNOWLEDGE</button></div>
+            </form>
+            <div id="acknowledged-block" class="acknowledged-block" hidden><span>✓ ACKNOWLEDGED</span><p id="acknowledgement-copy"></p></div>
+
+            <form id="note-form" class="operator-block">
+              <div class="block-number">02</div>
+              <div><label for="note-message">ADD PUBLIC NOTE</label><p>Post what changed, what users should expect, or what happens next.</p><textarea id="note-message" maxlength="2000" required placeholder="Emergency server is online. We’re verifying signed uploads and downloads before moving traffic."></textarea><div class="form-footer"><span id="note-count">0 / 2000</span><button type="submit" class="primary-button">PUBLISH NOTE</button></div></div>
+            </form>
+
+            <section class="notes-section">
+              <div class="section-label"><span>TEAM NOTES</span><span id="notes-count">0 NOTES</span></div>
+              <div id="notes-list"></div>
+            </section>
+          </div>
+        </section>
+      </div>
+      <p id="toast" class="toast" role="status" aria-live="polite"></p>
+    </main>
+    <script src="./admin.js"></script>
+  </body>
+</html>

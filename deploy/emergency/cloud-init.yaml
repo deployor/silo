@@ -1,0 +1,35 @@
+# Rendered by provision-emergency.yml. The only credential in Hetzner
+# user-data is a ten-minute, one-use bootstrap token. Runtime credentials are
+# fetched over TLS and written without ever being printed by cloud-init.
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - docker.io
+  - docker-compose-v2
+  - jq
+write_files:
+  - path: /opt/silo/compose.b64
+    permissions: "0600"
+    content: __COMPOSE_B64__
+  - path: /opt/silo/caddy.b64
+    permissions: "0600"
+    content: __CADDY_B64__
+  - path: /opt/silo/bootstrap.url
+    permissions: "0600"
+    content: __BOOTSTRAP_URL__
+  - path: /opt/silo/bootstrap.token
+    permissions: "0600"
+    content: __BOOTSTRAP_TOKEN__
+runcmd:
+  - mkdir -p /opt/silo
+  - install -d -o 65534 -g 65534 -m 0700 /opt/silo/accounting
+  - |
+    sh -c 'umask 077; base64 -d /opt/silo/compose.b64 > /opt/silo/compose.yml; base64 -d /opt/silo/caddy.b64 > /opt/silo/Caddyfile; rm -f /opt/silo/*.b64'
+  - |
+    sh -c 'umask 077; response=$(mktemp); curl --fail --silent --show-error --retry 12 --retry-all-errors --retry-delay 5 -H "Authorization: Bearer $(cat /opt/silo/bootstrap.token)" "$(cat /opt/silo/bootstrap.url)/exchange" -o "$response"; jq -er .runtime "$response" > /opt/silo/runtime.env; jq -er .reportToken "$response" > /opt/silo/report.token; rm -f "$response" /opt/silo/bootstrap.token'
+  - chmod 0600 /opt/silo/runtime.env /opt/silo/report.token /opt/silo/bootstrap.url
+  - |
+    sh -c 'cd /opt/silo && docker compose --env-file runtime.env -f compose.yml pull --quiet && docker compose --env-file runtime.env -f compose.yml up -d --pull always'
+  - |
+    sh -c 'cd /opt/silo; dataplane=$(docker inspect --format "{{index .RepoDigests 0}}" "$(docker compose --env-file runtime.env -f compose.yml ps -q dataplane)" 2>/dev/null || printf unavailable); caddy=$(docker inspect --format "{{index .RepoDigests 0}}" "$(docker compose --env-file runtime.env -f compose.yml ps -q caddy)" 2>/dev/null || printf unavailable); valkey=$(docker inspect --format "{{index .RepoDigests 0}}" "$(docker compose --env-file runtime.env -f compose.yml ps -q valkey)" 2>/dev/null || printf unavailable); jq -n --arg dataplane "$dataplane" --arg caddy "$caddy" --arg valkey "$valkey" "{dataplane:\$dataplane,caddy:\$caddy,valkey:\$valkey}" | curl --fail --silent --show-error -X POST -H "Authorization: Bearer $(cat /opt/silo/report.token)" -H "content-type: application/json" --data-binary @- "$(cat /opt/silo/bootstrap.url)/report"; rm -f /opt/silo/report.token /opt/silo/bootstrap.url'

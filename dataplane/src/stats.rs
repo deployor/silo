@@ -1,4 +1,5 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
+use chrono::Utc;
 use tracing::warn;
 
 use crate::{AppState, AuthorizeResponse};
@@ -41,6 +42,9 @@ async fn record_inner(
     let Some(user) = auth.user.as_ref() else {
         return Ok(());
     };
+    if state.cfg.emergency_mode {
+        return record_direct_to_postgres(state, auth, ingress, egress, count_request).await;
+    }
     let mut pipe = redis::pipe();
     if ingress > 0 {
         pipe.incr(format!("stats:user:{}:ingress", user.id), ingress as i64);
@@ -62,4 +66,28 @@ async fn record_inner(
     let mut conn = state.redis.clone();
     let _: () = pipe.query_async(&mut conn).await?;
     Ok(())
+}
+
+async fn record_direct_to_postgres(
+    state: &AppState,
+    auth: &AuthorizeResponse,
+    ingress: u64,
+    egress: u64,
+    count_request: bool,
+) -> Result<()> {
+    let user = auth.user.as_ref().context("missing user for stats")?;
+    let ingress = i64::try_from(ingress).context("ingress exceeds bigint")?;
+    let egress = i64::try_from(egress).context("egress exceeds bigint")?;
+    let requests = i64::from(count_request);
+    let period = Utc::now().format("%Y-%m").to_string();
+    crate::accounting::record_stats(
+        state,
+        &user.id,
+        auth.bucket.as_ref().map(|bucket| bucket.id.as_str()),
+        ingress,
+        egress,
+        requests,
+        period,
+    )
+    .await
 }

@@ -401,7 +401,8 @@ async fn get_signed_auth_context(
           b.deep_freeze_state, b.deep_freeze_reason, b.cors_config,
           u.id AS user_id,
           COALESCE(NULLIF(u.storage_limit_bytes, 0), (SELECT default_storage_limit_bytes FROM app_settings LIMIT 1), 1073741824) AS storage_limit_bytes,
-          u.storage_usage_bytes, u.egress_limit_bytes,
+          COALESCE((SELECT SUM(owned.total_bytes) FROM buckets owned WHERE owned.user_id = u.id), 0) AS storage_usage_bytes,
+          u.egress_limit_bytes,
           u.egress_bytes, u.egress_period, u.is_immortal, u.is_locked, u.marked_as_over_age,
           u.data_exported, u.files_deleted,
           k.secret_key, k.is_paused AS key_is_paused, k.pause_reason AS key_pause_reason
@@ -451,7 +452,8 @@ async fn get_public_auth_context(
           b.deep_freeze_state, b.deep_freeze_reason, b.cors_config,
           u.id AS user_id,
           COALESCE(NULLIF(u.storage_limit_bytes, 0), (SELECT default_storage_limit_bytes FROM app_settings LIMIT 1), 1073741824) AS storage_limit_bytes,
-          u.storage_usage_bytes, u.egress_limit_bytes,
+          COALESCE((SELECT SUM(owned.total_bytes) FROM buckets owned WHERE owned.user_id = u.id), 0) AS storage_usage_bytes,
+          u.egress_limit_bytes,
           u.egress_bytes, u.egress_period, u.is_immortal, u.is_locked, u.marked_as_over_age,
           u.data_exported, u.files_deleted
         FROM buckets b
@@ -551,7 +553,9 @@ fn bucket_from_request(state: &AppState, url: &Url) -> Option<String> {
     if host.ends_with(&format!(".{domain}")) && host != domain {
         return Some(host[..host.len() - domain.len() - 1].to_string());
     }
-    if host == domain || (domain == "localhost:3000" && host.starts_with("localhost")) {
+    if is_path_style_domain(state, &host)
+        || (domain == "localhost:3000" && host.starts_with("localhost"))
+    {
         return url
             .path_segments()
             .and_then(|mut segments| segments.next())
@@ -579,6 +583,10 @@ fn key_from_request(state: &AppState, url: &Url, bucket_name: &str) -> Result<St
     };
     ensure_no_traversal(&key)?;
     Ok(key)
+}
+
+fn is_path_style_domain(state: &AppState, host: &str) -> bool {
+    host == state.cfg.s3_domain || state.cfg.origin_domains.iter().any(|domain| domain == host)
 }
 
 fn internal_path(key: &str, user: Option<&AuthUser>, bucket: &BucketAuth) -> Result<String> {
