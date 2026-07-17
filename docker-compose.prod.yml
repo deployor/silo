@@ -14,6 +14,7 @@ services:
       PORT: "3000"
       DISK_CACHE_DIR: "/var/cache/silo-dataplane"
       DATAPLANE_URL: "http://dataplane:3001"
+      DASHBOARD_ORIGIN_DOMAINS: "${DASHBOARD_ORIGIN_DOMAINS:-primary-dashboard-origin.onsilo.dev}"
       REDIS_URL: "redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in the deployment environment}@silo-dragonfly:6379"
     depends_on:
       silo-dragonfly:
@@ -53,6 +54,7 @@ services:
       DATAPLANE_PUBLIC_SCHEME: "https"
       DATAPLANE_WRITER_INSTANCE_ID: "primary"
       DATAPLANE_WRITER_AUTO_CLAIM: "true"
+      DATAPLANE_ORIGIN_DOMAINS: "${DATAPLANE_ORIGIN_DOMAINS:-primary-origin.onsilo.dev}"
       DISK_CACHE_DIR: "/var/cache/silo-dataplane"
       REDIS_URL: "redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in the deployment environment}@silo-dragonfly:6379"
     depends_on:
