@@ -548,13 +548,17 @@ fn user_from_row(row: &sqlx::postgres::PgRow) -> UserAuth {
 }
 
 fn bucket_from_request(state: &AppState, url: &Url) -> Option<String> {
+    bucket_from_request_for_domains(&state.cfg.s3_domain, &state.cfg.origin_domains, url)
+}
+
+fn bucket_from_request_for_domains(
+    s3_domain: &str,
+    origin_domains: &[String],
+    url: &Url,
+) -> Option<String> {
     let host = url_host(url);
-    let domain = state.cfg.s3_domain.as_str();
-    if host.ends_with(&format!(".{domain}")) && host != domain {
-        return Some(host[..host.len() - domain.len() - 1].to_string());
-    }
-    if is_path_style_domain(state, &host)
-        || (domain == "localhost:3000" && host.starts_with("localhost"))
+    if is_path_style_host(s3_domain, origin_domains, &host)
+        || (s3_domain == "localhost:3000" && host.starts_with("localhost"))
     {
         return url
             .path_segments()
@@ -565,28 +569,26 @@ fn bucket_from_request(state: &AppState, url: &Url) -> Option<String> {
     None
 }
 
-fn key_from_request(state: &AppState, url: &Url, bucket_name: &str) -> Result<String> {
-    let host = url_host(url);
-    let domain = state.cfg.s3_domain.as_str();
-    let key = if host.ends_with(&format!(".{domain}")) && host != domain {
-        url.path().trim_start_matches('/').to_string()
+fn key_from_request(_state: &AppState, url: &Url, bucket_name: &str) -> Result<String> {
+    key_from_path_request(url, bucket_name)
+}
+
+fn key_from_path_request(url: &Url, bucket_name: &str) -> Result<String> {
+    let path = url.path();
+    let prefix = format!("/{bucket_name}/");
+    let key = if path.starts_with(&prefix) {
+        path[prefix.len()..].to_string()
+    } else if path == "/" || path == format!("/{bucket_name}") {
+        String::new()
     } else {
-        let path = url.path();
-        let prefix = format!("/{bucket_name}/");
-        if path.starts_with(&prefix) {
-            path[prefix.len()..].to_string()
-        } else if path == "/" || path == format!("/{bucket_name}") {
-            String::new()
-        } else {
-            path.trim_start_matches('/').to_string()
-        }
+        path.trim_start_matches('/').to_string()
     };
     ensure_no_traversal(&key)?;
     Ok(key)
 }
 
-fn is_path_style_domain(state: &AppState, host: &str) -> bool {
-    host == state.cfg.s3_domain || state.cfg.origin_domains.iter().any(|domain| domain == host)
+fn is_path_style_host(s3_domain: &str, origin_domains: &[String], host: &str) -> bool {
+    host == s3_domain || origin_domains.iter().any(|domain| domain == host)
 }
 
 fn internal_path(key: &str, user: Option<&AuthUser>, bucket: &BucketAuth) -> Result<String> {
@@ -1423,5 +1425,32 @@ mod tests {
             &headers,
             &["host".to_string(), "X-Amz-Date".to_string()]
         ));
+    }
+
+    #[test]
+    fn treats_configured_subdomain_origin_as_path_style() {
+        let origins = vec!["primary-origin.onsilo.dev".to_string()];
+        let url =
+            Url::parse("https://primary-origin.onsilo.dev/silo-canary/__silo_healthcheck/test")
+                .unwrap();
+
+        assert_eq!(
+            bucket_from_request_for_domains("onsilo.dev", &origins, &url).as_deref(),
+            Some("silo-canary")
+        );
+        assert_eq!(
+            key_from_path_request(&url, "silo-canary").unwrap(),
+            "__silo_healthcheck/test"
+        );
+    }
+
+    #[test]
+    fn rejects_virtual_hosted_bucket_routing() {
+        let url = Url::parse("https://photos.onsilo.dev/2026/image.png").unwrap();
+
+        assert_eq!(
+            bucket_from_request_for_domains("onsilo.dev", &[], &url),
+            None
+        );
     }
 }
