@@ -115,17 +115,25 @@ export default {
 	},
 	async fetch(request: Request, env: Env): Promise<Response> {
 		const url = new URL(request.url);
-		if (url.hostname === (env.S3_DNS_NAME || "onsilo.dev")) return outageFallback(request);
-		if (url.hostname === (env.DASHBOARD_DNS_NAME || "dash.onsilo.dev")) return dashboardStatusRedirect();
-		if (request.method === "OPTIONS") return corsPreflight(request, env, url.pathname);
-		if (request.method === "GET" && url.pathname === "/api/status") return json(await publicStatus(env));
-		if (request.method === "POST" && url.pathname.startsWith("/api/bootstrap/")) return bootstrap(request, env, url.pathname.slice(15));
-		if (request.method === "POST" && url.pathname.startsWith("/api/callback/")) return callback(request, env, url.pathname.slice(14));
-		if (url.pathname === "/api/admin/incidents" || url.pathname.startsWith("/api/admin/incidents/") || url.pathname.startsWith("/api/admin/notes/")) return incidentAdmin(request, env, url.pathname);
-		if (url.pathname === "/api/admin/maintenance" || url.pathname.startsWith("/api/admin/maintenance/")) return maintenanceAdmin(request, env, url.pathname);
-		if (request.method === "GET" && url.pathname === "/api/admin/operations") return operationsAdmin(request, env);
-		if (request.method === "POST" && url.pathname.startsWith("/api/admin/")) return admin(request, env, url.pathname.slice(11));
-		return json({ error: "not found" }, 404);
+		try {
+			if (url.hostname === (env.S3_DNS_NAME || "onsilo.dev")) return outageFallback(request);
+			if (url.hostname === (env.DASHBOARD_DNS_NAME || "dash.onsilo.dev")) return dashboardStatusRedirect();
+			if (request.method === "OPTIONS") return corsPreflight(request, env, url.pathname);
+			if (request.method === "GET" && url.pathname === "/api/status") return json(await publicStatus(env));
+			if (request.method === "POST" && url.pathname.startsWith("/api/bootstrap/")) return bootstrap(request, env, url.pathname.slice(15));
+			if (request.method === "POST" && url.pathname.startsWith("/api/callback/")) return callback(request, env, url.pathname.slice(14));
+			if (url.pathname === "/api/admin/incidents" || url.pathname.startsWith("/api/admin/incidents/") || url.pathname.startsWith("/api/admin/notes/")) return incidentAdmin(request, env, url.pathname);
+			if (url.pathname === "/api/admin/maintenance" || url.pathname.startsWith("/api/admin/maintenance/")) return maintenanceAdmin(request, env, url.pathname);
+			if (request.method === "GET" && url.pathname === "/api/admin/operations") return operationsAdmin(request, env);
+			if (request.method === "POST" && url.pathname.startsWith("/api/admin/")) return admin(request, env, url.pathname.slice(11));
+			return json({ error: "not found" }, 404);
+		} catch (error) {
+			console.error("request failed", error);
+			if (url.pathname.startsWith("/api/admin/")) {
+				return adminJson(request, env, { error: error instanceof Error ? error.message : "admin action failed" }, 500);
+			}
+			return json({ error: "request failed" }, 500);
+		}
 	},
 };
 
@@ -714,7 +722,16 @@ async function admin(request: Request, env: Env, action: string) {
 	const state = await getState(env);
 	if (action === "provision") {
 		if (["provisioning", "ready", "active", "recovering"].includes(state.failoverPhase)) return adminJson(request, env, { error: "an emergency recovery path already exists" }, 409);
-		if (!state.activeIncidentId) await openIncident(env, state, "Emergency provisioning started manually.", "Emergency recovery drill"); state.failoverPhase = "provisioning"; state.provisioningStep = "server_requested"; state.overall = "degraded"; await pointDashboardAtStatus(env); await dispatch(env, "provision_emergency", { callback_url: env.STATUS_CALLBACK_URL, incident_id: state.activeIncidentId }); await addUpdate(env, state, "monitoring", "Emergency provisioning started manually.");
+		const incidentId = state.activeIncidentId || crypto.randomUUID();
+		await dispatch(env, "provision_emergency", { callback_url: env.STATUS_CALLBACK_URL, incident_id: incidentId });
+		if (!state.activeIncidentId) {
+			state.activeIncidentId = incidentId;
+			await env.DB.prepare("INSERT INTO incidents (id, status, title, started_at) VALUES (?, ?, ?, ?)").bind(incidentId, "open", "Emergency recovery drill", new Date().toISOString()).run();
+		}
+		state.failoverPhase = "provisioning";
+		state.provisioningStep = "server_requested";
+		state.overall = "degraded";
+		await addUpdate(env, state, "monitoring", "Emergency provisioning started manually. Dashboard traffic remains on the healthy primary.");
 	}
 	else if (action === "activate") {
 		if (state.failoverPhase !== "ready" || state.provisioningStep !== "verified") return adminJson(request, env, { error: "emergency must pass readiness and storage verification before activation" }, 409);
@@ -834,7 +851,11 @@ async function cloudflare<T = unknown>(env: Env, path: string, method: string, b
 	return response.json<T>();
 }
 
-async function dispatch(env: Env, eventType: string, clientPayload: Record<string, unknown>) { const response = await fetch(`${env.GITHUB_API_BASE || "https://api.github.com"}/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/dispatches`, { method: "POST", headers: { accept: "application/vnd.github+json", authorization: `Bearer ${env.GITHUB_DISPATCH_TOKEN}`, "content-type": "application/json", "user-agent": "silo-status-controller" }, body: JSON.stringify({ event_type: eventType, client_payload: clientPayload }) }); if (!response.ok) throw new Error(`GitHub dispatch failed: ${response.status}`); }
+async function dispatch(env: Env, eventType: string, clientPayload: Record<string, unknown>) {
+	if (!env.GITHUB_DISPATCH_TOKEN || !env.GITHUB_OWNER || !env.GITHUB_REPO) throw new Error("GitHub dispatch is not configured");
+	const response = await fetch(`${env.GITHUB_API_BASE || "https://api.github.com"}/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/dispatches`, { method: "POST", headers: { accept: "application/vnd.github+json", authorization: `Bearer ${env.GITHUB_DISPATCH_TOKEN}`, "content-type": "application/json", "user-agent": "silo-status-controller" }, body: JSON.stringify({ event_type: eventType, client_payload: clientPayload }) });
+	if (!response.ok) throw new Error(`GitHub dispatch failed: ${response.status}`);
+}
 
 async function notifyMaintainers(env: Env, event: string, message: string) {
 	if (!env.ALERT_WEBHOOK_URL) return;
