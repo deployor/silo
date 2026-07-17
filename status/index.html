@@ -4,60 +4,141 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#101217" />
+    <meta name="description" content="Live service status for Silo storage." />
     <title>Silo status</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <svg class="icon-sprite" aria-hidden="true">
+      <symbol id="icon-check" viewBox="0 0 24 24"><path d="M9.55 17.15 4.4 12l1.45-1.45 3.7 3.7 8.6-8.6L19.6 7.1Z" /></symbol>
+      <symbol id="icon-close" viewBox="0 0 24 24"><path d="m7.05 18.35-1.4-1.4L10.6 12 5.65 7.05l1.4-1.4L12 10.6l4.95-4.95 1.4 1.4L13.4 12l4.95 4.95-1.4 1.4L12 13.4Z" /></symbol>
+      <symbol id="icon-warning" viewBox="0 0 24 24"><path d="M1.85 21 12 3l10.15 18Zm3.45-2h13.4L12 7.1ZM12 18q.43 0 .72-.29.28-.28.28-.71t-.29-.71A.97.97 0 0 0 12 16q-.43 0-.71.29A.97.97 0 0 0 11 17q0 .43.29.72.28.28.71.28Zm-1-3h2v-5h-2Z" /></symbol>
+      <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M12 20q-3.35 0-5.68-2.33A7.73 7.73 0 0 1 4 12q0-3.35 2.32-5.68A7.73 7.73 0 0 1 12 4q2.08 0 3.83 1t2.87 2.75V4H21v8h-8V9.7h4.8a6.16 6.16 0 0 0-2.31-2.43A6.52 6.52 0 0 0 12 6Q9.5 6 7.75 7.75A5.79 5.79 0 0 0 6 12q0 2.5 1.75 4.25A5.79 5.79 0 0 0 12 18q1.93 0 3.48-1.1A5.87 5.87 0 0 0 17.65 14h2.1a7.83 7.83 0 0 1-2.83 4.3A7.84 7.84 0 0 1 12 20Z" /></symbol>
+      <symbol id="icon-external" viewBox="0 0 24 24"><path d="M5 21q-.83 0-1.41-.59A1.92 1.92 0 0 1 3 19V5q0-.83.59-1.41A1.92 1.92 0 0 1 5 3h7v2H5v14h14v-7h2v7q0 .83-.59 1.41A1.92 1.92 0 0 1 19 21Zm4.7-5.3-1.4-1.4L17.6 5H14V3h7v7h-2V6.4Z" /></symbol>
+      <symbol id="icon-clock" viewBox="0 0 24 24"><path d="M15.3 16.7 16.7 15l-3.7-3V7h-2v6ZM12 22q-2.08 0-3.9-.79a10.2 10.2 0 0 1-3.18-2.13A10.2 10.2 0 0 1 2.79 15.9 9.75 9.75 0 0 1 2 12q0-2.08.79-3.9a10.2 10.2 0 0 1 2.13-3.18A10.2 10.2 0 0 1 8.1 2.79 9.75 9.75 0 0 1 12 2q2.08 0 3.9.79a10.2 10.2 0 0 1 3.18 2.13 10.2 10.2 0 0 1 2.13 3.18A9.75 9.75 0 0 1 22 12q0 2.08-.79 3.9a10.2 10.2 0 0 1-2.13 3.18 10.2 10.2 0 0 1-3.18 2.13A9.75 9.75 0 0 1 12 22Zm0-2q3.35 0 5.68-2.33A7.73 7.73 0 0 0 20 12q0-3.35-2.32-5.68A7.73 7.73 0 0 0 12 4Q8.65 4 6.32 6.32A7.73 7.73 0 0 0 4 12q0 3.35 2.32 5.67A7.73 7.73 0 0 0 12 20Z" /></symbol>
+    </svg>
+
+    <header class="site-header">
+      <nav class="nav-shell" aria-label="Silo status navigation">
+        <a class="wordmark" href="https://onsilo.dev" aria-label="Silo home">SILO<span>/</span>STATUS</a>
+        <div class="nav-meta">
+          <span id="updated">Checking now</span>
+          <button id="refresh" class="refresh-button" type="button" aria-label="Refresh status">
+            <svg aria-hidden="true"><use href="#icon-refresh" /></svg>
+          </button>
+        </div>
+      </nav>
+    </header>
+
     <main>
-      <header class="topbar">
-        <a class="wordmark" href="https://onsilo.dev">SILO<span>/</span>STATUS</a>
-        <p><i id="monitor-light" class="spinner" aria-hidden="true"></i><span id="updated">CHECKING LIVE STATUS</span></p>
-      </header>
-      <section class="hero" aria-live="polite">
-        <div class="hero-mark"><span id="orb" class="orb spinner" aria-hidden="true"></span><span>01</span></div>
-        <div>
-          <p class="eyebrow">SILO / INDEPENDENT SERVICE MONITOR</p>
-          <h1 id="headline">Checking Silo</h1>
-          <p id="summary">We’re asking the independent monitor now.</p>
+      <section id="hero" class="status-hero" data-state="loading" aria-live="polite">
+        <div class="status-emblem" aria-hidden="true">
+          <span class="hero-spinner"></span>
+          <svg class="hero-icon hero-icon-check"><use href="#icon-check" /></svg>
+          <svg class="hero-icon hero-icon-warning"><use href="#icon-warning" /></svg>
+          <svg class="hero-icon hero-icon-close"><use href="#icon-close" /></svg>
+        </div>
+        <p id="hero-label" class="hero-label">Checking Silo</p>
+        <h1 id="headline">One moment.</h1>
+        <p id="summary" class="hero-summary">Running live storage and infrastructure checks.</p>
+        <div id="hero-acknowledged" class="acknowledged-pill" hidden>
+          <svg aria-hidden="true"><use href="#icon-check" /></svg>
+          <span>Acknowledged by the Silo team</span>
         </div>
       </section>
-      <section id="outage-panel" class="outage-panel" hidden aria-live="polite">
-        <div class="outage-heading"><span class="outage-icon" aria-hidden="true">!</span><div><p class="eyebrow">SERVICE NOTICE</p><h2 id="outage-title">DEGRADED PERFORMANCE</h2></div></div>
-        <p id="outage-copy">We are starting the emergency recovery path now.</p>
+
+      <section id="recovery-panel" class="recovery-panel" hidden aria-live="polite">
+        <div class="recovery-heading">
+          <div>
+            <p class="section-kicker" id="recovery-kicker">Recovery in progress</p>
+            <h2 id="recovery-title">Backup systems are provisioning.</h2>
+          </div>
+          <span id="recovery-state" class="recovery-state">Starting</span>
+        </div>
+        <p id="recovery-copy" class="recovery-copy"></p>
         <ol id="failover-steps" class="failover-steps"></ol>
       </section>
-      <section class="services" aria-label="What is working">
-        <article>
-          <div><span>S3 STORAGE</span><small>API · UPLOADS · DOWNLOADS · AUTHENTICATION</small></div>
-          <b id="s3Storage" class="checking">CHECKING</b>
-        </article>
-        <article>
-          <div><span>DASHBOARD</span><small>ACCOUNTS · BUCKETS · SETTINGS</small></div>
-          <b id="dashboard" class="checking">CHECKING</b>
-        </article>
-        <article>
-          <div><span>RECOVERY PATH</span><small id="phase-copy">A small temporary S3 server is only created if Silo needs it.</small></div>
-          <b id="phase" class="checking">CHECKING</b>
-        </article>
-      </section>
-      <section class="story">
-        <div>
-          <p class="eyebrow" id="incident-kicker">LATEST UPDATE</p>
-          <h2 id="incident-title">Nothing needs your attention.</h2>
-          <p id="incident-acknowledged" class="incident-acknowledged" hidden>✓ ACKNOWLEDGED BY THE SILO TEAM</p>
-          <ol id="updates"><li>All clear. Silo is operating normally.</li></ol>
+
+      <section class="system-section" aria-labelledby="systems-heading">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">Live checks</p>
+            <h2 id="systems-heading">System status</h2>
+          </div>
+          <p>Updated every minute</p>
+        </div>
+
+        <div class="status-groups">
+          <article class="status-group">
+            <header><span>Storage operations</span><small>Real signed S3 requests</small></header>
+            <div class="status-row"><div><strong>S3 API</strong><small>Health and readiness</small></div><span id="status-s3Api" class="status-value unknown"><i></i>Checking</span></div>
+            <div class="status-row"><div><strong>Authentication</strong><small>SigV4 signed request</small></div><span id="status-authentication" class="status-value unknown"><i></i>Checking</span></div>
+            <div class="status-row"><div><strong>Uploads</strong><small>PUT object canary</small></div><span id="status-uploads" class="status-value unknown"><i></i>Checking</span></div>
+            <div class="status-row"><div><strong>Downloads</strong><small>GET object canary</small></div><span id="status-downloads" class="status-value unknown"><i></i>Checking</span></div>
+            <div class="status-row"><div><strong>Deletes</strong><small>DELETE object canary</small></div><span id="status-deletes" class="status-value unknown"><i></i>Checking</span></div>
+            <div class="status-row"><div><strong>Dashboard</strong><small>Accounts, buckets, and settings</small></div><span id="status-dashboard" class="status-value unknown"><i></i>Checking</span></div>
+          </article>
+
+          <article class="status-group">
+            <header><span>Infrastructure</span><small>Current serving path</small></header>
+            <div class="status-row"><div><strong>PostgreSQL</strong><small>Metadata on Aiven</small></div><span id="status-postgres" class="status-value unknown"><i></i>Checking</span></div>
+            <div class="status-row"><div><strong>Dragonfly / Valkey</strong><small>Cache and usage counters</small></div><span id="status-redis" class="status-value unknown"><i></i>Checking</span></div>
+            <div class="status-row"><div><strong>Object storage</strong><small>Backing storage connectivity</small></div><span id="status-backingStorage" class="status-value unknown"><i></i>Checking</span></div>
+            <div class="status-row"><div><strong>Writer lease</strong><small>Split-brain protection</small></div><span id="status-writerLease" class="status-value unknown"><i></i>Checking</span></div>
+            <div class="status-row"><div><strong>Recovery system</strong><small>Hetzner emergency path</small></div><span id="status-failover" class="status-value unknown"><i></i>Checking</span></div>
+          </article>
         </div>
       </section>
-      <section class="history">
-        <div class="history-heading"><p class="eyebrow">RECENT INCIDENTS</p><p id="uptime">90-DAY UPTIME · CALCULATING</p></div>
-        <div id="incidents"><p>No recent incidents.</p></div>
+
+      <section id="active-incident" class="incident-section" hidden aria-labelledby="incident-title">
+        <div class="section-heading">
+          <div><p class="section-kicker">Current incident</p><h2 id="incident-title">Service disruption</h2></div>
+          <span id="incident-status" class="incident-status">Investigating</span>
+        </div>
+        <div id="incident-acknowledgement" class="incident-acknowledgement" hidden></div>
+        <ol id="incident-timeline" class="incident-timeline"></ol>
       </section>
-      <section id="maintenance-section" class="history" hidden>
-        <p class="eyebrow">SCHEDULED MAINTENANCE</p>
+
+      <section id="maintenance-section" class="maintenance-section" hidden aria-labelledby="maintenance-heading">
+        <div class="section-heading"><div><p class="section-kicker">Planned work</p><h2 id="maintenance-heading">Scheduled maintenance</h2></div></div>
         <div id="maintenance"></div>
       </section>
-      <footer><span>INDEPENDENT OF SILO PRODUCTION</span><span><a href="./admin.html">INCIDENT DESK</a> · <a href="https://dash.onsilo.dev">OPEN DASHBOARD ↗</a></span></footer>
+
+      <section class="history-section" aria-labelledby="history-heading">
+        <div class="section-heading">
+          <div><p class="section-kicker">What happened before</p><h2 id="history-heading">Past incidents</h2></div>
+        </div>
+        <div id="incidents" class="incident-history"><div class="history-empty">Loading incident history…</div></div>
+      </section>
+
+      <section class="uptime-section" aria-labelledby="uptime-heading">
+        <div class="section-heading uptime-heading">
+          <div><p class="section-kicker">Last 90 days</p><h2 id="uptime-heading">Uptime</h2></div>
+          <span id="uptime-samples">Collecting data</span>
+        </div>
+        <div class="uptime-service">
+          <div class="uptime-label"><div><strong>S3 storage</strong><small>API and object operations</small></div><b id="uptime-s3">—</b></div>
+          <div id="uptime-s3-bars" class="uptime-bars" aria-label="S3 storage uptime over the last 90 days"></div>
+          <div class="uptime-range"><span>90 days ago</span><span>Today</span></div>
+        </div>
+        <div class="uptime-service">
+          <div class="uptime-label"><div><strong>Dashboard</strong><small>Account and bucket management</small></div><b id="uptime-dashboard">—</b></div>
+          <div id="uptime-dashboard-bars" class="uptime-bars" aria-label="Dashboard uptime over the last 90 days"></div>
+          <div class="uptime-range"><span>90 days ago</span><span>Today</span></div>
+        </div>
+      </section>
     </main>
+
+    <footer class="site-footer">
+      <div class="footer-shell">
+        <a class="wordmark footer-wordmark" href="https://onsilo.dev">SILO</a>
+        <nav aria-label="Footer navigation">
+          <a href="https://dash.onsilo.dev">Dashboard <svg aria-hidden="true"><use href="#icon-external" /></svg></a>
+          <a href="./admin.html">Incident desk</a>
+        </nav>
+      </div>
+    </footer>
+
     <script src="./status.js"></script>
   </body>
 </html>

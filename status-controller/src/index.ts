@@ -45,9 +45,33 @@ export interface Env {
 	GITHUB_API_BASE?: string;
 }
 
-type Component = "s3Api" | "uploads" | "downloads" | "dashboard" | "authentication" | "failover";
+type Component = "s3Api" | "uploads" | "downloads" | "deletes" | "authentication" | "postgres" | "redis" | "backingStorage" | "writerLease" | "dashboard" | "failover";
 type ComponentStatus = "operational" | "degraded" | "outage" | "unknown";
 type FailoverPhase = "inactive" | "investigating" | "provisioning" | "ready" | "active" | "recovering" | "failed";
+
+type ReadinessChecks = {
+	ok: boolean;
+	postgres?: boolean;
+	redis?: boolean;
+	storage?: boolean;
+	activeWriter?: boolean;
+};
+
+type OperationChecks = {
+	authentication: boolean;
+	upload: boolean;
+	download: boolean;
+	delete: boolean;
+};
+
+type ProbeChecks = {
+	health: boolean;
+	ready: boolean;
+	canary: boolean;
+	dashboard?: boolean;
+	readiness?: ReadinessChecks;
+	operations?: OperationChecks;
+};
 
 type StatusState = {
 	overall: "operational" | "degraded" | "major_outage";
@@ -75,7 +99,7 @@ const CHECK_TIMEOUT_MS = 12_000;
 const defaultState = (): StatusState => ({
 	overall: "operational",
 	components: {
-		s3Api: "unknown", uploads: "unknown", downloads: "unknown", dashboard: "unknown", authentication: "unknown", failover: "operational",
+		s3Api: "unknown", uploads: "unknown", downloads: "unknown", deletes: "unknown", authentication: "unknown", postgres: "unknown", redis: "unknown", backingStorage: "unknown", writerLease: "unknown", dashboard: "unknown", failover: "operational",
 	},
 	consecutiveFailures: 0,
 	consecutiveRecoveries: 0,
@@ -243,34 +267,42 @@ async function runMonitor(env: Env) {
 	await putState(env, state);
 }
 
-function setS3Components(state: StatusState, checks: { health: boolean; ready: boolean; canary: boolean }) {
-	state.components.s3Api = checks.health && checks.ready ? "operational" : "outage";
-	state.components.uploads = checks.canary ? "operational" : "outage";
-	state.components.downloads = checks.canary ? "operational" : "outage";
-	state.components.authentication = checks.canary ? "operational" : "outage";
+function componentStatus(value: boolean | undefined, fallback?: boolean): ComponentStatus {
+	const resolved = value ?? fallback;
+	return resolved === undefined ? "unknown" : resolved ? "operational" : "outage";
+}
+
+function setS3Components(state: StatusState, checks: ProbeChecks) {
+	state.components.s3Api = componentStatus(checks.health && checks.ready);
+	state.components.uploads = componentStatus(checks.operations?.upload, checks.canary);
+	state.components.downloads = componentStatus(checks.operations?.download, checks.canary);
+	state.components.deletes = componentStatus(checks.operations?.delete, checks.canary);
+	state.components.authentication = componentStatus(checks.operations?.authentication, checks.canary);
+	state.components.postgres = componentStatus(checks.readiness?.postgres, checks.ready);
+	state.components.redis = componentStatus(checks.readiness?.redis, checks.ready);
+	state.components.backingStorage = componentStatus(checks.readiness?.storage, checks.ready);
+	state.components.writerLease = componentStatus(checks.readiness?.activeWriter, checks.ready);
 }
 
 async function checkPrimary(env: Env, readOnly = false) {
-	const [health, ready, dashboard] = await Promise.all([
-		ok(env.PRIMARY_HEALTH_URL), ok(env.PRIMARY_READY_URL, env.DATAPLANE_INTERNAL_SECRET), ok(env.PRIMARY_DASHBOARD_URL || env.DASHBOARD_URL || ""),
+	const [health, readiness, dashboard] = await Promise.all([
+		ok(env.PRIMARY_HEALTH_URL), checkReadiness(env.PRIMARY_READY_URL, env.DATAPLANE_INTERNAL_SECRET), ok(env.PRIMARY_DASHBOARD_URL || env.DASHBOARD_URL || ""),
 	]);
-	const canary = await (readOnly ? s3ReadCanary(env, env.PRIMARY_S3_CANARY_URL) : s3Canary(env, env.PRIMARY_S3_CANARY_URL)).catch(() => false);
-	return { health, ready, dashboard, canary };
-}
-
-async function s3ReadCanary(env: Env, target: string) {
-	if (!target || !env.CANARY_ACCESS_KEY_ID || !env.CANARY_SECRET_ACCESS_KEY || !env.CANARY_BUCKET) return false;
-	return (await signedFetch(env, target, "HEAD", `/${env.CANARY_BUCKET}`)).ok;
+	const operations = readOnly
+		? await readOnlyOperationChecks(env, env.PRIMARY_S3_CANARY_URL).catch(() => failedOperationChecks())
+		: await s3CanaryChecks(env, env.PRIMARY_S3_CANARY_URL).catch(() => failedOperationChecks());
+	const canary = readOnly ? operations.authentication : operationChecksPassed(operations);
+	return { health, ready: readiness.ok, dashboard, canary, readiness, operations };
 }
 
 async function checkEmergency(env: Env) {
 	const origin = env.EMERGENCY_S3_CANARY_URL || `https://${env.EMERGENCY_DNS_NAME || "emergency-origin.onsilo.dev"}`;
-	const [health, ready] = await Promise.all([
+	const [health, readiness] = await Promise.all([
 		ok(env.EMERGENCY_HEALTH_URL || `${origin}/health`),
-		ok(env.EMERGENCY_READY_URL || `${origin}/ready`, env.DATAPLANE_INTERNAL_SECRET),
+		checkReadiness(env.EMERGENCY_READY_URL || `${origin}/ready`, env.DATAPLANE_INTERNAL_SECRET),
 	]);
-	const canary = await s3Canary(env, origin).catch(() => false);
-	return { health, ready, canary };
+	const operations = await s3CanaryChecks(env, origin).catch(() => failedOperationChecks());
+	return { health, ready: readiness.ok, canary: operationChecksPassed(operations), readiness, operations };
 }
 
 async function checkProductionMaintenance(env: Env) {
@@ -291,6 +323,23 @@ async function ok(url: string, readinessSecret?: string) {
 	catch { return false; }
 }
 
+async function checkReadiness(url: string, readinessSecret: string): Promise<ReadinessChecks> {
+	if (!url) return { ok: false };
+	try {
+		const response = await fetchWithDeadline(url, { redirect: "manual", headers: { "x-dataplane-secret": readinessSecret } });
+		const value = await response.json<{ postgres?: unknown; redis?: unknown; storage?: unknown; activeWriter?: unknown }>().catch(() => ({}));
+		return {
+			ok: response.ok,
+			postgres: typeof value.postgres === "boolean" ? value.postgres : undefined,
+			redis: typeof value.redis === "boolean" ? value.redis : undefined,
+			storage: typeof value.storage === "boolean" ? value.storage : undefined,
+			activeWriter: typeof value.activeWriter === "boolean" ? value.activeWriter : undefined,
+		};
+	} catch {
+		return { ok: false };
+	}
+}
+
 async function fetchWithDeadline(input: string | URL, init: RequestInit = {}) {
 	const controller = new AbortController();
 	const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
@@ -299,20 +348,44 @@ async function fetchWithDeadline(input: string | URL, init: RequestInit = {}) {
 }
 
 async function s3Canary(env: Env, target: string) {
-	if (!target || !env.CANARY_ACCESS_KEY_ID || !env.CANARY_SECRET_ACCESS_KEY || !env.CANARY_BUCKET) return false;
+	return operationChecksPassed(await s3CanaryChecks(env, target));
+}
+
+function failedOperationChecks(): OperationChecks {
+	return { authentication: false, upload: false, download: false, delete: false };
+}
+
+function operationChecksPassed(checks: OperationChecks) {
+	return checks.authentication && checks.upload && checks.download && checks.delete;
+}
+
+async function readOnlyOperationChecks(env: Env, target: string): Promise<OperationChecks> {
+	if (!target || !env.CANARY_ACCESS_KEY_ID || !env.CANARY_SECRET_ACCESS_KEY || !env.CANARY_BUCKET) return failedOperationChecks();
+	const authentication = (await signedFetch(env, target, "HEAD", `/${env.CANARY_BUCKET}`)).ok;
+	return { authentication, upload: false, download: false, delete: false };
+}
+
+async function s3CanaryChecks(env: Env, target: string): Promise<OperationChecks> {
+	if (!target || !env.CANARY_ACCESS_KEY_ID || !env.CANARY_SECRET_ACCESS_KEY || !env.CANARY_BUCKET) return failedOperationChecks();
+	const authentication = (await signedFetch(env, target, "HEAD", `/${env.CANARY_BUCKET}`)).ok;
+	if (!authentication) return failedOperationChecks();
 	const key = `__silo_healthcheck/${crypto.randomUUID()}`;
 	const body = `silo canary ${new Date().toISOString()}`;
 	const put = await signedFetch(env, target, "PUT", `/${env.CANARY_BUCKET}/${key}`, body);
-	if (!put.ok) return false;
-	let readOk = false;
+	if (!put.ok) return { authentication, upload: false, download: false, delete: false };
+	let download = false;
 	try {
 		const get = await signedFetch(env, target, "GET", `/${env.CANARY_BUCKET}/${key}`);
-		readOk = get.ok && await get.text() === body;
-	} finally {
-		const deleted = await signedFetch(env, target, "DELETE", `/${env.CANARY_BUCKET}/${key}`);
-		if (!deleted.ok) return false;
+		download = get.ok && await get.text() === body;
+	} catch {
+		download = false;
 	}
-	return readOk;
+	try {
+		const deletion = await signedFetch(env, target, "DELETE", `/${env.CANARY_BUCKET}/${key}`);
+		return { authentication, upload: true, download, delete: deletion.ok };
+	} catch {
+		return { authentication, upload: true, download, delete: false };
+	}
 }
 
 async function signedFetch(env: Env, origin: string, method: string, path: string, body = "") {
@@ -796,6 +869,7 @@ async function publicStatus(env: Env) {
 	const updates = state.activeIncidentId ? await env.DB.prepare("SELECT status, message, created_at as createdAt FROM incident_updates WHERE incident_id = ? ORDER BY id DESC LIMIT 20").bind(state.activeIncidentId).all() : { results: [] };
 	const notes = await env.DB.prepare("SELECT id, incident_id AS incidentId, message, created_at AS createdAt, updated_at AS updatedAt FROM incident_notes ORDER BY datetime(created_at) DESC LIMIT 100").all();
 	const uptime = await env.DB.prepare("SELECT COUNT(*) AS samples, COALESCE(SUM(s3_operational), 0) AS s3Ok, COALESCE(SUM(dashboard_operational), 0) AS dashboardOk, MIN(recorded_at) AS firstAt FROM uptime_checks WHERE datetime(recorded_at) >= datetime('now', '-90 days')").first<{ samples: number; s3Ok: number; dashboardOk: number; firstAt: string | null }>();
+	const uptimeHistory = await env.DB.prepare("SELECT substr(recorded_at, 1, 10) AS day, COUNT(*) AS samples, SUM(s3_operational) AS s3Ok, SUM(dashboard_operational) AS dashboardOk FROM uptime_checks WHERE datetime(recorded_at) >= datetime('now', '-90 days') GROUP BY substr(recorded_at, 1, 10) ORDER BY day ASC").all<{ day: string; samples: number; s3Ok: number; dashboardOk: number }>();
 	const maintenance = await env.DB.prepare("SELECT id, title, message, starts_at AS startsAt, ends_at AS endsAt FROM maintenance_windows WHERE datetime(ends_at) >= datetime('now') ORDER BY datetime(starts_at) ASC LIMIT 10").all();
 	const productionMaintenance = state.productionMaintenance ? { id: "production-maintenance", title: state.productionMaintenance.title, message: state.productionMaintenance.message, startsAt: state.productionMaintenance.startsAt, endsAt: null } : null;
 	const activeMaintenance = productionMaintenance || (maintenance.results as Array<{ startsAt: string; endsAt: string }>).find((window) => Date.parse(window.startsAt) <= Date.now() && Date.parse(window.endsAt) >= Date.now()) || null;
@@ -805,7 +879,14 @@ async function publicStatus(env: Env) {
 	const uptimeStart = uptime?.firstAt ? Math.max(Date.parse(uptime.firstAt), Date.now() - 90 * 24 * 60 * 60 * 1000) : Date.now();
 	const expectedSamples = uptimeSamples ? Math.max(uptimeSamples, Math.floor((Date.now() - uptimeStart) / 60_000) + 1) : 0;
 	const uptimePercent = (successful: number) => expectedSamples ? Math.round((100_000 * Number(successful || 0)) / expectedSamples) / 1000 : null;
-	return { overall: state.overall, components: state.components, failoverPhase: state.failoverPhase, provisioningStep: state.provisioningStep, activeIncidentId: state.activeIncidentId, updatedAt: state.updatedAt, activeMaintenance, recovery: { successfulChecks: Math.min(state.consecutiveRecoveries, RECOVERY_THRESHOLD), requiredChecks: RECOVERY_THRESHOLD, healthyMinutes: Math.min(healthyMinutes, 10), requiredHealthyMinutes: 10, cleanupAfter: state.destroyAfter }, uptime: { windowDays: 90, samples: uptimeSamples, expectedSamples, s3: uptimePercent(uptime?.s3Ok || 0), dashboard: uptimePercent(uptime?.dashboardOk || 0) }, maintenance: publishedMaintenance, incidents: incidents.results, updates: updates.results, notes: notes.results };
+	const history = (uptimeHistory.results || []).map((row) => ({
+		day: row.day,
+		samples: Number(row.samples || 0),
+		s3: Number(row.samples) ? Math.round((10_000 * Number(row.s3Ok || 0)) / Number(row.samples)) / 100 : null,
+		dashboard: Number(row.samples) ? Math.round((10_000 * Number(row.dashboardOk || 0)) / Number(row.samples)) / 100 : null,
+	}));
+	const components = { ...defaultState().components, ...state.components };
+	return { overall: state.overall, components, failoverPhase: state.failoverPhase, provisioningStep: state.provisioningStep, activeIncidentId: state.activeIncidentId, updatedAt: state.updatedAt, activeMaintenance, recovery: { successfulChecks: Math.min(state.consecutiveRecoveries, RECOVERY_THRESHOLD), requiredChecks: RECOVERY_THRESHOLD, healthyMinutes: Math.min(healthyMinutes, 10), requiredHealthyMinutes: 10, cleanupAfter: state.destroyAfter }, uptime: { windowDays: 90, samples: uptimeSamples, expectedSamples, s3: uptimePercent(uptime?.s3Ok || 0), dashboard: uptimePercent(uptime?.dashboardOk || 0), history }, maintenance: publishedMaintenance, incidents: incidents.results, updates: updates.results, notes: notes.results };
 }
 function secretMatches(request: Request, expected: string) { return Boolean(expected) && request.headers.get("authorization") === `Bearer ${expected}`; }
 function json(value: unknown, status = 200) { return new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json", "cache-control": "no-store", "access-control-allow-origin": "*" } }); }
