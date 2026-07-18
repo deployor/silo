@@ -37,7 +37,7 @@ services:
       DATAPLANE_REGION_URLS_JSON: "${DATAPLANE_REGION_URLS_JSON:-}"
       DISK_CACHE_DIR: "/var/cache/silo-dataplane"
       REDIS_URL: "redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD}@dragonfly:6379"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
       OTEL_TRACES_SAMPLER: "${OTEL_TRACES_SAMPLER:-parentbased_traceidratio}"
       OTEL_TRACES_SAMPLER_ARG: "${OTEL_TRACES_SAMPLER_ARG:-0.05}"
       OTEL_METRIC_EXPORT_INTERVAL: "${OTEL_METRIC_EXPORT_INTERVAL:-10000}"
@@ -95,7 +95,7 @@ services:
       DATAPLANE_ACCOUNTING_SPOOL_DIR: "/var/cache/silo-dataplane/accounting"
       DATAPLANE_ACCOUNTING_UNSAFE_MARKER: "/var/cache/silo-dataplane/accounting/UNSAFE"
       REDIS_URL: "redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD}@dragonfly:6379"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
       OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=production,service.version=${GIT_SHA:-unknown},silo.region=${SILO_REGION}"
       OTEL_SERVICE_NAME: "silo-dataplane"
     depends_on:
@@ -103,6 +103,7 @@ services:
         condition: service_started
       otel-collector:
         condition: service_started
+        required: false
     volumes:
       - dataplane-cache:/var/cache/silo-dataplane
     # Dokploy/Traefik reaches every regional S3 origin over its external
@@ -117,6 +118,7 @@ services:
   # Docker socket access; application OTLP supplies per-service telemetry.
   otel-collector:
     <<: *restart-policy
+    profiles: [observability]
     image: ${OTEL_COLLECTOR_IMAGE:?Set OTEL_COLLECTOR_IMAGE to an immutable contrib image}
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     environment:
