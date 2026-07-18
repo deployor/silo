@@ -124,7 +124,9 @@ services:
     environment:
       SILO_REGION: "${SILO_REGION}"
       SILO_INSTANCE_ID: "${SILO_INSTANCE_ID}"
-      SIGNOZ_OTLP_ENDPOINT: "${SIGNOZ_OTLP_ENDPOINT:?Set the SigNoz OTLP gRPC endpoint}"
+      # The collector is profile-gated. Keep interpolation optional so hosts
+      # without the profile do not fail Compose parsing before deployment.
+      SIGNOZ_OTLP_ENDPOINT: "${SIGNOZ_OTLP_ENDPOINT:-}"
       SIGNOZ_INGESTION_KEY: "${SIGNOZ_INGESTION_KEY:-}"
     volumes:
       - ./deploy/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
