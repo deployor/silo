@@ -41,7 +41,7 @@ EU environment differences:
 SILO_REGION=eu-central
 SILO_INSTANCE_ID=eu-central-logs-a
 CLICKHOUSE_NETWORK_ALIAS=silo-clickhouse-eu
-CLICKHOUSE_LOCAL_URL=http://silo-clickhouse-eu:8123
+CLICKHOUSE_LOCAL_URL=http://clickhouse:8123
 CLICKHOUSE_REMOTE_URL=https://logs-us.onsilo.dev
 ```
 
@@ -51,7 +51,7 @@ US environment differences:
 SILO_REGION=us-east
 SILO_INSTANCE_ID=us-east-logs-a
 CLICKHOUSE_NETWORK_ALIAS=silo-clickhouse-us
-CLICKHOUSE_LOCAL_URL=http://silo-clickhouse-us:8123
+CLICKHOUSE_LOCAL_URL=http://clickhouse:8123
 CLICKHOUSE_REMOTE_URL=https://logs-eu.onsilo.dev
 ```
 

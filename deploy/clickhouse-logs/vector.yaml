@@ -9,9 +9,14 @@ sources:
     ignore_older_secs: 86400
 
 transforms:
+  silo_request_candidates:
+    type: filter
+    inputs: [docker_json]
+    condition: contains(string!(.message), "silo.request")
+
   access_requests:
     type: remap
-    inputs: [docker_json]
+    inputs: [silo_request_candidates]
     drop_on_abort: true
     source: |-
       outer = parse_json!(string!(.message))
@@ -57,7 +62,7 @@ sinks:
       user: silo_ingest
       password: ${CLICKHOUSE_INGEST_PASSWORD}
     compression: gzip
-    skip_unknown_fields: false
+    skip_unknown_fields: true
     batch:
       max_events: 10000
       timeout_secs: 2
@@ -82,7 +87,7 @@ sinks:
       user: silo_ingest
       password: ${CLICKHOUSE_INGEST_PASSWORD}
     compression: gzip
-    skip_unknown_fields: false
+    skip_unknown_fields: true
     batch:
       max_events: 10000
       timeout_secs: 2
