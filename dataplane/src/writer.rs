@@ -365,7 +365,6 @@ async fn active_backend_in_transaction(
           ON b.region_id = s.region_id
          AND b.backend_id = s.active_backend_id
         WHERE s.region_id = $1
-        FOR SHARE OF s, b
         "#,
     )
     .bind(storage_region)
