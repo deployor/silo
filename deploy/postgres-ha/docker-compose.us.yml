@@ -91,7 +91,7 @@ services:
       - -c
       - random_page_cost=1.1
       - -c
-      - effective_io_concurrency=200
+      - effective_io_concurrency=16
       - -c
       - idle_in_transaction_session_timeout=120000
       - -c

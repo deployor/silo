@@ -96,7 +96,7 @@ services:
       - -c
       - random_page_cost=1.1
       - -c
-      - effective_io_concurrency=200
+      - effective_io_concurrency=16
       - -c
       - checkpoint_completion_target=0.9
       - -c
@@ -112,7 +112,9 @@ services:
       - -c
       - archive_mode=on
       - -c
-      - archive_command=pgbackrest --config=/etc/pgbackrest/pgbackrest.conf --stanza=silo archive-push %p
+      # Bootstrap safety: pgBackRest returns 103 until stanza-create has run.
+      # The real archive command is enabled immediately after the stanza exists.
+      - archive_command=/bin/true
       - -c
       - archive_timeout=60s
     depends_on:
@@ -133,6 +135,23 @@ services:
     networks:
       - db-private
       - dokploy-network
+
+  pgbackrest-bootstrap:
+    image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
+    restart: "no"
+    user: postgres
+    entrypoint:
+      - pgbackrest
+      - --config=/etc/pgbackrest/pgbackrest.conf
+      - --stanza=silo
+      - stanza-create
+    depends_on:
+      postgres: {condition: service_healthy}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data:ro
+      - pgbackrest-config:/etc/pgbackrest:ro
+      - pgbackrest-spool:/var/spool/pgbackrest
+    networks: [db-private]
 
   pgdog-config:
     image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
