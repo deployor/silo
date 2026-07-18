@@ -113,7 +113,7 @@ services:
       timeout: 5s
       retries: 60
       start_period: 30s
-    ports: ["15432:5432"]
+    ports: ["${POSTGRES_PUBLIC_PORT:-25432}:5432"]
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - postgres-tls:/tls:ro

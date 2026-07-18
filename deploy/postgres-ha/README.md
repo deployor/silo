@@ -45,7 +45,7 @@ US DATABASE_URL=postgres://silo_app:...@silo-db-us:6432/silo?sslmode=disable
 
 The connection is plaintext only inside Docker's `dokploy-network`. PgDog uses
 TLS 1.3 with full certificate verification for every PostgreSQL connection.
-Raw PostgreSQL port 15432 must allow only the other regional server and the
+Raw PostgreSQL port 25432 must allow only the other regional server and the
 Cloudflare Tunnel/VPC path. Do not expose PgDog port 6432 publicly.
 
 Keep the application pools small even though PgDog can accept many clients.
