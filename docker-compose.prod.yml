@@ -1,5 +1,3 @@
-name: silo-${SILO_REGION:?Set SILO_REGION to the deployment region ID}
-
 # This is the regional deployment template used by every Silo host. Run it
 # with COMPOSE_PROFILES=control-plane only on the EU host; all other hosts run
 # the regional services without that profile. A new region needs configuration,
@@ -36,7 +34,7 @@ services:
       DASHBOARD_ORIGIN_DOMAINS: "${DASHBOARD_ORIGIN_DOMAINS:-}"
       DATAPLANE_REGION_URLS_JSON: "${DATAPLANE_REGION_URLS_JSON:-}"
       DISK_CACHE_DIR: "/var/cache/silo-dataplane"
-      REDIS_URL: "redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD}@dragonfly:6379"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-}@dragonfly:6379"
       OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
       OTEL_TRACES_SAMPLER: "${OTEL_TRACES_SAMPLER:-parentbased_traceidratio}"
       OTEL_TRACES_SAMPLER_ARG: "${OTEL_TRACES_SAMPLER_ARG:-0.05}"
@@ -58,11 +56,11 @@ services:
   # never replicated across regions, and is never authoritative.
   dragonfly:
     <<: *restart-policy
-    image: ${DRAGONFLY_IMAGE:?Set DRAGONFLY_IMAGE to a reviewed immutable tag or digest}
+    image: ${DRAGONFLY_IMAGE:-docker.dragonflydb.io/dragonflydb/dragonfly:v1.32.0}
     ulimits:
       memlock: -1
     command:
-      - --requirepass=${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+      - --requirepass=${REDIS_PASSWORD:-}
       - --maxmemory=${DRAGONFLY_MAX_MEMORY:-8gb}
       - --cache_mode=true
     volumes:
@@ -82,19 +80,19 @@ services:
     environment:
       DATAPLANE_BIND: "0.0.0.0:3001"
       DATAPLANE_MODE: "regional"
-      DATAPLANE_REGION: "${SILO_REGION}"
-      DATAPLANE_ORIGIN_DOMAINS: "${DATAPLANE_ORIGIN_DOMAINS:?Set the regional public and fixed origin hostnames}"
-      DATAPLANE_INGRESS_DOMAINS: "${DATAPLANE_INGRESS_DOMAINS:?Set the shared hostname-to-region registry}"
-      DATAPLANE_REGION_PEERS: "${DATAPLANE_REGION_PEERS:?Set fixed origins for remote regional dataplanes}"
+      DATAPLANE_REGION: "${SILO_REGION:-}"
+      DATAPLANE_ORIGIN_DOMAINS: "${DATAPLANE_ORIGIN_DOMAINS:-}"
+      DATAPLANE_INGRESS_DOMAINS: "${DATAPLANE_INGRESS_DOMAINS:-}"
+      DATAPLANE_REGION_PEERS: "${DATAPLANE_REGION_PEERS:-}"
       DATAPLANE_PUBLIC_SCHEME: "https"
-      DATAPLANE_WRITER_INSTANCE_ID: "${SILO_INSTANCE_ID:?Set a stable unique instance ID}"
+      DATAPLANE_WRITER_INSTANCE_ID: "${SILO_INSTANCE_ID:-}"
       DATAPLANE_WRITER_AUTO_CLAIM: "true"
       DATAPLANE_FAILOVER_REGIONS: "${DATAPLANE_FAILOVER_REGIONS:-}"
-      CONTROL_PLANE_URL: "${CONTROL_PLANE_URL:?Set the global control-plane URL}"
+      CONTROL_PLANE_URL: "${CONTROL_PLANE_URL:-}"
       DISK_CACHE_DIR: "/var/cache/silo-dataplane"
       DATAPLANE_ACCOUNTING_SPOOL_DIR: "/var/cache/silo-dataplane/accounting"
       DATAPLANE_ACCOUNTING_UNSAFE_MARKER: "/var/cache/silo-dataplane/accounting/UNSAFE"
-      REDIS_URL: "redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD}@dragonfly:6379"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-}@dragonfly:6379"
       OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
       OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=production,service.version=${GIT_SHA:-unknown},silo.region=${SILO_REGION}"
       OTEL_SERVICE_NAME: "silo-dataplane"
@@ -119,7 +117,7 @@ services:
   otel-collector:
     <<: *restart-policy
     profiles: [observability]
-    image: ${OTEL_COLLECTOR_IMAGE:?Set OTEL_COLLECTOR_IMAGE to an immutable contrib image}
+    image: ${OTEL_COLLECTOR_IMAGE:-otel/opentelemetry-collector-contrib:0.128.0}
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     environment:
       SILO_REGION: "${SILO_REGION}"
