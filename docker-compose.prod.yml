@@ -24,7 +24,9 @@ services:
         GIT_DATE: ${GIT_DATE:-unknown}
         GIT_MESSAGE: ${GIT_MESSAGE:-unknown}
     env_file:
-      - ${SILO_CONTROL_ENV_FILE:-.env.control-plane}
+      # Dokploy materializes the Compose environment as `.env`. Operators that
+      # render split Infisical bundles can still override this path.
+      - ${SILO_CONTROL_ENV_FILE:-.env}
     environment:
       PORT: "3000"
       DATAPLANE_URL: "http://dataplane:3001"
@@ -76,7 +78,7 @@ services:
       context: ./dataplane
       dockerfile: Dockerfile
     env_file:
-      - ${SILO_DATAPLANE_ENV_FILE:-.env.dataplane}
+      - ${SILO_DATAPLANE_ENV_FILE:-.env}
     environment:
       DATAPLANE_BIND: "0.0.0.0:3001"
       DATAPLANE_MODE: "regional"
