@@ -832,8 +832,8 @@ function infrastructureGraph(data) {
 		});
 		if (canFlow("edge", serving.dataplane.id))
 			addJourney("request", [routeEdge], {
-				count: 18,
-				speed: 0.82,
+				count: 8,
+				speed: 0.68,
 				delay: index * 340,
 				spacing: 8,
 			});
@@ -867,15 +867,15 @@ function infrastructureGraph(data) {
 			);
 			if (canFlow(serving.dataplane.id, activeBackend.id))
 				addJourney("body", [storageEdge], {
-					count: 32,
-					speed: 0.94,
+					count: 14,
+					speed: 0.76,
 					delay: 700 + index * 340,
 					spacing: 8,
 				});
 			if (canFlow(activeBackend.id, serving.dataplane.id))
 				addJourney("response", [storageResponse], {
-					count: 20,
-					speed: 1.06,
+					count: 9,
+					speed: 0.84,
 					delay: 1080 + index * 340,
 					spacing: 8,
 				});
@@ -894,8 +894,8 @@ function infrastructureGraph(data) {
 				canFlow(activeBackend.id, replica.id)
 			)
 				addJourney("replication", [replicaEdge], {
-					count: 14,
-					speed: 0.68,
+					count: 6,
+					speed: 0.54,
 					delay: 1900 + index * 300,
 					spacing: 8,
 				});
@@ -975,43 +975,43 @@ function infrastructureGraph(data) {
 		);
 		if (canFlow(layout.dataplane.id, layout.redis.id))
 			addJourney("metadata", [cacheEdge], {
-				count: 16,
-				speed: 0.76,
+				count: 7,
+				speed: 0.6,
 				delay: 1150 + index * 300,
 				spacing: 8,
 			});
 		if (canFlow(layout.redis.id, layout.dataplane.id))
 			addJourney("response", [cacheReturn], {
-				count: 12,
-				speed: 0.96,
+				count: 5,
+				speed: 0.66,
 				delay: 1280 + index * 300,
 				spacing: 8,
 			});
 		if (canFlow(layout.dataplane.id, layout.disk.id))
 			addJourney("body", [diskEdge], {
-				count: 22,
-				speed: 0.84,
+				count: 10,
+				speed: 0.66,
 				delay: 1550 + index * 300,
 				spacing: 8,
 			});
 		if (canFlow(layout.disk.id, layout.dataplane.id))
 			addJourney("response", [diskReturn], {
-				count: 17,
-				speed: 1.02,
+				count: 7,
+				speed: 0.74,
 				delay: 1680 + index * 300,
 				spacing: 8,
 			});
 		if (canFlow(layout.dataplane.id, layout.pgdog.id, activeDatabase.id))
 			addJourney("database", [sqlEdge, poolEdge], {
-				count: 16,
-				speed: 0.8,
+				count: 7,
+				speed: 0.62,
 				delay: 2100 + index * 300,
 				spacing: 8,
 			});
 		if (canFlow(activeDatabase.id, layout.pgdog.id, layout.dataplane.id))
 			addJourney("response", [databaseReturn, sqlReturn], {
-				count: 13,
-				speed: 0.94,
+				count: 6,
+				speed: 0.68,
 				delay: 2310 + index * 300,
 				spacing: 8,
 			});
@@ -1031,8 +1031,8 @@ function infrastructureGraph(data) {
 			);
 			if (canFlow(layout.dataplane.id, target.clickhouse.id))
 				addJourney("logs", [logEdge], {
-					count: 12,
-					speed: logIndex === index ? 0.72 : 0.64,
+					count: 5,
+					speed: logIndex === index ? 0.55 : 0.48,
 					delay: 2800 + index * 300 + logIndex * 120,
 					spacing: 8,
 				});
@@ -1061,8 +1061,8 @@ function infrastructureGraph(data) {
 			)
 		)
 			addJourney("database", [walEdge], {
-				count: 18,
-				speed: 0.7,
+				count: 8,
+				speed: 0.55,
 				delay: 3300,
 				spacing: 8,
 			});
@@ -1081,8 +1081,8 @@ function infrastructureGraph(data) {
 		);
 		if (canFlow("control", controlHome.pgdog.id))
 			addJourney("metadata", [controlSqlEdge], {
-				count: 10,
-				speed: 0.7,
+				count: 4,
+				speed: 0.55,
 				delay: 900,
 				spacing: 8,
 			});
