@@ -113,7 +113,6 @@ pub(crate) async fn begin_mutation(
         SELECT EXISTS (
           SELECT 1 FROM buckets
           WHERE id = $1::uuid AND ($2 OR NOT is_paused)
-          FOR SHARE
         )
         "#,
     )

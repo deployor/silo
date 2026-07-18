@@ -3204,7 +3204,7 @@ async function probeClickHouse(
 					"Content-Type": "text/plain; charset=utf-8",
 				},
 				body: `SELECT uniqExact(request_id) AS recentRows,
-					formatDateTime(max(event_time), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS latestEventAt
+					concat(toString(max(event_time), 'UTC'), 'Z') AS latestEventAt
 				FROM request_logs FINAL
 				WHERE event_time >= now() - INTERVAL 15 MINUTE
 				FORMAT JSONEachRow`,
