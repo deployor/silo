@@ -571,6 +571,7 @@ async fn readiness(State(state): State<AppState>, headers: HeaderMap) -> Respons
         false
     };
     let redis_ok = state.redis.ping().await;
+    let disk_cache_status = state.disk_cache.readiness_status().await;
     let accounting_status = accounting::status(&state).await.unwrap_or_else(|_| {
         serde_json::json!({
             "durable": false,
@@ -875,6 +876,7 @@ async fn readiness(State(state): State<AppState>, headers: HeaderMap) -> Respons
         "postgres": postgres_ok,
         "regionalSchema": regional_schema_ok,
         "redis": redis_ok,
+        "diskCache": disk_cache_status,
         "accounting": accounting_status,
         "storage": storage_ok,
         "region": state.cfg.regions.local_region(),

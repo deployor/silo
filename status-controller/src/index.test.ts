@@ -52,6 +52,12 @@ function readiness(overrides: Record<string, unknown> = {}) {
 		postgres: true,
 		regionalSchema: true,
 		redis: false,
+		diskCache: {
+			enabled: true,
+			writable: true,
+			totalBytes: 1024,
+			maxTotalBytes: 4096,
+		},
 		accounting: { durable: true, pending: 0, unsafe: false },
 		storageRegions: { "eu-central": true },
 		failoverRegions: [] as string[],
@@ -289,15 +295,55 @@ describe("regional status safety contracts", () => {
 		};
 		const usReadiness = readiness({
 			region: "us-east",
+			redis: true,
 			storageRegions: { "eu-central": true, "us-east": true },
 			failoverRegions: ["eu-central"],
 		});
 		const snapshot = {
 			dashboard: true,
+			database: {
+				"eu-central": {
+					region: "eu-central",
+					reachable: true,
+					role: "primary",
+					generation: 1,
+					activeRegion: "eu-central",
+					replication: [
+						{
+							applicationName: "silo_us",
+							state: "streaming",
+							syncState: "sync",
+						},
+					],
+				},
+				"us-east": {
+					region: "us-east",
+					reachable: true,
+					role: "replica",
+					generation: 1,
+					activeRegion: "eu-central",
+					replication: [],
+				},
+			},
+			clickhouse: {
+				"eu-central": {
+					reachable: true,
+					recentRows: 20,
+					latestEventAt: "2026-07-18T20:00:00Z",
+				},
+				"us-east": {
+					reachable: true,
+					recentRows: 20,
+					latestEventAt: "2026-07-18T20:00:00Z",
+				},
+			},
 			dataplanes: {
 				"eu-central": {
 					health: false,
-					readiness: readiness({ postgres: false }),
+					readiness: readiness({
+						postgres: false,
+						diskCache: { enabled: true, writable: false },
+					}),
 				},
 				"us-east": { health: true, readiness: usReadiness },
 			},
@@ -319,6 +365,15 @@ describe("regional status safety contracts", () => {
 			snapshot as never,
 		);
 		expect(components["dataplane:eu-central"]).toBe("outage");
+		expect(components["pgdog:eu-central"]).toBe("outage");
+		expect(components["cache:eu-central"]).toBe("degraded");
+		expect(components["cache:us-east"]).toBe("operational");
+		expect(components["disk-cache:eu-central"]).toBe("outage");
+		expect(components["disk-cache:us-east"]).toBe("operational");
+		expect(components["postgresql:eu-central"]).toBe("operational");
+		expect(components["postgresql:us-east"]).toBe("operational");
+		expect(components["clickhouse:eu-central"]).toBe("operational");
+		expect(components["clickhouse:us-east"]).toBe("operational");
 		expect(components["storage:eu-central"]).toBe("operational");
 		expect(components["global-s3"]).toBe("degraded");
 		expect(__test.deriveOverall(registry, components)).toBe("degraded");

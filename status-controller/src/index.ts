@@ -79,12 +79,20 @@ type AccountingReadiness = {
 	unsafe: boolean;
 };
 
+type DiskCacheReadiness = {
+	enabled: boolean;
+	writable: boolean;
+	totalBytes?: number;
+	maxTotalBytes?: number;
+};
+
 type ReadinessChecks = {
 	ok: boolean;
 	region?: string;
 	postgres?: boolean;
 	regionalSchema?: boolean;
 	redis?: boolean;
+	diskCache?: DiskCacheReadiness;
 	accounting?: AccountingReadiness;
 	storage?: boolean;
 	storageRegions: Record<string, boolean>;
@@ -147,8 +155,8 @@ type StatusState = {
 
 type MonitorSnapshot = {
 	dashboard: boolean;
-	database?: Record<"eu-central" | "us-east", DatabaseProbe>;
-	clickhouse?: Record<"eu-central" | "us-east", ClickHouseProbe>;
+	database?: Record<string, DatabaseProbe>;
+	clickhouse?: Record<string, ClickHouseProbe>;
 	dataplanes: Record<string, DataplaneProbe>;
 	backends: Record<string, Record<string, BackendProbe>>;
 	logical: Record<string, OperationChecks>;
@@ -1166,15 +1174,61 @@ function deriveComponents(
 		const runtime = state.regions[region.id];
 		const homeProbe = snapshot.dataplanes[region.id];
 		const servingProbe = snapshot.dataplanes[runtime.activeDataplane];
+		const pgDogReachable = homeProbe?.readiness.postgres;
+		const diskCache = homeProbe?.readiness.diskCache;
+		const postgresProbe = snapshot.database?.[region.id];
+		const clickHouseProbe = snapshot.clickhouse?.[region.id];
 		components[`dataplane:${region.id}`] = dataplaneAvailable(homeProbe)
 			? "operational"
 			: "outage";
+		components[`pgdog:${region.id}`] =
+			pgDogReachable === undefined
+				? "unknown"
+				: pgDogReachable
+					? "operational"
+					: "outage";
+		components[`postgresql:${region.id}`] = !postgresProbe
+			? "unknown"
+			: postgresProbe.reachable
+				? "operational"
+				: "outage";
+		components[`clickhouse:${region.id}`] = !clickHouseProbe
+			? "unknown"
+			: clickHouseProbe.reachable
+				? "operational"
+				: "outage";
 		components[`accounting:${region.id}`] = !servingProbe?.readiness.accounting
 			? "unknown"
 			: servingProbe.readiness.accounting.durable &&
 					!servingProbe.readiness.accounting.unsafe
 				? "operational"
 				: "outage";
+		components[`cache:${region.id}`] =
+			homeProbe?.readiness.redis === undefined
+				? "unknown"
+				: homeProbe.readiness.redis
+					? "operational"
+					: "degraded";
+		components[`disk-cache:${region.id}`] = !diskCache
+			? "unknown"
+			: !diskCache.enabled
+				? "degraded"
+				: diskCache.writable
+					? "operational"
+					: "outage";
+		const logicalChecks = snapshot.logical[region.id];
+		for (const operation of [
+			"authentication",
+			"upload",
+			"download",
+			"delete",
+		] as const)
+			components[`operation:${region.id}:${operation}`] =
+				!logicalChecks?.configured
+					? "unknown"
+					: logicalChecks[operation]
+						? "operational"
+						: "outage";
 		for (const backend of region.backends) {
 			const probe = snapshot.backends[region.id]?.[backend.id];
 			components[`backend:${region.id}:${backend.id}`] = !probe?.checks
@@ -1676,6 +1730,7 @@ async function checkReadiness(
 			postgres: booleanField(value, "postgres"),
 			regionalSchema: booleanField(value, "regionalSchema"),
 			redis: booleanField(value, "redis"),
+			diskCache: diskCacheReadiness(value.diskCache),
 			storage: booleanField(value, "storage"),
 			accounting: accountingReadiness(value.accounting),
 			storageRegions: booleanMap(value.storageRegions),
@@ -1695,6 +1750,27 @@ async function checkReadiness(
 	} catch {
 		return empty();
 	}
+}
+
+function diskCacheReadiness(value: unknown): DiskCacheReadiness | undefined {
+	if (
+		!isRecord(value) ||
+		typeof value.enabled !== "boolean" ||
+		typeof value.writable !== "boolean"
+	)
+		return undefined;
+	const totalBytes = finiteNumber(value.totalBytes);
+	const maxTotalBytes = finiteNumber(value.maxTotalBytes);
+	return {
+		enabled: value.enabled,
+		writable: value.writable,
+		totalBytes:
+			totalBytes !== undefined && totalBytes >= 0 ? totalBytes : undefined,
+		maxTotalBytes:
+			maxTotalBytes !== undefined && maxTotalBytes >= 0
+				? maxTotalBytes
+				: undefined,
+	};
 }
 
 function accountingReadiness(value: unknown): AccountingReadiness | undefined {
@@ -3013,33 +3089,82 @@ function definitions(registry: RegionConfig[]): ComponentDefinition[] {
 	for (const region of registry) {
 		result.push({
 			id: `dataplane:${region.id}`,
-			name: `${region.flag} ${region.label} Dataplane`,
+			name: `${region.label} Dataplane`,
 			description: `Preferred ingress in ${region.id}`,
 			group: "regional",
 		});
 		result.push({
+			id: `pgdog:${region.id}`,
+			name: `${region.label} PgDog`,
+			description:
+				"Regional SQL pool and primary-routing path used by the dataplane",
+			group: "regional",
+		});
+		result.push({
+			id: `postgresql:${region.id}`,
+			name: `${region.label} PostgreSQL`,
+			description: "Direct physical PostgreSQL node and HA role probe",
+			group: "regional",
+		});
+		result.push({
+			id: `clickhouse:${region.id}`,
+			name: `${region.label} ClickHouse`,
+			description:
+				"Direct regional request-log query endpoint and recent-event probe",
+			group: "regional",
+		});
+		result.push({
 			id: `storage:${region.id}`,
-			name: `${region.flag} ${region.label} Storage`,
+			name: `${region.label} Storage`,
 			description: "Logical storage region",
 			group: "regional",
 		});
 		result.push({
 			id: `accounting:${region.id}`,
-			name: `${region.flag} ${region.label} Accounting Safety`,
+			name: `${region.label} Accounting Safety`,
 			description: "Durable regional accounting spool and replay state",
 			group: "regional",
 		});
+		result.push({
+			id: `cache:${region.id}`,
+			name: `${region.label} Dragonfly Cache`,
+			description:
+				"Local acceleration tier; durable serving remains available without it",
+			group: "regional",
+		});
+		result.push({
+			id: `disk-cache:${region.id}`,
+			name: `${region.label} Disk Cache`,
+			description: "Local dataplane object-cache volume and live write probe",
+			group: "regional",
+		});
+		for (const [operation, name, description] of [
+			["authentication", "Signed authentication", "AWS SigV4 request accepted"],
+			["upload", "Object upload", "Signed PUT object canary"],
+			[
+				"download",
+				"Object download",
+				"Signed GET object and body verification",
+			],
+			["delete", "Object deletion", "Signed DELETE object canary"],
+		] as const)
+			result.push({
+				id: `operation:${region.id}:${operation}`,
+				name: `${region.label} ${name}`,
+				description,
+				group: "regional",
+			});
 		for (const backend of region.backends)
 			result.push({
 				id: `backend:${region.id}:${backend.id}`,
-				name: `${region.flag} ${backend.label}`,
+				name: backend.label,
 				description: `${backend.provider} physical ${backend.role} backend`,
 				group: "backends",
 			});
 		if (region.backends.length > 1)
 			result.push({
 				id: `replication:${region.id}`,
-				name: `${region.flag} ${region.label} Replication`,
+				name: `${region.label} Replication`,
 				description: "Checkpoint freshness and replica lag",
 				group: "backends",
 			});

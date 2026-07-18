@@ -1,6 +1,7 @@
 const API = "https://status-api.onsilo.dev/api/status";
 
-let renderedComponentIds = [];
+let topologyAnimationFrame = 0;
+let topologyResizeObserver;
 
 const escapeHtml = (value) =>
 	String(value ?? "").replace(
@@ -36,17 +37,6 @@ function safeStatus(status) {
 	return ["operational", "degraded", "outage"].includes(status)
 		? status
 		: "unknown";
-}
-
-function statusBadge(status, text = statusText(status)) {
-	return `<span class="status-value ${safeStatus(status)}"><i aria-hidden="true"></i>${escapeHtml(text)}</span>`;
-}
-
-function setComponent(id, status = "unknown", text = statusText(status)) {
-	const node = document.getElementById(`status-${id}`);
-	if (!node) return;
-	node.className = `status-value ${safeStatus(status)}`;
-	node.innerHTML = `<i aria-hidden="true"></i>${escapeHtml(text)}`;
 }
 
 function formatTime(value) {
@@ -94,9 +84,7 @@ function affectedRegion(data) {
 }
 
 function regionName(region) {
-	return region
-		? `${region.flag || ""} ${region.label || region.id}`.trim()
-		: "The affected region";
+	return region ? region.label || region.id : "The affected region";
 }
 
 function heroContent(data) {
@@ -433,9 +421,9 @@ function fallbackDefinitions(data) {
 			group: "global",
 		},
 		{
-			id: "aiven-postgresql",
-			name: "Aiven PostgreSQL",
-			description: "Authoritative global metadata and coordination",
+			id: "postgresql-ha",
+			name: "PostgreSQL HA",
+			description: "Authoritative metadata with cross-region failover",
 			group: "global",
 		},
 	];
@@ -458,20 +446,6 @@ function fallbackDefinitions(data) {
 	return definitions;
 }
 
-function availabilityText(data, id) {
-	const value = data.componentAvailability?.[id]?.availability;
-	return typeof value === "number" && Number.isFinite(value)
-		? ` · 90d ${value.toFixed(3)}%`
-		: "";
-}
-
-function componentRow(data, definition, region) {
-	const activeBackend =
-		region && definition.id === `backend:${region.id}:${region.activeBackend}`;
-	const suffix = activeBackend ? " · Active physical backend" : "";
-	return `<div class="status-row"><div><strong>${escapeHtml(definition.name)}</strong><small>${escapeHtml(definition.description || "Live independent check")}${escapeHtml(suffix)}${escapeHtml(availabilityText(data, definition.id))}</small></div><span id="status-${escapeHtml(definition.id)}" class="status-value unknown"><i></i>Checking</span></div>`;
-}
-
 function phaseStatus(region) {
 	if (region.phase === "blocked") return "outage";
 	if (region.phase !== "normal" || region.providerPhase !== "normal")
@@ -479,56 +453,1048 @@ function phaseStatus(region) {
 	return "operational";
 }
 
-function renderComponents(data) {
+function cleanComponentName(value) {
+	return String(value || "Unnamed check").replace(/^[^\p{L}\p{N}]+/u, "");
+}
+
+function regionCode(id) {
+	if (id === "eu-central") return "DE";
+	if (id === "us-east") return "US";
+	return String(id || "RG")
+		.slice(0, 2)
+		.toUpperCase();
+}
+
+function componentStatus(data, id) {
+	return data.components?.[id] || "unknown";
+}
+
+function definitionMap(data) {
 	const definitions =
 		Array.isArray(data.componentDefinitions) && data.componentDefinitions.length
 			? data.componentDefinitions
 			: fallbackDefinitions(data);
-	renderedComponentIds = definitions.map((definition) => definition.id);
+	const map = new Map(definitions.map((item) => [item.id, item]));
+	const legacy = {
+		dashboard: ["Dashboard", "Derived from the global Bun control-plane check"],
+		database: ["Database", "Derived from the PostgreSQL HA check"],
+		storage: ["Storage", "Derived from the global signed S3 canary"],
+		s3Api: ["S3 API", "Derived from the global signed S3 canary"],
+		uploads: ["Uploads", "Legacy aggregate of regional PUT canaries"],
+		downloads: ["Downloads", "Legacy aggregate of regional GET canaries"],
+		authentication: [
+			"Authentication",
+			"Legacy aggregate of regional SigV4 canaries",
+		],
+	};
+	for (const id of Object.keys(data.components || {})) {
+		if (!map.has(id)) {
+			const details = legacy[id];
+			map.set(id, {
+				id,
+				name: details?.[0] || label(id),
+				description: details?.[1] || "Live monitor",
+				group: "additional",
+			});
+		}
+	}
+	return [...map.values()];
+}
 
-	const globalDefinitions = definitions.filter(
-		(definition) => definition.group === "global",
+function infrastructureGraph(data) {
+	const allRegions = regions(data);
+	const narrow = window.matchMedia("(max-width: 620px)").matches;
+	const width = narrow ? 520 : 1180;
+	const columns = narrow ? 1 : Math.min(2, Math.max(allRegions.length, 1));
+	const rows = Math.max(1, Math.ceil(allRegions.length / columns));
+	const regionTop = 158;
+	const regionHeight = 390;
+	const regionGap = 14;
+	const height = regionTop + rows * regionHeight + (rows - 1) * regionGap + 12;
+	const regionWidth = (width - 24 - (columns - 1) * regionGap) / columns;
+	const nodes = [];
+	const links = [];
+	const journeys = [];
+	const zones = [];
+	const definitions = new Map(
+		definitionMap(data).map((definition) => [definition.id, definition]),
 	);
-	const cards = [
-		`<article class="status-group"><header><span>Global services</span><small>Control and storage authority</small></header>${globalDefinitions.map((definition) => componentRow(data, definition)).join("")}</article>`,
-	];
+	const rank = { operational: 0, unknown: 1, degraded: 2, outage: 3 };
+	const worstStatus = (...statuses) =>
+		statuses
+			.map(safeStatus)
+			.reduce(
+				(worst, status) =>
+					(rank[status] ?? 1) > (rank[worst] ?? 1) ? status : worst,
+				"operational",
+			);
+	const addNode = (node) => {
+		const definition = definitions.get(node.componentId);
+		const item = {
+			width: narrow ? 138 : 146,
+			height: narrow ? 48 : 46,
+			kind: "service",
+			location: "Global",
+			detail:
+				definition?.description || "Independent live infrastructure check.",
+			...node,
+			status: node.status || componentStatus(data, node.componentId),
+		};
+		nodes.push(item);
+		return item;
+	};
+	const addLink = (source, target, channel, options = {}) => {
+		const link = {
+			id: options.id || `${source}:${target}:${links.length}`,
+			source,
+			target,
+			channel,
+			active: options.active !== false,
+			curve: options.curve || 0,
+			label: options.label || "",
+			status: safeStatus(options.status || "operational"),
+		};
+		links.push(link);
+		return link.id;
+	};
+	const addJourney = (type, edgeIds, options = {}) => {
+		journeys.push({
+			type,
+			edgeIds,
+			count: options.count || 3,
+			speed: options.speed || 0.8,
+			delay: options.delay || 0,
+			cycle: options.cycle || 900,
+			spacing: options.spacing || 13,
+		});
+	};
+	const canFlow = (...ids) =>
+		ids.every((id) => {
+			const status = nodes.find((node) => node.id === id)?.status;
+			return status === "operational" || status === "degraded";
+		});
 
-	for (const region of regions(data)) {
-		const coreIds = [
-			`storage:${region.id}`,
-			`dataplane:${region.id}`,
-			`replication:${region.id}`,
-		];
-		const core = coreIds
-			.map((id) => definitions.find((definition) => definition.id === id))
-			.filter(Boolean);
-		const backends = definitions.filter((definition) =>
+	const topStatus = worstStatus(
+		componentStatus(data, "global-s3"),
+		componentStatus(data, "control-plane"),
+		componentStatus(data, "database-ha-controller"),
+	);
+	zones.push({
+		id: "global",
+		code: "00",
+		label: "GLOBAL ROUTING + CONTROL",
+		x: 12,
+		y: 12,
+		width: width - 24,
+		height: 130,
+		status: topStatus,
+	});
+	addNode({
+		id: "edge",
+		label: "PUBLIC S3 ENDPOINTS",
+		meta: "signed end-to-end checks",
+		componentId: "global-s3",
+		x: narrow ? 92 : 180,
+		y: 80,
+		kind: "edge",
+		location: "Cloudflare global network",
+		detail:
+			"End-to-end public DNS, TLS, routing, authentication, and storage availability measured by signed regional S3 canaries.",
+		width: narrow ? 138 : 160,
+	});
+	addNode({
+		id: "control",
+		label: "BUN CONTROL PLANE",
+		meta: "global · Germany",
+		componentId: "control-plane",
+		x: narrow ? 260 : 590,
+		y: 80,
+		kind: "control",
+		location: "Germany",
+		width: narrow ? 148 : 164,
+	});
+	addNode({
+		id: "controller",
+		label: "STATUS + HA WORKER",
+		meta: "independent witness",
+		componentId: "database-ha-controller",
+		x: narrow ? 430 : 1000,
+		y: 80,
+		kind: "controller",
+		location: "Cloudflare Workers",
+		width: narrow ? 148 : 164,
+	});
+
+	const regionLayouts = new Map();
+	for (const [index, region] of allRegions.entries()) {
+		const column = index % columns;
+		const row = Math.floor(index / columns);
+		const x = 12 + column * (regionWidth + regionGap);
+		const y = regionTop + row * (regionHeight + regionGap);
+		const left = x + regionWidth * 0.18;
+		const center = x + regionWidth * 0.5;
+		const right = x + regionWidth * 0.82;
+		const backendDefinitions = [...definitions.values()].filter((definition) =>
 			definition.id.startsWith(`backend:${region.id}:`),
 		);
-		const generation = [
-			Number.isFinite(Number(region.writerGeneration))
-				? `writer ${region.writerGeneration}`
-				: null,
-			Number.isFinite(Number(region.backendGeneration))
-				? `backend ${region.backendGeneration}`
-				: null,
-		]
-			.filter(Boolean)
-			.join(" · ");
-		const pathText =
-			region.activeDataplane === region.homeDataplane
-				? "Home"
-				: `Via ${label(region.activeDataplane)}`;
-		const pathDescription = `Active backend ${region.activeBackend || "unknown"}${generation ? ` · ${generation}` : ""}`;
-		cards.push(
-			`<article class="status-group"><header><span>${escapeHtml(regionName(region))}</span><small>${escapeHtml(region.id)}</small></header>${core.map((definition) => componentRow(data, definition, region)).join("")}${backends.map((definition) => componentRow(data, definition, region)).join("")}<div class="status-row"><div><strong>Active serving path</strong><small>${escapeHtml(pathDescription)}</small></div>${statusBadge(phaseStatus(region), pathText)}</div></article>`,
-		);
+		if (backendDefinitions.length === 0) {
+			backendDefinitions.push({
+				id: `backend:${region.id}:${region.activeBackend || "primary"}`,
+				name: label(region.activeBackend || "S3 backend"),
+				description: "Active physical S3 backend",
+			});
+		}
+		const backendStatuses = backendDefinitions.map((definition) => ({
+			id: definition.id.slice(`backend:${region.id}:`.length),
+			status: componentStatus(data, definition.id),
+		}));
+		const criticalStatuses = [
+			phaseStatus(region),
+			componentStatus(data, `dataplane:${region.id}`),
+			componentStatus(data, `pgdog:${region.id}`),
+			backendStatuses.find((backend) => backend.id === region.activeBackend)
+				?.status || "unknown",
+		];
+		const optionalStatuses = [
+			componentStatus(data, `cache:${region.id}`),
+			componentStatus(data, `disk-cache:${region.id}`),
+			componentStatus(data, `clickhouse:${region.id}`),
+			...backendStatuses
+				.filter((backend) => backend.id !== region.activeBackend)
+				.map((backend) => backend.status),
+		];
+		if (data.databaseHa?.activeRegion === region.id)
+			criticalStatuses.push(componentStatus(data, `postgresql:${region.id}`));
+		else
+			optionalStatuses.push(componentStatus(data, `postgresql:${region.id}`));
+		const criticalStatus = worstStatus(...criticalStatuses);
+		const optionalStatus = worstStatus(...optionalStatuses);
+		const zoneStatus =
+			criticalStatus === "outage"
+				? "outage"
+				: criticalStatus === "degraded" ||
+						optionalStatus === "degraded" ||
+						optionalStatus === "outage"
+					? "degraded"
+					: criticalStatus === "unknown" || optionalStatus === "unknown"
+						? "unknown"
+						: "operational";
+		zones.push({
+			id: region.id,
+			code: regionCode(region.id),
+			label:
+				regionName(region).toUpperCase() +
+				(region.activeDataplane !== region.homeDataplane
+					? ` · TRAFFIC ON ${regionCode(region.activeDataplane)}`
+					: " · LOCAL TRAFFIC"),
+			x,
+			y,
+			width: regionWidth,
+			height: regionHeight,
+			status: zoneStatus,
+		});
+		const dataplane = addNode({
+			id: `dp:${region.id}`,
+			label: "RUST DATAPLANE",
+			meta:
+				regionCode(region.id) +
+				(region.activeDataplane === region.id ? " · serving" : " · standby") +
+				(region.writerGeneration ? ` · g${region.writerGeneration}` : ""),
+			componentId: `dataplane:${region.id}`,
+			x: center,
+			y: y + 68,
+			kind: "dataplane",
+			location: regionName(region),
+			width: 158,
+			detail:
+				"Regional Rust S3 service. Accounting safety is " +
+				statusText(
+					componentStatus(data, `accounting:${region.id}`),
+				).toLowerCase() +
+				".",
+		});
+		const redis = addNode({
+			id: `redis:${region.id}`,
+			label: "DRAGONFLY",
+			meta: "memory cache",
+			componentId: `cache:${region.id}`,
+			x: left,
+			y: y + 150,
+			kind: "cache",
+			location: regionName(region),
+		});
+		const disk = addNode({
+			id: `disk:${region.id}`,
+			label: "DISK CACHE",
+			meta: "persistent local volume",
+			componentId: `disk-cache:${region.id}`,
+			x: center,
+			y: y + 150,
+			kind: "cache",
+			location: regionName(region),
+			width: 154,
+		});
+		const pgdog = addNode({
+			id: `pgdog:${region.id}`,
+			label: "SQL / PGDOG PATH",
+			meta: "local pooled DB route",
+			componentId: `pgdog:${region.id}`,
+			x: right,
+			y: y + 150,
+			kind: "database",
+			location: regionName(region),
+			width: 154,
+		});
+		const backendNodes = backendDefinitions.map((definition, backendIndex) => {
+			const backendId = definition.id.slice(`backend:${region.id}:`.length);
+			const provider =
+				definition.description?.split(/\s+physical\s+/i)[0] ||
+				cleanComponentName(definition.name);
+			const role = /\breplica\b/i.test(definition.description || "")
+				? "replica"
+				: "primary";
+			return addNode({
+				id: `storage:${region.id}:${backendId}`,
+				label: `${String(provider || "S3")
+					.slice(0, 17)
+					.toUpperCase()} S3`,
+				meta:
+					(role === "replica" ? "replica" : "primary") +
+					(backendId === region.activeBackend
+						? " · active" +
+							(region.backendGeneration
+								? ` · g${region.backendGeneration}`
+								: "")
+						: ""),
+				componentId: definition.id,
+				x:
+					x +
+					(regionWidth * (backendIndex + 1)) / (backendDefinitions.length + 1),
+				y: y + 238,
+				kind: "backend",
+				location: regionName(region),
+				detail: definition.description,
+				width: backendDefinitions.length > 2 ? 138 : 154,
+				backendId,
+				role,
+			});
+		});
+		const clickhouse = addNode({
+			id: `ch:${region.id}`,
+			label: "CLICKHOUSE",
+			meta: "request logs",
+			componentId: `clickhouse:${region.id}`,
+			x: x + regionWidth * 0.26,
+			y: y + 334,
+			kind: "logs",
+			location: regionName(region),
+		});
+		const postgres = addNode({
+			id: `pg:${region.id}`,
+			label: "POSTGRESQL",
+			meta:
+				(data.databaseHa?.activeRegion === region.id
+					? "primary"
+					: "hot standby") +
+				" · " +
+				regionCode(region.id) +
+				(data.databaseHa?.generation
+					? ` · g${data.databaseHa.generation}`
+					: ""),
+			componentId: `postgresql:${region.id}`,
+			x: x + regionWidth * 0.74,
+			y: y + 334,
+			kind: "database",
+			location: regionName(region),
+			width: 154,
+		});
+		regionLayouts.set(region.id, {
+			region,
+			dataplane,
+			redis,
+			disk,
+			pgdog,
+			postgres,
+			clickhouse,
+			backendNodes,
+		});
 	}
 
-	document.getElementById("status-groups").innerHTML = cards.join("");
-	for (const definition of definitions) {
-		setComponent(definition.id, data.components?.[definition.id] || "unknown");
+	for (const [index, region] of allRegions.entries()) {
+		const logical = regionLayouts.get(region.id);
+		const serving = regionLayouts.get(region.activeDataplane) || logical;
+		if (!logical || !serving) continue;
+		const routeEdge = addLink("edge", serving.dataplane.id, "request", {
+			id: `route:${region.id}`,
+			label: `${regionCode(region.id)} TRAFFIC`,
+			curve: (index - (allRegions.length - 1) / 2) * 36,
+			status: phaseStatus(region),
+		});
+		if (canFlow("edge", serving.dataplane.id))
+			addJourney("request", [routeEdge], {
+				count: 18,
+				speed: 0.82,
+				delay: index * 340,
+				spacing: 8,
+			});
+		const activeBackend =
+			logical.backendNodes.find(
+				(node) => node.backendId === region.activeBackend,
+			) || logical.backendNodes[0];
+		if (activeBackend) {
+			const storageEdge = addLink(
+				serving.dataplane.id,
+				activeBackend.id,
+				"body",
+				{
+					id: `serving-storage:${region.id}`,
+					label:
+						regionCode(region.id) +
+						(region.activeDataplane === region.id ? " OBJECTS" : " FAILOVER"),
+					curve: region.activeDataplane === region.id ? 0 : index ? 62 : -62,
+					status: componentStatus(data, `storage:${region.id}`),
+				},
+			);
+			const storageResponse = addLink(
+				activeBackend.id,
+				serving.dataplane.id,
+				"response",
+				{
+					label: "OBJECT BODY",
+					curve: region.activeDataplane === region.id ? -18 : index ? -78 : 78,
+					status: componentStatus(data, `storage:${region.id}`),
+				},
+			);
+			if (canFlow(serving.dataplane.id, activeBackend.id))
+				addJourney("body", [storageEdge], {
+					count: 32,
+					speed: 0.94,
+					delay: 700 + index * 340,
+					spacing: 8,
+				});
+			if (canFlow(activeBackend.id, serving.dataplane.id))
+				addJourney("response", [storageResponse], {
+					count: 20,
+					speed: 1.06,
+					delay: 1080 + index * 340,
+					spacing: 8,
+				});
+		}
+		const replicas = logical.backendNodes.filter(
+			(node) => node !== activeBackend,
+		);
+		for (const [replicaIndex, replica] of replicas.entries()) {
+			const replicaEdge = addLink(activeBackend.id, replica.id, "replication", {
+				label: "REPLICATE",
+				curve: replicaIndex % 2 ? 24 : -24,
+				status: componentStatus(data, `replication:${region.id}`),
+			});
+			if (
+				componentStatus(data, `replication:${region.id}`) !== "outage" &&
+				canFlow(activeBackend.id, replica.id)
+			)
+				addJourney("replication", [replicaEdge], {
+					count: 14,
+					speed: 0.68,
+					delay: 1900 + index * 300,
+					spacing: 8,
+				});
+		}
 	}
+
+	for (const [index, layout] of [...regionLayouts.values()].entries()) {
+		const cacheEdge = addLink(
+			layout.dataplane.id,
+			layout.redis.id,
+			"metadata",
+			{
+				label: "LOOKUP",
+				curve: -10,
+				status: componentStatus(data, `cache:${layout.region.id}`),
+			},
+		);
+		const cacheReturn = addLink(
+			layout.redis.id,
+			layout.dataplane.id,
+			"response",
+			{
+				label: "HIT",
+				curve: 12,
+				status: componentStatus(data, `cache:${layout.region.id}`),
+			},
+		);
+		const diskEdge = addLink(layout.dataplane.id, layout.disk.id, "body", {
+			label: "READ / WRITE",
+			curve: -8,
+			status: componentStatus(data, `disk-cache:${layout.region.id}`),
+		});
+		const diskReturn = addLink(
+			layout.disk.id,
+			layout.dataplane.id,
+			"response",
+			{
+				label: "HOT BODY",
+				curve: 10,
+				status: componentStatus(data, `disk-cache:${layout.region.id}`),
+			},
+		);
+		const sqlEdge = addLink(layout.dataplane.id, layout.pgdog.id, "database", {
+			label: "QUERY",
+			curve: 10,
+			status: componentStatus(data, `pgdog:${layout.region.id}`),
+		});
+		const sqlReturn = addLink(
+			layout.pgdog.id,
+			layout.dataplane.id,
+			"response",
+			{
+				label: "RESULT",
+				curve: -12,
+				status: componentStatus(data, `pgdog:${layout.region.id}`),
+			},
+		);
+		const activeDatabase =
+			regionLayouts.get(data.databaseHa?.activeRegion)?.postgres ||
+			layout.postgres;
+		const activeDatabaseRegion =
+			data.databaseHa?.activeRegion || layout.region.id;
+		const poolEdge = addLink(layout.pgdog.id, activeDatabase.id, "database", {
+			label: "ACTIVE DB",
+			curve: activeDatabase === layout.postgres ? 0 : index ? 58 : -58,
+			status: componentStatus(data, `postgresql:${activeDatabaseRegion}`),
+		});
+		const databaseReturn = addLink(
+			activeDatabase.id,
+			layout.pgdog.id,
+			"response",
+			{
+				label: "ROW SET",
+				curve: activeDatabase === layout.postgres ? -18 : index ? -72 : 72,
+				status: componentStatus(data, `postgresql:${activeDatabaseRegion}`),
+			},
+		);
+		if (canFlow(layout.dataplane.id, layout.redis.id))
+			addJourney("metadata", [cacheEdge], {
+				count: 16,
+				speed: 0.76,
+				delay: 1150 + index * 300,
+				spacing: 8,
+			});
+		if (canFlow(layout.redis.id, layout.dataplane.id))
+			addJourney("response", [cacheReturn], {
+				count: 12,
+				speed: 0.96,
+				delay: 1280 + index * 300,
+				spacing: 8,
+			});
+		if (canFlow(layout.dataplane.id, layout.disk.id))
+			addJourney("body", [diskEdge], {
+				count: 22,
+				speed: 0.84,
+				delay: 1550 + index * 300,
+				spacing: 8,
+			});
+		if (canFlow(layout.disk.id, layout.dataplane.id))
+			addJourney("response", [diskReturn], {
+				count: 17,
+				speed: 1.02,
+				delay: 1680 + index * 300,
+				spacing: 8,
+			});
+		if (canFlow(layout.dataplane.id, layout.pgdog.id, activeDatabase.id))
+			addJourney("database", [sqlEdge, poolEdge], {
+				count: 16,
+				speed: 0.8,
+				delay: 2100 + index * 300,
+				spacing: 8,
+			});
+		if (canFlow(activeDatabase.id, layout.pgdog.id, layout.dataplane.id))
+			addJourney("response", [databaseReturn, sqlReturn], {
+				count: 13,
+				speed: 0.94,
+				delay: 2310 + index * 300,
+				spacing: 8,
+			});
+		for (const [logIndex, target] of [...regionLayouts.values()].entries()) {
+			const logEdge = addLink(
+				layout.dataplane.id,
+				target.clickhouse.id,
+				"logs",
+				{
+					label: logIndex === index ? "LOCAL LOG" : "REMOTE LOG",
+					curve: logIndex === index ? -12 : index ? 74 : -74,
+					status:
+						logIndex === index
+							? componentStatus(data, `clickhouse:${target.region.id}`)
+							: componentStatus(data, "clickhouse-log-redundancy"),
+				},
+			);
+			if (canFlow(layout.dataplane.id, target.clickhouse.id))
+				addJourney("logs", [logEdge], {
+					count: 12,
+					speed: logIndex === index ? 0.72 : 0.64,
+					delay: 2800 + index * 300 + logIndex * 120,
+					spacing: 8,
+				});
+		}
+	}
+
+	const activeDatabaseLayout = regionLayouts.get(data.databaseHa?.activeRegion);
+	const standbyDatabaseLayout = [...regionLayouts.values()].find(
+		(layout) => layout !== activeDatabaseLayout,
+	);
+	if (activeDatabaseLayout && standbyDatabaseLayout) {
+		const walEdge = addLink(
+			activeDatabaseLayout.postgres.id,
+			standbyDatabaseLayout.postgres.id,
+			"database",
+			{
+				label: data.databaseHa?.synchronousConfirmed ? "SYNC WAL" : "WAL",
+				curve: narrow ? 30 : -22,
+				status: componentStatus(data, "postgresql-replication"),
+			},
+		);
+		if (
+			canFlow(
+				activeDatabaseLayout.postgres.id,
+				standbyDatabaseLayout.postgres.id,
+			)
+		)
+			addJourney("database", [walEdge], {
+				count: 18,
+				speed: 0.7,
+				delay: 3300,
+				spacing: 8,
+			});
+	}
+	const controlHome =
+		regionLayouts.get("eu-central") || regionLayouts.values().next().value;
+	if (controlHome) {
+		const controlSqlEdge = addLink(
+			"control",
+			controlHome.pgdog.id,
+			"metadata",
+			{
+				label: "CONTROL DATA",
+				curve: narrow ? 48 : 24,
+			},
+		);
+		if (canFlow("control", controlHome.pgdog.id))
+			addJourney("metadata", [controlSqlEdge], {
+				count: 10,
+				speed: 0.7,
+				delay: 900,
+				spacing: 8,
+			});
+	}
+
+	return { width, height, nodes, links, zones, journeys, allRegions };
+}
+
+function renderTopology(data) {
+	const stage = document.getElementById("topology-stage");
+	if (!stage) return;
+	const d3 = globalThis.d3;
+	if (!d3) {
+		stage.innerHTML =
+			'<p class="diagram-unavailable">The interactive topology could not be loaded. Live telemetry remains available below.</p>';
+		return;
+	}
+	const draw = () => {
+		cancelAnimationFrame(topologyAnimationFrame);
+		stage.replaceChildren();
+		const graph = infrastructureGraph(data);
+		const nodeById = new Map(graph.nodes.map((node) => [node.id, node]));
+		const linkById = new Map(graph.links.map((link) => [link.id, link]));
+		const svg = d3
+			.select(stage)
+			.append("svg")
+			.attr("class", "topology-svg")
+			.attr("viewBox", `0 0 ${graph.width} ${graph.height}`)
+			.style("aspect-ratio", `${graph.width} / ${graph.height}`)
+			.attr("role", "group")
+			.attr("aria-roledescription", "live infrastructure diagram")
+			.attr(
+				"aria-label",
+				"Interactive live topology of Silo infrastructure in " +
+					graph.allRegions.map(regionName).join(" and "),
+			);
+		const scene = svg.append("g").attr("class", "topology-scene");
+		const defs = svg.append("defs");
+		for (const channel of [
+			"request",
+			"body",
+			"metadata",
+			"response",
+			"database",
+			"logs",
+			"replication",
+		]) {
+			defs
+				.append("marker")
+				.attr("id", `arrow-${channel}`)
+				.attr("viewBox", "0 -4 8 8")
+				.attr("refX", 7)
+				.attr("markerWidth", 7)
+				.attr("markerHeight", 7)
+				.attr("orient", "auto")
+				.append("path")
+				.attr("d", "M0,-3L8,0L0,3Z")
+				.attr("class", `arrow-head ${channel}`);
+		}
+		for (const state of ["degraded", "outage", "unknown"]) {
+			defs
+				.append("marker")
+				.attr("id", `arrow-${state}`)
+				.attr("viewBox", "0 -4 8 8")
+				.attr("refX", 7)
+				.attr("markerWidth", 7)
+				.attr("markerHeight", 7)
+				.attr("orient", "auto")
+				.append("path")
+				.attr("d", "M0,-3L8,0L0,3Z")
+				.attr("class", `arrow-head ${state}`);
+		}
+
+		const zone = scene
+			.append("g")
+			.attr("class", "topology-zones")
+			.selectAll("g")
+			.data(graph.zones)
+			.join("g")
+			.attr("class", (item) => `topology-zone ${safeStatus(item.status)}`);
+		zone
+			.append("rect")
+			.attr("x", (item) => item.x)
+			.attr("y", (item) => item.y)
+			.attr("width", (item) => item.width)
+			.attr("height", (item) => item.height)
+			.attr("rx", 12);
+		zone
+			.append("text")
+			.attr("x", (item) => item.x + 12)
+			.attr("y", (item) => item.y + 18)
+			.attr("class", "zone-code")
+			.text((item) => item.code);
+		zone
+			.append("text")
+			.attr("x", (item) => item.x + 34)
+			.attr("y", (item) => item.y + 18)
+			.attr("class", "zone-label")
+			.text((item) => item.label);
+
+		const pathFor = (link) => {
+			const source = nodeById.get(link.source);
+			const target = nodeById.get(link.target);
+			if (!source || !target) return "";
+			const dx = target.x - source.x;
+			const dy = target.y - source.y;
+			const clipToNode = (node, towardX, towardY) => {
+				const directionX = towardX - node.x;
+				const directionY = towardY - node.y;
+				const scale =
+					1 /
+					Math.max(
+						Math.abs(directionX) / Math.max(node.width / 2, 1),
+						Math.abs(directionY) / Math.max(node.height / 2, 1),
+						1,
+					);
+				return {
+					x: node.x + directionX * scale,
+					y: node.y + directionY * scale,
+				};
+			};
+			if (!link.curve) {
+				const start = clipToNode(source, target.x, target.y);
+				const end = clipToNode(target, source.x, source.y);
+				return `M${start.x},${start.y}L${end.x},${end.y}`;
+			}
+			const length = Math.max(Math.hypot(dx, dy), 1);
+			const middleX = (source.x + target.x) / 2;
+			const middleY = (source.y + target.y) / 2;
+			const controlX = middleX - (dy / length) * link.curve;
+			const controlY = middleY + (dx / length) * link.curve;
+			const start = clipToNode(source, controlX, controlY);
+			const end = clipToNode(target, controlX, controlY);
+			return (
+				"M" +
+				start.x +
+				"," +
+				start.y +
+				"Q" +
+				controlX +
+				"," +
+				controlY +
+				" " +
+				end.x +
+				"," +
+				end.y
+			);
+		};
+
+		const edges = scene
+			.append("g")
+			.attr("class", "topology-links")
+			.selectAll("path")
+			.data(graph.links)
+			.join("path")
+			.attr("class", (link) => {
+				const source = nodeById.get(link.source);
+				const target = nodeById.get(link.target);
+				const unhealthy =
+					source?.status === "outage" ||
+					target?.status === "outage" ||
+					link.status === "outage";
+				return (
+					"topology-link " +
+					link.channel +
+					" link-" +
+					link.status +
+					(link.active ? " active" : " standby") +
+					(unhealthy ? " unhealthy" : "")
+				);
+			})
+			.attr("d", pathFor)
+			.attr("marker-end", (link) => {
+				if (!link.active || link.channel === "standby") return null;
+				const source = nodeById.get(link.source);
+				const target = nodeById.get(link.target);
+				const state =
+					source?.status === "outage" || target?.status === "outage"
+						? "outage"
+						: link.status;
+				return `url(#arrow-${state === "operational" ? link.channel : state})`;
+			});
+		const edgeNodes = new Map();
+		edges.each(function mapEdge(link) {
+			edgeNodes.set(link.id, this);
+		});
+
+		scene
+			.append("g")
+			.attr("class", "topology-link-labels")
+			.selectAll("text")
+			.data(graph.links.filter((link) => link.label))
+			.join("text")
+			.attr("class", (link) => `link-label ${link.channel} link-${link.status}`)
+			.attr("x", (link) => {
+				const path = edgeNodes.get(link.id);
+				return path?.getPointAtLength(path.getTotalLength() * 0.5).x || 0;
+			})
+			.attr("y", (link) => {
+				const path = edgeNodes.get(link.id);
+				return (path?.getPointAtLength(path.getTotalLength() * 0.5).y || 0) - 5;
+			})
+			.text((link) => link.label);
+
+		const nodeSelection = scene
+			.append("g")
+			.attr("class", "topology-nodes")
+			.selectAll("g")
+			.data(graph.nodes)
+			.join("g")
+			.attr(
+				"class",
+				(node) => `topology-node ${node.kind} ${safeStatus(node.status)}`,
+			)
+			.attr("transform", (node) => `translate(${node.x},${node.y})`)
+			.attr("aria-hidden", "true");
+		nodeSelection
+			.append("rect")
+			.attr("x", (node) => -node.width / 2)
+			.attr("y", (node) => -node.height / 2)
+			.attr("width", (node) => node.width)
+			.attr("height", (node) => node.height)
+			.attr("rx", 8);
+		nodeSelection
+			.append("circle")
+			.attr("class", "node-state")
+			.attr("cx", (node) => -node.width / 2 + 12)
+			.attr("cy", 0)
+			.attr("r", 3);
+		nodeSelection
+			.append("text")
+			.attr("class", "node-health")
+			.attr("x", (node) => node.width / 2 - 8)
+			.attr("y", (node) => -node.height / 2 + 11)
+			.text(
+				(node) =>
+					({
+						operational: "LIVE",
+						degraded: "DEGRADED",
+						outage: "DOWN",
+						unknown: "CHECKING",
+					})[safeStatus(node.status)] || "CHECKING",
+			);
+		nodeSelection
+			.append("text")
+			.attr("class", "node-label")
+			.attr("x", (node) => -node.width / 2 + 22)
+			.attr("y", -2)
+			.text((node) => node.label);
+		nodeSelection
+			.append("text")
+			.attr("class", "node-meta")
+			.attr("x", (node) => -node.width / 2 + 22)
+			.attr("y", 11)
+			.text((node) => node.meta);
+
+		const reducedMotion = window.matchMedia(
+			"(prefers-reduced-motion: reduce)",
+		).matches;
+		const symbolTypes = {
+			request: d3.symbolCircle,
+			body: d3.symbolSquare,
+			metadata: d3.symbolDiamond,
+			response: d3.symbolCircle,
+			database: d3.symbolSquare,
+			logs: d3.symbolTriangle,
+			replication: d3.symbolDiamond,
+		};
+		const symbolSizes = {
+			request: 18,
+			body: 24,
+			metadata: 20,
+			response: 20,
+			database: 16,
+			logs: 14,
+			replication: 17,
+		};
+		const particles = [];
+		for (const journey of graph.journeys) {
+			if (
+				journey.edgeIds.some((edgeId) => {
+					const status = linkById.get(edgeId)?.status;
+					return status === "outage" || status === "unknown";
+				})
+			)
+				continue;
+			const segments = journey.edgeIds
+				.map((edgeId) => {
+					const path = edgeNodes.get(edgeId);
+					return path ? { edgeId, path, length: path.getTotalLength() } : null;
+				})
+				.filter(Boolean);
+			const totalLength = segments.reduce(
+				(total, segment) => total + segment.length,
+				0,
+			);
+			if (!totalLength) continue;
+			for (let index = 0; index < journey.count; index += 1) {
+				const sizeScale = [0.46, 0.66, 0.84, 1.08, 1.42, 1.78][
+					Math.floor(index + journey.delay / 100) % 6
+				];
+				particles.push({
+					type: journey.type,
+					segments,
+					totalLength,
+					index,
+					count: journey.count,
+					speed: journey.speed,
+					delay: journey.delay,
+					cycle: journey.cycle,
+					offset: index * journey.spacing,
+					sizeScale,
+				});
+			}
+		}
+		const particleSelection = scene
+			.append("g")
+			.attr("class", "topology-particles")
+			.selectAll("path")
+			.data(particles)
+			.join("path")
+			.attr("d", (particle) =>
+				d3
+					.symbol()
+					.type(symbolTypes[particle.type] || d3.symbolCircle)
+					.size((symbolSizes[particle.type] || 16) * particle.sizeScale)(),
+			)
+			.attr("class", (particle) => `flow-particle ${particle.type}`);
+		const locateParticle = (particle, time) => {
+			let distance;
+			let visible;
+			if (reducedMotion) {
+				distance = particle.totalLength * 0.55;
+				visible = particle.index === 0;
+			} else {
+				const travelTime = particle.totalLength / particle.speed;
+				const launchInterval = Math.max(
+					26,
+					Math.min(92, travelTime / Math.max(particle.count * 0.56, 1)),
+				);
+				const loopDuration = travelTime + launchInterval * particle.count;
+				const elapsed =
+					((time - particle.delay - particle.index * launchInterval) %
+						loopDuration) +
+					loopDuration;
+				const packetTime = elapsed % loopDuration;
+				visible = packetTime <= travelTime;
+				distance = Math.min(packetTime * particle.speed, particle.totalLength);
+			}
+			let segment = particle.segments[particle.segments.length - 1];
+			for (const candidate of particle.segments) {
+				if (distance <= candidate.length) {
+					segment = candidate;
+					break;
+				}
+				distance -= candidate.length;
+			}
+			const point = segment.path.getPointAtLength(distance);
+			const before = segment.path.getPointAtLength(Math.max(0, distance - 1));
+			const after = segment.path.getPointAtLength(
+				Math.min(segment.length, distance + 1),
+			);
+			const angle =
+				(Math.atan2(after.y - before.y, after.x - before.x) * 180) / Math.PI;
+			return {
+				transform: `translate(${point.x},${point.y}) rotate(${angle})`,
+				visible,
+			};
+		};
+		const positionParticles = (time) => {
+			particleSelection.each(function positionParticle(particle) {
+				const state = locateParticle(particle, time);
+				d3.select(this)
+					.attr("transform", state.transform)
+					.attr(
+						"opacity",
+						state.visible
+							? 0.64 + 0.36 * (1 - particle.index / particle.count)
+							: 0,
+					);
+			});
+		};
+		positionParticles(0);
+		if (!reducedMotion) {
+			const animate = (time) => {
+				positionParticles(time);
+				topologyAnimationFrame = requestAnimationFrame(animate);
+			};
+			topologyAnimationFrame = requestAnimationFrame(animate);
+		}
+	};
+
+	draw();
+	topologyResizeObserver?.disconnect();
+	if (globalThis.ResizeObserver) {
+		let narrowLayout = window.matchMedia("(max-width: 620px)").matches;
+		topologyResizeObserver = new ResizeObserver(() => {
+			const nextNarrowLayout = window.matchMedia("(max-width: 620px)").matches;
+			if (nextNarrowLayout !== narrowLayout) {
+				narrowLayout = nextNarrowLayout;
+				draw();
+			}
+		});
+		topologyResizeObserver.observe(stage);
+	}
+}
+
+function renderComponents(data) {
+	const html =
+		'<div class="topology-shell"><div id="topology-stage" class="topology-stage"></div></div>';
+	document.getElementById("status-groups").innerHTML = html;
+	renderTopology(data);
 }
 
 function renderActiveIncident(data) {
@@ -670,6 +1636,8 @@ function render(data) {
 }
 
 function renderUnavailable() {
+	cancelAnimationFrame(topologyAnimationFrame);
+	topologyResizeObserver?.disconnect();
 	const hero = document.getElementById("hero");
 	hero.dataset.state = "unreachable";
 	document.getElementById("hero-label").textContent = "Status check failed";
@@ -679,9 +1647,6 @@ function renderUnavailable() {
 		"This does not necessarily mean Silo is down. Please try again in a moment.";
 	document.getElementById("hero-acknowledged").hidden = true;
 	document.getElementById("recovery-panel").hidden = true;
-	renderedComponentIds.forEach((id) => {
-		setComponent(id, "unknown");
-	});
 	document.getElementById("updated").textContent = "Monitor unreachable";
 }
 

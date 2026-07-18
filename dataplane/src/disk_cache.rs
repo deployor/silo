@@ -45,6 +45,15 @@ pub(crate) struct DiskCache {
     inner: Arc<Mutex<DiskCacheInner>>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DiskCacheReadiness {
+    enabled: bool,
+    writable: bool,
+    total_bytes: u64,
+    max_total_bytes: u64,
+}
+
 #[derive(Clone)]
 struct DiskCacheConfig {
     enabled: bool,
@@ -174,6 +183,41 @@ impl DiskCache {
 
     pub(crate) fn min_size(&self) -> u64 {
         self.cfg.min_size
+    }
+
+    /// Re-probe the cache volume so readiness reflects the current disk rather
+    /// than only the result observed when the process started. Disk caching is
+    /// optional for durable serving, but operators still need to see when the
+    /// local acceleration volume becomes unavailable and when it recovers.
+    pub(crate) async fn readiness_status(&self) -> DiskCacheReadiness {
+        if !self.cfg.enabled {
+            return DiskCacheReadiness {
+                enabled: false,
+                writable: false,
+                total_bytes: 0,
+                max_total_bytes: self.cfg.max_total_size,
+            };
+        }
+
+        let probe = self.cfg.dir.join(format!(
+            ".readiness-{}",
+            TMP_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let writable = async {
+            tokio::fs::create_dir_all(&self.cfg.dir).await?;
+            tokio::fs::write(&probe, b"ok").await?;
+            tokio::fs::remove_file(&probe).await
+        }
+        .await
+        .is_ok();
+        let mut inner = self.inner.lock().await;
+        inner.writable = writable;
+        DiskCacheReadiness {
+            enabled: true,
+            writable,
+            total_bytes: inner.total_size,
+            max_total_bytes: self.cfg.max_total_size,
+        }
     }
 
     pub(crate) async fn record_demand(&self, bucket: &AuthBucket, key: &str, size_hint: u64) {
