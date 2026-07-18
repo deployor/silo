@@ -157,6 +157,7 @@ services:
 
   pgbackrest-initial-backup:
     image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
+    profiles: [backup]
     restart: "no"
     user: postgres
     entrypoint:
@@ -190,7 +191,7 @@ services:
       PGDOG_EU_HOST: postgres
       PGDOG_EU_PORT: "5432"
       PGDOG_US_HOST: ${PGDOG_US_HOST:-db-us.onsilo.dev}
-      PGDOG_US_PORT: ${PGDOG_US_PORT:-15432}
+      PGDOG_US_PORT: ${PGDOG_US_PORT:-25432}
       PGDOG_WORKERS: ${PGDOG_WORKERS:-4}
       PGDOG_POOL_SIZE: ${PGDOG_POOL_SIZE:-24}
       PGDOG_MIN_POOL_SIZE: ${PGDOG_MIN_POOL_SIZE:-2}

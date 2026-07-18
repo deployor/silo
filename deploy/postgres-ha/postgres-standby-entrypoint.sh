@@ -9,12 +9,12 @@ set -eu
 if [ ! -s "$PGDATA/PG_VERSION" ]; then
   rm -rf "${PGDATA:?}"/*
   export PGPASSWORD="$POSTGRES_REPLICATION_PASSWORD"
-  until pg_isready -h "$PRIMARY_DATABASE_HOST" -p "${PRIMARY_DATABASE_PORT:-15432}" -U "$POSTGRES_REPLICATION_USER"; do
+  until pg_isready -h "$PRIMARY_DATABASE_HOST" -p "${PRIMARY_DATABASE_PORT:-25432}" -U "$POSTGRES_REPLICATION_USER"; do
     sleep 2
   done
   pg_basebackup \
     --host="$PRIMARY_DATABASE_HOST" \
-    --port="${PRIMARY_DATABASE_PORT:-15432}" \
+    --port="${PRIMARY_DATABASE_PORT:-25432}" \
     --username="$POSTGRES_REPLICATION_USER" \
     --pgdata="$PGDATA" \
     --wal-method=stream \
