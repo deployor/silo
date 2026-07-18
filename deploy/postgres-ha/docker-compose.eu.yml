@@ -153,7 +153,9 @@ services:
       - postgres-socket:/var/run/postgresql
       - pgbackrest-config:/etc/pgbackrest:ro
       - pgbackrest-spool:/var/spool/pgbackrest
-    networks: [db-private]
+    networks:
+      - db-private
+      - dokploy-network
 
   pgdog-config:
     image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
