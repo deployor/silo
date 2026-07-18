@@ -59,6 +59,8 @@ and 2 Rust writer-fence connections per process. PgDog multiplexes these onto a
 2. Generate one private CA and a separate server certificate for each node.
    Include `postgres`, the regional DB hostname, and `db-primary.onsilo.dev` as
    SANs. Store keys only in Dokploy environment values.
+   During the initial copy only, set POSTGRES_MIGRATION_PUBLIC_IP to the
+   operator's exact IPv4 address. Remove that pg_hba entry after verification.
 3. Publish the immutable `silo-postgres` image.
 4. Deploy `docker-compose.eu.yml`. Do not point applications at it yet.
 5. Restore a fresh Aiven dump into the new EU primary and apply every migration.

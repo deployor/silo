@@ -45,6 +45,8 @@ services:
       POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER:-silo_replicator}
       POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:?set POSTGRES_REPLICATION_PASSWORD}
       POSTGRES_REPLICATION_SLOT: silo_us
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /tls/ca.crt
     command:
       - -c
       - listen_addresses=*

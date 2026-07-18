@@ -102,6 +102,7 @@ jobs:
       POSTGRES_SUPERUSER_PASSWORD: ci-only-superuser
       SILO_DATABASE_PASSWORD: ci-only-app
       POSTGRES_REPLICATION_PASSWORD: ci-only-replication
+      POSTGRES_HA_CONTROLLER_PASSWORD: ci-only-controller
       PGDOG_ADMIN_PASSWORD: ci-only-pgdog
       PGBACKREST_REPO1_ENDPOINT: s3.eu.example.test
       PGBACKREST_REPO1_BUCKET: silo-db-backup-eu
