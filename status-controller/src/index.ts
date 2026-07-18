@@ -1,3 +1,13 @@
+import {
+	type DatabaseProbe,
+	enableSynchronousReplication,
+	fenceDatabase,
+	probeDatabase,
+	promoteDatabase,
+	promotionEligible,
+	unfenceDatabase,
+} from "./database-ha";
+
 type ComponentStatus = "operational" | "degraded" | "outage" | "unknown";
 type OverallStatus = "operational" | "degraded" | "major_outage";
 type RegionPhase =
@@ -118,6 +128,13 @@ type StatusState = {
 	overall: OverallStatus;
 	components: Record<string, ComponentStatus>;
 	regions: Record<string, RegionRuntime>;
+	database: {
+		phase: "normal" | "investigating" | "promoting" | "active" | "blocked";
+		activeRegion: "eu-central" | "us-east";
+		generation: number;
+		consecutiveFailures: number;
+		synchronousConfirmed: boolean;
+	};
 	activeIncidentId?: string;
 	productionMaintenance?: {
 		title: string;
@@ -130,10 +147,19 @@ type StatusState = {
 
 type MonitorSnapshot = {
 	dashboard: boolean;
+	database?: Record<"eu-central" | "us-east", DatabaseProbe>;
+	clickhouse?: Record<"eu-central" | "us-east", ClickHouseProbe>;
 	dataplanes: Record<string, DataplaneProbe>;
 	backends: Record<string, Record<string, BackendProbe>>;
 	logical: Record<string, OperationChecks>;
 	homeReadOnly: Record<string, boolean>;
+};
+
+type ClickHouseProbe = {
+	reachable: boolean;
+	recentRows: number;
+	latestEventAt?: string;
+	error?: string;
 };
 
 type ComponentDefinition = {
@@ -223,6 +249,15 @@ async function runMonitor(env: Env): Promise<void> {
 			state.productionMaintenance || (await getActiveMaintenance(env)),
 		);
 		const snapshot = await takeSnapshot(env, registry, state);
+		try {
+			await processDatabaseHealth(env, state, snapshot);
+		} catch (error) {
+			state.database.phase = "blocked";
+			logError("database_ha_automation_blocked", error, {
+				activeRegion: state.database.activeRegion,
+				generation: state.database.generation,
+			});
+		}
 
 		for (const region of registry) {
 			const providerWasBlocked =
@@ -333,6 +368,118 @@ async function releaseMonitorLease(env: Env, holder: string): Promise<void> {
 	)
 		.bind(STATE_ID, holder)
 		.run();
+}
+
+async function processDatabaseHealth(
+	env: Env,
+	state: StatusState,
+	snapshot: MonitorSnapshot,
+): Promise<void> {
+	if (!snapshot.database) return;
+	const databaseEnv = env as Env & {
+		DATABASE_EU?: Hyperdrive;
+		DATABASE_US?: Hyperdrive;
+		AUTO_FAILOVER_DATABASE?: string;
+		DATABASE_APP_ROLE?: string;
+		DATABASE_NAME?: string;
+	};
+	const probes = Object.values(snapshot.database);
+	const primaries = probes.filter(
+		(probe) => probe.reachable && probe.role === "primary",
+	);
+	if (primaries.length > 1) {
+		const authoritative = primaries.find(
+			(probe) =>
+				probe.region === state.database.activeRegion &&
+				probe.generation === state.database.generation,
+		);
+		for (const stale of primaries.filter((probe) => probe !== authoritative)) {
+			const binding =
+				stale.region === "eu-central"
+					? databaseEnv.DATABASE_EU
+					: databaseEnv.DATABASE_US;
+			if (binding)
+				await fenceDatabase(
+					binding,
+					databaseEnv.DATABASE_APP_ROLE || "silo_app",
+					databaseEnv.DATABASE_NAME || "silo",
+				);
+		}
+		throw new Error(
+			"multiple PostgreSQL primaries detected; stale nodes fenced",
+		);
+	}
+
+	const active = snapshot.database[state.database.activeRegion];
+	if (
+		active.reachable &&
+		active.role === "primary" &&
+		active.activeRegion === state.database.activeRegion
+	) {
+		if (active.defaultTransactionReadOnly) {
+			const binding =
+				state.database.activeRegion === "eu-central"
+					? databaseEnv.DATABASE_EU
+					: databaseEnv.DATABASE_US;
+			if (!binding)
+				throw new Error("active database Hyperdrive binding is missing");
+			await unfenceDatabase(
+				binding,
+				databaseEnv.DATABASE_APP_ROLE || "silo_app",
+				databaseEnv.DATABASE_NAME || "silo",
+				state.database.generation,
+				state.database.activeRegion,
+			);
+		}
+		state.database.phase =
+			state.database.activeRegion === "eu-central" ? "normal" : "active";
+		state.database.generation = active.generation || state.database.generation;
+		state.database.consecutiveFailures = 0;
+		state.database.synchronousConfirmed ||= active.replication.some(
+			(peer) => peer.state === "streaming" && peer.syncState === "sync",
+		);
+		return;
+	}
+
+	state.database.consecutiveFailures += 1;
+	state.database.phase = "investigating";
+	if (state.database.consecutiveFailures < FAILURE_THRESHOLD) return;
+	const candidateRegion =
+		state.database.activeRegion === "eu-central" ? "us-east" : "eu-central";
+	const candidate = snapshot.database[candidateRegion];
+	if (
+		!state.database.synchronousConfirmed ||
+		!promotionEligible(candidate, state.database.generation)
+	) {
+		state.database.phase = "blocked";
+		return;
+	}
+	if (
+		databaseEnv.AUTO_FAILOVER_DATABASE !== "true" ||
+		env.FAILOVER_DRILL_APPROVED !== "true"
+	) {
+		state.database.phase = "blocked";
+		return;
+	}
+	const binding =
+		candidateRegion === "eu-central"
+			? databaseEnv.DATABASE_EU
+			: databaseEnv.DATABASE_US;
+	if (!binding) throw new Error("promotion Hyperdrive binding is missing");
+	state.database.phase = "promoting";
+	const promoted = await promoteDatabase(
+		candidateRegion,
+		binding,
+		state.database.generation,
+		databaseEnv.DATABASE_APP_ROLE || "silo_app",
+		databaseEnv.DATABASE_NAME || "silo",
+	);
+	state.database.activeRegion = candidateRegion;
+	state.database.generation =
+		promoted.generation || state.database.generation + 1;
+	state.database.consecutiveFailures = 0;
+	state.database.synchronousConfirmed = false;
+	state.database.phase = candidateRegion === "eu-central" ? "normal" : "active";
 }
 
 async function recordAutomationFailure(
@@ -829,6 +976,52 @@ async function takeSnapshot(
 	registry: RegionConfig[],
 	state: StatusState,
 ): Promise<MonitorSnapshot> {
+	const databaseEnv = env as Env & {
+		DATABASE_EU?: Hyperdrive;
+		DATABASE_US?: Hyperdrive;
+	};
+	const database =
+		databaseEnv.DATABASE_EU && databaseEnv.DATABASE_US
+			? (Object.fromEntries(
+					await Promise.all([
+						probeDatabase("eu-central", databaseEnv.DATABASE_EU).then(
+							(probe) => ["eu-central", probe] as const,
+						),
+						probeDatabase("us-east", databaseEnv.DATABASE_US).then(
+							(probe) => ["us-east", probe] as const,
+						),
+					]),
+				) as Record<"eu-central" | "us-east", DatabaseProbe>)
+			: undefined;
+	const clickhouseEnv = env as Env & {
+		CLICKHOUSE_EU_HEALTH_URL?: string;
+		CLICKHOUSE_US_HEALTH_URL?: string;
+		CLICKHOUSE_QUERY_USER?: string;
+		CLICKHOUSE_QUERY_PASSWORD?: string;
+	};
+	const clickhouse =
+		clickhouseEnv.CLICKHOUSE_EU_HEALTH_URL &&
+		clickhouseEnv.CLICKHOUSE_US_HEALTH_URL &&
+		clickhouseEnv.CLICKHOUSE_QUERY_PASSWORD
+			? await Promise.all([
+					probeClickHouse(
+						clickhouseEnv.CLICKHOUSE_EU_HEALTH_URL,
+						clickhouseEnv.CLICKHOUSE_QUERY_USER || "silo_query",
+						clickhouseEnv.CLICKHOUSE_QUERY_PASSWORD,
+					).then((probe) => ["eu-central", probe] as const),
+					probeClickHouse(
+						clickhouseEnv.CLICKHOUSE_US_HEALTH_URL,
+						clickhouseEnv.CLICKHOUSE_QUERY_USER || "silo_query",
+						clickhouseEnv.CLICKHOUSE_QUERY_PASSWORD,
+					).then((probe) => ["us-east", probe] as const),
+				]).then(
+					(entries) =>
+						Object.fromEntries(entries) as Record<
+							"eu-central" | "us-east",
+							ClickHouseProbe
+						>,
+				)
+			: undefined;
 	const dataplaneEntries = await Promise.all(
 		registry.map(async (region) => {
 			const [health, readiness] = await Promise.all([
@@ -890,6 +1083,8 @@ async function takeSnapshot(
 	);
 	return {
 		dashboard: await ok(env.DASHBOARD_HEALTH_URL),
+		database,
+		clickhouse,
 		dataplanes,
 		backends,
 		logical: Object.fromEntries(logicalEntries),
@@ -904,6 +1099,7 @@ function deriveComponents(
 ): Record<string, ComponentStatus> {
 	const components: Record<string, ComponentStatus> = {
 		"control-plane": snapshot.dashboard ? "operational" : "outage",
+		"database-ha-controller": "operational",
 	};
 	const postgresValues = Object.values(snapshot.dataplanes)
 		.filter((probe) => probe.health)
@@ -917,6 +1113,54 @@ function deriveComponents(
 				: postgresValues.some(Boolean)
 					? "degraded"
 					: "outage";
+	if (snapshot.database) {
+		const probes = Object.values(snapshot.database);
+		const reachable = probes.filter((probe) => probe.reachable);
+		const primaries = reachable.filter((probe) => probe.role === "primary");
+		const replicas = reachable.filter((probe) => probe.role === "replica");
+		const generations = new Set(
+			reachable.map((probe) => probe.generation).filter(Number.isFinite),
+		);
+		components["postgresql-ha"] =
+			primaries.length > 1 || reachable.length === 0
+				? "outage"
+				: primaries.length === 1 &&
+						replicas.length === 1 &&
+						generations.size === 1 &&
+						primaries[0].activeRegion === primaries[0].region
+					? "operational"
+					: primaries.length === 1
+						? "degraded"
+						: "outage";
+		const primary = primaries[0];
+		const synchronous = primary?.replication.some(
+			(peer) => peer.state === "streaming" && peer.syncState === "sync",
+		);
+		components["postgresql-replication"] =
+			replicas.length === 1 && synchronous ? "operational" : "outage";
+	}
+	if (snapshot.clickhouse) {
+		const probes = Object.values(snapshot.clickhouse);
+		const reachable = probes.filter((probe) => probe.reachable);
+		components["clickhouse-logs"] =
+			reachable.length === 2
+				? "operational"
+				: reachable.length === 1
+					? "degraded"
+					: "outage";
+		const [eu, us] = probes;
+		const eventSkew =
+			eu.latestEventAt && us.latestEventAt
+				? Math.abs(Date.parse(eu.latestEventAt) - Date.parse(us.latestEventAt))
+				: 0;
+		const rowSkew = Math.abs(eu.recentRows - us.recentRows);
+		components["clickhouse-log-redundancy"] =
+			reachable.length === 2 && eventSkew <= 60_000 && rowSkew <= 100
+				? "operational"
+				: reachable.length > 0
+					? "degraded"
+					: "outage";
+	}
 	let logicalHealthy = 0;
 	for (const region of registry) {
 		const runtime = state.regions[region.id];
@@ -989,7 +1233,8 @@ function deriveOverall(
 	components: Record<string, ComponentStatus>,
 ): OverallStatus {
 	if (
-		components["aiven-postgresql"] === "outage" ||
+		(components["postgresql-ha"] ?? components["aiven-postgresql"]) ===
+			"outage" ||
 		components["global-s3"] === "outage" ||
 		registry.some(
 			(region) =>
@@ -1958,6 +2203,13 @@ function defaultState(registry: RegionConfig[]): StatusState {
 		overall: "operational",
 		components: {},
 		regions,
+		database: {
+			phase: "normal",
+			activeRegion: "eu-central",
+			generation: 1,
+			consecutiveFailures: 0,
+			synchronousConfirmed: false,
+		},
 		updatedAt: new Date().toISOString(),
 	};
 }
@@ -1987,6 +2239,24 @@ async function getState(
 				: undefined;
 		state.updatedAt =
 			typeof value.updatedAt === "string" ? value.updatedAt : state.updatedAt;
+		if (isRecord(value.database)) {
+			state.database.phase = [
+				"normal",
+				"investigating",
+				"promoting",
+				"active",
+				"blocked",
+			].includes(String(value.database.phase))
+				? (value.database.phase as typeof state.database.phase)
+				: "normal";
+			state.database.activeRegion =
+				value.database.activeRegion === "us-east" ? "us-east" : "eu-central";
+			state.database.generation = finiteNumber(value.database.generation) || 1;
+			state.database.consecutiveFailures =
+				finiteNumber(value.database.consecutiveFailures) || 0;
+			state.database.synchronousConfirmed =
+				value.database.synchronousConfirmed === true;
+		}
 		if (isRecord(value.productionMaintenance))
 			state.productionMaintenance = {
 				title: requiredString(
@@ -2113,7 +2383,18 @@ async function operationsAdmin(
 		return adminJson(request, env, { error: "unauthorized" }, 401);
 	const state = await getState(env, registry);
 	const snapshot = await takeSnapshot(env, registry, state);
+	const databaseAutomation = env as Env & { AUTO_FAILOVER_DATABASE?: string };
 	return adminJson(request, env, {
+		databaseHa: {
+			controller: "cloudflare-worker",
+			...state.database,
+			configured: Boolean(snapshot.database),
+			probes: snapshot.database || null,
+			automation: {
+				failover: databaseAutomation.AUTO_FAILOVER_DATABASE === "true",
+				drillApproved: env.FAILOVER_DRILL_APPROVED === "true",
+			},
+		},
 		regions: registry.map((region) => ({
 			id: region.id,
 			label: `${region.flag} ${region.label}`,
@@ -2153,7 +2434,8 @@ async function operationsAction(
 	const input = await requestJsonRecord(request);
 	const regionId = stringField(input, "region");
 	const region = registry.find((candidate) => candidate.id === regionId);
-	if (!region)
+	const databaseAction = action.startsWith("database-");
+	if (!databaseAction && !region)
 		return adminJson(request, env, { error: "valid region is required" }, 400);
 	const leaseHolder = crypto.randomUUID();
 	if (!(await acquireMonitorLease(env, leaseHolder)))
@@ -2165,8 +2447,140 @@ async function operationsAction(
 		);
 	try {
 		const state = await getState(env, registry);
-		const runtime = state.regions[region.id];
 		const snapshot = await takeSnapshot(env, registry, state);
+		if (databaseAction) {
+			const databaseEnv = env as Env & {
+				DATABASE_EU?: Hyperdrive;
+				DATABASE_US?: Hyperdrive;
+				DATABASE_APP_ROLE?: string;
+				DATABASE_NAME?: string;
+			};
+			if (!snapshot.database)
+				return adminJson(
+					request,
+					env,
+					{ error: "database Hyperdrive bindings are not configured" },
+					409,
+				);
+			if (action === "database-enable-sync") {
+				const binding =
+					state.database.activeRegion === "eu-central"
+						? databaseEnv.DATABASE_EU
+						: databaseEnv.DATABASE_US;
+				if (!binding)
+					return adminJson(
+						request,
+						env,
+						{ error: "active database Hyperdrive binding is missing" },
+						409,
+					);
+				const standbyApplicationName =
+					stringField(input, "standbyApplicationName") ||
+					(state.database.activeRegion === "eu-central"
+						? "silo_us"
+						: "silo_eu");
+				await enableSynchronousReplication(
+					binding,
+					standbyApplicationName,
+					state.database.generation,
+				);
+				state.database.synchronousConfirmed = true;
+			} else if (action === "database-promote") {
+				if (regionId !== "eu-central" && regionId !== "us-east")
+					return adminJson(
+						request,
+						env,
+						{ error: "valid database region is required" },
+						400,
+					);
+				if (regionId === state.database.activeRegion)
+					return adminJson(
+						request,
+						env,
+						{ error: "target is already the active database region" },
+						409,
+					);
+				const candidate = snapshot.database[regionId];
+				if (
+					!state.database.synchronousConfirmed ||
+					!promotionEligible(candidate, state.database.generation)
+				)
+					return adminJson(
+						request,
+						env,
+						{ error: "target did not pass the lossless promotion gate" },
+						409,
+					);
+				const binding =
+					regionId === "eu-central"
+						? databaseEnv.DATABASE_EU
+						: databaseEnv.DATABASE_US;
+				if (!binding)
+					return adminJson(
+						request,
+						env,
+						{ error: "target database Hyperdrive binding is missing" },
+						409,
+					);
+				const promoted = await promoteDatabase(
+					regionId,
+					binding,
+					state.database.generation,
+					databaseEnv.DATABASE_APP_ROLE || "silo_app",
+					databaseEnv.DATABASE_NAME || "silo",
+				);
+				state.database.activeRegion = regionId;
+				state.database.generation =
+					promoted.generation || state.database.generation + 1;
+				state.database.consecutiveFailures = 0;
+				state.database.synchronousConfirmed = false;
+				state.database.phase = regionId === "eu-central" ? "normal" : "active";
+			} else if (action === "database-fence-stale") {
+				if (regionId !== "eu-central" && regionId !== "us-east")
+					return adminJson(
+						request,
+						env,
+						{ error: "valid database region is required" },
+						400,
+					);
+				if (regionId === state.database.activeRegion)
+					return adminJson(
+						request,
+						env,
+						{ error: "refusing to fence the active database region" },
+						409,
+					);
+				const binding =
+					regionId === "eu-central"
+						? databaseEnv.DATABASE_EU
+						: databaseEnv.DATABASE_US;
+				if (!binding)
+					return adminJson(
+						request,
+						env,
+						{ error: "target database Hyperdrive binding is missing" },
+						409,
+					);
+				await fenceDatabase(
+					binding,
+					databaseEnv.DATABASE_APP_ROLE || "silo_app",
+					databaseEnv.DATABASE_NAME || "silo",
+				);
+			} else {
+				return adminJson(request, env, { error: "unknown action" }, 404);
+			}
+			state.updatedAt = new Date().toISOString();
+			await putState(env, state);
+			return adminJson(request, env, { ok: true, databaseHa: state.database });
+		}
+		if (!region)
+			return adminJson(
+				request,
+				env,
+				{ error: "valid region is required" },
+				400,
+			);
+		const runtime = state.regions[region.id];
 		if (action === "activate-failover") {
 			const target = chooseFailoverCandidate(
 				env,
@@ -2412,6 +2826,7 @@ async function publicStatus(
 	registry: RegionConfig[],
 ): Promise<unknown> {
 	const state = await getState(env, registry);
+	const databaseAutomation = env as Env & { AUTO_FAILOVER_DATABASE?: string };
 	const incidents = await env.DB.prepare(
 		"SELECT id, status, title, started_at AS startedAt, resolved_at AS resolvedAt, acknowledged_at AS acknowledgedAt, acknowledgement_message AS acknowledgementMessage FROM incidents ORDER BY datetime(started_at) DESC LIMIT 10",
 	).all();
@@ -2504,7 +2919,10 @@ async function publicStatus(
 	);
 	const legacyComponents: Record<string, ComponentStatus> = {
 		dashboard: state.components["control-plane"] || "unknown",
-		database: state.components["aiven-postgresql"] || "unknown",
+		database:
+			state.components["postgresql-ha"] ||
+			state.components["aiven-postgresql"] ||
+			"unknown",
 		storage: state.components["global-s3"] || "unknown",
 		s3Api: state.components["global-s3"] || "unknown",
 		uploads: state.components["global-s3"] || "unknown",
@@ -2513,6 +2931,13 @@ async function publicStatus(
 	};
 	return {
 		overall: state.overall,
+		databaseHa: {
+			controller: "cloudflare-worker",
+			...state.database,
+			configured: "postgresql-ha" in state.components,
+			automationEnabled: databaseAutomation.AUTO_FAILOVER_DATABASE === "true",
+			drillApproved: env.FAILOVER_DRILL_APPROVED === "true",
+		},
 		components: { ...state.components, ...legacyComponents },
 		componentDefinitions,
 		componentAvailability,
@@ -2550,6 +2975,38 @@ function definitions(registry: RegionConfig[]): ComponentDefinition[] {
 			id: "aiven-postgresql",
 			name: "Aiven PostgreSQL",
 			description: "Authoritative global metadata and coordination",
+			group: "global",
+		},
+		{
+			id: "postgresql-ha",
+			name: "Silo PostgreSQL HA",
+			description:
+				"EU primary, US hot standby, and Cloudflare-controlled promotion",
+			group: "global",
+		},
+		{
+			id: "database-ha-controller",
+			name: "Database HA Controller",
+			description:
+				"Independent Cloudflare Worker witness, fencing, and promotion controller",
+			group: "global",
+		},
+		{
+			id: "postgresql-replication",
+			name: "PostgreSQL Cross-region Replication",
+			description: "Synchronous WAL durability and replica freshness",
+			group: "global",
+		},
+		{
+			id: "clickhouse-logs",
+			name: "Request Log Analytics",
+			description: "EU and US ClickHouse query availability",
+			group: "global",
+		},
+		{
+			id: "clickhouse-log-redundancy",
+			name: "Request Log Redundancy",
+			description: "Durable dual-region delivery and recent-event parity",
 			group: "global",
 		},
 	];
@@ -2727,6 +3184,50 @@ async function ok(url: string): Promise<boolean> {
 		return (await fetchWithDeadline(url, { redirect: "manual" })).ok;
 	} catch {
 		return false;
+	}
+}
+async function probeClickHouse(
+	url: string,
+	user: string,
+	password: string,
+): Promise<ClickHouseProbe> {
+	try {
+		const endpoint = new URL(url);
+		if (endpoint.protocol !== "https:") throw new Error("HTTPS is required");
+		endpoint.searchParams.set("database", "silo_logs");
+		const response = await fetchWithDeadline(
+			endpoint,
+			{
+				method: "POST",
+				headers: {
+					Authorization: `Basic ${btoa(`${user}:${password}`)}`,
+					"Content-Type": "text/plain; charset=utf-8",
+				},
+				body: `SELECT uniqExact(request_id) AS recentRows,
+					formatDateTime(max(event_time), '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS latestEventAt
+				FROM request_logs FINAL
+				WHERE event_time >= now() - INTERVAL 15 MINUTE
+				FORMAT JSONEachRow`,
+			},
+			8_000,
+		);
+		if (!response.ok)
+			throw new Error(`ClickHouse returned HTTP ${response.status}`);
+		const row = JSON.parse((await response.text()).trim()) as {
+			recentRows?: string | number;
+			latestEventAt?: string;
+		};
+		return {
+			reachable: true,
+			recentRows: Number(row.recentRows || 0),
+			latestEventAt: row.latestEventAt || undefined,
+		};
+	} catch (error) {
+		return {
+			reachable: false,
+			recentRows: 0,
+			error: error instanceof Error ? error.message : String(error),
+		};
 	}
 }
 async function fetchWithDeadline(

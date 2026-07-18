@@ -41,6 +41,11 @@ services:
       OTEL_METRIC_EXPORT_INTERVAL: "${OTEL_METRIC_EXPORT_INTERVAL:-10000}"
       OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=production,service.version=${GIT_SHA:-unknown},silo.region=global"
       OTEL_SERVICE_NAME: "silo-control-plane"
+      SILO_REGION: "eu-central"
+      SILO_INSTANCE_ID: "control-plane-eu"
+      CLICKHOUSE_QUERY_URLS: "${CLICKHOUSE_QUERY_URLS:-}"
+      CLICKHOUSE_QUERY_USER: "${CLICKHOUSE_QUERY_USER:-silo_query}"
+      CLICKHOUSE_QUERY_PASSWORD: "${CLICKHOUSE_QUERY_PASSWORD:-}"
     depends_on:
       dragonfly:
         condition: service_started
@@ -87,6 +92,11 @@ services:
       DATAPLANE_PUBLIC_SCHEME: "https"
       DATAPLANE_WRITER_INSTANCE_ID: "${SILO_INSTANCE_ID:-}"
       DATAPLANE_WRITER_AUTO_CLAIM: "true"
+      # Reserve enough shared-pool capacity for foreground S3/readiness work.
+      # Before raising these, keep the sum across all regional dataplanes and
+      # the control plane below the managed PostgreSQL connection limit.
+      DATAPLANE_DATABASE_MAX_CONNECTIONS: "${DATAPLANE_DATABASE_MAX_CONNECTIONS:-3}"
+      DATAPLANE_REPLICATION_WORKERS: "${DATAPLANE_REPLICATION_WORKERS:-1}"
       DATAPLANE_FAILOVER_REGIONS: "${DATAPLANE_FAILOVER_REGIONS:-}"
       CONTROL_PLANE_URL: "${CONTROL_PLANE_URL:-}"
       DISK_CACHE_DIR: "/var/cache/silo-dataplane"

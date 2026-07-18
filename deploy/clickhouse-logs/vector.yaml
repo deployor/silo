@@ -1,0 +1,97 @@
+data_dir: /var/lib/vector
+
+sources:
+  docker_json:
+    type: file
+    include:
+      - /var/lib/docker/containers/*/*.log
+    read_from: end
+    ignore_older_secs: 86400
+
+transforms:
+  access_requests:
+    type: remap
+    inputs: [docker_json]
+    drop_on_abort: true
+    source: |-
+      outer = parse_json!(string!(.message))
+      event = object!(parse_json!(strip_whitespace(string!(outer.log))))
+      if exists(event.fields) {
+        event = merge(event, object!(event.fields), deep: true)
+      }
+      if event.event != "silo.request" {
+        abort
+      }
+      parsed_event_time = parse_timestamp!(string!(event.event_time), format: "%+")
+      . = {
+        "event_time": format_timestamp!(parsed_event_time, format: "%Y-%m-%d %H:%M:%S.%3f"),
+        "request_id": string!(event.request_id),
+        "region": string(event.region) ?? "unknown",
+        "service": string(event.service) ?? "unknown",
+        "instance": string(event.instance) ?? "unknown",
+        "storage_region": string(event.storage_region) ?? "",
+        "action": string(event.action) ?? "",
+        "bucket_id": string(event.bucket_id) ?? "",
+        "bucket_name": string(event.bucket_name) ?? "",
+        "owner_id": string(event.owner_id) ?? "",
+        "requester_id": string(event.requester_id) ?? "",
+        "method": string!(event.method),
+        "path": string!(event.path),
+        "status_code": to_int!(event.status_code),
+        "ingress_bytes": to_int(event.ingress_bytes) ?? 0,
+        "egress_bytes": to_int(event.egress_bytes) ?? 0,
+        "latency_ms": to_int(event.latency_ms) ?? 0,
+        "ip_address": string(event.ip_address) ?? "",
+        "user_agent": string(event.user_agent) ?? ""
+      }
+
+sinks:
+  clickhouse_local:
+    type: clickhouse
+    inputs: [access_requests]
+    endpoint: ${CLICKHOUSE_LOCAL_URL}
+    database: silo_logs
+    table: request_logs
+    auth:
+      strategy: basic
+      user: silo_ingest
+      password: ${CLICKHOUSE_INGEST_PASSWORD}
+    compression: gzip
+    skip_unknown_fields: false
+    batch:
+      max_events: 10000
+      timeout_secs: 2
+    buffer:
+      type: disk
+      max_size: 10737418240
+      when_full: block
+    request:
+      retry_attempts: 2147483647
+      retry_initial_backoff_secs: 1
+      retry_max_duration_secs: 30
+      timeout_secs: 30
+
+  clickhouse_remote:
+    type: clickhouse
+    inputs: [access_requests]
+    endpoint: ${CLICKHOUSE_REMOTE_URL}
+    database: silo_logs
+    table: request_logs
+    auth:
+      strategy: basic
+      user: silo_ingest
+      password: ${CLICKHOUSE_INGEST_PASSWORD}
+    compression: gzip
+    skip_unknown_fields: false
+    batch:
+      max_events: 10000
+      timeout_secs: 2
+    buffer:
+      type: disk
+      max_size: 10737418240
+      when_full: block
+    request:
+      retry_attempts: 2147483647
+      retry_initial_backoff_secs: 1
+      retry_max_duration_secs: 30
+      timeout_secs: 30

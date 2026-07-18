@@ -1,15 +1,15 @@
 import { randomBytes } from "node:crypto";
 import { AwsClient } from "aws4fetch";
-import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { config } from "../../config";
 import { db } from "../../db";
 import {
+	adminAuditLogs,
 	bucketDeletionTombstones,
 	bucketKeys,
 	buckets,
 	dataplaneMutationIntents,
-	requestLogs,
 	sessions,
 	users,
 } from "../../db/schema";
@@ -36,6 +36,7 @@ import {
 	getMaintenanceStatus,
 	MAINTENANCE_ERROR,
 } from "../../services/maintenance-service";
+import { requestLogStore } from "../../services/request-log-store";
 import {
 	getAppSettings,
 	updateAppSettings,
@@ -424,8 +425,19 @@ async function getUserBuckets(userId: string) {
 }
 
 async function listAdminBuckets(url: URL) {
-	const limit = Number.parseInt(url.searchParams.get("limit") || "50", 10);
-	const offset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
+	const parsedLimit = Number.parseInt(
+		url.searchParams.get("limit") || "50",
+		10,
+	);
+	const parsedOffset = Number.parseInt(
+		url.searchParams.get("offset") || "0",
+		10,
+	);
+	const limit = Math.max(
+		1,
+		Math.min(Number.isFinite(parsedLimit) ? parsedLimit : 50, 250),
+	);
+	const offset = Math.max(0, Number.isFinite(parsedOffset) ? parsedOffset : 0);
 	const search = url.searchParams.get("search")?.trim();
 	const pausedOnly = url.searchParams.get("pausedOnly") === "true";
 	const sortBy = url.searchParams.get("sortBy") || "totalRequests";
@@ -448,38 +460,6 @@ async function listAdminBuckets(url: URL) {
 
 	const conditions = filters.length > 0 ? and(...filters) : undefined;
 
-	const orderFn = sortOrder === "asc" ? asc : desc;
-	const orderBy = (() => {
-		switch (sortBy) {
-			case "name":
-				return orderFn(buckets.name);
-			case "totalBytes":
-				return orderFn(buckets.totalBytes);
-			case "egressBytes":
-				return orderFn(
-					sql<number>`COALESCE(sum(${requestLogs.egressBytes}), 0)`.mapWith(
-						Number,
-					),
-				);
-			case "getRequests":
-				return orderFn(
-					sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'GET' then 1 else 0 end), 0)`.mapWith(
-						Number,
-					),
-				);
-			case "putRequests":
-				return orderFn(
-					sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'PUT' then 1 else 0 end), 0)`.mapWith(
-						Number,
-					),
-				);
-			case "updatedAt":
-				return orderFn(buckets.updatedAt);
-			default:
-				return orderFn(buckets.totalRequests);
-		}
-	})();
-
 	const query = db
 		.select({
 			id: buckets.id,
@@ -490,61 +470,66 @@ async function listAdminBuckets(url: URL) {
 			isPaused: buckets.isPaused,
 			pauseReason: buckets.pauseReason,
 			totalBytes: buckets.totalBytes,
-			totalRequests: buckets.totalRequests,
-			getRequests:
-				sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'GET' then 1 else 0 end), 0)`.mapWith(
-					Number,
-				),
-			putRequests:
-				sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'PUT' then 1 else 0 end), 0)`.mapWith(
-					Number,
-				),
-			deleteRequests:
-				sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'DELETE' then 1 else 0 end), 0)`.mapWith(
-					Number,
-				),
-			headRequests:
-				sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'HEAD' then 1 else 0 end), 0)`.mapWith(
-					Number,
-				),
-			egressBytes:
-				sql<number>`COALESCE(sum(${requestLogs.egressBytes}), 0)`.mapWith(
-					Number,
-				),
-			ingressBytes:
-				sql<number>`COALESCE(sum(${requestLogs.ingressBytes}), 0)`.mapWith(
-					Number,
-				),
+			transactionalTotalRequests: buckets.totalRequests,
 			updatedAt: buckets.updatedAt,
 			createdAt: buckets.createdAt,
 		})
 		.from(buckets)
-		.leftJoin(users, eq(buckets.userId, users.id))
-		.leftJoin(requestLogs, eq(requestLogs.bucketName, buckets.name))
-		.groupBy(buckets.id, users.id)
-		.orderBy(orderBy)
-		.limit(limit)
-		.offset(offset);
+		.leftJoin(users, eq(buckets.userId, users.id));
 
 	if (conditions) {
 		query.where(conditions);
 	}
 
-	const rows = await query;
-
-	const countQuery = db
-		.select({ count: sql<number>`count(*)` })
-		.from(buckets)
-		.leftJoin(users, eq(buckets.userId, users.id));
-	if (conditions) {
-		countQuery.where(conditions);
-	}
-	const countRes = await countQuery;
-	const total = Number(countRes[0]?.count || 0);
+	const [bucketRows, requestAggregates] = await Promise.all([
+		query,
+		requestLogStore.bucketAggregates().catch((error) => {
+			console.error("ClickHouse request aggregates unavailable:", error);
+			return new Map();
+		}),
+	]);
+	const rows = bucketRows.map((bucket) => {
+		const aggregate = requestAggregates.get(bucket.name);
+		return {
+			...bucket,
+			totalRequests:
+				aggregate?.totalRequests ||
+				Number(bucket.transactionalTotalRequests || 0),
+			getRequests: aggregate?.getRequests || 0,
+			putRequests: aggregate?.putRequests || 0,
+			deleteRequests: aggregate?.deleteRequests || 0,
+			headRequests: aggregate?.headRequests || 0,
+			egressBytes: aggregate?.egressBytes || 0,
+			ingressBytes: aggregate?.ingressBytes || 0,
+		};
+	});
+	const sortable = new Set([
+		"name",
+		"totalBytes",
+		"totalRequests",
+		"egressBytes",
+		"getRequests",
+		"putRequests",
+		"updatedAt",
+	]);
+	const sortKey = sortable.has(sortBy) ? sortBy : "totalRequests";
+	rows.sort((left, right) => {
+		const a = left[sortKey as keyof typeof left];
+		const b = right[sortKey as keyof typeof right];
+		const comparison =
+			a instanceof Date && b instanceof Date
+				? a.getTime() - b.getTime()
+				: typeof a === "number" && typeof b === "number"
+					? a - b
+					: String(a ?? "").localeCompare(String(b ?? ""));
+		return sortOrder === "asc" ? comparison : -comparison;
+	});
+	const total = rows.length;
+	const page = rows.slice(offset, offset + limit);
 
 	return new Response(
 		JSON.stringify({
-			buckets: rows,
+			buckets: page,
 			total,
 			limit,
 			offset,
@@ -1763,108 +1748,74 @@ async function deleteFile(bucketName: string, url: URL) {
 }
 
 async function listLogs(url: URL) {
-	const limit = Number.parseInt(url.searchParams.get("limit") || "50", 10);
-	const offset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
+	const requestedLimit = Number.parseInt(
+		url.searchParams.get("limit") || "50",
+		10,
+	);
+	const requestedOffset = Number.parseInt(
+		url.searchParams.get("offset") || "0",
+		10,
+	);
+	const limit = Math.max(
+		1,
+		Math.min(Number.isFinite(requestedLimit) ? requestedLimit : 50, 250),
+	);
+	const offset = Math.max(
+		0,
+		Number.isFinite(requestedOffset) ? requestedOffset : 0,
+	);
 	const search = url.searchParams.get("search");
 	const bucketFilter = url.searchParams.get("bucket");
 	const methodFilter = url.searchParams.get("method");
 	const statusFilter = url.searchParams.get("status");
 	const ipFilter = url.searchParams.get("ip");
-	const sortBy = url.searchParams.get("sortBy") || "createdAt";
-	const sortOrder = url.searchParams.get("sortOrder") || "desc";
-
-	const filters = [];
-
-	if (search) {
-		filters.push(
-			or(
-				ilike(requestLogs.path, `%${search}%`),
-				ilike(requestLogs.method, `%${search}%`),
-				ilike(requestLogs.bucketName, `%${search}%`),
-				ilike(users.email, `%${search}%`),
-				ilike(requestLogs.userAgent, `%${search}%`),
-				ilike(requestLogs.ipAddress, `%${search}%`),
-				ilike(requestLogs.requesterId, `%${search}%`),
-				// Cast status code to text for search
-				sql`CAST(${requestLogs.statusCode} AS TEXT) ILIKE ${`%${search}%`}`,
-			),
-		);
-	}
-
-	if (bucketFilter) {
-		filters.push(eq(requestLogs.bucketName, bucketFilter));
-	}
-	if (methodFilter) {
-		filters.push(eq(requestLogs.method, methodFilter));
-	}
-	if (statusFilter) {
-		filters.push(eq(requestLogs.statusCode, Number.parseInt(statusFilter, 10)));
-	}
-	if (ipFilter) {
-		filters.push(eq(requestLogs.ipAddress, ipFilter));
-	}
-
-	const conditions = filters.length > 0 ? and(...filters) : undefined;
-
-	const orderFn = sortOrder === "asc" ? asc : desc;
-	const orderBy = (() => {
-		switch (sortBy) {
-			case "latencyMs":
-				return orderFn(requestLogs.latencyMs);
-			case "ingressBytes":
-				return orderFn(requestLogs.ingressBytes);
-			case "egressBytes":
-				return orderFn(requestLogs.egressBytes);
-			case "statusCode":
-				return orderFn(requestLogs.statusCode);
-			default:
-				return orderFn(requestLogs.createdAt);
-		}
-	})();
-
-	const logsQuery = db
-		.select({
-			id: requestLogs.id,
-			method: requestLogs.method,
-			path: requestLogs.path,
-			statusCode: requestLogs.statusCode,
-			latencyMs: requestLogs.latencyMs,
-			createdAt: requestLogs.createdAt,
-			bucketName: requestLogs.bucketName,
-			ownerEmail: users.email,
-			ipAddress: requestLogs.ipAddress,
-			ingressBytes: requestLogs.ingressBytes,
-			egressBytes: requestLogs.egressBytes,
-			userAgent: requestLogs.userAgent,
-			requesterId: requestLogs.requesterId,
-			requestId: requestLogs.id,
-		})
-		.from(requestLogs)
-		.leftJoin(users, eq(requestLogs.ownerId, users.id))
-		.orderBy(orderBy)
-		.limit(limit)
-		.offset(offset);
-
-	if (conditions) {
-		logsQuery.where(conditions);
-	}
-
-	const logs = await logsQuery;
-
-	let total = 0;
-	if (conditions) {
-		const countRes = await db
-			.select({ count: sql<number>`count(*)` })
-			.from(requestLogs)
-			.leftJoin(users, eq(requestLogs.ownerId, users.id))
-			.where(conditions);
-		total = Number(countRes[0].count);
-	} else {
-		const countRes = await db
-			.select({ count: sql<number>`count(*)` })
-			.from(requestLogs);
-		total = Number(countRes[0].count);
-	}
+	const allowedSorts = new Set([
+		"createdAt",
+		"latencyMs",
+		"ingressBytes",
+		"egressBytes",
+		"statusCode",
+	]);
+	const requestedSort = url.searchParams.get("sortBy") || "createdAt";
+	const sortBy = (
+		allowedSorts.has(requestedSort) ? requestedSort : "createdAt"
+	) as
+		| "createdAt"
+		| "latencyMs"
+		| "ingressBytes"
+		| "egressBytes"
+		| "statusCode";
+	const parsedStatus = statusFilter
+		? Number.parseInt(statusFilter, 10)
+		: undefined;
+	const { logs, total } = await requestLogStore.list({
+		limit,
+		offset,
+		search,
+		bucket: bucketFilter,
+		method: methodFilter,
+		status:
+			parsedStatus !== undefined && parsedStatus >= 0 && parsedStatus <= 999
+				? parsedStatus
+				: undefined,
+		ip: ipFilter,
+		sortBy,
+		sortOrder: url.searchParams.get("sortOrder") === "asc" ? "asc" : "desc",
+	});
+	const ownerIds = [
+		...new Set(logs.map((log) => log.ownerId).filter(Boolean)),
+	] as string[];
+	const ownerRows = ownerIds.length
+		? await db
+				.select({ id: users.id, email: users.email })
+				.from(users)
+				.where(inArray(users.id, ownerIds))
+		: [];
+	const ownerEmails = new Map(
+		ownerRows.map((owner) => [owner.id, owner.email]),
+	);
+	for (const log of logs)
+		log.ownerEmail = log.ownerId ? ownerEmails.get(log.ownerId) || null : null;
 
 	return new Response(
 		JSON.stringify({
@@ -2188,23 +2139,16 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					})
 					.where(eq(sessions.id, sessionId));
 
-				// Audit log (very lightweight; will show up in Admin Logs)
-				await db.insert(requestLogs).values({
-					bucketId: null,
-					bucketName: null,
-					ownerId: targetUserId,
-					requesterId: user.id,
-					method: "ADMIN",
-					path: `impersonate:start:${targetUserId}`,
-					statusCode: 200,
-					ingressBytes: 0,
-					egressBytes: 0,
+				await db.insert(adminAuditLogs).values({
+					targetUserId,
+					actorUserId: user.id,
+					action: "impersonate.start",
 					ipAddress:
 						req.headers.get("x-forwarded-for") ||
 						req.headers.get("cf-connecting-ip") ||
 						"unknown",
 					userAgent: req.headers.get("user-agent") || "Admin",
-					latencyMs: 0,
+					metadata: { expiresAt: impersonationExpiresAt.toISOString() },
 				});
 
 				const headers = new Headers({ "Content-Type": "application/json" });
@@ -2270,23 +2214,16 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					})
 					.where(eq(sessions.id, sessionId));
 
-				// Audit log
-				await db.insert(requestLogs).values({
-					bucketId: null,
-					bucketName: null,
-					ownerId: sess[0].impersonatedUserId,
-					requesterId: user.id,
-					method: "ADMIN",
-					path: `impersonate:stop:${sess[0].impersonatedUserId}`,
-					statusCode: 200,
-					ingressBytes: 0,
-					egressBytes: 0,
+				await db.insert(adminAuditLogs).values({
+					targetUserId: sess[0].impersonatedUserId,
+					actorUserId: user.id,
+					action: "impersonate.stop",
 					ipAddress:
 						req.headers.get("x-forwarded-for") ||
 						req.headers.get("cf-connecting-ip") ||
 						"unknown",
 					userAgent: req.headers.get("user-agent") || "Admin",
-					latencyMs: 0,
+					metadata: {},
 				});
 
 				const headers = new Headers({ "Content-Type": "application/json" });

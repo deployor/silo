@@ -8,6 +8,7 @@ import {
 	foreignKey,
 	index,
 	integer,
+	jsonb,
 	pgTable,
 	primaryKey,
 	text,
@@ -267,37 +268,37 @@ export const bucketCollaborators = pgTable(
 	},
 );
 
-export const requestLogs = pgTable(
-	"request_logs",
+// Correctness-relevant operator actions remain in PostgreSQL. High-volume
+// access telemetry lives in the redundant ClickHouse log plane.
+export const adminAuditLogs = pgTable(
+	"admin_audit_logs",
 	{
 		id: uuid("id").defaultRandom().primaryKey(),
-		bucketId: uuid("bucket_id").references(() => buckets.id, {
+		actorUserId: text("actor_user_id").references(() => users.id, {
 			onDelete: "set null",
 		}),
-		bucketName: text("bucket_name"),
-		ownerId: text("owner_id").references(() => users.id, {
+		targetUserId: text("target_user_id").references(() => users.id, {
 			onDelete: "set null",
 		}),
-		requesterId: text("requester_id").references(() => users.id, {
-			onDelete: "set null",
-		}),
-		method: text("method").notNull(), // GET, PUT, DELETE, HEAD
-		path: text("path").notNull(), // The object key or path
-		statusCode: bigint("status_code", { mode: "number" }).notNull(),
-		ingressBytes: bigint("ingress_bytes", { mode: "number" }).default(0),
-		egressBytes: bigint("egress_bytes", { mode: "number" }).default(0),
+		action: text("action").notNull(),
 		ipAddress: text("ip_address"),
 		userAgent: text("user_agent"),
-		latencyMs: bigint("latency_ms", { mode: "number" }),
+		metadata: jsonb("metadata")
+			.$type<Record<string, unknown>>()
+			.notNull()
+			.default({}),
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 	},
-	(table) => {
-		return {
-			ownerIdx: index("log_owner_idx").on(table.ownerId),
-			bucketIdx: index("log_bucket_idx").on(table.bucketId),
-			createdAtIdx: index("log_created_at_idx").on(table.createdAt),
-		};
-	},
+	(table) => ({
+		actorCreatedIdx: index("admin_audit_actor_created_idx").on(
+			table.actorUserId,
+			table.createdAt,
+		),
+		targetCreatedIdx: index("admin_audit_target_created_idx").on(
+			table.targetUserId,
+			table.createdAt,
+		),
+	}),
 );
 
 export const objectStats = pgTable(

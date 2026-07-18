@@ -83,6 +83,14 @@ control plane plus every dataplane during failover. Allow both regional hosts
 and the control plane. There must be no per-region database and no SQLite/local
 Postgres fallback.
 
+Budget the configured limit explicitly. With the shipped two-region defaults,
+the steady-state ceiling is `2 control-plane + (2 × 3 dataplane query) +
+(2 × 2 writer-fence) = 12` application connections. Leave provider/admin
+headroom above that ceiling. `DATAPLANE_REPLICATION_WORKERS=1` is intentional
+on small managed plans: replication uses the shared query pool, so increasing
+worker concurrency without also re-budgeting PostgreSQL can starve foreground
+S3 and `/ready` requests.
+
 Before migration, verify globally unique S3 bucket names:
 
 ```sql

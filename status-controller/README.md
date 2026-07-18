@@ -149,7 +149,14 @@ FAILOVER_ACTIVATION_URLS
 FAILOVER_DEACTIVATION_URLS
 FAILOVER_HOOK_SECRET
 ALERT_WEBHOOK_URL                 # optional
+CLICKHOUSE_QUERY_PASSWORD
 ```
+
+`CLICKHOUSE_EU_HEALTH_URL` and `CLICKHOUSE_US_HEALTH_URL` are fixed HTTPS
+origins for the independent log replicas. The Worker queries both every minute
+and publishes separate availability and recent-event parity components. The
+query credential is read-only. Never give the status Worker an ingest or
+ClickHouse administration credential.
 
 `CLOUDFLARE_API_BASE` is a test override. Leave it unset in production.
 

@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db";
-import { objectStats, requestLogs } from "../db/schema";
+import { objectStats } from "../db/schema";
 import { getContext } from "../lib/context";
 import { getMaintenanceStatus } from "./maintenance-service";
 
@@ -42,7 +42,6 @@ class LogService {
 	private queue: LogEntry[] = [];
 	private flushTimer: Timer | null = null;
 	private readonly BATCH_SIZE = 100;
-	private readonly INSERT_CHUNK_SIZE = 250;
 	private readonly FLUSH_INTERVAL_MS = 5000;
 
 	public logRequest(response: Response, ingress: number = 0) {
@@ -52,7 +51,7 @@ class LogService {
 		const duration = Math.round(performance.now() - ctx.startTime);
 		const egress = parseInt(response.headers.get("content-length") || "0", 10);
 
-		this.queue.push({
+		const entry = {
 			id: ctx.requestId,
 			bucketId: ctx.bucket.id,
 			bucketName: ctx.bucket.name,
@@ -66,7 +65,37 @@ class LogService {
 			ipAddress: ctx.ip,
 			userAgent: ctx.userAgent ? ctx.userAgent.slice(0, 255) : null,
 			latencyMs: duration,
-		});
+		};
+
+		// Access telemetry is append-only analytics data. Emit a structured event
+		// for the regional Vector collectors; they durably deliver it to both
+		// ClickHouse nodes. S3 success never depends on either log database.
+		console.log(
+			JSON.stringify({
+				event: "silo.request",
+				event_time: new Date().toISOString(),
+				request_id: entry.id,
+				region: process.env.SILO_REGION || "global",
+				service: "silo-control-plane",
+				instance: process.env.SILO_INSTANCE_ID || "control-plane",
+				storage_region: ctx.bucket.resolvedRegion || "",
+				action: "dashboard",
+				bucket_id: entry.bucketId,
+				bucket_name: entry.bucketName,
+				owner_id: entry.ownerId,
+				requester_id: entry.requesterId || "",
+				method: entry.method,
+				path: entry.path,
+				status_code: entry.statusCode,
+				ingress_bytes: entry.ingressBytes,
+				egress_bytes: entry.egressBytes,
+				ip_address: entry.ipAddress,
+				user_agent: entry.userAgent || "",
+				latency_ms: entry.latencyMs,
+			}),
+		);
+
+		this.queue.push(entry);
 
 		if (this.queue.length >= this.BATCH_SIZE) {
 			this.flush();
@@ -77,7 +106,10 @@ class LogService {
 
 	private async flush() {
 		if (this.queue.length === 0) return;
-		if ((await getMaintenanceStatus()).fullMaintenanceMode) return;
+		if ((await getMaintenanceStatus()).fullMaintenanceMode) {
+			this.scheduleFlush();
+			return;
+		}
 
 		if (this.flushTimer) {
 			clearTimeout(this.flushTimer);
@@ -88,12 +120,6 @@ class LogService {
 		this.queue = [];
 
 		try {
-			for (let i = 0; i < batch.length; i += this.INSERT_CHUNK_SIZE) {
-				await db
-					.insert(requestLogs)
-					.values(batch.slice(i, i + this.INSERT_CHUNK_SIZE));
-			}
-
 			const objectEntries = batch.filter(
 				(entry) =>
 					entry.path.startsWith("/") &&

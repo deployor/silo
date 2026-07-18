@@ -57,7 +57,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
-      - run: bun test src/index.test.ts
+      - run: bun test src/index.test.ts src/database-ha.test.ts
       - run: npx --yes wrangler@4.112.0 types worker-configuration.d.ts --config wrangler.jsonc --env-file .dev.vars.example --strict-vars false --check
       - run: npx --yes --package typescript@5.9.3 tsc --noEmit -p tsconfig.json
       - run: npx --yes wrangler@4.112.0 d1 migrations apply silo-status --local --config wrangler.jsonc
@@ -91,6 +91,85 @@ jobs:
       - name: Verify the multi-region migration is replay-safe
         run: psql -h 127.0.0.1 -U postgres -d silo -v ON_ERROR_STOP=1 -f drizzle/0005_multi_region_control_plane.sql
 
+  postgres-ha-compose:
+    name: PostgreSQL HA and PgDog topology
+    runs-on: ubuntu-latest
+    env:
+      SILO_POSTGRES_IMAGE: postgres:17.5-bookworm
+      POSTGRES_TLS_CA_B64: Y2ktY2E=
+      POSTGRES_TLS_CERT_B64: Y2ktY2VydA==
+      POSTGRES_TLS_KEY_B64: Y2kta2V5
+      POSTGRES_SUPERUSER_PASSWORD: ci-only-superuser
+      SILO_DATABASE_PASSWORD: ci-only-app
+      POSTGRES_REPLICATION_PASSWORD: ci-only-replication
+      PGDOG_ADMIN_PASSWORD: ci-only-pgdog
+      PGBACKREST_REPO1_ENDPOINT: s3.eu.example.test
+      PGBACKREST_REPO1_BUCKET: silo-db-backup-eu
+      PGBACKREST_REPO1_KEY: ci-repo1-key
+      PGBACKREST_REPO1_KEY_SECRET: ci-repo1-secret
+      PGBACKREST_REPO2_ENDPOINT: s3.us.example.test
+      PGBACKREST_REPO2_BUCKET: silo-db-backup-us
+      PGBACKREST_REPO2_KEY: ci-repo2-key
+      PGBACKREST_REPO2_KEY_SECRET: ci-repo2-secret
+      PGBACKREST_CIPHER_PASS: ci-only-backup-cipher
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate EU and US database topology
+        run: |
+          set -euo pipefail
+          for file in deploy/postgres-ha/docker-compose.eu.yml deploy/postgres-ha/docker-compose.us.yml; do
+            docker compose -f "$file" config --quiet
+          done
+      - name: Validate PgDog configuration
+        run: |
+          set -euo pipefail
+          config_dir=$(mktemp -d)
+          docker run --rm \
+            -v "$PWD/deploy/postgres-ha/pgdog-configure.sh:/configure.sh:ro" \
+            -v "$config_dir:/config" \
+            -e SILO_DATABASE_NAME=silo \
+            -e SILO_DATABASE_USER=silo_app \
+            -e SILO_DATABASE_PASSWORD=ci-only-app \
+            -e PGDOG_ADMIN_PASSWORD=ci-only-pgdog \
+            -e PGDOG_EU_HOST=db-eu.onsilo.dev \
+            -e PGDOG_US_HOST=db-us.onsilo.dev \
+            alpine:3.22 sh /configure.sh
+          touch "$config_dir/ca.crt"
+          docker run --rm \
+            -v "$config_dir:/config:ro" \
+            -v "$config_dir:/tls:ro" \
+            ghcr.io/pgdogdev/pgdog:v0.1.48@sha256:c8d900deea2f760b5b9711d2582e8bfdf64caa45d42ad3683567e90efc3bf646 \
+            pgdog -c /config/pgdog.toml -u /config/users.toml configcheck
+
+  clickhouse-log-plane:
+    name: ClickHouse dual-region log topology
+    runs-on: ubuntu-latest
+    env:
+      SILO_REGION: eu-central
+      CLICKHOUSE_NETWORK_ALIAS: silo-clickhouse-eu
+      CLICKHOUSE_ADMIN_PASSWORD: ci-admin
+      CLICKHOUSE_INGEST_PASSWORD: ci-ingest
+      CLICKHOUSE_QUERY_PASSWORD: ci-query
+      CLICKHOUSE_LOCAL_URL: http://silo-clickhouse-eu:8123
+      CLICKHOUSE_REMOTE_URL: https://logs-us.invalid
+      CLICKHOUSE_BACKUP_EU_URL: https://s3.eu.invalid/backups/clickhouse
+      CLICKHOUSE_BACKUP_EU_KEY_ID: ci-eu-key
+      CLICKHOUSE_BACKUP_EU_KEY_SECRET: ci-eu-secret
+      CLICKHOUSE_BACKUP_US_URL: https://s3.us.invalid/backups/clickhouse
+      CLICKHOUSE_BACKUP_US_KEY_ID: ci-us-key
+      CLICKHOUSE_BACKUP_US_KEY_SECRET: ci-us-secret
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose and Vector
+        run: |
+          docker compose -f deploy/clickhouse-logs/docker-compose.yml config --quiet
+          docker run --rm \
+            -e CLICKHOUSE_LOCAL_URL=http://127.0.0.1:8123 \
+            -e CLICKHOUSE_REMOTE_URL=http://127.0.0.1:8124 \
+            -e CLICKHOUSE_INGEST_PASSWORD=ci-ingest \
+            -v "$PWD/deploy/clickhouse-logs/vector.yaml:/etc/vector/vector.yaml:ro" \
+            timberio/vector:0.46.1-debian \
+            validate --skip-healthchecks /etc/vector/vector.yaml
   deployment-config:
     name: Regional Compose template
     runs-on: ubuntu-latest

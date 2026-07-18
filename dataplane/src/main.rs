@@ -5,7 +5,7 @@ use std::{
     net::SocketAddr,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, RwLock,
+        Arc, Mutex, RwLock,
     },
     time::Duration,
 };
@@ -254,6 +254,17 @@ struct AuthUser {
     is_immortal: bool,
 }
 
+#[derive(Clone, Debug)]
+struct RequestLogContext {
+    request_id: String,
+    bucket_id: String,
+    bucket_name: String,
+    owner_id: String,
+    requester_id: String,
+    storage_region: String,
+    action: String,
+}
+
 #[derive(Serialize)]
 struct AuthorizeRequest {
     method: String,
@@ -264,6 +275,7 @@ struct AuthorizeRequest {
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
+        .json()
         .with_env_filter(env::var("RUST_LOG").unwrap_or_else(|_| "info,tower_http=warn".into()))
         .init();
 
@@ -1763,9 +1775,42 @@ fn env_bool(name: &str) -> bool {
     )
 }
 
-async fn handle_request(State(state): State<AppState>, req: Request<Body>) -> Response<Body> {
+async fn handle_request(State(state): State<AppState>, mut req: Request<Body>) -> Response<Body> {
     let emergency_mode = state.cfg.emergency_mode;
-    let response = match handle_request_inner(state, req).await {
+    let started = std::time::Instant::now();
+    let method = req.method().to_string();
+    let path = req
+        .uri()
+        .path_and_query()
+        .map(|value| value.as_str())
+        .unwrap_or("/")
+        .to_string();
+    let ingress_bytes = req
+        .headers()
+        .get(header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(0);
+    let ip_address = rate_limit::client_identity(req.headers());
+    let user_agent = req
+        .headers()
+        .get(header::USER_AGENT)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("")
+        .chars()
+        .take(512)
+        .collect::<String>();
+    let log_context = Arc::new(Mutex::new(RequestLogContext {
+        request_id: uuid::Uuid::new_v4().to_string(),
+        bucket_id: String::new(),
+        bucket_name: String::new(),
+        owner_id: String::new(),
+        requester_id: String::new(),
+        storage_region: String::new(),
+        action: String::new(),
+    }));
+    req.extensions_mut().insert(log_context.clone());
+    let response = match handle_request_inner(state.clone(), req).await {
         Ok(res) => res,
         Err(err) => {
             error!(error = %err, "dataplane request failed");
@@ -1776,11 +1821,49 @@ async fn handle_request(State(state): State<AppState>, req: Request<Body>) -> Re
             )
         }
     };
-    with_failover_header(response, emergency_mode)
+    let response = with_failover_header(response, emergency_mode);
+    let egress_bytes = response
+        .headers()
+        .get(header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<u64>().ok())
+        .unwrap_or(0);
+    let context = log_context
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    tracing::info!(
+        event = "silo.request",
+        event_time = %chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+        request_id = %context.request_id,
+        region = %state.cfg.regions.local_region(),
+        service = "silo-dataplane",
+        instance = %state.cfg.writer_instance_id,
+        storage_region = %context.storage_region,
+        action = %context.action,
+        bucket_id = %context.bucket_id,
+        bucket_name = %context.bucket_name,
+        owner_id = %context.owner_id,
+        requester_id = %context.requester_id,
+        method = %method,
+        path = %path,
+        status_code = response.status().as_u16(),
+        ingress_bytes,
+        egress_bytes,
+        latency_ms = started.elapsed().as_millis() as u64,
+        ip_address = %ip_address,
+        user_agent = %user_agent,
+        "silo request completed"
+    );
+    response
 }
 
 async fn handle_request_inner(state: AppState, req: Request<Body>) -> Result<Response<Body>> {
     let (parts, body) = req.into_parts();
+    let request_log = parts
+        .extensions
+        .get::<Arc<Mutex<RequestLogContext>>>()
+        .cloned();
     let method = parts.method.clone();
     let headers = parts.headers.clone();
     let url = reconstruct_url(&state.cfg, &parts.uri, &headers)?;
@@ -1825,6 +1908,21 @@ async fn handle_request_inner(state: AppState, req: Request<Body>) -> Result<Res
     }
 
     let mut auth = authorize(&state, &method, &url, &headers).await?;
+    if let Some(request_log) = request_log.as_ref() {
+        let mut context = request_log
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        context.action = auth.action.clone().unwrap_or_default();
+        if let Some(bucket) = auth.bucket.as_ref() {
+            context.bucket_id = bucket.id.clone();
+            context.bucket_name = bucket.name.clone();
+            context.storage_region = bucket.resolved_region.clone();
+        }
+        if let Some(user) = auth.user.as_ref() {
+            context.owner_id = user.id.clone();
+            context.requester_id = user.id.clone();
+        }
+    }
     if !auth.allowed {
         return Ok(s3_passthrough_error(auth));
     }

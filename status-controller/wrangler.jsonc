@@ -3,6 +3,7 @@
   "name": "silo-status-controller",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-17",
+  "compatibility_flags": ["nodejs_compat_v2"],
   "triggers": {
     "crons": ["* * * * *"]
   },
@@ -20,9 +21,17 @@
     "MAINTENANCE_URL": "https://control-origin.onsilo.dev/api/maintenance-status",
     "DASHBOARD_DNS_NAME": "dash.onsilo.dev",
     "CONTROL_PLANE_ORIGIN_HOST": "control-origin.onsilo.dev",
+    "CF_ZONE_ID": "34a21ef2edadeb27a46276ee028a2192",
+    "CF_DASHBOARD_RECORD_ID": "72efab866490d5bcacca830b64fdb235",
     "STATUS_ADMIN_ORIGINS": "https://status.onsilo.dev",
     "AUTO_ACTIVATE_FAILOVER": "false",
     "AUTO_PROMOTE_STORAGE": "false",
+    "AUTO_FAILOVER_DATABASE": "false",
+    "DATABASE_APP_ROLE": "silo_app",
+    "DATABASE_NAME": "silo",
+    "CLICKHOUSE_EU_HEALTH_URL": "https://logs-eu.onsilo.dev",
+    "CLICKHOUSE_US_HEALTH_URL": "https://logs-us.onsilo.dev",
+    "CLICKHOUSE_QUERY_USER": "silo_query",
     "AUTO_REDIRECT_DASHBOARD": "false",
     "AUTO_RECOVER": "true",
     "FAILOVER_DRILL_APPROVED": "false"
