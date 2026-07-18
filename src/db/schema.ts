@@ -1,10 +1,15 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
 	bigint,
+	bigserial,
 	boolean,
+	check,
 	doublePrecision,
+	foreignKey,
 	index,
+	integer,
 	pgTable,
+	primaryKey,
 	text,
 	timestamp,
 	uniqueIndex,
@@ -70,7 +75,13 @@ export const buckets = pgTable(
 		id: uuid("id").defaultRandom().primaryKey(),
 		name: text("name").notNull(),
 		userId: text("user_id").references(() => users.id),
+		// Legacy signing-region value retained for backwards compatibility.
 		region: text("region").default("auto"),
+		requestedRegion: text("requested_region").default("auto").notNull(),
+		resolvedRegion: text("resolved_region")
+			.default("eu-central")
+			.notNull()
+			.references(() => storageRegionState.regionId, { onDelete: "restrict" }),
 		isPublic: boolean("is_public").default(false).notNull(),
 		isSystem: boolean("is_system").default(false).notNull(),
 		isPaused: boolean("is_paused").default(false).notNull(),
@@ -114,9 +125,52 @@ export const buckets = pgTable(
 	(table) => {
 		return {
 			nameIdx: index("name_idx").on(table.name),
+			nameUniqueIdx: uniqueIndex("buckets_name_unique_idx").on(table.name),
 			userIdIdx: index("user_id_idx").on(table.userId),
+			requestedRegionCheck: check(
+				"buckets_requested_region_check",
+				sql`${table.requestedRegion} ~ '^[a-z0-9][a-z0-9-]*$'`,
+			),
+			resolvedRegionCheck: check(
+				"buckets_resolved_region_check",
+				sql`${table.resolvedRegion} ~ '^[a-z0-9][a-z0-9-]*$'`,
+			),
 		};
 	},
+);
+
+/**
+ * Durable logical tombstones intentionally have no user/bucket foreign keys:
+ * they must survive cascades long enough to audit and reconcile provider
+ * replication after the live bucket row has gone away.
+ */
+export const bucketDeletionTombstones = pgTable(
+	"bucket_deletion_tombstones",
+	{
+		bucketId: uuid("bucket_id").primaryKey(),
+		bucketName: text("bucket_name").notNull(),
+		ownerUserId: text("owner_user_id"),
+		requestedRegion: text("requested_region").notNull(),
+		resolvedRegion: text("resolved_region").notNull(),
+		rootPrefix: text("root_prefix"),
+		deletedByUserId: text("deleted_by_user_id"),
+		deletedAt: timestamp("deleted_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => ({
+		regionDeletedAtIdx: index(
+			"bucket_deletion_tombstones_region_deleted_at_idx",
+		).on(table.resolvedRegion, table.deletedAt),
+		resolvedRegionCheck: check(
+			"bucket_deletion_tombstones_resolved_region_check",
+			sql`${table.resolvedRegion} ~ '^[a-z0-9][a-z0-9-]*$'`,
+		),
+		requestedRegionCheck: check(
+			"bucket_deletion_tombstones_requested_region_check",
+			sql`${table.requestedRegion} ~ '^[a-z0-9][a-z0-9-]*$'`,
+		),
+	}),
 );
 
 export const bucketKeys = pgTable(
@@ -510,4 +564,603 @@ export const deepFreezeJobs = pgTable(
 			),
 		};
 	},
+);
+
+export const dataplaneWriterLeases = pgTable(
+	"dataplane_writer_lease",
+	{
+		name: text("name").primaryKey(),
+		holderId: text("holder_id").notNull(),
+		generation: bigint("generation", { mode: "bigint" }).notNull(),
+		leaseExpiresAt: timestamp("lease_expires_at", {
+			withTimezone: true,
+		}).notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => ({
+		regionNameCheck: check(
+			"dataplane_writer_lease_region_name_check",
+			sql`${table.name} ~ '^s3:[a-z0-9][a-z0-9-]*$'`,
+		),
+	}),
+);
+
+export const storageRegionBackends = pgTable(
+	"storage_region_backends",
+	{
+		regionId: text("region_id").notNull(),
+		backendId: text("backend_id").notNull(),
+		provider: text("provider").notNull(),
+		bucketName: text("bucket_name"),
+		role: text("role").default("primary").notNull(),
+		status: text("status").default("standby").notNull(),
+		promotionAuthorized: boolean("promotion_authorized")
+			.default(false)
+			.notNull(),
+		replicationCheckpoint: bigint("replication_checkpoint", {
+			mode: "bigint",
+		})
+			.default(0n)
+			.notNull(),
+		replicationCaughtUpAt: timestamp("replication_caught_up_at", {
+			withTimezone: true,
+		}),
+		lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true }),
+		// A newly registered replica is not promotable until the dataplane has
+		// copied and verified the complete pre-existing object set. Live event
+		// checkpoints alone cannot prove that historical objects were copied.
+		bootstrapState: text("bootstrap_state").default("pending").notNull(),
+		bootstrapBarrierSequence: bigint("bootstrap_barrier_sequence", {
+			mode: "bigint",
+		}),
+		bootstrapCursor: text("bootstrap_cursor"),
+		bootstrapObjectsCopied: bigint("bootstrap_objects_copied", {
+			mode: "bigint",
+		})
+			.default(0n)
+			.notNull(),
+		bootstrapBytesCopied: bigint("bootstrap_bytes_copied", {
+			mode: "bigint",
+		})
+			.default(0n)
+			.notNull(),
+		bootstrapSourceBackendId: text("bootstrap_source_backend_id"),
+		bootstrapSourceGeneration: bigint("bootstrap_source_generation", {
+			mode: "bigint",
+		}),
+		bootstrapStartedAt: timestamp("bootstrap_started_at", {
+			withTimezone: true,
+		}),
+		bootstrapHeartbeatAt: timestamp("bootstrap_heartbeat_at", {
+			withTimezone: true,
+		}),
+		bootstrapCompletedAt: timestamp("bootstrap_completed_at", {
+			withTimezone: true,
+		}),
+		bootstrapVerifiedAt: timestamp("bootstrap_verified_at", {
+			withTimezone: true,
+		}),
+		bootstrapLastError: text("bootstrap_last_error"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => ({
+		pk: primaryKey({ columns: [table.regionId, table.backendId] }),
+		regionStatusIdx: index("storage_region_backends_region_status_idx").on(
+			table.regionId,
+			table.status,
+		),
+		activeRegionIdx: uniqueIndex("storage_region_backends_one_active_idx")
+			.on(table.regionId)
+			.where(sql`${table.status} = 'active'`),
+		authorizedRegionIdx: uniqueIndex(
+			"storage_region_backends_one_authorized_idx",
+		)
+			.on(table.regionId)
+			.where(sql`${table.promotionAuthorized} = true`),
+		regionIdCheck: check(
+			"storage_region_backends_region_id_check",
+			sql`${table.regionId} ~ '^[a-z0-9][a-z0-9-]*$'`,
+		),
+		backendIdCheck: check(
+			"storage_region_backends_backend_id_check",
+			sql`${table.backendId} ~ '^[a-z0-9][a-z0-9-]*$'`,
+		),
+		roleCheck: check(
+			"storage_region_backends_role_check",
+			sql`${table.role} IN ('primary', 'replica')`,
+		),
+		statusCheck: check(
+			"storage_region_backends_status_check",
+			sql`${table.status} IN ('active', 'standby', 'unavailable', 'disabled')`,
+		),
+		checkpointCheck: check(
+			"storage_region_backends_checkpoint_check",
+			sql`${table.replicationCheckpoint} >= 0`,
+		),
+		bootstrapStateCheck: check(
+			"storage_region_backends_bootstrap_state_check",
+			sql`${table.bootstrapState} IN ('pending', 'running', 'verifying', 'complete', 'failed')`,
+		),
+		bootstrapProgressCheck: check(
+			"storage_region_backends_bootstrap_progress_check",
+			sql`(${table.bootstrapBarrierSequence} IS NULL OR ${table.bootstrapBarrierSequence} >= 0)
+				AND ${table.bootstrapObjectsCopied} >= 0
+				AND ${table.bootstrapBytesCopied} >= 0
+				AND (${table.bootstrapSourceGeneration} IS NULL OR ${table.bootstrapSourceGeneration} > 0)`,
+		),
+		bootstrapCompleteCheck: check(
+			"storage_region_backends_bootstrap_complete_check",
+			sql`${table.bootstrapState} <> 'complete' OR (
+				${table.bootstrapBarrierSequence} IS NOT NULL
+				AND ${table.bootstrapStartedAt} IS NOT NULL
+				AND ${table.bootstrapCompletedAt} IS NOT NULL
+				AND ${table.bootstrapVerifiedAt} IS NOT NULL
+				AND ${table.bootstrapLastError} IS NULL
+				AND ${table.replicationCheckpoint} >= ${table.bootstrapBarrierSequence}
+			)`,
+		),
+		promotionBootstrapCheck: check(
+			"storage_region_backends_promotion_bootstrap_check",
+			sql`${table.promotionAuthorized} = false OR (
+				${table.bootstrapState} = 'complete'
+				AND ${table.bootstrapVerifiedAt} IS NOT NULL
+				AND ${table.bootstrapBarrierSequence} IS NOT NULL
+				AND ${table.replicationCheckpoint} >= ${table.bootstrapBarrierSequence}
+			)`,
+		),
+		bootstrapSourceFk: foreignKey({
+			columns: [table.regionId, table.bootstrapSourceBackendId],
+			foreignColumns: [table.regionId, table.backendId],
+		}),
+	}),
+);
+
+export const storageRegionState = pgTable(
+	"storage_region_state",
+	{
+		regionId: text("region_id").primaryKey(),
+		activeBackendId: text("active_backend_id").notNull(),
+		backendGeneration: bigint("backend_generation", { mode: "bigint" })
+			.default(1n)
+			.notNull(),
+		requiredReplicationCheckpoint: bigint("required_replication_checkpoint", {
+			mode: "bigint",
+		})
+			.default(0n)
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => ({
+		activeBackendFk: foreignKey({
+			columns: [table.regionId, table.activeBackendId],
+			foreignColumns: [
+				storageRegionBackends.regionId,
+				storageRegionBackends.backendId,
+			],
+		}),
+		generationCheck: check(
+			"storage_region_state_generation_check",
+			sql`${table.backendGeneration} > 0`,
+		),
+		checkpointCheck: check(
+			"storage_region_state_checkpoint_check",
+			sql`${table.requiredReplicationCheckpoint} >= 0`,
+		),
+		regionIdCheck: check(
+			"storage_region_state_region_id_check",
+			sql`${table.regionId} ~ '^[a-z0-9][a-z0-9-]*$'`,
+		),
+	}),
+);
+
+export const storageBackendPromotions = pgTable(
+	"storage_backend_promotions",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		regionId: text("region_id").notNull(),
+		fromBackendId: text("from_backend_id").notNull(),
+		toBackendId: text("to_backend_id").notNull(),
+		oldBackendGeneration: bigint("old_backend_generation", {
+			mode: "bigint",
+		}).notNull(),
+		newBackendGeneration: bigint("new_backend_generation", {
+			mode: "bigint",
+		}).notNull(),
+		requiredReplicationCheckpoint: bigint("required_replication_checkpoint", {
+			mode: "bigint",
+		}).notNull(),
+		observedReplicationCheckpoint: bigint("observed_replication_checkpoint", {
+			mode: "bigint",
+		}).notNull(),
+		actor: text("actor").notNull(),
+		reason: text("reason").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => ({
+		regionCreatedAtIdx: index(
+			"storage_backend_promotions_region_created_at_idx",
+		).on(table.regionId, table.createdAt),
+		fromBackendFk: foreignKey({
+			columns: [table.regionId, table.fromBackendId],
+			foreignColumns: [
+				storageRegionBackends.regionId,
+				storageRegionBackends.backendId,
+			],
+		}),
+		toBackendFk: foreignKey({
+			columns: [table.regionId, table.toBackendId],
+			foreignColumns: [
+				storageRegionBackends.regionId,
+				storageRegionBackends.backendId,
+			],
+		}),
+	}),
+);
+
+export const storageBackendAdminEvents = pgTable(
+	"storage_backend_admin_events",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		regionId: text("region_id").notNull(),
+		backendId: text("backend_id").notNull(),
+		action: text("action").notNull(),
+		actor: text("actor").notNull(),
+		detailsJson: text("details_json").notNull().default("{}"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => ({
+		regionCreatedAtIdx: index(
+			"storage_backend_admin_events_region_created_at_idx",
+		).on(table.regionId, table.createdAt),
+		backendFk: foreignKey({
+			columns: [table.regionId, table.backendId],
+			foreignColumns: [
+				storageRegionBackends.regionId,
+				storageRegionBackends.backendId,
+			],
+		}),
+		actionCheck: check(
+			"storage_backend_admin_events_action_check",
+			sql`${table.action} IN ('register', 'status', 'bootstrap', 'bootstrap_retry', 'authorize', 'revoke')`,
+		),
+	}),
+);
+
+export const storageReplicationEvents = pgTable(
+	"storage_replication_events",
+	{
+		sequence: bigserial("sequence", { mode: "bigint" }).primaryKey(),
+		eventId: uuid("event_id").defaultRandom().notNull().unique(),
+		regionId: text("region_id").notNull(),
+		sourceBackendId: text("source_backend_id").notNull(),
+		backendGeneration: bigint("backend_generation", {
+			mode: "bigint",
+		}).notNull(),
+		// Deliberately no FK: tombstones must survive logical bucket deletion.
+		bucketId: uuid("bucket_id").notNull(),
+		objectKey: text("object_key").notNull(),
+		operation: text("operation").notNull(),
+		state: text("state").default("prepared").notNull(),
+		failureReason: text("failure_reason"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		committedAt: timestamp("committed_at", { withTimezone: true }),
+		finalizedAt: timestamp("finalized_at", { withTimezone: true }),
+	},
+	(table) => ({
+		eventRegionUniqueIdx: uniqueIndex(
+			"storage_replication_events_sequence_region_unique",
+		).on(table.sequence, table.regionId),
+		regionSequenceIdx: index(
+			"storage_replication_events_region_sequence_idx",
+		).on(table.regionId, table.sequence),
+		committedSequenceIdx: index(
+			"storage_replication_events_committed_sequence_idx",
+		)
+			.on(table.regionId, table.sequence)
+			.where(sql`${table.state} = 'committed'`),
+		sourceBackendFk: foreignKey({
+			columns: [table.regionId, table.sourceBackendId],
+			foreignColumns: [
+				storageRegionBackends.regionId,
+				storageRegionBackends.backendId,
+			],
+		}),
+		operationCheck: check(
+			"storage_replication_events_operation_check",
+			sql`${table.operation} IN ('put', 'delete')`,
+		),
+		backendGenerationCheck: check(
+			"storage_replication_events_backend_generation_check",
+			sql`${table.backendGeneration} > 0`,
+		),
+		stateCheck: check(
+			"storage_replication_events_state_check",
+			sql`${table.state} IN ('prepared', 'committed', 'cancelled')`,
+		),
+	}),
+);
+
+export const storageReplicationDeliveries = pgTable(
+	"storage_replication_deliveries",
+	{
+		sequence: bigint("sequence", { mode: "bigint" }).notNull(),
+		regionId: text("region_id").notNull(),
+		targetBackendId: text("target_backend_id").notNull(),
+		status: text("status").default("pending").notNull(),
+		attempts: bigint("attempts", { mode: "number" }).default(0).notNull(),
+		lastError: text("last_error"),
+		nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		lockedAt: timestamp("locked_at", { withTimezone: true }),
+		completedAt: timestamp("completed_at", { withTimezone: true }),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => ({
+		pk: primaryKey({ columns: [table.sequence, table.targetBackendId] }),
+		eventFk: foreignKey({
+			columns: [table.sequence, table.regionId],
+			foreignColumns: [
+				storageReplicationEvents.sequence,
+				storageReplicationEvents.regionId,
+			],
+		}).onDelete("cascade"),
+		targetBackendFk: foreignKey({
+			columns: [table.regionId, table.targetBackendId],
+			foreignColumns: [
+				storageRegionBackends.regionId,
+				storageRegionBackends.backendId,
+			],
+		}),
+		pendingIdx: index("storage_replication_deliveries_pending_idx")
+			.on(table.status, table.nextAttemptAt, table.sequence)
+			.where(sql`${table.status} IN ('pending', 'failed')`),
+		statusCheck: check(
+			"storage_replication_deliveries_status_check",
+			sql`${table.status} IN ('pending', 'running', 'complete', 'failed')`,
+		),
+		attemptsCheck: check(
+			"storage_replication_deliveries_attempts_check",
+			sql`${table.attempts} >= 0`,
+		),
+	}),
+);
+
+export const multipartUploadGenerations = pgTable(
+	"multipart_upload_generations",
+	{
+		uploadId: text("upload_id").primaryKey(),
+		bucketId: uuid("bucket_id").notNull(),
+		storageRegion: text("storage_region").default("eu-central").notNull(),
+		backendId: text("backend_id").default("primary").notNull(),
+		backendGeneration: bigint("backend_generation", { mode: "bigint" })
+			.default(1n)
+			.notNull(),
+		writerGeneration: bigint("writer_generation", {
+			mode: "bigint",
+		}).notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => ({
+		createdAtIdx: index("multipart_upload_generations_created_at_idx").on(
+			table.createdAt,
+		),
+		storageRegionIdx: index(
+			"multipart_upload_generations_storage_region_idx",
+		).on(table.storageRegion),
+		storageBackendFk: foreignKey({
+			columns: [table.storageRegion, table.backendId],
+			foreignColumns: [
+				storageRegionBackends.regionId,
+				storageRegionBackends.backendId,
+			],
+		}),
+		storageRegionCheck: check(
+			"multipart_upload_generations_storage_region_check",
+			sql`${table.storageRegion} ~ '^[a-z0-9][a-z0-9-]*$'`,
+		),
+		backendGenerationCheck: check(
+			"multipart_upload_generations_backend_generation_check",
+			sql`${table.backendGeneration} > 0`,
+		),
+	}),
+);
+
+export const dataplaneAccountingEvents = pgTable(
+	"dataplane_accounting_events",
+	{
+		id: text("id").primaryKey(),
+		appliedAt: timestamp("applied_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+);
+
+export const dataplaneQuotaReservations = pgTable(
+	"dataplane_quota_reservations",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		userId: text("user_id")
+			.references(() => users.id, { onDelete: "cascade" })
+			.notNull(),
+		kind: text("kind").default("storage").notNull(),
+		bytes: bigint("bytes", { mode: "bigint" }).notNull(),
+		expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => ({
+		userKindExpiryIdx: index(
+			"dataplane_quota_reservations_user_kind_expiry_idx",
+		).on(table.userId, table.kind, table.expiresAt),
+		kindCheck: check(
+			"dataplane_quota_reservations_kind_check",
+			sql`${table.kind} = 'storage'`,
+		),
+		bytesCheck: check(
+			"dataplane_quota_reservations_bytes_check",
+			sql`${table.bytes} > 0`,
+		),
+	}),
+);
+
+/**
+ * Durable provider-mutation journal. The dataplane records intent before the
+ * physical write, then applies accounting and reservation release
+ * idempotently after provider success. Prepared/ambiguous rows intentionally
+ * survive for provider reconciliation rather than guessing an object delta.
+ */
+export const dataplaneMutationIntents = pgTable(
+	"dataplane_mutation_intents",
+	{
+		id: uuid("id").defaultRandom().primaryKey(),
+		regionId: text("region_id")
+			.references(() => storageRegionState.regionId, { onDelete: "restrict" })
+			.notNull(),
+		bucketId: uuid("bucket_id")
+			.references(() => buckets.id, { onDelete: "restrict" })
+			.notNull(),
+		userId: text("user_id").references(() => users.id, {
+			onDelete: "restrict",
+		}),
+		objectKey: text("object_key").notNull(),
+		operation: text("operation").notNull(),
+		oldSize: bigint("old_size", { mode: "bigint" }).notNull(),
+		newSize: bigint("new_size", { mode: "bigint" }).notNull(),
+		quotaReservationId: uuid("quota_reservation_id").references(
+			() => dataplaneQuotaReservations.id,
+			{ onDelete: "set null" },
+		),
+		replicationEventId: uuid("replication_event_id").references(
+			() => storageReplicationEvents.eventId,
+			{ onDelete: "restrict" },
+		),
+		state: text("state").default("prepared").notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.defaultNow()
+			.notNull(),
+		committedAt: timestamp("committed_at", { withTimezone: true }),
+		appliedAt: timestamp("applied_at", { withTimezone: true }),
+		lastError: text("last_error"),
+	},
+	(table) => ({
+		stateCreatedAtIdx: index(
+			"dataplane_mutation_intents_state_created_at_idx",
+		).on(table.state, table.createdAt),
+		regionBucketStateIdx: index(
+			"dataplane_mutation_intents_region_bucket_state_idx",
+		).on(table.regionId, table.bucketId, table.state),
+		replicationEventIdx: uniqueIndex(
+			"dataplane_mutation_intents_replication_event_unique_idx",
+		)
+			.on(table.replicationEventId)
+			.where(sql`${table.replicationEventId} IS NOT NULL`),
+		operationCheck: check(
+			"dataplane_mutation_intents_operation_check",
+			sql`${table.operation} IN ('put', 'delete')`,
+		),
+		stateCheck: check(
+			"dataplane_mutation_intents_state_check",
+			sql`${table.state} IN ('prepared', 'committed', 'cancelled', 'applied')`,
+		),
+		sizeCheck: check(
+			"dataplane_mutation_intents_size_check",
+			sql`${table.oldSize} >= 0 AND ${table.newSize} >= 0`,
+		),
+		stateTimestampsCheck: check(
+			"dataplane_mutation_intents_state_timestamps_check",
+			sql`(${table.state} NOT IN ('committed', 'applied') OR ${table.committedAt} IS NOT NULL)
+				AND (${table.state} <> 'applied' OR ${table.appliedAt} IS NOT NULL)`,
+		),
+	}),
+);
+
+export const dataplaneMultipartQuotaUploads = pgTable(
+	"dataplane_multipart_quota_uploads",
+	{
+		uploadId: text("upload_id").primaryKey(),
+		userId: text("user_id")
+			.references(() => users.id, { onDelete: "cascade" })
+			.notNull(),
+		bucketId: uuid("bucket_id")
+			.references(() => buckets.id, { onDelete: "cascade" })
+			.notNull(),
+		storageRegion: text("storage_region").notNull(),
+		backendId: text("backend_id").notNull(),
+		backendGeneration: bigint("backend_generation", {
+			mode: "bigint",
+		}).notNull(),
+		existingCredit: bigint("existing_credit", { mode: "bigint" })
+			.default(0n)
+			.notNull(),
+		expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+	},
+	(table) => ({
+		backendFk: foreignKey({
+			columns: [table.storageRegion, table.backendId],
+			foreignColumns: [
+				storageRegionBackends.regionId,
+				storageRegionBackends.backendId,
+			],
+		}),
+		regionCheck: check(
+			"dataplane_multipart_quota_uploads_region_check",
+			sql`${table.storageRegion} ~ '^[a-z0-9][a-z0-9-]*$'`,
+		),
+		generationCheck: check(
+			"dataplane_multipart_quota_uploads_generation_check",
+			sql`${table.backendGeneration} > 0`,
+		),
+		creditCheck: check(
+			"dataplane_multipart_quota_uploads_credit_check",
+			sql`${table.existingCredit} >= 0`,
+		),
+		expiresAtIdx: index("dataplane_multipart_quota_uploads_expires_at_idx").on(
+			table.expiresAt,
+		),
+	}),
+);
+
+export const dataplaneMultipartQuotaParts = pgTable(
+	"dataplane_multipart_quota_parts",
+	{
+		uploadId: text("upload_id")
+			.references(() => dataplaneMultipartQuotaUploads.uploadId, {
+				onDelete: "cascade",
+			})
+			.notNull(),
+		partNumber: integer("part_number").notNull(),
+		partBytes: bigint("part_bytes", { mode: "bigint" }).default(0n).notNull(),
+	},
+	(table) => ({
+		pk: primaryKey({ columns: [table.uploadId, table.partNumber] }),
+		partNumberCheck: check(
+			"dataplane_multipart_quota_parts_part_number_check",
+			sql`${table.partNumber} BETWEEN 1 AND 10000`,
+		),
+		partBytesCheck: check(
+			"dataplane_multipart_quota_parts_bytes_check",
+			sql`${table.partBytes} >= 0`,
+		),
+	}),
 );

@@ -1,25 +1,37 @@
 import { randomBytes } from "node:crypto";
 import { AwsClient } from "aws4fetch";
-import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { config } from "../../config";
 import { db } from "../../db";
 import {
+	bucketDeletionTombstones,
 	bucketKeys,
 	buckets,
+	dataplaneMutationIntents,
 	requestLogs,
 	sessions,
 	users,
 } from "../../db/schema";
 import { jsonResponse } from "../../lib/api-utils";
+import { invalidateDataplaneAuthCache } from "../../lib/dataplane-cache";
+import {
+	beginDataplaneBucketTeardown,
+	executeDataplaneStorage,
+	releaseDataplaneBucketTeardown,
+} from "../../lib/dataplane-storage-client";
 import { getDiskCacheStats } from "../../lib/disk-cache";
 import { redis } from "../../lib/redis";
+import { isStorageRegionId } from "../../lib/regions";
 import { buildCorsConfig } from "../../lib/s3/cors";
 import { deleteBucketContents, getInternalPath } from "../../lib/s3/paths";
-import { s3Client } from "../../lib/s3-client";
-import { parseS3Xml } from "../../lib/s3-xml";
+import { parseS3Xml, requireS3XmlElement } from "../../lib/s3-xml";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
+import {
+	deleteBucket as deleteBucketService,
+	emptyBucket as emptyBucketService,
+} from "../../services/bucket-service";
 import {
 	getMaintenanceStatus,
 	MAINTENANCE_ERROR,
@@ -28,10 +40,32 @@ import {
 	getAppSettings,
 	updateAppSettings,
 } from "../../services/settings-service";
+import {
+	authorizeStorageBackendPromotion,
+	listStorageRegionBackends,
+	listStorageRegionStatuses,
+	promoteStorageBackend,
+	registerStorageRegionBackend,
+	revokeStorageBackendPromotion,
+	startStorageBackendBootstrap,
+	updateStorageRegionBackendStatus,
+} from "../../services/storage-backend-service";
 import { handleAdminRedemptionsRequest } from "../redemptions";
 
 function secureFlag(): string {
 	return config.isProduction ? "; Secure" : "";
+}
+
+function adminJson(value: unknown, status = 200) {
+	return new Response(
+		JSON.stringify(value, (_key, item) =>
+			typeof item === "bigint" ? item.toString() : item,
+		),
+		{
+			status,
+			headers: { "Content-Type": "application/json" },
+		},
+	);
 }
 
 type AdminUpdateUserQuotaBody = {
@@ -43,6 +77,24 @@ type S3ListContentsItem = {
 	Key: string;
 	Size: number;
 };
+
+async function fetchAdminBucketStorage(
+	bucket: typeof buckets.$inferSelect,
+	owner: typeof users.$inferSelect,
+	pathWithQuery: string,
+	init: RequestInit & {
+		method: "GET" | "HEAD" | "PUT" | "POST" | "DELETE";
+	},
+) {
+	return executeDataplaneStorage({
+		bucket,
+		rootPrefix: getInternalPath("", owner, bucket),
+		pathWithQuery,
+		method: init.method,
+		headers: init.headers,
+		body: init.body,
+	});
+}
 
 type S3ListBucketResult = {
 	Contents?: S3ListContentsItem | S3ListContentsItem[];
@@ -204,8 +256,36 @@ async function getCacheStatsJson() {
 				).toFixed(1)
 			: "0";
 
-	// Get S3 circuit breaker state
-	const circuit = s3Client.getCircuitState();
+	const storageBackends = (await listStorageRegionStatuses()).map(
+		(backend) => ({
+			regionId: backend.regionId,
+			backendId: backend.activeBackendId,
+			backendGeneration: backend.backendGeneration.toString(),
+			bucketName: backend.bucketName,
+			provider: backend.provider,
+			state:
+				backend.status === "active" && backend.lastVerifiedAt
+					? "closed"
+					: "unavailable",
+			failures: 0,
+			replicationCheckpoint: backend.replicationCheckpoint.toString(),
+			requiredReplicationCheckpoint:
+				backend.requiredReplicationCheckpoint.toString(),
+		}),
+	);
+	const circuit = {
+		state: storageBackends.some((backend) => backend.state === "unavailable")
+			? "open"
+			: storageBackends.some((backend) => backend.state === "open")
+				? "open"
+				: storageBackends.some((backend) => backend.state === "half-open")
+					? "half-open"
+					: "closed",
+		failures: storageBackends.reduce(
+			(sum, backend) => sum + backend.failures,
+			0,
+		),
+	};
 
 	return {
 		redis: {
@@ -239,6 +319,7 @@ async function getCacheStatsJson() {
 		system: {
 			circuitState: circuit.state,
 			circuitFailures: circuit.failures,
+			storageBackends,
 			uptime: formatUptime(Math.floor(process.uptime())),
 		},
 	};
@@ -550,7 +631,7 @@ async function runAdminSpeedtest(req: Request) {
 		accessKeyId: key[0].accessKey,
 		secretAccessKey: key[0].secretKey,
 		service: "s3",
-		region: config.s3.region || "auto",
+		region: config.s3SigningRegion || "auto",
 	});
 
 	const payloadSizeBytes = sizeMb * 1024 * 1024;
@@ -1340,14 +1421,21 @@ async function getBucketDetails(bucketName: string) {
 			query.set("prefix", internalPrefix);
 			query.set("max-keys", "50");
 
-			const s3Res = await s3Client.fetch(`?${query.toString()}`, {
-				method: "GET",
-			});
+			const s3Res = await fetchAdminBucketStorage(
+				bucket[0],
+				owner[0],
+				`?${query.toString()}`,
+				{
+					method: "GET",
+				},
+			);
 			if (s3Res.ok) {
 				const xml = await s3Res.text();
-				const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
-					xml,
-				).ListBucketResult;
+				const result = requireS3XmlElement(
+					parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(xml)
+						.ListBucketResult,
+					"ListBucketResult",
+				);
 				if (result.Contents) {
 					const contents: S3ListContentsItem[] = Array.isArray(result.Contents)
 						? (result.Contents as S3ListContentsItem[])
@@ -1399,7 +1487,12 @@ async function previewFile(bucketName: string, url: URL) {
 	const internalKey = getInternalPath(key, owner[0], bucket[0]);
 
 	try {
-		const s3Res = await s3Client.fetch(internalKey, { method: "GET" });
+		const s3Res = await fetchAdminBucketStorage(
+			bucket[0],
+			owner[0],
+			internalKey,
+			{ method: "GET" },
+		);
 		if (!s3Res.ok) return new Response(s3Res.body, { status: s3Res.status });
 
 		const headers = new Headers(s3Res.headers);
@@ -1419,6 +1512,7 @@ async function pauseBucket(bucketName: string, req: Request) {
 		.update(buckets)
 		.set({ isPaused: body.isPaused, pauseReason: body.pauseReason || null })
 		.where(eq(buckets.name, bucketName));
+	await invalidateDataplaneAuthCache({ bucketName });
 	return new Response("Updated", { status: 200 });
 }
 
@@ -1427,6 +1521,7 @@ async function resetBucketCors(bucketName: string) {
 		.update(buckets)
 		.set({ corsConfig: JSON.stringify(buildCorsConfig()) })
 		.where(eq(buckets.name, bucketName));
+	await invalidateDataplaneAuthCache({ bucketName });
 	return new Response("Reset", { status: 200 });
 }
 
@@ -1439,56 +1534,139 @@ async function deleteBucket(bucketName: string, url: URL) {
 		.where(eq(buckets.name, bucketName))
 		.limit(1);
 
-	if (bucket.length > 0) {
-		let owner: (typeof users.$inferSelect)[] = [];
-		if (bucket[0].userId) {
-			owner = await db
-				.select()
-				.from(users)
-				.where(eq(users.id, bucket[0].userId))
-				.limit(1);
-		}
-
-		if (owner.length > 0) {
-			// Normal Bucket Deletion or Emptying
-			if (isReset) {
-				// Just empty, don't delete
-				const internalPrefix = getInternalPath("", owner[0], bucket[0]);
-				try {
-					await deleteBucketContents(internalPrefix);
-
-					// Reset usage stats (bytes only, keep requests?)
-					await db
-						.update(buckets)
-						.set({ totalBytes: 0 })
-						.where(eq(buckets.id, bucket[0].id));
-
-					return new Response("Emptied", { status: 200 });
-				} catch (e) {
-					console.error("Failed to empty bucket:", e);
-					return new Response("Failed to empty bucket", { status: 500 });
-				}
-			}
-
-			const internalPrefix = getInternalPath("", owner[0], bucket[0]);
-			try {
-				await deleteBucketContents(internalPrefix);
-			} catch (e) {
-				console.error("Failed to empty bucket during admin delete:", e);
-			}
-		}
+	if (bucket.length === 0) {
+		return new Response("Not Found", { status: 404 });
 	}
 
-	await db.delete(buckets).where(eq(buckets.name, bucketName));
-	return new Response("Deleted", { status: 200 });
+	try {
+		if (!bucket[0].isSystem) {
+			if (isReset) {
+				await emptyBucketService(bucketName, "admin-control-plane", true);
+				return new Response("Emptied", { status: 200 });
+			}
+			await deleteBucketService(bucketName, "admin-control-plane", true);
+			return new Response("Deleted", { status: 200 });
+		}
+
+		// System buckets have no owner but still need the same storage and
+		// accounting proof before their metadata can be removed.
+		const originalPause = {
+			isPaused: bucket[0].isPaused,
+			pauseReason: bucket[0].pauseReason,
+		};
+		await db
+			.update(buckets)
+			.set({
+				isPaused: true,
+				pauseReason: isReset
+					? "Admin empty operation in progress"
+					: "Admin deletion in progress",
+				updatedAt: new Date(),
+			})
+			.where(eq(buckets.id, bucket[0].id));
+		await invalidateDataplaneAuthCache({ bucketName });
+
+		const internalPrefix = getInternalPath("", null, bucket[0]);
+		await deleteBucketContents(internalPrefix, bucket[0]);
+		const teardownToken = await beginDataplaneBucketTeardown(bucket[0]);
+		if (isReset) {
+			try {
+				await db
+					.update(buckets)
+					.set({
+						totalBytes: 0,
+						isPaused: originalPause.isPaused,
+						pauseReason: originalPause.pauseReason,
+						updatedAt: new Date(),
+					})
+					.where(eq(buckets.id, bucket[0].id));
+			} catch (error) {
+				await releaseDataplaneBucketTeardown(bucket[0], teardownToken).catch(
+					(releaseError) =>
+						console.error(
+							"Failed to release rejected system-bucket reset",
+							releaseError,
+						),
+				);
+				throw error;
+			}
+			await releaseDataplaneBucketTeardown(bucket[0], teardownToken).catch(
+				(error) =>
+					console.error(
+						"Failed to release completed system-bucket reset",
+						error,
+					),
+			);
+			await invalidateDataplaneAuthCache({ bucketName });
+			return new Response("Emptied", { status: 200 });
+		}
+
+		try {
+			await db.transaction(async (tx) => {
+				await tx
+					.delete(dataplaneMutationIntents)
+					.where(
+						and(
+							eq(dataplaneMutationIntents.bucketId, bucket[0].id),
+							inArray(dataplaneMutationIntents.state, ["applied", "cancelled"]),
+						),
+					);
+				await tx
+					.insert(bucketDeletionTombstones)
+					.values({
+						bucketId: bucket[0].id,
+						bucketName: bucket[0].name,
+						ownerUserId: null,
+						requestedRegion: bucket[0].requestedRegion,
+						resolvedRegion: bucket[0].resolvedRegion,
+						rootPrefix: internalPrefix,
+						deletedByUserId: "admin-control-plane",
+					})
+					.onConflictDoNothing();
+				await tx.delete(buckets).where(eq(buckets.id, bucket[0].id));
+			});
+		} catch (error) {
+			await releaseDataplaneBucketTeardown(bucket[0], teardownToken).catch(
+				(releaseError) =>
+					console.error(
+						"Failed to release rejected system-bucket fence",
+						releaseError,
+					),
+			);
+			throw error;
+		}
+		await releaseDataplaneBucketTeardown(bucket[0], teardownToken).catch(
+			(error) =>
+				console.error("Failed to release finalized system-bucket fence", error),
+		);
+		await invalidateDataplaneAuthCache({ bucketName });
+		return new Response("Deleted", { status: 200 });
+	} catch (error) {
+		console.error("Admin bucket teardown failed:", error);
+		return new Response("Bucket storage could not be safely finalized", {
+			status: 502,
+		});
+	}
 }
 
 async function pauseKey(keyId: string, req: Request) {
 	const body = await req.json();
+	const [key] = await db
+		.select({ accessKey: bucketKeys.accessKey, bucketName: buckets.name })
+		.from(bucketKeys)
+		.innerJoin(buckets, eq(bucketKeys.bucketId, buckets.id))
+		.where(eq(bucketKeys.id, keyId))
+		.limit(1);
 	await db
 		.update(bucketKeys)
 		.set({ isPaused: body.isPaused, pauseReason: body.pauseReason || null })
 		.where(eq(bucketKeys.id, keyId));
+	if (key) {
+		await invalidateDataplaneAuthCache({
+			bucketName: key.bucketName,
+			accessKey: key.accessKey,
+		});
+	}
 	return new Response("Updated", { status: 200 });
 }
 
@@ -1510,7 +1688,19 @@ async function updateKeyNote(keyId: string, req: Request) {
 }
 
 async function deleteKey(keyId: string) {
+	const [key] = await db
+		.select({ accessKey: bucketKeys.accessKey, bucketName: buckets.name })
+		.from(bucketKeys)
+		.innerJoin(buckets, eq(bucketKeys.bucketId, buckets.id))
+		.where(eq(bucketKeys.id, keyId))
+		.limit(1);
 	await db.delete(bucketKeys).where(eq(bucketKeys.id, keyId));
+	if (key) {
+		await invalidateDataplaneAuthCache({
+			bucketName: key.bucketName,
+			accessKey: key.accessKey,
+		});
+	}
 	return new Response("Deleted", { status: 200 });
 }
 
@@ -1537,10 +1727,23 @@ async function deleteFile(bucketName: string, url: URL) {
 
 			// Get file size first to update quota
 			try {
-				const headRes = await s3Client.fetch(internalKey, { method: "HEAD" });
+				const headRes = await fetchAdminBucketStorage(
+					bucket[0],
+					owner[0],
+					internalKey,
+					{ method: "HEAD" },
+				);
 				const size = Number(headRes.headers.get("content-length") || 0);
 
-				await s3Client.fetch(internalKey, { method: "DELETE" });
+				const deleteRes = await fetchAdminBucketStorage(
+					bucket[0],
+					owner[0],
+					internalKey,
+					{ method: "DELETE" },
+				);
+				if (!deleteRes.ok) {
+					throw new Error(`Storage delete failed (${deleteRes.status})`);
+				}
 
 				if (size > 0) {
 					await db
@@ -1552,6 +1755,7 @@ async function deleteFile(bucketName: string, url: URL) {
 				}
 			} catch (e) {
 				console.error("Failed to delete file (admin):", e);
+				return new Response("Failed to delete file", { status: 502 });
 			}
 		}
 	}
@@ -1693,7 +1897,8 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	if (
 		maintenance.fullMaintenanceMode &&
 		path !== "/admin/settings" &&
-		path !== "/api/admin/settings"
+		path !== "/api/admin/settings" &&
+		!path.startsWith("/api/admin/storage/")
 	) {
 		return new Response(MAINTENANCE_ERROR, { status: 503 });
 	}
@@ -1748,6 +1953,176 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	if (path.startsWith("/api/admin/")) {
 		if (!user.isAdmin) {
 			return new Response("Forbidden", { status: 403 });
+		}
+
+		if (path === "/api/admin/storage/backends" && req.method === "GET") {
+			const region = url.searchParams.get("region");
+			if (region && !isStorageRegionId(region)) {
+				return adminJson({ error: "Unknown storage region" }, 400);
+			}
+			const regionId = region && isStorageRegionId(region) ? region : undefined;
+			return adminJson(await listStorageRegionBackends(regionId));
+		}
+
+		if (path === "/api/admin/storage/backends" && req.method === "POST") {
+			const body = await req.json().catch(() => null);
+			const parsed = z
+				.object({
+					regionId: z.string().refine(isStorageRegionId),
+					backendId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/),
+					provider: z.string().min(1).max(128),
+					bucketName: z.string().min(1).max(255).nullable().optional(),
+					role: z.enum(["primary", "replica"]).optional(),
+				})
+				.safeParse(body);
+			if (!parsed.success) {
+				return adminJson(
+					{ error: parsed.error.issues[0]?.message || "Invalid body" },
+					400,
+				);
+			}
+			const { backendId, provider } = parsed.data;
+			if (!backendId || !provider) {
+				return adminJson(
+					{ error: "Backend ID and provider are required" },
+					400,
+				);
+			}
+			try {
+				return adminJson(
+					await registerStorageRegionBackend({
+						backendId,
+						provider,
+						bucketName: parsed.data.bucketName,
+						role: parsed.data.role,
+						regionId: parsed.data.regionId as Parameters<
+							typeof registerStorageRegionBackend
+						>[0]["regionId"],
+						actor: user.id,
+					}),
+					201,
+				);
+			} catch (error) {
+				return adminJson(
+					{
+						error:
+							error instanceof Error ? error.message : "Registration failed",
+					},
+					409,
+				);
+			}
+		}
+
+		const storageBackendActionMatch = path.match(
+			/^\/api\/admin\/storage\/backends\/([a-z0-9-]+)\/([a-z0-9-]+)\/(authorize|promote|bootstrap|bootstrap-retry)$/,
+		);
+		if (storageBackendActionMatch) {
+			const [, regionId, backendId, action] = storageBackendActionMatch;
+			if (!isStorageRegionId(regionId)) {
+				return adminJson({ error: "Unknown storage region" }, 400);
+			}
+			try {
+				if (
+					(action === "bootstrap" || action === "bootstrap-retry") &&
+					req.method === "POST"
+				) {
+					const body = await req.json().catch(() => null);
+					const parsed = z
+						.object({ reason: z.string().trim().min(1).max(2_000) })
+						.safeParse(body);
+					if (!parsed.success) {
+						return adminJson(
+							{ error: "Storage bootstrap reason is required" },
+							400,
+						);
+					}
+					return adminJson(
+						await startStorageBackendBootstrap({
+							regionId,
+							targetBackendId: backendId,
+							actor: user.id,
+							reason: parsed.data.reason,
+							retry: action === "bootstrap-retry",
+						}),
+						202,
+					);
+				}
+				if (action === "authorize" && req.method === "POST") {
+					return adminJson(
+						await authorizeStorageBackendPromotion({
+							regionId,
+							targetBackendId: backendId,
+							actor: user.id,
+						}),
+					);
+				}
+				if (action === "authorize" && req.method === "DELETE") {
+					return adminJson(
+						await revokeStorageBackendPromotion({
+							regionId,
+							targetBackendId: backendId,
+							actor: user.id,
+						}),
+					);
+				}
+				if (action === "promote" && req.method === "POST") {
+					const body = await req.json().catch(() => null);
+					const parsed = z
+						.object({ reason: z.string().trim().min(1).max(2_000) })
+						.safeParse(body);
+					if (!parsed.success) {
+						return adminJson({ error: "Promotion reason is required" }, 400);
+					}
+					return adminJson(
+						await promoteStorageBackend({
+							regionId,
+							targetBackendId: backendId,
+							actor: user.id,
+							reason: parsed.data.reason,
+						}),
+					);
+				}
+				return adminJson({ error: "Method not allowed" }, 405);
+			} catch (error) {
+				return adminJson(
+					{
+						error: error instanceof Error ? error.message : "Operation failed",
+					},
+					409,
+				);
+			}
+		}
+
+		const storageBackendMatch = path.match(
+			/^\/api\/admin\/storage\/backends\/([a-z0-9-]+)\/([a-z0-9-]+)$/,
+		);
+		if (storageBackendMatch && req.method === "PATCH") {
+			const [, regionId, backendId] = storageBackendMatch;
+			if (!isStorageRegionId(regionId)) {
+				return adminJson({ error: "Unknown storage region" }, 400);
+			}
+			const body = await req.json().catch(() => null);
+			const parsed = z
+				.object({ status: z.enum(["standby", "unavailable", "disabled"]) })
+				.safeParse(body);
+			if (!parsed.success) {
+				return adminJson({ error: "Invalid backend status" }, 400);
+			}
+			try {
+				return adminJson(
+					await updateStorageRegionBackendStatus({
+						regionId,
+						backendId,
+						status: parsed.data.status,
+						actor: user.id,
+					}),
+				);
+			} catch (error) {
+				return adminJson(
+					{ error: error instanceof Error ? error.message : "Update failed" },
+					409,
+				);
+			}
 		}
 
 		// Cache stats API

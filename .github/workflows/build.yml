@@ -1,33 +1,114 @@
-name: Build dataplane image
+name: Publish regional dataplane image
 
 on:
   push:
     branches: [main]
-    paths: [dataplane/**, deploy/emergency/caddy.Dockerfile, .github/workflows/build.yml]
+    paths:
+      - dataplane/**
+      - docker-compose.prod.yml
+      - deploy/eu-central.env.example
+      - deploy/us-east.env.example
+      - deploy/otel-collector.yaml
+      - .env.production.example
+      - .github/workflows/build.yml
   workflow_dispatch:
 
 permissions:
   contents: read
   packages: write
 
+concurrency:
+  group: publish-dataplane-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  dataplane:
+  verify-dataplane:
+    name: Test regional Rust dataplane
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: 1.93.1
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: dataplane
+      - run: cargo fmt --manifest-path dataplane/Cargo.toml --all -- --check
+      - run: cargo clippy --locked --manifest-path dataplane/Cargo.toml --all-targets -- -D warnings
+      - run: cargo test --locked --manifest-path dataplane/Cargo.toml
+
+  regional-compose:
+    name: Validate ${{ matrix.region }} deployment
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        region: [eu-central, us-east]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render and assert regional topology
+        env:
+          SILO_CONTROL_ENV_FILE: .env.production.example
+          SILO_DATAPLANE_ENV_FILE: .env.production.example
+          DRAGONFLY_IMAGE: docker.dragonflydb.io/dragonflydb/dragonfly:v1.30.3
+          OTEL_COLLECTOR_IMAGE: otel/opentelemetry-collector-contrib:0.130.1
+          REDIS_PASSWORD: ci-only-regional-cache-password
+          SIGNOZ_OTLP_ENDPOINT: signoz.invalid:4317
+        shell: bash
+        run: |
+          set -euo pipefail
+          compose() {
+            docker compose \
+              --env-file "deploy/${{ matrix.region }}.env.example" \
+              -f docker-compose.prod.yml \
+              "$@"
+          }
+          compose config --quiet
+          compose config --format json | jq -e '
+            (.services.dataplane.networks | has("default"))
+            and (.services.dataplane.networks | has("dokploy-network"))
+            and .services.dragonfly
+            and .services["otel-collector"]
+            and ([.services["otel-collector"].volumes[]?.source]
+              | index("/var/run/docker.sock") | not)
+          ' >/dev/null
+          if [ "${{ matrix.region }}" = "eu-central" ]; then
+            compose config --format json | jq -e '
+              (.services["control-plane"].networks | has("default"))
+              and (.services["control-plane"].networks | has("dokploy-network"))
+            ' >/dev/null
+          else
+            compose config --format json | jq -e \
+              '.services["control-plane"] == null' >/dev/null
+          fi
+
+  publish:
+    name: Publish immutable regional image
+    needs: [verify-dataplane, regional-compose]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: metadata
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/silo-dataplane
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-,format=long
       - uses: docker/build-push-action@v6
         with:
           context: ./dataplane
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/silo-dataplane:latest
-      - uses: docker/build-push-action@v6
-        with:
-          context: ./deploy/emergency
-          file: ./deploy/emergency/caddy.Dockerfile
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/silo-caddy:latest
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true

@@ -48,6 +48,7 @@ pub(crate) struct DiskCache {
 #[derive(Clone)]
 struct DiskCacheConfig {
     enabled: bool,
+    local_region: String,
     dir: PathBuf,
     max_total_size: u64,
     min_size: u64,
@@ -98,10 +99,11 @@ struct ByteRange {
 }
 
 impl DiskCache {
-    pub(crate) fn from_env(emergency_mode: bool) -> Result<Self> {
+    pub(crate) fn from_env(emergency_mode: bool, local_region: &str) -> Result<Self> {
         let cfg = DiskCacheConfig {
             enabled: !emergency_mode
                 && env::var("DISK_CACHE_ENABLED").map_or(true, |v| v != "false"),
+            local_region: local_region.to_string(),
             dir: cache_dir(),
             max_total_size: env_u64("DISK_CACHE_MAX_TOTAL_SIZE", 20 * 1024 * 1024 * 1024),
             min_size: env_u64("DISK_CACHE_MIN_SIZE", REDIS_OBJECT_LIMIT_BYTES),
@@ -174,8 +176,8 @@ impl DiskCache {
         self.cfg.min_size
     }
 
-    pub(crate) async fn record_demand(&self, bucket_id: &str, key: &str, size_hint: u64) {
-        if !self.cfg.enabled {
+    pub(crate) async fn record_demand(&self, bucket: &AuthBucket, key: &str, size_hint: u64) {
+        if !self.cache_local_bucket(bucket) {
             return;
         }
         let mut inner = self.inner.lock().await;
@@ -183,7 +185,7 @@ impl DiskCache {
             return;
         }
 
-        let demand_key = demand_key(bucket_id, key);
+        let demand_key = demand_key(&bucket.id, key);
         if let Some(entry) = inner.demand.get_mut(&demand_key) {
             entry.hits = entry.hits.saturating_add(1);
             entry.last_hit = SystemTime::now();
@@ -221,11 +223,13 @@ impl DiskCache {
         bucket: &AuthBucket,
         key: &str,
     ) -> Result<Option<Response<Body>>> {
-        if !self.is_enabled_and_writable().await {
+        if !self.cache_local_bucket(bucket) || !self.is_enabled_and_writable().await {
             return Ok(None);
         }
 
-        let hash = hash_key(&bucket.id, key);
+        let Some(hash) = self.cache_hash(bucket, key) else {
+            return Ok(None);
+        };
         let blob_path = self.blob_path(&hash);
         let meta_path = self.meta_path(&hash);
         let Some(mut meta) = self.read_valid_meta(&hash, &blob_path, &meta_path).await? else {
@@ -251,7 +255,7 @@ impl DiskCache {
 
         self.record_hit(&hash, &blob_path, &meta_path, &mut meta)
             .await;
-        self.record_demand(&bucket.id, key, meta.size).await;
+        self.record_demand(bucket, key, meta.size).await;
 
         if let Some(range_header) = header_value(headers, axum::http::header::RANGE.as_str()) {
             return self
@@ -269,10 +273,12 @@ impl DiskCache {
         bucket: &AuthBucket,
         key: &str,
     ) -> Result<Option<Response<Body>>> {
-        if !self.is_enabled_and_writable().await {
+        if !self.cache_local_bucket(bucket) || !self.is_enabled_and_writable().await {
             return Ok(None);
         }
-        let hash = hash_key(&bucket.id, key);
+        let Some(hash) = self.cache_hash(bucket, key) else {
+            return Ok(None);
+        };
         let blob_path = self.blob_path(&hash);
         let meta_path = self.meta_path(&hash);
         let Some(mut meta) = self.read_valid_meta(&hash, &blob_path, &meta_path).await? else {
@@ -280,7 +286,7 @@ impl DiskCache {
         };
         self.record_hit(&hash, &blob_path, &meta_path, &mut meta)
             .await;
-        self.record_demand(&bucket.id, key, meta.size).await;
+        self.record_demand(bucket, key, meta.size).await;
 
         let mut builder = Response::builder().status(StatusCode::OK);
         for (key, value) in &meta.headers {
@@ -292,10 +298,10 @@ impl DiskCache {
     }
 
     pub(crate) async fn object_size(&self, bucket: &AuthBucket, key: &str) -> Option<u64> {
-        if !self.is_enabled_and_writable().await {
+        if !self.cache_local_bucket(bucket) || !self.is_enabled_and_writable().await {
             return None;
         }
-        let hash = hash_key(&bucket.id, key);
+        let hash = self.cache_hash(bucket, key)?;
         let blob_path = self.blob_path(&hash);
         let meta_path = self.meta_path(&hash);
         self.read_valid_meta(&hash, &blob_path, &meta_path)
@@ -314,7 +320,9 @@ impl DiskCache {
     ) -> Result<Response<Body>> {
         let status = StatusCode::from_u16(res.status().as_u16())?;
         let headers = response_headers(res.headers());
-        let hash = hash_key(&bucket.id, key);
+        let hash = self
+            .cache_hash(bucket, key)
+            .ok_or_else(|| anyhow!("disk cache attempted for an unresolved or remote backend"))?;
         let blob_path = self.blob_path(&hash);
         let meta_path = self.meta_path(&hash);
         let tmp_suffix = format!(
@@ -366,8 +374,11 @@ impl DiskCache {
         Ok(builder.body(Body::from_stream(ReceiverStream::new(rx)))?)
     }
 
-    pub(crate) async fn should_admit(&self, bucket_id: &str, key: &str, size: u64) -> bool {
-        if !self.is_eligible(size) || !self.is_enabled_and_writable().await {
+    pub(crate) async fn should_admit(&self, bucket: &AuthBucket, key: &str, size: u64) -> bool {
+        if !self.cache_local_bucket(bucket)
+            || !self.is_eligible(size)
+            || !self.is_enabled_and_writable().await
+        {
             return false;
         }
         let mut inner = self.inner.lock().await;
@@ -375,7 +386,7 @@ impl DiskCache {
         let threshold = admission_threshold(self.cfg.base_admission_hits, pressure);
         let hits = inner
             .demand
-            .get(&demand_key(bucket_id, key))
+            .get(&demand_key(&bucket.id, key))
             .map(|entry| entry.hits)
             .unwrap_or(0);
         if hits < threshold {
@@ -395,11 +406,13 @@ impl DiskCache {
         true
     }
 
-    pub(crate) async fn invalidate(&self, bucket_id: &str, key: &str) {
-        if !self.cfg.enabled {
+    pub(crate) async fn invalidate(&self, bucket: &AuthBucket, key: &str) {
+        if !self.cache_local_bucket(bucket) {
             return;
         }
-        let hash = hash_key(bucket_id, key);
+        let Some(hash) = self.cache_hash(bucket, key) else {
+            return;
+        };
         let size = fs::metadata(self.blob_path(&hash))
             .map(|m| m.len())
             .unwrap_or(0);
@@ -415,6 +428,25 @@ impl DiskCache {
             return false;
         }
         self.inner.lock().await.writable
+    }
+
+    fn cache_local_bucket(&self, bucket: &AuthBucket) -> bool {
+        self.cfg.enabled
+            && bucket.resolved_region == self.cfg.local_region
+            && bucket.active_backend.is_some()
+    }
+
+    fn cache_hash(&self, bucket: &AuthBucket, key: &str) -> Option<String> {
+        let backend = bucket.active_backend.as_ref()?;
+        Some(hash_key(
+            &self.cfg.local_region,
+            &bucket.resolved_region,
+            &backend.id,
+            backend.generation,
+            bucket.writer_generation?,
+            &bucket.id,
+            key,
+        ))
     }
 
     async fn read_valid_meta(
@@ -888,8 +920,26 @@ fn demand_key(bucket_id: &str, key: &str) -> String {
     format!("{bucket_id}\0{key}")
 }
 
-fn hash_key(bucket_id: &str, key: &str) -> String {
+fn hash_key(
+    local_region: &str,
+    storage_region: &str,
+    backend_id: &str,
+    backend_generation: i64,
+    writer_generation: i64,
+    bucket_id: &str,
+    key: &str,
+) -> String {
     let mut hasher = Sha256::new();
+    hasher.update(local_region.as_bytes());
+    hasher.update(b":");
+    hasher.update(storage_region.as_bytes());
+    hasher.update(b":");
+    hasher.update(backend_id.as_bytes());
+    hasher.update(b":");
+    hasher.update(backend_generation.to_string().as_bytes());
+    hasher.update(b":");
+    hasher.update(writer_generation.to_string().as_bytes());
+    hasher.update(b":");
     hasher.update(bucket_id.as_bytes());
     hasher.update(b":");
     hasher.update(key.as_bytes());
@@ -1032,5 +1082,12 @@ mod tests {
         assert_eq!(admission_threshold(2, 0.1), 2);
         assert_eq!(admission_threshold(2, 0.8), 4);
         assert_eq!(admission_threshold(2, 0.95), 6);
+    }
+
+    #[test]
+    fn writer_transfer_changes_disk_cache_namespace() {
+        let before = hash_key("eu", "eu", "b2-eu", 4, 12, "bucket", "key");
+        let after = hash_key("eu", "eu", "b2-eu", 4, 13, "bucket", "key");
+        assert_ne!(before, after);
     }
 }

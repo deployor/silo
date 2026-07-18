@@ -217,14 +217,25 @@ async fn check_window(
     if limit == 0 || amount == 0 {
         return Ok(None);
     }
-    let mut conn = state.redis.clone();
-    let retry_after: i64 = redis::Script::new(FIXED_WINDOW_LUA)
+    // Rate limiting is best effort while Dragonfly is unavailable. Durable
+    // authorization and quotas remain enforced by Aiven.
+    let Some(mut conn) = state.redis.connection().await else {
+        return Ok(None);
+    };
+    let retry_after: i64 = match redis::Script::new(FIXED_WINDOW_LUA)
         .key(key)
         .arg(amount)
         .arg(limit)
         .arg(window_seconds)
         .invoke_async(&mut conn)
-        .await?;
+        .await
+    {
+        Ok(retry_after) => retry_after,
+        Err(error) => {
+            tracing::warn!(error = %error, "Dragonfly rate limiter failed; failing open");
+            return Ok(None);
+        }
+    };
 
     if retry_after > 0 {
         return Ok(Some(slow_down_response(message, retry_after as u64)));

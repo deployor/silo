@@ -13,9 +13,11 @@ import {
 	buildBucketObjectUrl,
 	parseBucketCustomDomains,
 } from "../../../lib/bucket-domains";
+import { invalidateDataplaneListCache } from "../../../lib/dataplane-cache";
+import { executeDataplaneStorage } from "../../../lib/dataplane-storage-client";
+import { getBucketStorageRegion, getStorageRegion } from "../../../lib/regions";
 import { getInternalPath } from "../../../lib/s3/paths";
-import { s3Client } from "../../../lib/s3-client";
-import { parseS3Xml } from "../../../lib/s3-xml";
+import { parseS3Xml, requireS3XmlElement } from "../../../lib/s3-xml";
 import { getCurrentUser } from "../../../lib/session";
 import {
 	assertCanReadFiles,
@@ -96,10 +98,6 @@ function cloneOwnerUser(user: typeof users.$inferSelect) {
 	};
 }
 
-function dataplaneInternalUrl(path: string): string {
-	return `${config.dataplane.url.replace(/\/+$/, "")}${path}`;
-}
-
 async function fetchDataplaneListXml(params: {
 	bucket: BucketRecord;
 	owner: typeof users.$inferSelect;
@@ -112,8 +110,9 @@ async function fetchDataplaneListXml(params: {
 	}
 
 	const rootPrefix = getInternalPath("", params.owner, params.bucket);
+	const regionId = getBucketStorageRegion(params.bucket);
 	const res = await fetch(
-		dataplaneInternalUrl("/api/internal/dashboard/list"),
+		`${config.dataplane.regionUrls[regionId]}/api/internal/dashboard/list`,
 		{
 			method: "POST",
 			headers: {
@@ -124,6 +123,7 @@ async function fetchDataplaneListXml(params: {
 				bucket: {
 					id: params.bucket.id,
 					name: params.bucket.name,
+					resolvedRegion: getBucketStorageRegion(params.bucket),
 				},
 				rootPrefix,
 				query: params.query.toString(),
@@ -138,26 +138,21 @@ async function fetchDataplaneListXml(params: {
 	return res.text();
 }
 
-async function invalidateDataplaneListCache(bucketId: string) {
-	if (!config.dataplane.internalSecret) return;
-
-	const res = await fetch(
-		dataplaneInternalUrl("/api/internal/dashboard/list-cache/invalidate"),
-		{
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"x-dataplane-secret": config.dataplane.internalSecret,
-			},
-			body: JSON.stringify({ bucketId }),
-		},
-	);
-	if (!res.ok) {
-		console.warn("Failed to invalidate dataplane list cache", {
-			bucketId,
-			status: res.status,
-		});
-	}
+async function fetchBucketStorage(
+	params: Pick<BucketContext, "bucket" | "owner">,
+	pathWithQuery: string,
+	init: RequestInit & {
+		method: "GET" | "HEAD" | "PUT" | "POST" | "DELETE";
+	},
+) {
+	return executeDataplaneStorage({
+		bucket: params.bucket,
+		rootPrefix: getInternalPath("", params.owner, params.bucket),
+		pathWithQuery,
+		method: init.method,
+		headers: init.headers,
+		body: init.body,
+	});
 }
 
 async function getBucketAndOwner(
@@ -338,12 +333,12 @@ async function createS3PresignedGetUrl(params: {
 	expiresSeconds: number;
 }): Promise<string> {
 	const { accessKey, secretKey } = await getPresignBucketKey(params.bucket.id);
-	const region = config.s3.region || "auto";
+	const region = "auto";
 	const service = "s3";
 	const { amzDate, dateStamp } = sigv4Date(new Date());
 	const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
 	const credential = `${accessKey}/${credentialScope}`;
-	const host = config.s3Domain;
+	const host = getStorageRegion(getBucketStorageRegion(params.bucket)).endpoint;
 	const path = canonicalS3Path(params.bucket.name, params.key);
 	const query = new URLSearchParams({
 		"X-Amz-Algorithm": "AWS4-HMAC-SHA256",
@@ -381,8 +376,9 @@ async function createS3PresignedGetUrl(params: {
 }
 
 function mapContentToFileItem(
-	contentItem: { Key: string; Size: number; LastModified: string },
+	contentItem: S3ListContent,
 	rootPrefix: string,
+	bucket: BucketRecord,
 ): FileItem | null {
 	const key = contentItem.Key;
 	const relativeKey = key.startsWith(rootPrefix)
@@ -396,8 +392,13 @@ function mapContentToFileItem(
 		key: normalizedKey,
 		name: getNameFromKey(normalizedKey),
 		size: Number(contentItem.Size) || 0,
-		lastModified: contentItem.LastModified,
-		url: `https://${config.s3Domain}/${normalizedKey}`,
+		lastModified: contentItem.LastModified || "",
+		url: buildBucketObjectUrl({
+			bucketName: bucket.name,
+			key: normalizedKey,
+			customDomains: parseBucketCustomDomains(bucket.customDomains),
+			s3Domain: getStorageRegion(getBucketStorageRegion(bucket)).endpoint,
+		}),
 		type: "file",
 		extension: getExtension(normalizedKey),
 		parentPrefix: getParentPrefix(normalizedKey),
@@ -452,9 +453,10 @@ async function listDirectoryPage(params: {
 		owner: params.owner,
 		query,
 	});
-	const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
-		xml,
-	).ListBucketResult;
+	const result = requireS3XmlElement(
+		parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(xml).ListBucketResult,
+		"ListBucketResult",
+	);
 
 	const contents = result.Contents
 		? Array.isArray(result.Contents)
@@ -469,8 +471,8 @@ async function listDirectoryPage(params: {
 		: [];
 
 	const files = contents
-		.map((contentItem: { Key: string; Size: number; LastModified: string }) =>
-			mapContentToFileItem(contentItem, rootPrefix),
+		.map((contentItem: S3ListContent) =>
+			mapContentToFileItem(contentItem, rootPrefix, params.bucket),
 		)
 		.filter((item: FileItem | null): item is FileItem => Boolean(item))
 		.filter(
@@ -533,9 +535,11 @@ async function searchFiles(params: {
 			owner: params.owner,
 			query,
 		});
-		const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
-			xml,
-		).ListBucketResult;
+		const result = requireS3XmlElement(
+			parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(xml)
+				.ListBucketResult,
+			"ListBucketResult",
+		);
 		const contents = result.Contents
 			? Array.isArray(result.Contents)
 				? result.Contents
@@ -543,7 +547,11 @@ async function searchFiles(params: {
 			: [];
 
 		for (const contentItem of contents) {
-			const mapped = mapContentToFileItem(contentItem, rootPrefix);
+			const mapped = mapContentToFileItem(
+				contentItem,
+				rootPrefix,
+				params.bucket,
+			);
 			if (!mapped) continue;
 
 			const searchable = `${mapped.relativePath} ${mapped.name}`.toLowerCase();
@@ -570,10 +578,17 @@ async function searchFiles(params: {
 	};
 }
 
-async function deleteSingleObject(internalKey: string): Promise<number> {
-	const headRes = await s3Client.fetch(internalKey, { method: "HEAD" });
+async function deleteSingleObject(
+	params: Pick<BucketContext, "bucket" | "owner">,
+	internalKey: string,
+): Promise<number> {
+	const headRes = await fetchBucketStorage(params, internalKey, {
+		method: "HEAD",
+	});
 	const size = Number(headRes.headers.get("content-length") || 0);
-	const deleteRes = await s3Client.fetch(internalKey, { method: "DELETE" });
+	const deleteRes = await fetchBucketStorage(params, internalKey, {
+		method: "DELETE",
+	});
 	if (!deleteRes.ok) {
 		throw new Error(`S3 Delete Error: ${deleteRes.status}`);
 	}
@@ -612,17 +627,16 @@ async function deletePrefixObjects(params: {
 				query.set("continuation-token", continuationToken);
 			}
 
-			const listRes = await s3Client.fetch(`?${query.toString()}`, {
-				method: "GET",
+			const xml = await fetchDataplaneListXml({
+				bucket: params.bucket,
+				owner: params.owner,
+				query,
 			});
-			if (!listRes.ok) {
-				throw new Error(`S3 Error: ${listRes.status}`);
-			}
-
-			const xml = await listRes.text();
-			const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
-				xml,
-			).ListBucketResult;
+			const result = requireS3XmlElement(
+				parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(xml)
+					.ListBucketResult,
+				"ListBucketResult",
+			);
 			const contents = result.Contents
 				? Array.isArray(result.Contents)
 					? result.Contents
@@ -637,7 +651,7 @@ async function deletePrefixObjects(params: {
 				const relativeKey = objectKey.startsWith(rootPrefix)
 					? objectKey.slice(rootPrefix.length)
 					: objectKey;
-				deletedBytes += await deleteSingleObject(objectKey);
+				deletedBytes += await deleteSingleObject(params, objectKey);
 				deletedKeys.push(relativeKey);
 			}
 
@@ -649,13 +663,17 @@ async function deletePrefixObjects(params: {
 }
 
 async function copyObject(
+	params: Pick<BucketContext, "bucket" | "owner">,
 	sourceInternalKey: string,
 	destinationInternalKey: string,
 ) {
-	const res = await s3Client.fetch(destinationInternalKey, {
+	const res = await fetchBucketStorage(params, destinationInternalKey, {
 		method: "PUT",
 		headers: {
-			"x-amz-copy-source": `/${config.s3.bucket}/${sourceInternalKey}`,
+			"x-silo-copy-source-path-b64": Buffer.from(
+				sourceInternalKey,
+				"utf8",
+			).toString("base64url"),
 			"Content-Length": "0",
 		},
 	});
@@ -665,8 +683,11 @@ async function copyObject(
 	}
 }
 
-async function headObject(internalKey: string) {
-	const res = await s3Client.fetch(internalKey, { method: "HEAD" });
+async function headObject(
+	params: Pick<BucketContext, "bucket" | "owner">,
+	internalKey: string,
+) {
+	const res = await fetchBucketStorage(params, internalKey, { method: "HEAD" });
 	if (!res.ok) {
 		throw new Error(
 			res.status === 404 ? "File not found" : `S3 Head Error: ${res.status}`,
@@ -844,7 +865,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 
 		try {
 			const [stat, analytics] = await Promise.all([
-				headObject(internalKey),
+				headObject(bucketData, internalKey),
 				getObjectAnalytics(bucketData.bucket.id, safeKey),
 			]);
 
@@ -855,6 +876,9 @@ export async function handleFiles(req: Request): Promise<Response> {
 						customDomains: parseBucketCustomDomains(
 							bucketData.bucket.customDomains,
 						),
+						s3Domain: getStorageRegion(
+							getBucketStorageRegion(bucketData.bucket),
+						).endpoint,
 					})
 				: null;
 
@@ -920,7 +944,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 		);
 
 		try {
-			const response = await s3Client.fetch(internalKey, {
+			const response = await fetchBucketStorage(bucketData, internalKey, {
 				method: "GET",
 				headers: {
 					...(req.headers.get("range")
@@ -1130,7 +1154,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 							bucketData.owner,
 							bucketData.bucket,
 						);
-						deletedBytes += await deleteSingleObject(internalKey);
+						deletedBytes += await deleteSingleObject(bucketData, internalKey);
 						deletedKeys.push(key);
 					}
 				}
@@ -1143,7 +1167,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 						})
 						.where(eq(buckets.id, bucketData.bucket.id));
 				}
-				await invalidateDataplaneListCache(bucketData.bucket.id);
+				await invalidateDataplaneListCache(bucketData.bucket);
 
 				return jsonResponse({
 					message:
@@ -1174,7 +1198,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 					bucketData.owner,
 					bucketData.bucket,
 				);
-				deletedBytes += await deleteSingleObject(internalKey);
+				deletedBytes += await deleteSingleObject(bucketData, internalKey);
 			}
 
 			if (deletedBytes > 0) {
@@ -1183,7 +1207,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 					.set({ totalBytes: sql`${buckets.totalBytes} - ${deletedBytes}` })
 					.where(eq(buckets.id, bucketData.bucket.id));
 			}
-			await invalidateDataplaneListCache(bucketData.bucket.id);
+			await invalidateDataplaneListCache(bucketData.bucket);
 
 			return jsonResponse({
 				message: normalizedKeys.length === 1 ? "Deleted" : "Deleted files",
@@ -1269,7 +1293,9 @@ export async function handleFiles(req: Request): Promise<Response> {
 						bucketData.owner,
 						bucketData.bucket,
 					);
-					const before = await s3Client.fetch(internalKey, { method: "HEAD" });
+					const before = await fetchBucketStorage(bucketData, internalKey, {
+						method: "HEAD",
+					});
 					if (!before.ok && before.status !== 404) {
 						return errorResponse("Failed to inspect existing file", 502);
 					}
@@ -1294,7 +1320,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 						return errorResponse("Storage quota exceeded", 403);
 					}
 
-					const uploadRes = await s3Client.fetch(internalKey, {
+					const uploadRes = await fetchBucketStorage(bucketData, internalKey, {
 						method: "PUT",
 						headers: {
 							"Content-Type": file.type || "application/octet-stream",
@@ -1302,7 +1328,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 						},
 						body: file.stream(),
 						duplex: "half",
-					} as RequestInit);
+					} as RequestInit & { method: "PUT" });
 
 					if (!uploadRes.ok) {
 						const message = await uploadRes.text();
@@ -1337,7 +1363,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 					(sum, item) => sum + item.size,
 					0,
 				);
-				await invalidateDataplaneListCache(bucketData.bucket.id);
+				await invalidateDataplaneListCache(bucketData.bucket);
 
 				return jsonResponse({
 					message: "Uploaded files",
@@ -1392,10 +1418,10 @@ export async function handleFiles(req: Request): Promise<Response> {
 					bucketData.bucket,
 				);
 
-				await headObject(sourceInternalKey);
-				await copyObject(sourceInternalKey, destinationInternalKey);
-				await deleteSingleObject(sourceInternalKey);
-				await invalidateDataplaneListCache(bucketData.bucket.id);
+				await headObject(bucketData, sourceInternalKey);
+				await copyObject(bucketData, sourceInternalKey, destinationInternalKey);
+				await deleteSingleObject(bucketData, sourceInternalKey);
+				await invalidateDataplaneListCache(bucketData.bucket);
 
 				return jsonResponse({
 					message: "Renamed file",
@@ -1442,13 +1468,17 @@ export async function handleFiles(req: Request): Promise<Response> {
 						bucketData.bucket,
 					);
 
-					await headObject(sourceInternalKey);
-					await copyObject(sourceInternalKey, destinationInternalKey);
-					await deleteSingleObject(sourceInternalKey);
+					await headObject(bucketData, sourceInternalKey);
+					await copyObject(
+						bucketData,
+						sourceInternalKey,
+						destinationInternalKey,
+					);
+					await deleteSingleObject(bucketData, sourceInternalKey);
 
 					moved.push({ sourceKey, destinationKey });
 				}
-				await invalidateDataplaneListCache(bucketData.bucket.id);
+				await invalidateDataplaneListCache(bucketData.bucket);
 
 				return jsonResponse({
 					message: "Moved files",

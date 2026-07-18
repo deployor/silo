@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+	AUTOMATIC_REGION_ID,
+	isRequestedBucketRegion,
+	type RequestedBucketRegion,
+} from "./regions";
 
 // Bucket Name Validation
 // Only lowercase letters, numbers, and hyphens.
@@ -29,6 +34,12 @@ export const bucketNameSchema = z
 
 export const createBucketSchema = z.object({
 	name: bucketNameSchema,
+	requestedRegion: z
+		.string()
+		.refine(isRequestedBucketRegion, "Unsupported storage region")
+		.transform((value) => value as RequestedBucketRegion)
+		.optional()
+		.default(AUTOMATIC_REGION_ID),
 });
 
 export const updateBucketVisibilitySchema = z.object({

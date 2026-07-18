@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import { bucketCollaborators, buckets, users } from "../db/schema";
+import { context } from "../lib/context";
 
 export const COLLABORATION_PERMISSIONS = [
 	"manage_keys",
@@ -136,7 +137,8 @@ export async function getBucketOwnerById(ownerUserId: string) {
 	const result = await db
 		.select({
 			user: users,
-			storageUsageBytes: sql<number>`COALESCE(sum(${buckets.totalBytes}), 0)`.mapWith(Number),
+			storageUsageBytes:
+				sql<number>`COALESCE(sum(${buckets.totalBytes}), 0)`.mapWith(Number),
 		})
 		.from(users)
 		.leftJoin(buckets, eq(buckets.userId, users.id))
@@ -485,6 +487,8 @@ export async function getBucketAccessForUser(params: {
 	if (!bucket) {
 		throw new Error("Bucket not found");
 	}
+	const requestContext = context.getStore();
+	if (requestContext) requestContext.bucket = bucket;
 
 	if (!bucket.userId) {
 		throw new Error("Owner not found");

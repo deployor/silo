@@ -29,6 +29,8 @@ type ExportCommandState = {
 		name: string;
 		totalBytes: number;
 		objectCount: number;
+		resolvedRegion: "eu-central" | "us-east";
+		endpoint: string;
 	}>;
 };
 
@@ -85,16 +87,6 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 
 		const shellQuote = (value: string) => `'${value.replace(/'/g, `'"'"'`)}'`;
 		const destinationPath = "./silo-export";
-		const s3Flags = [
-			"--s3-provider Other",
-			`--s3-access-key-id ${shellQuote(exportCommand.accessKey)}`,
-			`--s3-secret-access-key ${shellQuote(exportCommand.secretKey)}`,
-			`--s3-endpoint ${shellQuote(exportCommand.endpoint)}`,
-			"--s3-region auto",
-			"--s3-force-path-style",
-			"--s3-no-check-bucket",
-		].join(" ");
-
 		const modeFlags =
 			exportSpeedMode === "safe"
 				? "--fast-list --transfers 8 --checkers 16 --multi-thread-streams 2 --multi-thread-cutoff 128M --progress"
@@ -103,10 +95,21 @@ export function OffboardingPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					: "--fast-list --transfers 32 --checkers 64 --multi-thread-streams 8 --multi-thread-cutoff 64M --progress";
 
 		const bucketCommands = selectedExportBuckets
-			.map(
-				(bucketName) =>
-					`echo "Downloading ${bucketName}" && rclone copy ${shellQuote(`:s3:${bucketName}/`)} "$DEST/${bucketName}" ${s3Flags} ${modeFlags}`,
-			)
+			.map((bucketName) => {
+				const bucket = exportCommand.buckets.find(
+					(entry) => entry.name === bucketName,
+				);
+				const s3Flags = [
+					"--s3-provider Other",
+					`--s3-access-key-id ${shellQuote(exportCommand.accessKey)}`,
+					`--s3-secret-access-key ${shellQuote(exportCommand.secretKey)}`,
+					`--s3-endpoint ${shellQuote(bucket?.endpoint || exportCommand.endpoint)}`,
+					"--s3-region auto",
+					"--s3-force-path-style",
+					"--s3-no-check-bucket",
+				].join(" ");
+				return `echo "Downloading ${bucketName}" && rclone copy ${shellQuote(`:s3:${bucketName}/`)} "$DEST/${bucketName}" ${s3Flags} ${modeFlags}`;
+			})
 			.join(" \\\n  && ");
 
 		return [

@@ -1,196 +1,156 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use axum::{
     body::Body,
     http::{Response, StatusCode},
 };
 use chrono::{Datelike, Utc};
-use std::collections::HashMap;
+use sqlx::Row;
+use uuid::Uuid;
 
 use crate::{
-    rate_limit::check_egress_bytes, response::s3_error, stats::record_egress, AppState, AuthUser,
+    rate_limit::check_egress_bytes, response::s3_error, AppState, AuthBucket, AuthUser,
     AuthorizeResponse,
 };
 
-const STORAGE_QUOTA_LUA: &str = r#"
-local key = KEYS[1]
-local delta = tonumber(ARGV[1])
-local limit = tonumber(ARGV[2])
-local seed = tonumber(ARGV[3])
+const STORAGE_RESERVATION_SECONDS: i32 = 6 * 60 * 60;
+const MULTIPART_RESERVATION_SECONDS: i32 = 7 * 24 * 60 * 60;
 
-local current = tonumber(redis.call('GET', key))
-if current == nil then
-  current = seed
-  redis.call('SET', key, current)
-end
+/// A durable, globally visible reservation. Every dataplane talks to the same
+/// Aiven database, so this token prevents EU and US writers from admitting the
+/// same final quota byte concurrently.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct StorageReservation(Option<Uuid>);
 
-if (current + delta) > limit then
-  return {0, current}
-end
+impl StorageReservation {
+    fn none() -> Self {
+        Self(None)
+    }
 
-local nextValue = redis.call('INCRBY', key, delta)
-return {1, nextValue}
-"#;
-
-const RELEASE_QUOTA_LUA: &str = r#"
-local key = KEYS[1]
-local delta = tonumber(ARGV[1])
-local current = tonumber(redis.call('GET', key))
-if current == nil then
-  return 0
-end
-local nextValue = current - delta
-if nextValue < 0 then nextValue = 0 end
-redis.call('SET', key, nextValue)
-return nextValue
-"#;
-
-const MPU_QUOTA_LUA: &str = r#"
-local quotaKey = KEYS[1]
-local mpuKey = KEYS[2]
-local partNumber = ARGV[1]
-local partSize = tonumber(ARGV[2])
-local limit = tonumber(ARGV[3])
-local seed = tonumber(ARGV[4])
-local ttl = tonumber(ARGV[5])
-
-local existingCredit = tonumber(redis.call('HGET', mpuKey, '__existingCredit') or '0')
-local previousPartSize = tonumber(redis.call('HGET', mpuKey, partNumber) or '0')
-local previousTotal = tonumber(redis.call('HGET', mpuKey, '__total') or '0')
-local nextTotal = previousTotal - previousPartSize + partSize
-if nextTotal < 0 then nextTotal = 0 end
-
-local previousReserved = previousTotal - existingCredit
-if previousReserved < 0 then previousReserved = 0 end
-local nextReserved = nextTotal - existingCredit
-if nextReserved < 0 then nextReserved = 0 end
-local delta = nextReserved - previousReserved
-
-if delta > 0 then
-  local current = tonumber(redis.call('GET', quotaKey))
-  if current == nil then
-    current = seed
-    redis.call('SET', quotaKey, current)
-  end
-  if (current + delta) > limit then
-    return {0, current, previousTotal}
-  end
-  redis.call('INCRBY', quotaKey, delta)
-elseif delta < 0 then
-  local current = tonumber(redis.call('GET', quotaKey))
-  if current ~= nil then
-    local nextValue = current + delta
-    if nextValue < 0 then nextValue = 0 end
-    redis.call('SET', quotaKey, nextValue)
-  end
-end
-
-redis.call('HSET', mpuKey, partNumber, partSize, '__total', nextTotal)
-redis.call('EXPIRE', mpuKey, ttl)
-return {1, nextReserved, nextTotal}
-"#;
-
-const RELEASE_MPU_PART_LUA: &str = r#"
-local quotaKey = KEYS[1]
-local mpuKey = KEYS[2]
-local partNumber = ARGV[1]
-local ttl = tonumber(ARGV[2])
-
-local existingCredit = tonumber(redis.call('HGET', mpuKey, '__existingCredit') or '0')
-local previousPartSize = tonumber(redis.call('HGET', mpuKey, partNumber) or '0')
-local previousTotal = tonumber(redis.call('HGET', mpuKey, '__total') or '0')
-local nextTotal = previousTotal - previousPartSize
-if nextTotal < 0 then nextTotal = 0 end
-
-local previousReserved = previousTotal - existingCredit
-if previousReserved < 0 then previousReserved = 0 end
-local nextReserved = nextTotal - existingCredit
-if nextReserved < 0 then nextReserved = 0 end
-local release = previousReserved - nextReserved
-
-if release > 0 then
-  local current = tonumber(redis.call('GET', quotaKey))
-  if current ~= nil then
-    local nextValue = current - release
-    if nextValue < 0 then nextValue = 0 end
-    redis.call('SET', quotaKey, nextValue)
-  end
-end
-
-redis.call('HDEL', mpuKey, partNumber)
-redis.call('HSET', mpuKey, '__total', nextTotal)
-redis.call('EXPIRE', mpuKey, ttl)
-return {release, nextTotal}
-"#;
-
-fn storage_key(user_id: &str) -> String {
-    format!("quota:storage:{user_id}")
+    pub(crate) fn id(self) -> Option<Uuid> {
+        self.0
+    }
 }
 
-fn egress_key(user_id: &str, period: &str) -> String {
-    format!("quota:egress:{user_id}:{period}")
-}
+pub(crate) async fn reserve_storage(
+    state: &AppState,
+    user: &AuthUser,
+    delta: u64,
+) -> Result<StorageReservation> {
+    if delta == 0 || user.is_immortal {
+        return Ok(StorageReservation::none());
+    }
+    let delta = i64::try_from(delta).context("storage reservation exceeds bigint")?;
+    let mut tx = state.pg.begin().await?;
+    lock_user_quota(&mut tx, &user.id).await?;
+    cleanup_expired(&mut tx, &user.id).await?;
 
-fn mpu_key(user_id: &str, bucket_id: &str, upload_id: &str) -> String {
-    format!("quota:mpu:{user_id}:{bucket_id}:{upload_id}")
-}
+    let (is_immortal, limit) = load_storage_limit(&mut tx, &user.id).await?;
+    if is_immortal {
+        tx.commit().await?;
+        return Ok(StorageReservation::none());
+    }
+    let limit = limit.ok_or_else(|| anyhow!("storage quota denied"))?;
+    let used = load_reserved_storage_usage(&mut tx, &user.id).await?;
+    if used > limit || delta > limit.saturating_sub(used) {
+        return Err(anyhow!("storage quota exceeded"));
+    }
 
-fn egress_limit(user: &AuthUser) -> Option<u64> {
-    if user.is_immortal {
-        return None;
-    }
-    if let Some(limit) = user.egress_limit_bytes {
-        if limit == -1 {
-            return None;
-        }
-        return u64::try_from(limit).ok();
-    }
-    let storage = u64::try_from(user.storage_limit_bytes.unwrap_or(0)).unwrap_or(0);
-    Some(std::cmp::max(
-        storage.saturating_mul(3),
-        10 * 1024 * 1024 * 1024,
-    ))
-}
-
-pub(crate) async fn reserve_storage(state: &AppState, user: &AuthUser, delta: u64) -> Result<()> {
-    if user.is_immortal || delta == 0 {
-        return Ok(());
-    }
-    let limit = user
-        .storage_limit_bytes
-        .and_then(|v| u64::try_from(v).ok())
-        .unwrap_or(0);
-    if limit == 0 {
-        return Err(anyhow!("storage quota denied"));
-    }
-    check_and_incr_quota(
-        state,
-        &storage_key(&user.id),
-        delta,
-        limit,
-        u64::try_from(user.storage_usage_bytes).unwrap_or(0),
-        "storage",
+    let id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO dataplane_quota_reservations
+          (id, user_id, kind, bytes, expires_at, created_at)
+        VALUES ($1, $2, 'storage', $3, now() + make_interval(secs => $4), now())
+        "#,
     )
-    .await
+    .bind(id)
+    .bind(&user.id)
+    .bind(delta)
+    .bind(STORAGE_RESERVATION_SECONDS)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(StorageReservation(Some(id)))
 }
 
-pub(crate) async fn reserve_egress(state: &AppState, user: &AuthUser, delta: u64) -> Result<()> {
-    let Some(limit) = egress_limit(user) else {
+pub(crate) async fn release_storage_reservation(
+    state: &AppState,
+    reservation: StorageReservation,
+) -> Result<()> {
+    let Some(id) = reservation.0 else {
         return Ok(());
     };
+    sqlx::query("DELETE FROM dataplane_quota_reservations WHERE id = $1")
+        .bind(id)
+        .execute(&state.pg)
+        .await?;
+    Ok(())
+}
+
+/// Egress accounting and enforcement are one Aiven row lock. This is both the
+/// usage write and the quota reservation; callers must not enqueue a second
+/// egress increment after this succeeds.
+pub(crate) async fn reserve_egress(state: &AppState, user: &AuthUser, delta: u64) -> Result<()> {
+    if delta == 0 {
+        return Ok(());
+    }
+    let delta = i64::try_from(delta).context("egress reservation exceeds bigint")?;
     let period = current_egress_period();
-    let seed = if user.egress_period.as_deref() == Some(period.as_str()) {
-        u64::try_from(user.egress_bytes).unwrap_or(0)
+    let mut tx = state.pg.begin().await?;
+    lock_user_quota(&mut tx, &user.id).await?;
+    let row = sqlx::query(
+        r#"
+        SELECT is_immortal, storage_limit_bytes, egress_limit_bytes,
+               egress_bytes, egress_period
+        FROM users
+        WHERE id = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(&user.id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| anyhow!("quota user does not exist"))?;
+    let immortal: bool = row.try_get("is_immortal")?;
+    let storage_limit: Option<i64> = row.try_get("storage_limit_bytes")?;
+    let explicit_limit: Option<i64> = row.try_get("egress_limit_bytes")?;
+    let previous_period: Option<String> = row.try_get("egress_period")?;
+    let previous = if previous_period.as_deref() == Some(period.as_str()) {
+        row.try_get::<i64, _>("egress_bytes")?.max(0)
     } else {
         0
     };
-    let key = egress_key(&user.id, &period);
-    check_and_incr_quota(state, &key, delta, limit, seed, "egress").await?;
-    let mut conn = state.redis.clone();
-    let _: redis::RedisResult<()> = redis::cmd("EXPIRE")
-        .arg(&key)
-        .arg(90 * 24 * 60 * 60)
-        .query_async(&mut conn)
-        .await;
+    let limit = if immortal || explicit_limit == Some(-1) {
+        None
+    } else if let Some(limit) = explicit_limit {
+        Some(limit.max(0))
+    } else {
+        Some(
+            storage_limit
+                .unwrap_or(0)
+                .max(0)
+                .saturating_mul(3)
+                .max(10 * 1024 * 1024 * 1024),
+        )
+    };
+    if limit.is_some_and(|limit| previous > limit || delta > limit.saturating_sub(previous)) {
+        return Err(anyhow!("egress quota exceeded"));
+    }
+    let next = previous
+        .checked_add(delta)
+        .ok_or_else(|| anyhow!("egress counter exceeds bigint"))?;
+    let updated = sqlx::query(
+        "UPDATE users SET egress_bytes = $1, egress_period = $2, updated_at = now() WHERE id = $3",
+    )
+    .bind(next)
+    .bind(&period)
+    .bind(&user.id)
+    .execute(&mut *tx)
+    .await?;
+    if updated.rows_affected() != 1 {
+        return Err(anyhow!("egress quota user disappeared"));
+    }
+    tx.commit().await?;
     Ok(())
 }
 
@@ -200,14 +160,11 @@ pub(crate) async fn reserve_served_egress(
     bytes: u64,
 ) -> Result<Option<Response<Body>>> {
     if bytes == 0 {
-        record_egress(state, auth, bytes).await;
         return Ok(None);
     }
-
-    if let Some(res) = check_egress_bytes(state, auth, bytes).await? {
-        return Ok(Some(res));
+    if let Some(response) = check_egress_bytes(state, auth, bytes).await? {
+        return Ok(Some(response));
     }
-
     if let Some(user) = &auth.user {
         if reserve_egress(state, user, bytes).await.is_err() {
             return Ok(Some(s3_error(
@@ -217,46 +174,51 @@ pub(crate) async fn reserve_served_egress(
             )));
         }
     }
-
-    record_egress(state, auth, bytes).await;
     Ok(None)
 }
 
-fn current_egress_period() -> String {
-    let now = Utc::now();
-    format!("{:04}-{:02}", now.year(), now.month())
-}
-
-async fn check_and_incr_quota(
+pub(crate) async fn register_multipart_upload(
     state: &AppState,
-    key: &str,
-    delta: u64,
-    limit: u64,
-    seed: u64,
-    label: &str,
+    user_id: &str,
+    bucket: &AuthBucket,
+    upload_id: &str,
+    existing_size: u64,
 ) -> Result<()> {
-    let mut conn = state.redis.clone();
-    let result: Vec<i64> = redis::Script::new(STORAGE_QUOTA_LUA)
-        .key(key)
-        .arg(delta)
-        .arg(limit)
-        .arg(seed)
-        .invoke_async(&mut conn)
-        .await?;
-    if result.first().copied() == Some(1) {
-        Ok(())
-    } else {
-        Err(anyhow!("{label} quota exceeded"))
+    if user_id.is_empty() || bucket.id.is_empty() || upload_id.is_empty() {
+        return Err(anyhow!("multipart quota identity is incomplete"));
     }
-}
-
-pub(crate) async fn release_storage(state: &AppState, user_id: &str, delta: u64) -> Result<()> {
-    let mut conn = state.redis.clone();
-    let _: i64 = redis::Script::new(RELEASE_QUOTA_LUA)
-        .key(storage_key(user_id))
-        .arg(delta)
-        .invoke_async(&mut conn)
-        .await?;
+    let existing_size = i64::try_from(existing_size).context("existing object exceeds bigint")?;
+    let backend = bucket.active_backend()?;
+    let mut tx = state.pg.begin().await?;
+    lock_user_quota(&mut tx, user_id).await?;
+    cleanup_expired(&mut tx, user_id).await?;
+    sqlx::query(
+        r#"
+        INSERT INTO dataplane_multipart_quota_uploads
+          (upload_id, user_id, bucket_id, storage_region, backend_id,
+           backend_generation, existing_credit, expires_at)
+        VALUES ($1, $2, $3::uuid, $4, $5, $6, $7,
+                now() + make_interval(secs => $8))
+        ON CONFLICT (upload_id) DO UPDATE SET
+          expires_at = EXCLUDED.expires_at
+        WHERE dataplane_multipart_quota_uploads.user_id = EXCLUDED.user_id
+          AND dataplane_multipart_quota_uploads.bucket_id = EXCLUDED.bucket_id
+          AND dataplane_multipart_quota_uploads.storage_region = EXCLUDED.storage_region
+          AND dataplane_multipart_quota_uploads.backend_id = EXCLUDED.backend_id
+          AND dataplane_multipart_quota_uploads.backend_generation = EXCLUDED.backend_generation
+        "#,
+    )
+    .bind(upload_id)
+    .bind(user_id)
+    .bind(&bucket.id)
+    .bind(&bucket.resolved_region)
+    .bind(&backend.id)
+    .bind(backend.generation)
+    .bind(existing_size)
+    .bind(MULTIPART_RESERVATION_SECONDS)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
     Ok(())
 }
 
@@ -268,33 +230,123 @@ pub(crate) async fn reserve_multipart_part(
     part_number: &str,
     part_size: u64,
 ) -> Result<()> {
-    if user.is_immortal {
-        return Ok(());
+    let part_number = part_number
+        .parse::<i32>()
+        .context("multipart part number is invalid")?;
+    if !(1..=10_000).contains(&part_number) || bucket_id.is_empty() || upload_id.is_empty() {
+        return Err(anyhow!("multipart quota identity is invalid"));
     }
-    let limit = user
-        .storage_limit_bytes
-        .and_then(|v| u64::try_from(v).ok())
-        .unwrap_or(0);
-    if limit == 0 || bucket_id.is_empty() || upload_id.is_empty() || part_number.is_empty() {
-        return Err(anyhow!("multipart quota denied"));
+    let part_size = i64::try_from(part_size).context("multipart part exceeds bigint")?;
+    let mut tx = state.pg.begin().await?;
+    lock_user_quota(&mut tx, &user.id).await?;
+    cleanup_expired(&mut tx, &user.id).await?;
+    let upload_exists = sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT EXISTS (
+          SELECT 1
+          FROM dataplane_multipart_quota_uploads
+          WHERE upload_id = $1 AND user_id = $2 AND bucket_id = $3::uuid
+            AND expires_at > now()
+          FOR UPDATE
+        )
+        "#,
+    )
+    .bind(upload_id)
+    .bind(&user.id)
+    .bind(bucket_id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if !upload_exists {
+        return Err(anyhow!("multipart quota upload is missing or expired"));
     }
+    let (is_immortal, limit) = load_storage_limit(&mut tx, &user.id).await?;
+    let previous = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COALESCE((
+          SELECT part_bytes FROM dataplane_multipart_quota_parts
+          WHERE upload_id = $1 AND part_number = $2
+        ), 0)::bigint
+        "#,
+    )
+    .bind(upload_id)
+    .bind(part_number)
+    .fetch_one(&mut *tx)
+    .await?;
+    if !is_immortal && part_size > previous {
+        let limit = limit.ok_or_else(|| anyhow!("storage quota denied"))?;
+        let used = load_reserved_storage_usage(&mut tx, &user.id).await?;
+        let growth = part_size - previous;
+        if used > limit || growth > limit.saturating_sub(used) {
+            return Err(anyhow!("multipart quota exceeded"));
+        }
+    }
+    sqlx::query(
+        r#"
+        INSERT INTO dataplane_multipart_quota_parts (upload_id, part_number, part_bytes)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (upload_id, part_number) DO UPDATE
+        SET part_bytes = EXCLUDED.part_bytes
+        "#,
+    )
+    .bind(upload_id)
+    .bind(part_number)
+    .bind(part_size)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(
+        r#"
+        UPDATE dataplane_multipart_quota_uploads
+        SET expires_at = now() + make_interval(secs => $2)
+        WHERE upload_id = $1
+        "#,
+    )
+    .bind(upload_id)
+    .bind(MULTIPART_RESERVATION_SECONDS)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(())
+}
 
-    let mut conn = state.redis.clone();
-    let result: Vec<i64> = redis::Script::new(MPU_QUOTA_LUA)
-        .key(storage_key(&user.id))
-        .key(mpu_key(&user.id, bucket_id, upload_id))
-        .arg(part_number)
-        .arg(part_size)
-        .arg(limit)
-        .arg(u64::try_from(user.storage_usage_bytes).unwrap_or(0))
-        .arg(7 * 24 * 60 * 60)
-        .invoke_async(&mut conn)
-        .await?;
-    if result.first().copied() == Some(1) {
-        Ok(())
-    } else {
-        Err(anyhow!("multipart quota exceeded"))
+pub(crate) async fn multipart_completed_size(
+    state: &AppState,
+    user_id: &str,
+    bucket_id: &str,
+    upload_id: &str,
+    part_numbers: &[i32],
+) -> Result<u64> {
+    if part_numbers.is_empty() || part_numbers.len() > 10_000 {
+        return Err(anyhow!("multipart completion has no valid parts"));
     }
+    let mut unique = part_numbers.to_vec();
+    unique.sort_unstable();
+    unique.dedup();
+    if unique.len() != part_numbers.len() || unique.iter().any(|part| !(1..=10_000).contains(part))
+    {
+        return Err(anyhow!("multipart completion part list is invalid"));
+    }
+    let row = sqlx::query(
+        r#"
+        SELECT COUNT(*)::bigint AS part_count,
+               COALESCE(SUM(p.part_bytes), 0)::bigint AS total_bytes
+        FROM dataplane_multipart_quota_uploads u
+        JOIN dataplane_multipart_quota_parts p ON p.upload_id = u.upload_id
+        WHERE u.upload_id = $1 AND u.user_id = $2 AND u.bucket_id = $3::uuid
+          AND u.expires_at > now() AND p.part_number = ANY($4)
+        "#,
+    )
+    .bind(upload_id)
+    .bind(user_id)
+    .bind(bucket_id)
+    .bind(&unique)
+    .fetch_one(&state.pg)
+    .await?;
+    let count: i64 = row.try_get("part_count")?;
+    if usize::try_from(count).ok() != Some(unique.len()) {
+        return Err(anyhow!("multipart completion references an untracked part"));
+    }
+    let total: i64 = row.try_get("total_bytes")?;
+    u64::try_from(total).context("multipart completed size is invalid")
 }
 
 pub(crate) async fn release_multipart_part(
@@ -304,41 +356,24 @@ pub(crate) async fn release_multipart_part(
     upload_id: &str,
     part_number: &str,
 ) -> Result<()> {
-    if bucket_id.is_empty() || upload_id.is_empty() || part_number.is_empty() {
+    let Ok(part_number) = part_number.parse::<i32>() else {
         return Ok(());
-    }
-
-    let mut conn = state.redis.clone();
-    let _: Vec<i64> = redis::Script::new(RELEASE_MPU_PART_LUA)
-        .key(storage_key(user_id))
-        .key(mpu_key(user_id, bucket_id, upload_id))
-        .arg(part_number)
-        .arg(7 * 24 * 60 * 60)
-        .invoke_async(&mut conn)
-        .await?;
-    Ok(())
-}
-
-pub(crate) async fn register_multipart_upload(
-    state: &AppState,
-    user_id: &str,
-    bucket_id: &str,
-    upload_id: &str,
-    existing_size: u64,
-) -> Result<()> {
-    if user_id.is_empty() || bucket_id.is_empty() || upload_id.is_empty() {
-        return Ok(());
-    }
-    let mut conn = state.redis.clone();
-    let _: () = redis::pipe()
-        .hset(
-            mpu_key(user_id, bucket_id, upload_id),
-            "__existingCredit",
-            existing_size,
-        )
-        .expire(mpu_key(user_id, bucket_id, upload_id), 7 * 24 * 60 * 60)
-        .query_async(&mut conn)
-        .await?;
+    };
+    sqlx::query(
+        r#"
+        DELETE FROM dataplane_multipart_quota_parts p
+        USING dataplane_multipart_quota_uploads u
+        WHERE p.upload_id = u.upload_id
+          AND p.upload_id = $1 AND p.part_number = $2
+          AND u.user_id = $3 AND u.bucket_id = $4::uuid
+        "#,
+    )
+    .bind(upload_id)
+    .bind(part_number)
+    .bind(user_id)
+    .bind(bucket_id)
+    .execute(&state.pg)
+    .await?;
     Ok(())
 }
 
@@ -348,14 +383,17 @@ pub(crate) async fn clear_multipart_upload(
     bucket_id: &str,
     upload_id: &str,
 ) -> Result<()> {
-    if user_id.is_empty() || bucket_id.is_empty() || upload_id.is_empty() {
-        return Ok(());
-    }
-    let mut conn = state.redis.clone();
-    let _: () = redis::cmd("DEL")
-        .arg(mpu_key(user_id, bucket_id, upload_id))
-        .query_async(&mut conn)
-        .await?;
+    sqlx::query(
+        r#"
+        DELETE FROM dataplane_multipart_quota_uploads
+        WHERE upload_id = $1 AND user_id = $2 AND bucket_id = $3::uuid
+        "#,
+    )
+    .bind(upload_id)
+    .bind(user_id)
+    .bind(bucket_id)
+    .execute(&state.pg)
+    .await?;
     Ok(())
 }
 
@@ -365,35 +403,175 @@ pub(crate) async fn release_multipart_upload(
     bucket_id: &str,
     upload_id: &str,
 ) -> Result<()> {
-    if user_id.is_empty() || bucket_id.is_empty() || upload_id.is_empty() {
-        return Ok(());
-    }
-    let key = mpu_key(user_id, bucket_id, upload_id);
-    let mut conn = state.redis.clone();
-    let values: HashMap<String, String> = redis::cmd("HGETALL")
-        .arg(&key)
-        .query_async(&mut conn)
+    clear_multipart_upload(state, user_id, bucket_id, upload_id).await
+}
+
+async fn lock_user_quota(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: &str,
+) -> Result<()> {
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('silo:quota:' || $1, 0))")
+        .bind(user_id)
+        .execute(&mut **tx)
         .await?;
-    let existing_credit = quota_number(values.get("__existingCredit"));
-    let mut total = quota_number(values.get("__total"));
-    if total == 0 {
-        for (field, value) in &values {
-            if field != "__existingCredit" && field != "__total" {
-                total = total.saturating_add(quota_number(Some(value)));
-            }
-        }
-    }
-    let reserved = total.saturating_sub(existing_credit);
-    if reserved > 0 {
-        release_storage(state, user_id, reserved).await?;
-    }
-    let mut conn = state.redis.clone();
-    let _: () = redis::cmd("DEL").arg(key).query_async(&mut conn).await?;
     Ok(())
 }
 
-fn quota_number(value: Option<&String>) -> u64 {
-    value
-        .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(0)
+async fn cleanup_expired(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: &str,
+) -> Result<()> {
+    sqlx::query(
+        r#"
+        DELETE FROM dataplane_quota_reservations r
+        WHERE r.user_id = $1 AND r.expires_at <= now()
+          AND NOT EXISTS (
+            SELECT 1 FROM dataplane_mutation_intents i
+            WHERE i.quota_reservation_id = r.id
+              AND i.state IN ('prepared', 'committed')
+          )
+        "#,
+    )
+    .bind(user_id)
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query(
+        "DELETE FROM dataplane_multipart_quota_uploads WHERE user_id = $1 AND expires_at <= now()",
+    )
+    .bind(user_id)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+async fn load_storage_limit(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: &str,
+) -> Result<(bool, Option<i64>)> {
+    let row = sqlx::query(
+        r#"
+        SELECT u.is_immortal, u.storage_limit_bytes,
+               (SELECT default_storage_limit_bytes FROM app_settings LIMIT 1)
+                 AS default_storage_limit_bytes
+        FROM users u
+        WHERE u.id = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(&mut **tx)
+    .await?
+    .ok_or_else(|| anyhow!("quota user does not exist"))?;
+    let immortal: bool = row.try_get("is_immortal")?;
+    let explicit: Option<i64> = row.try_get("storage_limit_bytes")?;
+    let default: Option<i64> = row.try_get("default_storage_limit_bytes")?;
+    Ok(resolve_storage_limit(immortal, explicit, default))
+}
+
+fn resolve_storage_limit(
+    immortal: bool,
+    explicit: Option<i64>,
+    configured_default: Option<i64>,
+) -> (bool, Option<i64>) {
+    if immortal {
+        return (true, None);
+    }
+    // Keep this byte-for-byte equivalent in meaning to auth/control-plane:
+    // COALESCE(NULLIF(users.storage_limit_bytes, 0),
+    //          app_settings.default_storage_limit_bytes, 1 GiB).
+    let resolved = explicit
+        .filter(|value| *value != 0)
+        .or(configured_default)
+        .unwrap_or(1024 * 1024 * 1024);
+    if resolved == -1 {
+        (false, None)
+    } else {
+        (false, Some(resolved.max(0)))
+    }
+}
+
+async fn load_reserved_storage_usage(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    user_id: &str,
+) -> Result<i64> {
+    sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT (
+          COALESCE((
+            SELECT SUM(GREATEST(total_bytes, 0)) FROM buckets WHERE user_id = $1
+          ), 0)
+          + COALESCE((
+            SELECT SUM(bytes) FROM dataplane_quota_reservations
+            WHERE user_id = $1 AND kind = 'storage'
+              AND (
+                expires_at > now()
+                OR EXISTS (
+                  SELECT 1 FROM dataplane_mutation_intents i
+                  WHERE i.quota_reservation_id = dataplane_quota_reservations.id
+                    AND i.state IN ('prepared', 'committed')
+                )
+              )
+          ), 0)
+          + COALESCE((
+            SELECT SUM(GREATEST(COALESCE(parts.total_bytes, 0) - uploads.existing_credit, 0))
+            FROM dataplane_multipart_quota_uploads uploads
+            LEFT JOIN (
+              SELECT upload_id, SUM(part_bytes) AS total_bytes
+              FROM dataplane_multipart_quota_parts
+              GROUP BY upload_id
+            ) parts ON parts.upload_id = uploads.upload_id
+            WHERE uploads.user_id = $1 AND uploads.expires_at > now()
+          ), 0)
+          + COALESCE((
+            SELECT SUM(GREATEST(new_size - old_size, 0))
+            FROM dataplane_mutation_intents
+            WHERE user_id = $1 AND state IN ('prepared', 'committed')
+              AND quota_reservation_id IS NULL
+          ), 0)
+        )::bigint
+        "#,
+    )
+    .bind(user_id)
+    .fetch_one(&mut **tx)
+    .await
+    .context("failed to calculate global reserved storage usage")
+}
+
+fn current_egress_period() -> String {
+    let now = Utc::now();
+    format!("{:04}-{:02}", now.year(), now.month())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_storage_limit;
+
+    #[test]
+    fn storage_limit_uses_product_default_semantics() {
+        assert_eq!(
+            resolve_storage_limit(false, None, Some(5_000)),
+            (false, Some(5_000))
+        );
+        assert_eq!(
+            resolve_storage_limit(false, Some(0), Some(5_000)),
+            (false, Some(5_000))
+        );
+        assert_eq!(
+            resolve_storage_limit(false, None, None),
+            (false, Some(1024 * 1024 * 1024))
+        );
+        assert_eq!(
+            resolve_storage_limit(false, Some(42), Some(5_000)),
+            (false, Some(42))
+        );
+    }
+
+    #[test]
+    fn storage_limit_preserves_unlimited_decisions() {
+        assert_eq!(
+            resolve_storage_limit(false, Some(-1), Some(5_000)),
+            (false, None)
+        );
+        assert_eq!(resolve_storage_limit(true, Some(1), Some(1)), (true, None));
+    }
 }

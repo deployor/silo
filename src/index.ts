@@ -4,10 +4,16 @@ import { config } from "./config";
 import { databaseTarget, db } from "./db";
 import { handleSlackRequest } from "./integrations/slack";
 import { errorResponse } from "./lib/api-utils";
-import { context } from "./lib/context";
+import { context, type RequestContext } from "./lib/context";
 import { getDiskCacheStats } from "./lib/disk-cache";
 import { redis } from "./lib/redis";
 import { validateOrigin } from "./lib/security";
+import {
+	beginHttpRequestTelemetry,
+	classifyControlPlaneRoute,
+	initializeTelemetry,
+	shutdownTelemetry,
+} from "./lib/telemetry";
 import { render } from "./lib/view-engine";
 import { rateLimit } from "./middleware/rate-limit";
 import { securityHeaders } from "./middleware/security-headers";
@@ -109,6 +115,7 @@ function isFullMaintenanceException(path: string): boolean {
 	return (
 		path === "/admin/settings" ||
 		path === "/api/admin/settings" ||
+		path.startsWith("/api/admin/storage/") ||
 		path === "/api/maintenance-status" ||
 		path.startsWith("/assets/")
 	);
@@ -229,6 +236,7 @@ function isDashboardRequest(req: Request, url: URL): boolean {
 	return false;
 }
 
+initializeTelemetry();
 console.log("Connecting to PostgreSQL", databaseTarget());
 try {
 	await migrate(db, { migrationsFolder: "./drizzle" });
@@ -247,21 +255,32 @@ const server = Bun.serve({
 	async fetch(req) {
 		const url = new URL(req.url);
 		const requestId = crypto.randomUUID();
+		const telemetry = beginHttpRequestTelemetry({
+			req,
+			requestId,
+			route: classifyControlPlaneRoute(
+				url.pathname,
+				isDashboardRequest(req, url),
+			),
+		});
+		const traceId = telemetry.traceId;
 		const startTime = performance.now();
-
-		return context.run(
-			{
-				requestId,
-				startTime,
-				ip:
-					req.headers.get("x-forwarded-for") ||
-					req.headers.get("cf-connecting-ip") ||
-					"unknown",
-				userAgent: req.headers.get("user-agent"),
-				method: req.method,
-				path: url.pathname,
-			},
-			async () => {
+		const requestContext: RequestContext = {
+			requestId,
+			traceId,
+			startTime,
+			ip:
+				req.headers.get("x-forwarded-for") ||
+				req.headers.get("cf-connecting-ip") ||
+				"unknown",
+			userAgent: req.headers.get("user-agent"),
+			method: req.method,
+			path: url.pathname,
+		};
+		let status = 500;
+		let failed = false;
+		try {
+			const result = await context.run(requestContext, async () => {
 				let response: Response = new Response("Internal Error", {
 					status: 500,
 				});
@@ -416,8 +435,49 @@ const server = Bun.serve({
 
 				const isS3 = !isDashboard;
 				return securityHeaders(req, response, isS3);
-			},
-		);
+			});
+			status = result.status;
+			failed = status >= 500;
+			try {
+				result.headers.set("x-request-id", requestId);
+			} catch {
+				// Some platform-generated responses expose immutable headers.
+			}
+			return result;
+		} catch (error) {
+			failed = true;
+			throw error;
+		} finally {
+			const bucketRegion = requestContext.bucket?.resolvedRegion;
+			const durationMs = Number((performance.now() - startTime).toFixed(3));
+			const route = classifyControlPlaneRoute(
+				url.pathname,
+				isDashboardRequest(req, url),
+			);
+			telemetry.finish({
+				status,
+				durationMs,
+				failed,
+				bucketRegion:
+					typeof bucketRegion === "string" ? bucketRegion : undefined,
+			});
+			console.log(
+				JSON.stringify({
+					event: "http_request_completed",
+					service: "silo-control-plane",
+					service_region: "global",
+					request_id: requestId,
+					trace_id: traceId,
+					method: req.method,
+					route,
+					status,
+					duration_ms: durationMs,
+					bucket_storage_region:
+						typeof bucketRegion === "string" ? bucketRegion : null,
+					failed,
+				}),
+			);
+		}
 	},
 });
 
@@ -456,6 +516,8 @@ async function gracefulShutdown(signal: string) {
 	} catch (e) {
 		console.error("Log flush error:", e);
 	}
+
+	await shutdownTelemetry();
 
 	// 4. Stop background timers
 	if (config.deepFreezeEnabled) {

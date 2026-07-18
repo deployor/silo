@@ -4,6 +4,7 @@ import {
 	buildBucketUrlExample,
 	parseBucketCustomDomains,
 } from "../../../lib/bucket-domains";
+import { getBucketStorageRegion, getStorageRegion } from "../../../lib/regions";
 import { getCurrentUser } from "../../../lib/session";
 import {
 	createBucketSchema,
@@ -22,7 +23,17 @@ import {
 	updateBucketVisibility,
 	verifyBucketCustomDomain,
 } from "../../../services/bucket-service";
+import { getBucketAccessForUser } from "../../../services/collaboration-service";
 import { createKey } from "../../../services/key-service";
+
+async function getBucketRegionalEndpoint(params: {
+	bucketName: string;
+	userId: string;
+	isAdmin: boolean;
+}) {
+	const access = await getBucketAccessForUser(params);
+	return getStorageRegion(getBucketStorageRegion(access.bucket)).endpoint;
+}
 
 export async function handleBuckets(req: Request): Promise<Response> {
 	const user = await getCurrentUser(req);
@@ -50,14 +61,28 @@ export async function handleBuckets(req: Request): Promise<Response> {
 				return errorResponse(result.error.issues[0].message, 400);
 			}
 
-			const { name: bucketName } = result.data;
+			const { name: bucketName, requestedRegion } = result.data;
 
-			const newBucket = await createBucket(user.id, bucketName);
+			const newBucket = await createBucket(
+				user.id,
+				bucketName,
+				requestedRegion,
+			);
 			const keys = await createKey(newBucket.id, "dashboard", "Default key");
 
-			const publicUrl = buildBucketUrlExample({ bucketName });
+			const region = getStorageRegion(getBucketStorageRegion(newBucket));
+			const publicUrl = buildBucketUrlExample({
+				bucketName,
+				s3Domain: region.endpoint,
+			});
 
-			return jsonResponse({ ...keys, publicUrl });
+			return jsonResponse({
+				...keys,
+				publicUrl,
+				requestedRegion: newBucket.requestedRegion,
+				resolvedRegion: newBucket.resolvedRegion,
+				endpoint: region.endpoint,
+			});
 		} catch (e: unknown) {
 			console.error(e);
 			const message = e instanceof Error ? e.message : "Internal Error";
@@ -94,16 +119,24 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 
 		if (req.method === "GET") {
 			try {
-				const domains = await listBucketCustomDomains({
-					bucketName,
-					userId: user.id,
-					isAdmin: user.isAdmin,
-				});
+				const [domains, regionalEndpoint] = await Promise.all([
+					listBucketCustomDomains({
+						bucketName,
+						userId: user.id,
+						isAdmin: user.isAdmin,
+					}),
+					getBucketRegionalEndpoint({
+						bucketName,
+						userId: user.id,
+						isAdmin: user.isAdmin,
+					}),
+				]);
 				return jsonResponse({
 					domains,
 					publicUrlExample: buildBucketUrlExample({
 						bucketName,
 						customDomains: domains,
+						s3Domain: regionalEndpoint,
 					}),
 				});
 			} catch (e: unknown) {
@@ -214,17 +247,20 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 		}
 		const isEmpty = url.searchParams.get("empty") === "true";
 
-		if (isEmpty) {
-			emptyBucket(bucketName, user.id, user.isAdmin).catch((e) =>
-				console.error("[emptyBucket] background error:", e),
-			);
-			return jsonResponse({ message: "Emptied" });
-		}
+		try {
+			if (isEmpty) {
+				await emptyBucket(bucketName, user.id, user.isAdmin);
+				return jsonResponse({ message: "Emptied" });
+			}
 
-		deleteBucket(bucketName, user.id, user.isAdmin).catch((e) =>
-			console.error("[deleteBucket] background error:", e),
-		);
-		return jsonResponse({ message: "Deleted" });
+			await deleteBucket(bucketName, user.id, user.isAdmin);
+			return jsonResponse({ message: "Deleted" });
+		} catch (error) {
+			console.error("[bucket teardown] failed:", error);
+			const message =
+				error instanceof Error ? error.message : "Bucket teardown failed";
+			return errorResponse(message, 502);
+		}
 	}
 
 	if (req.method === "PATCH") {
@@ -245,16 +281,24 @@ export async function handleBucketOperations(req: Request): Promise<Response> {
 			const { isPublic } = result.data;
 
 			await updateBucketVisibility(bucketName, user.id, isPublic, user.isAdmin);
-			const bucketRows = await listBucketCustomDomains({
-				bucketName,
-				userId: user.id,
-				isAdmin: user.isAdmin,
-			}).catch(() => parseBucketCustomDomains(null));
+			const [bucketRows, regionalEndpoint] = await Promise.all([
+				listBucketCustomDomains({
+					bucketName,
+					userId: user.id,
+					isAdmin: user.isAdmin,
+				}).catch(() => parseBucketCustomDomains(null)),
+				getBucketRegionalEndpoint({
+					bucketName,
+					userId: user.id,
+					isAdmin: user.isAdmin,
+				}),
+			]);
 			return jsonResponse({
 				message: "Updated",
 				publicUrl: buildBucketUrlExample({
 					bucketName,
 					customDomains: bucketRows,
+					s3Domain: regionalEndpoint,
 				}),
 			});
 		} catch (e: unknown) {

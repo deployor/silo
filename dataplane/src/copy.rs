@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use axum::{
     body::Body,
     http::{HeaderMap, HeaderValue, Method, Response, StatusCode},
@@ -7,8 +7,8 @@ use sqlx::Row;
 
 use crate::{
     cache::{invalidate_object_caches, try_redis_object_size},
-    quota::{release_storage, reserve_storage},
-    response::{reqwest_to_s3_response, s3_error, with_s3_headers},
+    quota::{release_storage_reservation, reserve_storage},
+    response::{buffered_reqwest_to_s3_response, s3_error, with_s3_headers},
     upstream::signed_upstream_request,
     AppState, AuthBucket, AuthorizeResponse,
 };
@@ -46,64 +46,172 @@ pub(crate) async fn fast_copy_object(
             ));
         }
     };
+    if source.bucket.resolved_region != target_bucket.resolved_region {
+        return Ok(with_s3_headers(
+            s3_error(
+                StatusCode::BAD_REQUEST,
+                "InvalidRequest",
+                "CopyObject across storage regions is not supported. Download and upload the object to migrate it explicitly.",
+            ),
+            &auth,
+        ));
+    }
     let target_path = auth.path_with_query.as_deref().unwrap_or("");
     let (source_size, target_size) = tokio::join!(
         cached_existing_size(&state, &source.bucket, &source.key, &source.internal_path),
         cached_existing_size(&state, target_bucket, target_key, target_path),
     );
-    let source_size = source_size.unwrap_or(0);
-    let target_size = target_size.unwrap_or(0);
+    let source_size = match source_size? {
+        Some(size) => size,
+        None => {
+            return Ok(with_s3_headers(
+                s3_error(
+                    StatusCode::NOT_FOUND,
+                    "NoSuchKey",
+                    "The source key does not exist.",
+                ),
+                &auth,
+            ));
+        }
+    };
+    let target_size = target_size?.unwrap_or(0);
     let delta = source_size.saturating_sub(target_size);
-    let mut reserved = 0;
-    if delta > 0 && reserve_storage(&state, user, delta).await.is_err() {
-        return Ok(with_s3_headers(
-            s3_error(
-                StatusCode::FORBIDDEN,
-                "QuotaExceeded",
-                "You have exceeded your storage quota.",
-            ),
-            &auth,
-        ));
-    } else if delta > 0 {
-        reserved = delta;
-    }
+    let mut reservation = if delta > 0 {
+        match reserve_storage(&state, user, delta).await {
+            Ok(reservation) => Some(reservation),
+            Err(_) => {
+                return Ok(with_s3_headers(
+                    s3_error(
+                        StatusCode::FORBIDDEN,
+                        "QuotaExceeded",
+                        "You have exceeded your storage quota.",
+                    ),
+                    &auth,
+                ));
+            }
+        }
+    } else {
+        None
+    };
 
     let mut upstream_headers = headers.clone();
+    let target_storage = state.cfg.regions.backend(
+        &target_bucket.resolved_region,
+        &target_bucket.active_backend()?.id,
+    )?;
     upstream_headers.insert(
         "x-amz-copy-source",
         HeaderValue::from_str(&format!(
             "/{}/{}",
-            state.cfg.s3_bucket, source.internal_path
+            target_storage.bucket, source.internal_path
         ))?,
     );
 
+    let replication_events = match crate::replication::prepare(
+        &state,
+        target_bucket,
+        &[auth.path_with_query.as_deref().unwrap_or("").to_string()],
+        crate::replication::Operation::Put,
+    )
+    .await
+    {
+        Ok(events) => events,
+        Err(error) => {
+            if let Some(reservation) = reservation.take() {
+                let _ = release_storage_reservation(&state, reservation).await;
+            }
+            return Err(error).context("failed to prepare provider replication for copy");
+        }
+    };
+    let mutation_intent = match crate::accounting::prepare_mutation_intent(
+        &state,
+        &target_bucket.resolved_region,
+        &target_bucket.id,
+        Some(&user.id),
+        target_path
+            .split_once('?')
+            .map(|(path, _)| path)
+            .unwrap_or(target_path),
+        "put",
+        target_size,
+        source_size,
+        reservation.and_then(|reservation| reservation.id()),
+        replication_events
+            .first()
+            .map(crate::replication::PreparedEvent::event_id),
+    )
+    .await
+    {
+        Ok(intent) => intent,
+        Err(error) => {
+            crate::replication::cancel(
+                &state,
+                &replication_events,
+                "accounting intent preparation failed",
+            )
+            .await?;
+            if let Some(reservation) = reservation.take() {
+                let _ = release_storage_reservation(&state, reservation).await;
+            }
+            return Err(error).context("failed to prepare durable copy accounting intent");
+        }
+    };
+
     let upstream = signed_upstream_request(
         &state,
+        target_bucket,
         Method::PUT,
         auth.path_with_query.as_deref().unwrap_or(""),
         &upstream_headers,
         Some(0),
     )?;
-    let res = upstream.send().await?;
-    let status = res.status();
-    if !status.is_success() {
-        if reserved > 0 {
-            let _ = release_storage(&state, &user.id, reserved).await;
+    let res = match upstream.send().await {
+        Ok(response) => response,
+        Err(error) => {
+            // The provider outcome is ambiguous. Keep the prepared event so
+            // promotion remains blocked until an operator reconciles it. The
+            // durable quota reservation is retained conservatively as well.
+            return Err(error.into());
         }
+    };
+    let status = res.status();
+    let response_headers = res.headers().clone();
+    let response_body = res.bytes().await?;
+    let embedded_error = {
+        let body = String::from_utf8_lossy(&response_body);
+        body.contains("<Error>") || body.contains("<Error ")
+    };
+    if !status.is_success() || embedded_error {
+        crate::accounting::cancel_mutation_intent(
+            &state,
+            mutation_intent,
+            "authoritative copy was rejected",
+        )
+        .await?;
+        crate::replication::cancel(
+            &state,
+            &replication_events,
+            "authoritative copy was rejected",
+        )
+        .await?;
     } else {
+        let actual_size = head_existing_size(&state, target_bucket, target_path)
+            .await?
+            .ok_or_else(|| anyhow!("copied object could not be verified"))?;
+        if actual_size != source_size {
+            crate::accounting::correct_prepared_mutation_size(&state, mutation_intent, actual_size)
+                .await?;
+            return Err(anyhow!(
+                "copy result size changed during the operation; reconciliation is required"
+            ));
+        }
+        crate::accounting::commit_mutation_intent(&state, mutation_intent).await?;
+        crate::replication::commit(&state, &replication_events).await?;
         invalidate_object_caches(&state, target_bucket, target_key).await;
         bump_list_cache(&state, target_bucket).await;
-        let shrink = target_size.saturating_sub(source_size);
-        if shrink > 0 {
-            let _ = release_storage(&state, &user.id, shrink).await;
-        }
-        if let Err(error) =
-            commit_bucket_delta(&state, target_bucket, source_size, target_size).await
-        {
-            tracing::warn!(error = %error, "copy object bucket byte commit failed");
-        }
+        reservation.take();
     }
-    reqwest_to_s3_response(res, &auth).await
+    buffered_reqwest_to_s3_response(status.as_u16(), &response_headers, response_body, &auth)
 }
 
 async fn resolve_copy_source(
@@ -126,11 +234,12 @@ async fn resolve_copy_source(
             user_id: Some(user.id.clone()),
             is_public: false,
             is_system: false,
+            resolved_region: target_bucket.resolved_region.clone(),
         }
     } else {
         let row = sqlx::query(
             r#"
-            SELECT id::text AS id, name, user_id, is_public, is_system
+            SELECT id::text AS id, name, user_id, is_public, is_system, resolved_region
             FROM buckets
             WHERE name = $1
             LIMIT 1
@@ -146,6 +255,7 @@ async fn resolve_copy_source(
             user_id: row.try_get("user_id")?,
             is_public: row.try_get("is_public")?,
             is_system: row.try_get("is_system")?,
+            resolved_region: row.try_get("resolved_region")?,
         }
     };
 
@@ -173,25 +283,39 @@ async fn resolve_copy_source(
         bucket: AuthBucket {
             id: bucket.id,
             name: bucket.name,
+            resolved_region: bucket.resolved_region,
+            active_backend: target_bucket.active_backend.clone(),
+            writer_generation: target_bucket.writer_generation,
         },
         key: key.to_string(),
         internal_path,
     })
 }
 
-async fn head_existing_size(state: &AppState, path: &str) -> Result<u64> {
+async fn head_existing_size(
+    state: &AppState,
+    bucket: &AuthBucket,
+    path: &str,
+) -> Result<Option<u64>> {
     let empty = HeaderMap::new();
-    let req = signed_upstream_request(state, Method::HEAD, path, &empty, None)?;
+    let req = signed_upstream_request(state, bucket, Method::HEAD, path, &empty, None)?;
     let res = req.send().await?;
-    if !res.status().is_success() {
-        return Ok(0);
+    if res.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(None);
     }
-    Ok(res
+    if !res.status().is_success() {
+        return Err(anyhow!(
+            "object size probe returned status {}",
+            res.status()
+        ));
+    }
+    let size = res
         .headers()
         .get(reqwest::header::CONTENT_LENGTH)
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(0))
+        .ok_or_else(|| anyhow!("object size probe omitted Content-Length"))?;
+    Ok(Some(size))
 }
 
 async fn cached_existing_size(
@@ -199,38 +323,31 @@ async fn cached_existing_size(
     bucket: &AuthBucket,
     key: &str,
     path: &str,
-) -> Result<u64> {
+) -> Result<Option<u64>> {
     if let Some(size) = try_redis_object_size(state, bucket, key).await {
-        return Ok(size);
+        return Ok(Some(size));
     }
     if let Some(size) = state.disk_cache.object_size(bucket, key).await {
-        return Ok(size);
+        return Ok(Some(size));
     }
-    head_existing_size(state, path).await
+    head_existing_size(state, bucket, path).await
 }
 
 async fn bump_list_cache(state: &AppState, bucket: &AuthBucket) {
-    if !state.cfg.redis_object_cache_enabled {
+    if !state.cfg.redis_object_cache_enabled || !state.cfg.regions.is_local(&bucket.resolved_region)
+    {
         return;
     }
-    let mut conn = state.redis.clone();
+    let Ok(namespace) = bucket.cache_namespace(&state.cfg) else {
+        return;
+    };
+    let Some(mut conn) = state.redis.connection().await else {
+        return;
+    };
     let _: redis::RedisResult<i64> = redis::cmd("INCR")
-        .arg(format!("s3:listver:{}", bucket.id))
+        .arg(format!("s3:{namespace}:listver:{}", bucket.id))
         .query_async(&mut conn)
         .await;
-}
-
-async fn commit_bucket_delta(
-    state: &AppState,
-    bucket: &AuthBucket,
-    final_size: u64,
-    existing_size: u64,
-) -> Result<()> {
-    let delta = i128::from(final_size) - i128::from(existing_size);
-    if delta == 0 {
-        return Ok(());
-    }
-    crate::usage::commit_bucket_usage_delta(state, bucket, i64::try_from(delta)?).await
 }
 
 fn header_value<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
@@ -315,6 +432,7 @@ struct SourceBucket {
     user_id: Option<String>,
     is_public: bool,
     is_system: bool,
+    resolved_region: String,
 }
 
 struct CopySource {

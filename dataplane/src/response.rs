@@ -43,6 +43,24 @@ pub(crate) async fn reqwest_to_s3_response(
     Ok(with_s3_headers(reqwest_to_axum(res).await?, auth))
 }
 
+pub(crate) fn buffered_reqwest_to_s3_response(
+    status: u16,
+    headers: &reqwest::header::HeaderMap,
+    body: bytes::Bytes,
+    auth: &AuthorizeResponse,
+) -> Result<Response<Body>> {
+    let mut builder = Response::builder().status(StatusCode::from_u16(status)?);
+    for (key, value) in headers {
+        if let (Ok(name), Ok(value)) = (
+            HeaderName::from_bytes(key.as_str().as_bytes()),
+            HeaderValue::from_bytes(value.as_bytes()),
+        ) {
+            builder = builder.header(name, value);
+        }
+    }
+    Ok(with_s3_headers(builder.body(Body::from(body))?, auth))
+}
+
 pub(crate) fn with_s3_headers(res: Response<Body>, auth: &AuthorizeResponse) -> Response<Body> {
     let (mut parts, body) = res.into_parts();
     let mut headers = parts.headers;

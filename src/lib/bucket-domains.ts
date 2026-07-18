@@ -204,6 +204,7 @@ export function buildBucketObjectUrl(params: {
 	bucketName: string;
 	key: string;
 	customDomains?: BucketCustomDomain[];
+	s3Domain?: string;
 }): string {
 	const safeKey = params.key.replace(/^\/+/, "");
 	const encodedKey = safeKey
@@ -211,23 +212,25 @@ export function buildBucketObjectUrl(params: {
 		.map((segment) => encodeURIComponent(segment))
 		.join("/");
 	if (!config.customDomainsEnabled) {
-		return `https://${config.s3Domain}/${params.bucketName}/${encodedKey}`;
+		return `https://${params.s3Domain || config.s3Domain}/${params.bucketName}/${encodedKey}`;
 	}
 	const primary = getPrimaryVerifiedCustomDomain(params.customDomains || []);
 	if (primary) {
 		return `https://${primary.domain}/${encodedKey}`;
 	}
-	return `https://${config.s3Domain}/${params.bucketName}/${encodedKey}`;
+	return `https://${params.s3Domain || config.s3Domain}/${params.bucketName}/${encodedKey}`;
 }
 
 export function buildBucketUrlExample(params: {
 	bucketName: string;
 	customDomains?: BucketCustomDomain[];
 	fileName?: string;
+	s3Domain?: string;
 }): string {
 	return buildBucketObjectUrl({
 		bucketName: params.bucketName,
 		customDomains: params.customDomains,
+		s3Domain: params.s3Domain,
 		key: params.fileName || "file.png",
 	});
 }

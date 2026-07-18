@@ -1,0 +1,136 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  control-plane:
+    name: Control plane and dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - run: bun test
+      - run: bun run build
+      - run: bunx --package typescript@5.9.3 tsc --noEmit -p tsconfig.server.json
+      - run: bunx --package typescript@5.9.3 tsc --noEmit -p tsconfig.frontend.json
+
+  dataplane:
+    name: Rust dataplane
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: 1.93.1
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: dataplane
+      - run: cargo fmt --manifest-path dataplane/Cargo.toml --all -- --check
+      - run: cargo clippy --manifest-path dataplane/Cargo.toml --all-targets -- -D warnings
+      - run: cargo test --manifest-path dataplane/Cargo.toml
+
+  status-controller:
+    name: Status controller
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: status-controller
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun test src/index.test.ts
+      - run: npx --yes wrangler@4.112.0 types worker-configuration.d.ts --config wrangler.jsonc --env-file .dev.vars.example --strict-vars false --check
+      - run: npx --yes --package typescript@5.9.3 tsc --noEmit -p tsconfig.json
+      - run: npx --yes wrangler@4.112.0 d1 migrations apply silo-status --local --config wrangler.jsonc
+      - run: npx --yes wrangler@4.112.0 deploy --dry-run --config wrangler.jsonc
+
+  migrations:
+    name: PostgreSQL migrations
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: silo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d silo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply every migration
+        run: |
+          for migration in drizzle/*.sql; do
+            psql -h 127.0.0.1 -U postgres -d silo -v ON_ERROR_STOP=1 -f "$migration"
+          done
+      - name: Verify the multi-region migration is replay-safe
+        run: psql -h 127.0.0.1 -U postgres -d silo -v ON_ERROR_STOP=1 -f drizzle/0005_multi_region_control_plane.sql
+
+  deployment-config:
+    name: Regional Compose template
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        region: [eu-central, us-east]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render regional deployment
+        env:
+          SILO_CONTROL_ENV_FILE: .env.production.example
+          SILO_DATAPLANE_ENV_FILE: .env.production.example
+          DRAGONFLY_IMAGE: docker.dragonflydb.io/dragonflydb/dragonfly:v1.30.3
+          OTEL_COLLECTOR_IMAGE: otel/opentelemetry-collector-contrib:0.130.1
+          REDIS_PASSWORD: ci-only-password
+          SIGNOZ_OTLP_ENDPOINT: signoz.invalid:4317
+        shell: bash
+        run: |
+          set -euo pipefail
+          compose() {
+            docker compose \
+              --env-file "deploy/${{ matrix.region }}.env.example" \
+              -f docker-compose.prod.yml \
+              "$@"
+          }
+          compose config --quiet
+          compose config --format json | jq -e '
+            (.services.dataplane.networks | has("default"))
+            and (.services.dataplane.networks | has("dokploy-network"))
+            and (.services | has("dragonfly"))
+            and (.services | has("otel-collector"))
+            and ([.services["otel-collector"].volumes[]?.source]
+              | index("/var/run/docker.sock") | not)
+          ' >/dev/null
+          if [ "${{ matrix.region }}" = "eu-central" ]; then
+            compose config --format json | jq -e '
+              (.services["control-plane"].networks | has("default"))
+              and (.services["control-plane"].networks | has("dokploy-network"))
+            ' >/dev/null
+          else
+            compose config --format json | jq -e \
+              '.services["control-plane"] == null' >/dev/null
+          fi

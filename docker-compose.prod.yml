@@ -1,5 +1,21 @@
+name: silo-${SILO_REGION:?Set SILO_REGION to the deployment region ID}
+
+# This is the regional deployment template used by every Silo host. Run it
+# with COMPOSE_PROFILES=control-plane only on the EU host; all other hosts run
+# the regional services without that profile. A new region needs configuration,
+# secrets, DNS, and another deployment of this same file—not another Bun app.
+
+x-restart-policy: &restart-policy
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+
 services:
+  # The single global Bun control plane lives with eu-central. Do not enable
+  # this profile on us-east or future regional hosts.
   control-plane:
+    <<: *restart-policy
+    profiles: [control-plane]
     build:
       context: .
       dockerfile: Dockerfile
@@ -7,65 +23,113 @@ services:
         GIT_SHA: ${GIT_SHA:-unknown}
         GIT_DATE: ${GIT_DATE:-unknown}
         GIT_MESSAGE: ${GIT_MESSAGE:-unknown}
-    restart: unless-stopped
     env_file:
-      - ${SILO_ENV_FILE:-.env}
+      - ${SILO_CONTROL_ENV_FILE:-.env.control-plane}
     environment:
       PORT: "3000"
-      DISK_CACHE_DIR: "/var/cache/silo-dataplane"
       DATAPLANE_URL: "http://dataplane:3001"
-      DASHBOARD_ORIGIN_DOMAINS: "${DASHBOARD_ORIGIN_DOMAINS:-primary-dashboard-origin.onsilo.dev}"
-      REDIS_URL: "redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in the deployment environment}@silo-dragonfly:6379"
+      # These are optional at Compose-render time because this profiled service
+      # is absent on non-EU hosts. The Bun production config fails closed if an
+      # enabled control plane does not supply every regional URL.
+      DASHBOARD_ORIGIN_DOMAINS: "${DASHBOARD_ORIGIN_DOMAINS:-}"
+      DATAPLANE_REGION_URLS_JSON: "${DATAPLANE_REGION_URLS_JSON:-}"
+      DISK_CACHE_DIR: "/var/cache/silo-dataplane"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD}@dragonfly:6379"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
+      OTEL_TRACES_SAMPLER: "${OTEL_TRACES_SAMPLER:-parentbased_traceidratio}"
+      OTEL_TRACES_SAMPLER_ARG: "${OTEL_TRACES_SAMPLER_ARG:-0.05}"
+      OTEL_METRIC_EXPORT_INTERVAL: "${OTEL_METRIC_EXPORT_INTERVAL:-10000}"
+      OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=production,service.version=${GIT_SHA:-unknown},silo.region=global"
+      OTEL_SERVICE_NAME: "silo-control-plane"
     depends_on:
-      silo-dragonfly:
+      dragonfly:
+        condition: service_started
+      dataplane:
         condition: service_started
     volumes:
       - dataplane-cache:/var/cache/silo-dataplane:ro
-    # PostgreSQL is external (Aiven) and is injected through the deployment
-    # environment. Keep Dokploy networking only for the current app stack.
     networks:
       - default
       - dokploy-network
 
-  # Private, in-stack Redis-compatible cache. It is intentionally not exposed
-  # on a host port: the control-plane reaches it over Docker's default network.
-  silo-dragonfly:
-    image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
-    restart: unless-stopped
+  # Each host owns one independent cache. It is never exposed on a host port,
+  # never replicated across regions, and is never authoritative.
+  dragonfly:
+    <<: *restart-policy
+    image: ${DRAGONFLY_IMAGE:?Set DRAGONFLY_IMAGE to a reviewed immutable tag or digest}
     ulimits:
       memlock: -1
     command:
-      - --requirepass=${REDIS_PASSWORD:?Set REDIS_PASSWORD in the deployment environment}
-      - --maxmemory=8gb
+      - --requirepass=${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+      - --maxmemory=${DRAGONFLY_MAX_MEMORY:-8gb}
       - --cache_mode=true
     volumes:
-      - dragonflydata:/data
+      - dragonfly-data:/data
 
+  # The same service definition runs in eu-central, us-east, and future
+  # regions. Normal secret bundles contain only the local B2 credential. A
+  # remote credential and DATAPLANE_FAILOVER_REGIONS are materialized by
+  # Infisical only for an explicitly authorized failover.
   dataplane:
+    <<: *restart-policy
     build:
       context: ./dataplane
       dockerfile: Dockerfile
-    restart: unless-stopped
     env_file:
-      - ${SILO_ENV_FILE:-.env}
+      - ${SILO_DATAPLANE_ENV_FILE:-.env.dataplane}
     environment:
       DATAPLANE_BIND: "0.0.0.0:3001"
-      CONTROL_PLANE_URL: "http://control-plane:3000"
+      DATAPLANE_MODE: "regional"
+      DATAPLANE_REGION: "${SILO_REGION}"
+      DATAPLANE_ORIGIN_DOMAINS: "${DATAPLANE_ORIGIN_DOMAINS:?Set the regional public and fixed origin hostnames}"
+      DATAPLANE_INGRESS_DOMAINS: "${DATAPLANE_INGRESS_DOMAINS:?Set the shared hostname-to-region registry}"
+      DATAPLANE_REGION_PEERS: "${DATAPLANE_REGION_PEERS:?Set fixed origins for remote regional dataplanes}"
       DATAPLANE_PUBLIC_SCHEME: "https"
-      DATAPLANE_WRITER_INSTANCE_ID: "primary"
+      DATAPLANE_WRITER_INSTANCE_ID: "${SILO_INSTANCE_ID:?Set a stable unique instance ID}"
       DATAPLANE_WRITER_AUTO_CLAIM: "true"
-      DATAPLANE_ORIGIN_DOMAINS: "${DATAPLANE_ORIGIN_DOMAINS:-primary-origin.onsilo.dev}"
+      DATAPLANE_FAILOVER_REGIONS: "${DATAPLANE_FAILOVER_REGIONS:-}"
+      CONTROL_PLANE_URL: "${CONTROL_PLANE_URL:?Set the global control-plane URL}"
       DISK_CACHE_DIR: "/var/cache/silo-dataplane"
-      REDIS_URL: "redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in the deployment environment}@silo-dragonfly:6379"
+      DATAPLANE_ACCOUNTING_SPOOL_DIR: "/var/cache/silo-dataplane/accounting"
+      DATAPLANE_ACCOUNTING_UNSAFE_MARKER: "/var/cache/silo-dataplane/accounting/UNSAFE"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD}@dragonfly:6379"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"
+      OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=production,service.version=${GIT_SHA:-unknown},silo.region=${SILO_REGION}"
+      OTEL_SERVICE_NAME: "silo-dataplane"
     depends_on:
-      control-plane:
-        condition: service_healthy
+      dragonfly:
+        condition: service_started
+      otel-collector:
+        condition: service_started
     volumes:
       - dataplane-cache:/var/cache/silo-dataplane
+    # Dokploy/Traefik reaches every regional S3 origin over its external
+    # network. The private default network remains for Dragonfly, OTLP, and
+    # the optional colocated control plane.
+    networks:
+      - default
+      - dokploy-network
+
+  # Regional collector: receives application OTLP and ships structured
+  # container logs plus host metrics to the existing SigNoz stack. It has no
+  # Docker socket access; application OTLP supplies per-service telemetry.
+  otel-collector:
+    <<: *restart-policy
+    image: ${OTEL_COLLECTOR_IMAGE:?Set OTEL_COLLECTOR_IMAGE to an immutable contrib image}
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      SILO_REGION: "${SILO_REGION}"
+      SILO_INSTANCE_ID: "${SILO_INSTANCE_ID}"
+      SIGNOZ_OTLP_ENDPOINT: "${SIGNOZ_OTLP_ENDPOINT:?Set the SigNoz OTLP gRPC endpoint}"
+      SIGNOZ_INGESTION_KEY: "${SIGNOZ_INGESTION_KEY:-}"
+    volumes:
+      - ./deploy/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - /:/hostfs:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
 
 volumes:
   dataplane-cache:
-  dragonflydata:
+  dragonfly-data:
 
 networks:
   dokploy-network:

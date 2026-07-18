@@ -205,6 +205,7 @@ export async function handleDataplaneAuthorize(
 		bucket: {
 			id: bucket.id,
 			name: bucket.name,
+			resolvedRegion: bucket.resolvedRegion || "eu-central",
 			isSystem: bucket.isSystem,
 			isPublic: bucket.isPublic,
 		},

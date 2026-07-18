@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#101217" />
     <meta name="description" content="Live service status for Silo storage." />
     <title>Silo status</title>
-		<link rel="stylesheet" href="./styles.css?v=20260717-1" />
+		<link rel="stylesheet" href="./styles.css?v=20260717-2" />
   </head>
   <body>
     <svg class="icon-sprite" aria-hidden="true">
@@ -34,9 +34,9 @@
       <section id="hero" class="status-hero" data-state="loading" aria-live="polite">
         <div class="status-emblem" aria-hidden="true">
           <span class="hero-spinner"></span>
-          <svg class="hero-icon hero-icon-check"><use href="#icon-check" /></svg>
-          <svg class="hero-icon hero-icon-warning"><use href="#icon-warning" /></svg>
-          <svg class="hero-icon hero-icon-close"><use href="#icon-close" /></svg>
+          <svg class="hero-icon hero-icon-check" aria-hidden="true"><use href="#icon-check" /></svg>
+          <svg class="hero-icon hero-icon-warning" aria-hidden="true"><use href="#icon-warning" /></svg>
+          <svg class="hero-icon hero-icon-close" aria-hidden="true"><use href="#icon-close" /></svg>
         </div>
         <p id="hero-label" class="hero-label">Checking Silo</p>
         <h1 id="headline">One moment.</h1>
@@ -51,7 +51,7 @@
         <div class="recovery-heading">
           <div>
             <p class="section-kicker" id="recovery-kicker">Recovery in progress</p>
-            <h2 id="recovery-title">Backup systems are provisioning.</h2>
+            <h2 id="recovery-title">Regional recovery is in progress.</h2>
           </div>
           <span id="recovery-state" class="recovery-state">Starting</span>
         </div>
@@ -68,24 +68,10 @@
           <p>Updated every minute</p>
         </div>
 
-        <div class="status-groups">
+        <div id="status-groups" class="status-groups" aria-live="polite">
           <article class="status-group">
-            <header><span>Storage operations</span><small>Real signed S3 requests</small></header>
-            <div class="status-row"><div><strong>S3 API</strong><small>Health and readiness</small></div><span id="status-s3Api" class="status-value unknown"><i></i>Checking</span></div>
-            <div class="status-row"><div><strong>Authentication</strong><small>SigV4 signed request</small></div><span id="status-authentication" class="status-value unknown"><i></i>Checking</span></div>
-            <div class="status-row"><div><strong>Uploads</strong><small>PUT object canary</small></div><span id="status-uploads" class="status-value unknown"><i></i>Checking</span></div>
-            <div class="status-row"><div><strong>Downloads</strong><small>GET object canary</small></div><span id="status-downloads" class="status-value unknown"><i></i>Checking</span></div>
-            <div class="status-row"><div><strong>Deletes</strong><small>DELETE object canary</small></div><span id="status-deletes" class="status-value unknown"><i></i>Checking</span></div>
-            <div class="status-row"><div><strong>Dashboard</strong><small>Accounts, buckets, and settings</small></div><span id="status-dashboard" class="status-value unknown"><i></i>Checking</span></div>
-          </article>
-
-          <article class="status-group">
-            <header><span>Infrastructure</span><small>Current serving path</small></header>
-            <div class="status-row"><div><strong>PostgreSQL</strong><small>Metadata on Aiven</small></div><span id="status-postgres" class="status-value unknown"><i></i>Checking</span></div>
-            <div class="status-row"><div><strong>Dragonfly / Valkey</strong><small>Cache and usage counters</small></div><span id="status-redis" class="status-value unknown"><i></i>Checking</span></div>
-            <div class="status-row"><div><strong>Object storage</strong><small>Backing storage connectivity</small></div><span id="status-backingStorage" class="status-value unknown"><i></i>Checking</span></div>
-            <div class="status-row"><div><strong>Writer lease</strong><small>Split-brain protection</small></div><span id="status-writerLease" class="status-value unknown"><i></i>Checking</span></div>
-            <div class="status-row"><div><strong>Recovery system</strong><small>Hetzner emergency path</small></div><span id="status-failover" class="status-value unknown"><i></i>Checking</span></div>
+            <header><span>Global services</span><small>Control and storage authority</small></header>
+            <div class="status-row"><div><strong>Loading components</strong><small>Waiting for the independent monitor</small></div><span class="status-value unknown"><i></i>Checking</span></div>
           </article>
         </div>
       </section>
@@ -139,6 +125,6 @@
       </div>
     </footer>
 
-		<script src="./status.js?v=20260717-1"></script>
+		<script src="./status.js?v=20260717-2"></script>
   </body>
 </html>
