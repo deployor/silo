@@ -60,6 +60,7 @@ jobs:
           set -euo pipefail
           compose() {
             docker compose \
+              --profile observability \
               --env-file "deploy/${{ matrix.region }}.env.example" \
               -f docker-compose.prod.yml \
               "$@"
