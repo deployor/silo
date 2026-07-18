@@ -112,9 +112,7 @@ services:
       - -c
       - archive_mode=on
       - -c
-      # Bootstrap safety: pgBackRest returns 103 until stanza-create has run.
-      # The real archive command is enabled immediately after the stanza exists.
-      - archive_command=/bin/true
+      - archive_command=pgbackrest --config=/etc/pgbackrest/pgbackrest.conf --stanza=silo archive-push %p
       - -c
       - archive_timeout=60s
     depends_on:
