@@ -8,6 +8,7 @@ services:
       CLICKHOUSE_DB: silo_logs
       CLICKHOUSE_USER: silo_admin
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD}
+      CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
       CLICKHOUSE_INGEST_PASSWORD: ${CLICKHOUSE_INGEST_PASSWORD}
       CLICKHOUSE_QUERY_PASSWORD: ${CLICKHOUSE_QUERY_PASSWORD}
@@ -28,6 +29,23 @@ services:
         aliases:
           - ${CLICKHOUSE_NETWORK_ALIAS:-silo-clickhouse}
 
+  clickhouse-users:
+    image: clickhouse/clickhouse-server:26.3
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD}
+      CLICKHOUSE_INGEST_PASSWORD: ${CLICKHOUSE_INGEST_PASSWORD}
+      CLICKHOUSE_QUERY_PASSWORD: ${CLICKHOUSE_QUERY_PASSWORD}
+    entrypoint: [/bin/sh, /bootstrap/init-users.sh]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - ./init-users.sh:/bootstrap/init-users.sh:ro
+
   vector-access-logs:
     image: timberio/vector:0.46.1-debian
     restart: unless-stopped
@@ -39,8 +57,8 @@ services:
       CLICKHOUSE_INGEST_PASSWORD: ${CLICKHOUSE_INGEST_PASSWORD}
     command: [--config, /etc/vector/vector.yaml]
     depends_on:
-      clickhouse:
-        condition: service_healthy
+      clickhouse-users:
+        condition: service_completed_successfully
     volumes:
       - ./vector.yaml:/etc/vector/vector.yaml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
