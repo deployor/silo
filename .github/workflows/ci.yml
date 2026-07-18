@@ -110,9 +110,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          profile_args=(--profile observability)
+          if [ "${{ matrix.region }}" = "eu-central" ]; then
+            profile_args+=(--profile control-plane)
+          fi
           compose() {
             docker compose \
-              --profile observability \
+              "${profile_args[@]}" \
               --env-file "deploy/${{ matrix.region }}.env.example" \
               -f docker-compose.prod.yml \
               "$@"
