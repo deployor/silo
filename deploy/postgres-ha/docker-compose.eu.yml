@@ -129,6 +129,7 @@ services:
     ports: ["${POSTGRES_PUBLIC_PORT:-25432}:5432"]
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - postgres-socket:/var/run/postgresql
       - postgres-tls:/tls:ro
       - pgbackrest-config:/etc/pgbackrest:ro
       - pgbackrest-spool:/var/spool/pgbackrest
@@ -149,6 +150,7 @@ services:
       postgres: {condition: service_healthy}
     volumes:
       - postgres-data:/var/lib/postgresql/data:ro
+      - postgres-socket:/var/run/postgresql
       - pgbackrest-config:/etc/pgbackrest:ro
       - pgbackrest-spool:/var/spool/pgbackrest
     networks: [db-private]
@@ -196,6 +198,7 @@ services:
 
 volumes:
   postgres-data: null
+  postgres-socket: null
   postgres-tls: null
   pgdog-config: null
   pgbackrest-config: null
