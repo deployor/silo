@@ -224,8 +224,8 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									className="bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-hc-red cursor-pointer"
 								>
 									<option value="">All Ingress Regions</option>
-									<option value="eu-central">🇩🇪 Europe</option>
-									<option value="us-east">🇺🇸 United States</option>
+									<option value="eu-central">EU - Germany</option>
+									<option value="us-east">US East</option>
 								</select>
 								<select
 									value={storageRegion}
@@ -233,8 +233,8 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									className="bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-hc-red cursor-pointer"
 								>
 									<option value="">All Storage Regions</option>
-									<option value="eu-central">🇩🇪 Europe</option>
-									<option value="us-east">🇺🇸 United States</option>
+									<option value="eu-central">EU - Germany</option>
+									<option value="us-east">US East</option>
 								</select>
 								<input
 									value={action}

@@ -1458,7 +1458,12 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 										</h3>
 										<div className="silo-bucket-facts">
 											<span>
-												{storageRegion.flag} {storageRegion.name}
+												<img
+													src={storageRegion.flagUrl}
+													alt=""
+													className="mr-1 inline-block h-3 w-[18px] rounded-sm border border-white/15 object-cover align-[-1px]"
+												/>
+												{storageRegion.name}
 											</span>
 											<span>{formatBytes(bucket.totalBytes)}</span>
 											<span>
@@ -2271,10 +2276,12 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											<span className="flex items-start justify-between gap-3">
 												<span>
 													<span className="block text-base font-bold text-white">
-														<span className="mr-2 text-xl" aria-hidden="true">
-															{region.flag}
-														</span>
-														{region.name} — {region.location}
+														<img
+															src={region.flagUrl}
+															alt={region.flagAlt}
+															className="mr-2 inline-block h-4 w-6 rounded-sm border border-white/15 object-cover align-[-2px]"
+														/>
+														{region.label}
 													</span>
 													<span className="mt-2 block text-xs leading-relaxed text-text-muted">
 														{region.description}
@@ -2282,7 +2289,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 												</span>
 												{region.isDefault ? (
 													<span className="rounded-full border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
-														Default
+														Recommended
 													</span>
 												) : null}
 											</span>

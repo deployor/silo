@@ -8,20 +8,26 @@ export const DEFAULT_STORAGE_REGION_ID = "eu-central" as const;
 export const STORAGE_REGIONS = [
 	{
 		id: "eu-central",
-		flag: "🇩🇪",
-		name: "Europe",
+		flagUrl: "https://flagcdn.com/w80/de.png",
+		flagAlt: "German flag",
+		name: "EU",
+		label: "EU - Germany",
 		location: "Germany",
-		description: "Recommended for European users",
+		description:
+			"Recommended for global traffic. It is the fastest choice for most users, apps, and distributed teams.",
 		endpoint: "onsilo.dev",
 		regionalEndpoint: "eu.onsilo.dev",
 		isDefault: true,
 	},
 	{
 		id: "us-east",
-		flag: "🇺🇸",
-		name: "United States",
+		flagUrl: "https://flagcdn.com/w80/us.png",
+		flagAlt: "US flag",
+		name: "US",
+		label: "US East",
 		location: "US East",
-		description: "Recommended for users and workloads in North America",
+		description:
+			"Choose this only when this bucket will be accessed almost exclusively by US users or US-hosted servers.",
 		endpoint: "us.onsilo.dev",
 		regionalEndpoint: "us.onsilo.dev",
 		isDefault: false,
