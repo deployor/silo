@@ -99,9 +99,6 @@ services:
     depends_on:
       dragonfly:
         condition: service_started
-      otel-collector:
-        condition: service_started
-        required: false
     volumes:
       - dataplane-cache:/var/cache/silo-dataplane
     # Dokploy/Traefik reaches every regional S3 origin over its external
