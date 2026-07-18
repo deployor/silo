@@ -2973,7 +2973,7 @@ function definitions(registry: RegionConfig[]): ComponentDefinition[] {
 		},
 		{
 			id: "aiven-postgresql",
-			name: "Aiven PostgreSQL",
+			name: "PostgreSQL Primary",
 			description: "Authoritative global metadata and coordination",
 			group: "global",
 		},

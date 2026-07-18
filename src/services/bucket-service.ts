@@ -420,7 +420,7 @@ export async function emptyBucket(
 		await deleteBucketContents(internalPrefix, bucket[0]);
 		teardownToken = await beginDataplaneBucketTeardown(bucket[0]);
 
-		// Reset only after all asynchronous accounting deltas are in Aiven.
+		// Reset only after all asynchronous accounting deltas are durable in PostgreSQL.
 		await db
 			.update(buckets)
 			.set({ totalBytes: 0, updatedAt: new Date() })
