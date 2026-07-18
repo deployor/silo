@@ -1769,6 +1769,9 @@ async function listLogs(url: URL) {
 	const methodFilter = url.searchParams.get("method");
 	const statusFilter = url.searchParams.get("status");
 	const ipFilter = url.searchParams.get("ip");
+	const regionFilter = url.searchParams.get("region");
+	const storageRegionFilter = url.searchParams.get("storageRegion");
+	const actionFilter = url.searchParams.get("action");
 	const allowedSorts = new Set([
 		"createdAt",
 		"latencyMs",
@@ -1799,6 +1802,9 @@ async function listLogs(url: URL) {
 				? parsedStatus
 				: undefined,
 		ip: ipFilter,
+		region: regionFilter,
+		storageRegion: storageRegionFilter,
+		action: actionFilter,
 		sortBy,
 		sortOrder: url.searchParams.get("sortOrder") === "asc" ? "asc" : "desc",
 	});

@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
     paths:
+      - src/**
+      - package.json
+      - bun.lock
+      - Dockerfile
+      - vite.config.*
+      - tsconfig*.json
       - dataplane/**
       - docker-compose.prod.yml
       - deploy/eu-central.env.example

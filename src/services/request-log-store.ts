@@ -11,6 +11,9 @@ export type RequestLogFilters = {
 	method?: string | null;
 	status?: number;
 	ip?: string | null;
+	region?: string | null;
+	storageRegion?: string | null;
+	action?: string | null;
 	sortBy:
 		| "createdAt"
 		| "latencyMs"
@@ -61,8 +64,6 @@ const SORT_COLUMNS: Record<RequestLogFilters["sortBy"], string> = {
 };
 
 class RequestLogStore {
-	private nextEndpoint = 0;
-
 	configured(): boolean {
 		return this.endpoints().length > 0;
 	}
@@ -95,6 +96,18 @@ class RequestLogStore {
 			clauses.push("ip_address = {ip:String}");
 			parameters.ip = filters.ip;
 		}
+		if (filters.region) {
+			clauses.push("region = {region:String}");
+			parameters.region = filters.region;
+		}
+		if (filters.storageRegion) {
+			clauses.push("storage_region = {storageRegion:String}");
+			parameters.storageRegion = filters.storageRegion;
+		}
+		if (filters.action) {
+			clauses.push("action = {action:String}");
+			parameters.action = filters.action;
+		}
 		const where = clauses.join(" AND ");
 		const order = SORT_COLUMNS[filters.sortBy];
 		const direction = filters.sortOrder === "asc" ? "ASC" : "DESC";
@@ -106,7 +119,7 @@ class RequestLogStore {
 					path,
 					status_code AS statusCode,
 					latency_ms AS latencyMs,
-					formatDateTime(event_time, '%Y-%m-%dT%H:%i:%S.%3fZ', 'UTC') AS createdAt,
+					concat(toString(event_time, 'UTC'), 'Z') AS createdAt,
 					nullIf(bucket_name, '') AS bucketName,
 					nullIf(owner_id, '') AS ownerId,
 					nullIf(ip_address, '') AS ipAddress,
@@ -205,10 +218,12 @@ class RequestLogStore {
 		const endpoints = this.endpoints();
 		if (!endpoints.length)
 			throw new Error("ClickHouse request log store is not configured");
-		const start = this.nextEndpoint++ % endpoints.length;
 		const failures: string[] = [];
-		for (let index = 0; index < endpoints.length; index += 1) {
-			const endpoint = endpoints[(start + index) % endpoints.length];
+		// Keep offset pagination pinned to the preferred replica. The replicas are
+		// independently ingested and can differ briefly, so round-robin reads can
+		// otherwise skip or duplicate rows between successive pages. Fall through
+		// to the next region only when the preferred query endpoint fails.
+		for (const endpoint of endpoints) {
 			try {
 				return await this.queryAt<T>(endpoint, query, parameters);
 			} catch (error) {

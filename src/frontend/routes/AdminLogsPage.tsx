@@ -22,6 +22,9 @@ type LogItem = {
 	userAgent?: string | null;
 	requesterId?: string | null;
 	requestId?: string | null;
+	region: string;
+	storageRegion: string;
+	action: string;
 };
 
 type LogsResponse = {
@@ -48,6 +51,9 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const [method, setMethod] = useState("");
 	const [status, setStatus] = useState("");
 	const [ip, setIp] = useState("");
+	const [region, setRegion] = useState("");
+	const [storageRegion, setStorageRegion] = useState("");
+	const [action, setAction] = useState("");
 	const [showFilters, setShowFilters] = useState(false);
 
 	const [sortBy, setSortBy] = useState("createdAt");
@@ -88,6 +94,9 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 			if (method) q.set("method", method);
 			if (status) q.set("status", status);
 			if (ip) q.set("ip", ip);
+			if (region) q.set("region", region);
+			if (storageRegion) q.set("storageRegion", storageRegion);
+			if (action) q.set("action", action);
 
 			try {
 				const data = await fetchJson<LogsResponse>(
@@ -107,7 +116,20 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				setLoading(false);
 			}
 		},
-		[bucket, ip, loading, method, offset, search, sortBy, sortOrder, status],
+		[
+			action,
+			bucket,
+			ip,
+			loading,
+			method,
+			offset,
+			region,
+			search,
+			sortBy,
+			sortOrder,
+			status,
+			storageRegion,
+		],
 	);
 
 	const onSort = (field: string) => {
@@ -127,6 +149,9 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		setMethod("");
 		setStatus("");
 		setIp("");
+		setRegion("");
+		setStorageRegion("");
+		setAction("");
 		setSearch("");
 		window.setTimeout(() => loadLogs(true), 0);
 	};
@@ -151,7 +176,8 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					<div>
 						<h2 className="text-xl font-bold text-white">Request Logs</h2>
 						<p className="text-text-muted text-sm mt-1">
-							View all request logs across all buckets.
+							Regional request telemetry from ClickHouse, with automatic US
+							query fallback if Europe is unavailable.
 						</p>
 					</div>
 					<div className="flex flex-col gap-4 items-end">
@@ -190,6 +216,31 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									onChange={(e) => setBucket(e.target.value)}
 									type="text"
 									placeholder="Bucket Name"
+									className="bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-hc-red w-32"
+								/>
+								<select
+									value={region}
+									onChange={(e) => setRegion(e.target.value)}
+									className="bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-hc-red cursor-pointer"
+								>
+									<option value="">All Ingress Regions</option>
+									<option value="eu-central">🇩🇪 Europe</option>
+									<option value="us-east">🇺🇸 United States</option>
+								</select>
+								<select
+									value={storageRegion}
+									onChange={(e) => setStorageRegion(e.target.value)}
+									className="bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-hc-red cursor-pointer"
+								>
+									<option value="">All Storage Regions</option>
+									<option value="eu-central">🇩🇪 Europe</option>
+									<option value="us-east">🇺🇸 United States</option>
+								</select>
+								<input
+									value={action}
+									onChange={(e) => setAction(e.target.value)}
+									type="text"
+									placeholder="S3 Action"
 									className="bg-black/30 border border-white/10 rounded-lg px-3 py-1.5 text-white text-xs font-mono focus:outline-none focus:border-hc-red w-32"
 								/>
 								<select
@@ -256,6 +307,8 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								</th>
 								<th className="px-6 py-4">Path</th>
 								<th className="px-6 py-4">Bucket</th>
+								<th className="px-6 py-4">Region</th>
+								<th className="px-6 py-4">Action</th>
 								<th className="px-6 py-4">User</th>
 								<th className="px-6 py-4">IP</th>
 								<th className="px-6 py-4">User Agent</th>
@@ -305,6 +358,12 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 									<td className="px-6 py-4 font-mono text-xs text-text-muted">
 										{log.bucketName || "-"}
 									</td>
+									<td className="px-6 py-4 font-mono text-xs text-text-muted whitespace-nowrap">
+										{log.region || "-"}
+									</td>
+									<td className="px-6 py-4 font-mono text-xs text-text-muted whitespace-nowrap">
+										{log.action || "-"}
+									</td>
 									<td
 										className="px-6 py-4 font-mono text-xs text-text-muted truncate max-w-[150px]"
 										title={log.ownerEmail || ""}
@@ -346,7 +405,7 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							{!loading && logs.length === 0 ? (
 								<tr>
 									<td
-										colSpan={12}
+										colSpan={14}
 										className="px-6 py-8 text-center text-text-muted italic"
 									>
 										No logs found.
@@ -385,6 +444,14 @@ export function AdminLogsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
 							<Card title="Method" value={selected.method} />
 							<Card title="Status Code" value={String(selected.statusCode)} />
+						</div>
+						<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+							<Card title="Ingress Region" value={selected.region || "-"} />
+							<Card
+								title="Storage Region"
+								value={selected.storageRegion || "-"}
+							/>
+							<Card title="S3 Action" value={selected.action || "-"} />
 						</div>
 						<div className="bg-black/30 p-4 rounded-xl border border-white/10 mb-4">
 							<div className="text-xs text-text-muted uppercase font-bold mb-1">
