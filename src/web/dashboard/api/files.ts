@@ -155,6 +155,14 @@ async function fetchBucketStorage(
 	});
 }
 
+function storageResponseContentLength(response: Response): number {
+	return Number(
+		response.headers.get("x-silo-upstream-content-length") ||
+			response.headers.get("content-length") ||
+			0,
+	);
+}
+
 async function getBucketAndOwner(
 	requestUser: UserRecord,
 	bucketName: string,
@@ -585,7 +593,7 @@ async function deleteSingleObject(
 	const headRes = await fetchBucketStorage(params, internalKey, {
 		method: "HEAD",
 	});
-	const size = Number(headRes.headers.get("content-length") || 0);
+	const size = storageResponseContentLength(headRes);
 	const deleteRes = await fetchBucketStorage(params, internalKey, {
 		method: "DELETE",
 	});
@@ -694,7 +702,7 @@ async function headObject(
 		);
 	}
 	return {
-		size: Number(res.headers.get("content-length") || 0),
+		size: storageResponseContentLength(res),
 		contentType: res.headers.get("content-type") || "application/octet-stream",
 	};
 }
@@ -1300,7 +1308,7 @@ export async function handleFiles(req: Request): Promise<Response> {
 						return errorResponse("Failed to inspect existing file", 502);
 					}
 					const existingSize = before.ok
-						? Number(before.headers.get("content-length") || 0)
+						? storageResponseContentLength(before)
 						: 0;
 					const delta = Math.max(0, size - existingSize);
 					const configuredLimit = Number(

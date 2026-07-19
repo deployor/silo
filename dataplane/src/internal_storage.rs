@@ -294,11 +294,20 @@ async fn execute_inner(state: AppState, headers: HeaderMap, body: Body) -> Resul
         )
         .await?;
     }
+    let upstream_content_length = (method == Method::HEAD)
+        .then(|| response_headers.get(header::CONTENT_LENGTH).cloned())
+        .flatten();
     let mut response = Response::builder().status(status);
     for (name, value) in &response_headers {
+        if method == Method::HEAD && name == header::CONTENT_LENGTH {
+            continue;
+        }
         if !is_hop_by_hop(name.as_str()) {
             response = response.header(name, value);
         }
+    }
+    if let Some(content_length) = upstream_content_length {
+        response = response.header("x-silo-upstream-content-length", content_length);
     }
     if let Some(generation) = writer_generation {
         response = response.header("x-silo-writer-generation", generation.to_string());
@@ -306,7 +315,12 @@ async fn execute_inner(state: AppState, headers: HeaderMap, body: Body) -> Resul
     if let Some(backend) = bucket.active_backend.as_ref() {
         response = response.header("x-silo-backend-generation", backend.generation.to_string());
     }
-    let response = if let Some(body) = buffered_response {
+    let response = if method == Method::HEAD {
+        // The protected endpoint itself is a POST. Forwarding the upstream
+        // object's Content-Length with an empty HEAD body makes HTTP proxies
+        // treat this response as truncated and replace it with a 502.
+        response.body(Body::empty())?
+    } else if let Some(body) = buffered_response {
         response.body(Body::from(body))?
     } else {
         let stream = streaming_upstream
