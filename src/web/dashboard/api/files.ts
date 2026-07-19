@@ -155,38 +155,6 @@ async function fetchBucketStorage(
 	});
 }
 
-async function existingFileSize(
-	params: Pick<BucketContext, "bucket" | "owner">,
-	internalKey: string,
-): Promise<number> {
-	const head = await fetchBucketStorage(params, internalKey, {
-		method: "HEAD",
-	});
-	if (head.ok) return Number(head.headers.get("content-length") || 0);
-	if (head.status === 404) return 0;
-
-	// Some S3-compatible upstreams reject authenticated HEAD object requests
-	// while correctly serving ranged GETs. Read one byte instead: Content-Range
-	// still contains the full existing object size and keeps overwrite quota
-	// accounting exact.
-	const rangedGet = await fetchBucketStorage(params, internalKey, {
-		method: "GET",
-		headers: { Range: "bytes=0-0" },
-	});
-	try {
-		if (rangedGet.status === 404 || rangedGet.status === 416) return 0;
-		if (!rangedGet.ok) {
-			throw new Error(`storage inspection failed with ${rangedGet.status}`);
-		}
-		const total = rangedGet.headers
-			.get("content-range")
-			?.match(/\/(\d+)$/)?.[1];
-		return Number(total || rangedGet.headers.get("content-length") || 0);
-	} finally {
-		await rangedGet.body?.cancel();
-	}
-}
-
 async function getBucketAndOwner(
 	requestUser: UserRecord,
 	bucketName: string,
@@ -1325,7 +1293,15 @@ export async function handleFiles(req: Request): Promise<Response> {
 						bucketData.owner,
 						bucketData.bucket,
 					);
-					const existingSize = await existingFileSize(bucketData, internalKey);
+					const before = await fetchBucketStorage(bucketData, internalKey, {
+						method: "HEAD",
+					});
+					if (!before.ok && before.status !== 404) {
+						return errorResponse("Failed to inspect existing file", 502);
+					}
+					const existingSize = before.ok
+						? Number(before.headers.get("content-length") || 0)
+						: 0;
 					const delta = Math.max(0, size - existingSize);
 					const configuredLimit = Number(
 						bucketData.owner.storageLimitBytes ?? 0,
