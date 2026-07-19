@@ -36,6 +36,13 @@
 			"when": 1784232000000,
 			"tag": "0004_failover_fencing",
 			"breakpoints": true
+		},
+		{
+			"idx": 5,
+			"version": "5",
+			"when": 1784305200000,
+			"tag": "0005_multi_region_control_plane",
+			"breakpoints": true
 		}
 	]
 }

@@ -25,12 +25,16 @@ pub(crate) struct InternalListRequest {
 pub(crate) struct InternalListBucket {
     pub(crate) id: String,
     pub(crate) name: String,
+    #[serde(default = "crate::default_storage_region")]
+    pub(crate) resolved_region: String,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct InternalListInvalidateRequest {
     pub(crate) bucket_id: String,
+    #[serde(default = "crate::default_storage_region")]
+    pub(crate) resolved_region: String,
 }
 
 pub(crate) async fn fast_list_objects(
@@ -54,9 +58,20 @@ pub(crate) async fn fast_internal_list_objects(
     request: InternalListRequest,
 ) -> Result<Response<Body>> {
     ensure_internal_list_query_jailed(&request.query, &request.root_prefix)?;
+    state
+        .cfg
+        .regions
+        .ensure_served(&request.bucket.resolved_region)?;
+    let active_backend =
+        crate::writer::active_backend(&state, &request.bucket.resolved_region).await?;
+    let writer_generation =
+        crate::writer::current_generation(&state, &request.bucket.resolved_region).await?;
     let bucket = AuthBucket {
         id: request.bucket.id,
         name: request.bucket.name,
+        resolved_region: request.bucket.resolved_region,
+        active_backend: Some(active_backend),
+        writer_generation: Some(writer_generation),
     };
     let auth = AuthorizeResponse {
         allowed: true,
@@ -76,13 +91,27 @@ pub(crate) async fn fast_internal_list_objects(
     cached_list_objects_response(state, &auth, &bucket, &request.query, &HeaderMap::new()).await
 }
 
-pub(crate) async fn invalidate_list_cache(state: &AppState, bucket_id: &str) -> Result<()> {
-    if !state.cfg.redis_object_cache_enabled {
+pub(crate) async fn invalidate_list_cache(
+    state: &AppState,
+    bucket_id: &str,
+    storage_region: &str,
+) -> Result<()> {
+    if !state.cfg.redis_object_cache_enabled || !state.cfg.regions.is_local(storage_region) {
         return Ok(());
     }
-    let mut conn = state.redis.clone();
+    let active_backend = crate::writer::active_backend(state, storage_region).await?;
+    let bucket = AuthBucket {
+        id: bucket_id.to_string(),
+        name: String::new(),
+        resolved_region: storage_region.to_string(),
+        active_backend: Some(active_backend),
+        writer_generation: Some(crate::writer::current_generation(state, storage_region).await?),
+    };
+    let Some(mut conn) = state.redis.connection().await else {
+        return Ok(());
+    };
     let result: redis::RedisResult<()> = redis::cmd("INCR")
-        .arg(format!("s3:listver:{bucket_id}"))
+        .arg(list_version_key(state, &bucket)?)
         .query_async(&mut conn)
         .await;
     if let Err(error) = result {
@@ -98,9 +127,16 @@ async fn cached_list_objects_response(
     query: &str,
     headers: &HeaderMap,
 ) -> Result<Response<Body>> {
-    if !state.cfg.redis_object_cache_enabled {
-        let upstream =
-            signed_upstream_request(&state, Method::GET, &format!("?{query}"), headers, None)?;
+    if !state.cfg.redis_object_cache_enabled || !state.cfg.regions.is_local(&bucket.resolved_region)
+    {
+        let upstream = signed_upstream_request(
+            &state,
+            bucket,
+            Method::GET,
+            &format!("?{query}"),
+            headers,
+            None,
+        )?;
         let res = upstream.send().await?;
         let status = res.status();
         let xml = res.text().await?;
@@ -113,11 +149,15 @@ async fn cached_list_objects_response(
             auth,
         ));
     }
-    let list_version = get_list_cache_version(&state, &bucket.id).await;
+    let list_version = get_list_cache_version(&state, bucket).await;
     let list_type = query_param_value(query, "list-type").unwrap_or_else(|| "1".to_string());
     let cache_key = format!(
-        "s3:list:{}:{}:{}:{}",
-        bucket.id, list_version, list_type, query
+        "s3:{}:list:{}:{}:{}:{}",
+        bucket.cache_namespace(&state.cfg)?,
+        bucket.id,
+        list_version,
+        list_type,
+        query
     );
 
     if let Some(cached) = try_redis_string(&state, &cache_key, "list cache read failed").await {
@@ -131,8 +171,14 @@ async fn cached_list_objects_response(
         ));
     }
 
-    let upstream =
-        signed_upstream_request(&state, Method::GET, &format!("?{query}"), headers, None)?;
+    let upstream = signed_upstream_request(
+        &state,
+        bucket,
+        Method::GET,
+        &format!("?{query}"),
+        headers,
+        None,
+    )?;
     let res = upstream.send().await?;
     let status = res.status();
     let xml = res.text().await?;
@@ -160,12 +206,17 @@ async fn cached_list_objects_response(
 }
 
 pub(crate) async fn fast_bucket_location(
-    state: AppState,
+    _state: AppState,
     auth: AuthorizeResponse,
 ) -> Result<Response<Body>> {
+    let storage_region = auth
+        .bucket
+        .as_ref()
+        .map(|bucket| bucket.resolved_region.as_str())
+        .unwrap_or(crate::regions::DEFAULT_STORAGE_REGION);
     let body = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<LocationConstraint xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">{}</LocationConstraint>",
-        state.cfg.s3_region
+        storage_region
     );
     Ok(with_s3_headers(
         Response::builder()
@@ -353,18 +404,25 @@ fn hex_value(byte: u8) -> Option<u8> {
     }
 }
 
-async fn get_list_cache_version(state: &AppState, bucket_id: &str) -> String {
-    try_redis_string(
-        state,
-        &format!("s3:listver:{bucket_id}"),
-        "list version cache read failed",
-    )
-    .await
-    .unwrap_or_else(|| "0".to_string())
+async fn get_list_cache_version(state: &AppState, bucket: &AuthBucket) -> String {
+    let Ok(key) = list_version_key(state, bucket) else {
+        return "0".to_string();
+    };
+    try_redis_string(state, &key, "list version cache read failed")
+        .await
+        .unwrap_or_else(|| "0".to_string())
+}
+
+fn list_version_key(state: &AppState, bucket: &AuthBucket) -> Result<String> {
+    Ok(format!(
+        "s3:{}:listver:{bucket_id}",
+        bucket.cache_namespace(&state.cfg)?,
+        bucket_id = bucket.id,
+    ))
 }
 
 async fn try_redis_string(state: &AppState, key: &str, log_message: &str) -> Option<String> {
-    let mut conn = state.redis.clone();
+    let mut conn = state.redis.connection().await?;
     match redis::cmd("GET").arg(key).query_async(&mut conn).await {
         Ok(value) => value,
         Err(error) => {
@@ -381,7 +439,9 @@ async fn set_redis_string(
     ttl_seconds: u64,
     log_message: &str,
 ) {
-    let mut conn = state.redis.clone();
+    let Some(mut conn) = state.redis.connection().await else {
+        return;
+    };
     let result: redis::RedisResult<()> = redis::cmd("SETEX")
         .arg(key)
         .arg(ttl_seconds)

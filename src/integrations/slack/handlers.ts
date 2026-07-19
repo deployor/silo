@@ -11,8 +11,9 @@ import {
 import { config } from "../../config";
 import { db } from "../../db";
 import { bucketKeys, buckets } from "../../db/schema";
-import { buildCorsConfig } from "../../lib/s3/cors";
+import { invalidateDataplaneAuthCache } from "../../lib/dataplane-cache";
 import { isReservedBucketName } from "../../lib/s3/paths";
+import { createBucket } from "../../services/bucket-service";
 import { createKey } from "../../services/key-service";
 import { getAppSettings } from "../../services/settings-service";
 import { getStorageUsage, getUserBySlackId } from "../../services/user-service";
@@ -238,15 +239,7 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			};
 		}
 
-		const newBucket = await db
-			.insert(buckets)
-			.values({
-				name: bucketName,
-				userId: user.id,
-				isPublic: false,
-				corsConfig: JSON.stringify(buildCorsConfig()),
-			})
-			.returning();
+		const newBucket = [await createBucket(user.id, bucketName, "auto")];
 
 		const { accessKey, secretKey } = await createKey(newBucket[0].id, "slack");
 
@@ -403,7 +396,21 @@ export async function handleInteraction(payload: SlackInteractionPayload) {
 			.limit(1);
 
 		if (bucket.length > 0) {
-			await db.delete(bucketKeys).where(eq(bucketKeys.id, keyId));
+			const [key] = await db
+				.select({ accessKey: bucketKeys.accessKey })
+				.from(bucketKeys)
+				.where(and(eq(bucketKeys.id, keyId), eq(bucketKeys.bucketId, bucketId)))
+				.limit(1);
+			if (!key) return;
+			await db
+				.delete(bucketKeys)
+				.where(
+					and(eq(bucketKeys.id, keyId), eq(bucketKeys.bucketId, bucketId)),
+				);
+			await invalidateDataplaneAuthCache({
+				bucketName: bucket[0].name,
+				accessKey: key.accessKey,
+			});
 
 			const keys = await db
 				.select()

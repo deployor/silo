@@ -1,7 +1,8 @@
-import { count, eq } from "drizzle-orm";
+import { and, count, eq, sql } from "drizzle-orm";
 import { config } from "../config";
 import { db } from "../db";
 import { bucketKeys, buckets, type users } from "../db/schema";
+import { invalidateDataplaneAuthCache } from "../lib/dataplane-cache";
 import {
 	assertCanManageKeys,
 	getBucketAccessForUser,
@@ -33,17 +34,6 @@ export async function createKey(
 	const isImmortal = (bucket.user as typeof users.$inferSelect | null)
 		?.isImmortal;
 
-	const existingCount = await db
-		.select({ count: count() })
-		.from(bucketKeys)
-		.where(eq(bucketKeys.bucketId, bucketId));
-
-	if (!isImmortal && (existingCount[0]?.count ?? 0) >= maxKeys) {
-		throw new Error(
-			`Key limit reached (${maxKeys}). Delete an existing key to create a new one.`,
-		);
-	}
-
 	const envPrefix = config.isProduction ? "SILO_P" : "SILO_D";
 
 	const randomPart = Array.from(
@@ -66,12 +56,26 @@ export async function createKey(
 	// Example: SILO_P_SK_8E2D1C...
 	const secretKey = `${envPrefix}_SK_${secretRandomPart}`;
 
-	await db.insert(bucketKeys).values({
-		bucketId,
-		accessKey,
-		secretKey,
-		source,
-		note: note?.trim() || null,
+	await db.transaction(async (tx) => {
+		await tx.execute(
+			sql`SELECT pg_advisory_xact_lock(hashtextextended(${`silo:bucket-keys:${bucketId}`}, 0))`,
+		);
+		const [existingCount] = await tx
+			.select({ value: count() })
+			.from(bucketKeys)
+			.where(eq(bucketKeys.bucketId, bucketId));
+		if (!isImmortal && (existingCount?.value ?? 0) >= maxKeys) {
+			throw new Error(
+				`Key limit reached (${maxKeys}). Delete an existing key to create a new one.`,
+			);
+		}
+		await tx.insert(bucketKeys).values({
+			bucketId,
+			accessKey,
+			secretKey,
+			source,
+			note: note?.trim() || null,
+		});
 	});
 
 	return { accessKey, secretKey };
@@ -93,11 +97,21 @@ export async function updateKeyNote(
 	const noteDeepFreezeMessage = getBucketDeepFreezeMessage(access.bucket);
 	if (noteDeepFreezeMessage && !isAdmin) throw new Error(noteDeepFreezeMessage);
 	assertCanManageKeys(access);
+	const [key] = await db
+		.select({ id: bucketKeys.id })
+		.from(bucketKeys)
+		.where(
+			and(eq(bucketKeys.id, keyId), eq(bucketKeys.bucketId, access.bucket.id)),
+		)
+		.limit(1);
+	if (!key) throw new Error("Key not found");
 
 	await db
 		.update(bucketKeys)
 		.set({ note: note?.trim() || null })
-		.where(eq(bucketKeys.id, keyId));
+		.where(
+			and(eq(bucketKeys.id, keyId), eq(bucketKeys.bucketId, access.bucket.id)),
+		);
 }
 
 export async function deleteKey(
@@ -117,7 +131,23 @@ export async function deleteKey(
 		throw new Error(deleteDeepFreezeMessage);
 	assertCanManageKeys(access);
 
-	await db.delete(bucketKeys).where(eq(bucketKeys.id, keyId));
+	const [key] = await db
+		.select({ accessKey: bucketKeys.accessKey })
+		.from(bucketKeys)
+		.where(
+			and(eq(bucketKeys.id, keyId), eq(bucketKeys.bucketId, access.bucket.id)),
+		)
+		.limit(1);
+	if (!key) throw new Error("Key not found");
+	await db
+		.delete(bucketKeys)
+		.where(
+			and(eq(bucketKeys.id, keyId), eq(bucketKeys.bucketId, access.bucket.id)),
+		);
+	await invalidateDataplaneAuthCache({
+		bucketName,
+		accessKey: key?.accessKey,
+	});
 }
 
 export async function listKeysForBucket(

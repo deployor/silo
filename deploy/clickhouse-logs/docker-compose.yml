@@ -1,0 +1,102 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.3
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      CLICKHOUSE_DB: silo_logs
+      CLICKHOUSE_USER: silo_admin
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD}
+      CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+      CLICKHOUSE_INGEST_PASSWORD: ${CLICKHOUSE_INGEST_PASSWORD}
+      CLICKHOUSE_QUERY_PASSWORD: ${CLICKHOUSE_QUERY_PASSWORD}
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - clickhouse-logs:/var/log/clickhouse-server
+      - ./schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+      - ./init-users.sh:/docker-entrypoint-initdb.d/002-users.sh:ro
+    healthcheck:
+      test: [CMD-SHELL, "clickhouse client --user silo_admin --password \"$$CLICKHOUSE_ADMIN_PASSWORD\" --query 'SELECT 1' >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      default:
+      dokploy-network:
+        aliases:
+          - ${CLICKHOUSE_NETWORK_ALIAS:-silo-clickhouse}
+
+  clickhouse-users:
+    image: clickhouse/clickhouse-server:26.3
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD}
+      CLICKHOUSE_INGEST_PASSWORD: ${CLICKHOUSE_INGEST_PASSWORD}
+      CLICKHOUSE_QUERY_PASSWORD: ${CLICKHOUSE_QUERY_PASSWORD}
+    entrypoint: [/bin/sh, /bootstrap/init-users.sh]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - ./init-users.sh:/bootstrap/init-users.sh:ro
+
+  vector-access-logs:
+    image: timberio/vector:0.46.1-debian
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      CLICKHOUSE_LOCAL_URL: ${CLICKHOUSE_LOCAL_URL}
+      CLICKHOUSE_REMOTE_URL: ${CLICKHOUSE_REMOTE_URL}
+      CLICKHOUSE_INGEST_PASSWORD: ${CLICKHOUSE_INGEST_PASSWORD}
+    command: [--config, /etc/vector/vector.yaml]
+    depends_on:
+      clickhouse-users:
+        condition: service_completed_successfully
+    volumes:
+      - ./vector.yaml:/etc/vector/vector.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - vector-data:/var/lib/vector
+    healthcheck:
+      test: [CMD, vector, validate, --skip-healthchecks, /etc/vector/vector.yaml]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  clickhouse-backup:
+    image: clickhouse/clickhouse-server:26.3
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      SILO_REGION: ${SILO_REGION}
+      CLICKHOUSE_ADMIN_PASSWORD: ${CLICKHOUSE_ADMIN_PASSWORD}
+      CLICKHOUSE_BACKUP_INTERVAL_SECONDS: ${CLICKHOUSE_BACKUP_INTERVAL_SECONDS:-21600}
+      CLICKHOUSE_BACKUP_INITIAL_DELAY_SECONDS: ${CLICKHOUSE_BACKUP_INITIAL_DELAY_SECONDS:-300}
+      CLICKHOUSE_BACKUP_EU_URL: ${CLICKHOUSE_BACKUP_EU_URL}
+      CLICKHOUSE_BACKUP_EU_KEY_ID: ${CLICKHOUSE_BACKUP_EU_KEY_ID}
+      CLICKHOUSE_BACKUP_EU_KEY_SECRET: ${CLICKHOUSE_BACKUP_EU_KEY_SECRET}
+      CLICKHOUSE_BACKUP_US_URL: ${CLICKHOUSE_BACKUP_US_URL}
+      CLICKHOUSE_BACKUP_US_KEY_ID: ${CLICKHOUSE_BACKUP_US_KEY_ID}
+      CLICKHOUSE_BACKUP_US_KEY_SECRET: ${CLICKHOUSE_BACKUP_US_KEY_SECRET}
+    entrypoint: [/bin/sh, /backup/backup-loop.sh]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - ./backup-loop.sh:/backup/backup-loop.sh:ro
+
+volumes:
+  clickhouse-data:
+  clickhouse-logs:
+  vector-data:
+
+networks:
+  dokploy-network:
+    external: true

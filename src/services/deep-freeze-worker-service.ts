@@ -162,6 +162,8 @@ export class DeepFreezeWorkerService {
 				});
 
 				await deleteLiveBucketObjects({
+					owner,
+					bucket,
 					manifest: archive.manifest,
 					onProgress,
 				});
@@ -201,9 +203,10 @@ export class DeepFreezeWorkerService {
 						? (JSON.parse(job.manifestJson) as Awaited<
 								ReturnType<typeof readDeepFreezeManifest>
 							>)
-						: await readDeepFreezeManifest(
-								job.manifestKey || storageKeys.manifestKey,
-							);
+						: await readDeepFreezeManifest({
+								bucket,
+								manifestKey: job.manifestKey || storageKeys.manifestKey,
+							});
 				const restored = await restoreDeepFreezeArchive({
 					owner,
 					bucket,

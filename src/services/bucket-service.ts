@@ -1,7 +1,13 @@
-import { eq } from "drizzle-orm";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
 import { config } from "../config";
 import { db } from "../db";
-import { bucketKeys, buckets, users } from "../db/schema";
+import {
+	bucketDeletionTombstones,
+	bucketKeys,
+	buckets,
+	dataplaneMutationIntents,
+	users,
+} from "../db/schema";
 import {
 	type BucketCustomDomain,
 	createCustomDomainRecord,
@@ -18,7 +24,17 @@ import {
 	getCloudflareCustomHostname,
 	isCloudflareForSaasConfigured,
 } from "../lib/cloudflare-for-saas";
+import { invalidateDataplaneAuthCache } from "../lib/dataplane-cache";
+import {
+	beginDataplaneBucketTeardown,
+	releaseDataplaneBucketTeardown,
+} from "../lib/dataplane-storage-client";
 import { redis } from "../lib/redis";
+import {
+	isRequestedBucketRegion,
+	type RequestedBucketRegion,
+	resolveRequestedRegion,
+} from "../lib/regions";
 import { buildCorsConfig } from "../lib/s3/cors";
 import {
 	deleteBucketContents,
@@ -44,7 +60,68 @@ async function invalidateBucketAuthCache(bucketName: string) {
 	await Promise.allSettled([
 		redis.del(`auth:pub:${bucketName}`),
 		redis.del(`s3:list:${bucketName}:`),
+		invalidateDataplaneAuthCache({ bucketName }),
 	]);
+}
+
+async function pauseBucketForDestructiveOperation(
+	bucket: typeof buckets.$inferSelect,
+	reason: string,
+) {
+	await db
+		.update(buckets)
+		.set({
+			isPaused: true,
+			pauseReason: reason,
+			updatedAt: new Date(),
+		})
+		.where(eq(buckets.id, bucket.id));
+	await invalidateBucketAuthCache(bucket.name);
+}
+
+async function restoreBucketPauseState(bucket: typeof buckets.$inferSelect) {
+	await db
+		.update(buckets)
+		.set({
+			isPaused: bucket.isPaused,
+			pauseReason: bucket.pauseReason,
+			updatedAt: new Date(),
+		})
+		.where(eq(buckets.id, bucket.id));
+	await invalidateBucketAuthCache(bucket.name);
+}
+
+async function finalizeBucketDeletion(params: {
+	bucket: typeof buckets.$inferSelect;
+	rootPrefix: string | null;
+	deletedByUserId: string;
+}) {
+	await db.transaction(async (tx) => {
+		// The exclusive dataplane proof guarantees accounting is flushed. Keep
+		// unresolved prepared/committed intents as a fail-closed FK blocker, while
+		// terminal journal rows can be retired with the bucket metadata.
+		await tx
+			.delete(dataplaneMutationIntents)
+			.where(
+				and(
+					eq(dataplaneMutationIntents.bucketId, params.bucket.id),
+					inArray(dataplaneMutationIntents.state, ["applied", "cancelled"]),
+				),
+			);
+		await tx
+			.insert(bucketDeletionTombstones)
+			.values({
+				bucketId: params.bucket.id,
+				bucketName: params.bucket.name,
+				ownerUserId: params.bucket.userId,
+				requestedRegion: params.bucket.requestedRegion,
+				resolvedRegion: params.bucket.resolvedRegion,
+				rootPrefix: params.rootPrefix,
+				deletedByUserId: params.deletedByUserId,
+			})
+			.onConflictDoNothing();
+		await tx.delete(buckets).where(eq(buckets.id, params.bucket.id));
+	});
 }
 
 export type CorsRule = {
@@ -234,51 +311,70 @@ async function getOwnedBucketOrThrow(
 	return bucket[0];
 }
 
-export async function createBucket(userId: string, name: string) {
+export async function createBucket(
+	userId: string,
+	name: string,
+	requestedRegion: RequestedBucketRegion = "auto",
+) {
 	if (!name || !/^[a-z0-9-]+$/.test(name)) {
 		throw new Error("Invalid bucket name");
 	}
+	if (!isRequestedBucketRegion(requestedRegion)) {
+		throw new Error("Unsupported storage region");
+	}
+	const resolvedRegion = resolveRequestedRegion(requestedRegion);
 
 	if (isReservedBucketName(name)) {
 		throw new Error("Bucket name is reserved for system use");
 	}
 
-	// Check user for immortality
-	const user = await db.query.users.findFirst({
-		where: eq(users.id, userId),
-	});
-
-	if (!user) throw new Error("User not found");
-
 	const settings = await getAppSettings();
 	const maxBuckets = settings.defaultMaxBucketsPerUser;
+	let newBucket: (typeof buckets.$inferSelect)[];
+	try {
+		newBucket = await db.transaction(async (tx) => {
+			// Serialize quota decisions for one owner across all Bun instances.
+			await tx.execute(
+				sql`SELECT pg_advisory_xact_lock(hashtextextended(${`silo:bucket-owner:${userId}`}, 0))`,
+			);
+			const [user] = await tx
+				.select({ isImmortal: users.isImmortal })
+				.from(users)
+				.where(eq(users.id, userId))
+				.limit(1);
+			if (!user) throw new Error("User not found");
 
-	const userBuckets = await db
-		.select()
-		.from(buckets)
-		.where(eq(buckets.userId, userId));
+			const [bucketCount] = await tx
+				.select({ value: count() })
+				.from(buckets)
+				.where(eq(buckets.userId, userId));
+			if (!user.isImmortal && (bucketCount?.value ?? 0) >= maxBuckets) {
+				throw new Error(`Bucket limit reached (${maxBuckets})`);
+			}
 
-	if (!user.isImmortal && userBuckets.length >= maxBuckets) {
-		throw new Error(`Bucket limit reached (${maxBuckets})`);
+			return tx
+				.insert(buckets)
+				.values({
+					name,
+					userId,
+					region: requestedRegion,
+					requestedRegion,
+					resolvedRegion,
+					corsConfig: JSON.stringify(buildCorsConfig()),
+				})
+				.returning();
+		});
+	} catch (error) {
+		if (
+			typeof error === "object" &&
+			error !== null &&
+			"code" in error &&
+			error.code === "23505"
+		) {
+			throw new Error("Bucket name already taken");
+		}
+		throw error;
 	}
-
-	const existing = await db
-		.select()
-		.from(buckets)
-		.where(eq(buckets.name, name))
-		.limit(1);
-	if (existing.length > 0) {
-		throw new Error("Bucket name already taken");
-	}
-
-	const newBucket = await db
-		.insert(buckets)
-		.values({
-			name,
-			userId,
-			corsConfig: JSON.stringify(buildCorsConfig()),
-		})
-		.returning();
 
 	await invalidateBucketAuthCache(name);
 
@@ -315,13 +411,39 @@ export async function emptyBucket(
 	if (owner.length === 0) throw new Error("Owner not found");
 
 	const internalPrefix = getInternalPath("", owner[0], bucket[0]);
-	await deleteBucketContents(internalPrefix);
+	await pauseBucketForDestructiveOperation(
+		bucket[0],
+		"Bucket empty operation in progress",
+	);
+	let teardownToken: string | null = null;
+	try {
+		await deleteBucketContents(internalPrefix, bucket[0]);
+		teardownToken = await beginDataplaneBucketTeardown(bucket[0]);
 
-	// Reset usage stats for the bucket
-	await db
-		.update(buckets)
-		.set({ totalBytes: 0 })
-		.where(eq(buckets.id, bucket[0].id));
+		// Reset only after all asynchronous accounting deltas are durable in PostgreSQL.
+		await db
+			.update(buckets)
+			.set({ totalBytes: 0, updatedAt: new Date() })
+			.where(eq(buckets.id, bucket[0].id));
+	} catch (error) {
+		if (teardownToken) {
+			await releaseDataplaneBucketTeardown(bucket[0], teardownToken).catch(
+				(releaseError) =>
+					console.error(
+						"Failed to release rejected empty-bucket fence",
+						releaseError,
+					),
+			);
+		}
+		throw error;
+	}
+	if (teardownToken) {
+		await releaseDataplaneBucketTeardown(bucket[0], teardownToken).catch(
+			(error) =>
+				console.error("Failed to release completed empty-bucket fence", error),
+		);
+	}
+	await restoreBucketPauseState(bucket[0]);
 }
 
 export async function deleteBucket(
@@ -342,8 +464,13 @@ export async function deleteBucket(
 	if (deleteDeepFreezeMessage && !isAdmin)
 		throw new Error(deleteDeepFreezeMessage);
 	if (bucket[0].isSystem) throw new Error("Cannot delete system bucket");
+	await pauseBucketForDestructiveOperation(
+		bucket[0],
+		"Bucket deletion in progress",
+	);
 
-	// Best-effort: remove all objects first so upstream storage doesn't leak
+	// Never remove authoritative metadata unless fenced storage deletion succeeds.
+	let internalPrefix: string | null = null;
 	try {
 		if (bucket[0].userId) {
 			const owner = await db
@@ -351,16 +478,38 @@ export async function deleteBucket(
 				.from(users)
 				.where(eq(users.id, bucket[0].userId))
 				.limit(1);
-			if (owner.length > 0) {
-				const internalPrefix = getInternalPath("", owner[0], bucket[0]);
-				await deleteBucketContents(internalPrefix);
-			}
+			if (owner.length === 0) throw new Error("Owner not found");
+			internalPrefix = getInternalPath("", owner[0], bucket[0]);
+			await deleteBucketContents(internalPrefix, bucket[0]);
 		}
 	} catch (e) {
 		console.error("Failed to empty bucket during delete:", e);
+		throw new Error("Bucket storage could not be verified as empty");
 	}
 
-	await db.delete(buckets).where(eq(buckets.name, name));
+	const teardownToken = await beginDataplaneBucketTeardown(bucket[0]);
+	try {
+		await finalizeBucketDeletion({
+			bucket: bucket[0],
+			rootPrefix: internalPrefix,
+			deletedByUserId: userId,
+		});
+	} catch (error) {
+		await releaseDataplaneBucketTeardown(bucket[0], teardownToken).catch(
+			(releaseError) =>
+				console.error(
+					"Failed to release rejected bucket teardown",
+					releaseError,
+				),
+		);
+		throw error;
+	}
+	// The metadata transaction already committed. The dataplane also expires
+	// abandoned locks, so a release transport failure must not misreport it.
+	await releaseDataplaneBucketTeardown(bucket[0], teardownToken).catch(
+		(error) =>
+			console.error("Failed to release finalized bucket teardown fence", error),
+	);
 	await invalidateBucketAuthCache(name);
 }
 
@@ -412,6 +561,7 @@ export async function updateCorsConfig(
 		.update(buckets)
 		.set({ corsConfig: JSON.stringify(corsConfig) })
 		.where(eq(buckets.id, access.bucket.id));
+	await invalidateBucketAuthCache(name);
 }
 
 export async function addBucketCustomDomain(params: {

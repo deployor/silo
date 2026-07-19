@@ -7,24 +7,43 @@ use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
 use url::Url;
 
-use crate::{AppState, Config};
+use crate::{regions::StorageBackend, AppState, AuthBucket};
 
 type HmacSha256 = Hmac<Sha256>;
 
 pub(crate) fn signed_upstream_request(
     state: &AppState,
+    bucket: &AuthBucket,
     method: Method,
     path_with_query: &str,
     incoming_headers: &HeaderMap,
     content_length: Option<u64>,
 ) -> Result<reqwest::RequestBuilder> {
-    let cfg = &state.cfg;
-    let url = upstream_url(cfg, path_with_query)?;
+    let backend = bucket.active_backend()?;
+    signed_backend_request(
+        state,
+        &bucket.resolved_region,
+        &backend.id,
+        method,
+        path_with_query,
+        incoming_headers,
+        content_length,
+    )
+}
+
+pub(crate) fn signed_backend_request(
+    state: &AppState,
+    storage_region: &str,
+    backend_id: &str,
+    method: Method,
+    path_with_query: &str,
+    incoming_headers: &HeaderMap,
+    content_length: Option<u64>,
+) -> Result<reqwest::RequestBuilder> {
+    let storage = state.cfg.regions.backend(storage_region, backend_id)?;
+    let url = upstream_url(storage, path_with_query)?;
     let mut headers = filtered_upstream_headers(incoming_headers);
-    headers.insert(
-        "host".into(),
-        format!("{}.{}", cfg.s3_bucket, cfg.s3_endpoint),
-    );
+    headers.insert("host".into(), request_host(storage));
     headers.insert("x-amz-content-sha256".into(), "UNSIGNED-PAYLOAD".into());
     if let Some(len) = content_length {
         headers.insert("content-length".into(), len.to_string());
@@ -36,7 +55,15 @@ pub(crate) fn signed_upstream_request(
         headers.remove("content-encoding");
     }
 
-    sign_headers(state, method.as_str(), &url, &mut headers)?;
+    sign_headers(
+        state,
+        storage_region,
+        backend_id,
+        storage,
+        method.as_str(),
+        &url,
+        &mut headers,
+    )?;
 
     let mut builder = state.http.request(
         reqwest::Method::from_bytes(method.as_str().as_bytes())?,
@@ -48,22 +75,35 @@ pub(crate) fn signed_upstream_request(
     Ok(builder)
 }
 
-fn upstream_url(cfg: &Config, path_with_query: &str) -> Result<Url> {
-    let host = format!("{}.{}", cfg.s3_bucket, cfg.s3_endpoint);
+fn upstream_url(storage: &StorageBackend, path_with_query: &str) -> Result<Url> {
+    let host = request_host(storage);
+    let bucket_prefix = if storage.force_path_style {
+        format!("{}/", storage.bucket)
+    } else {
+        String::new()
+    };
     let url = if let Some((path, query)) = path_with_query.split_once('?') {
         format!(
-            "{}://{host}/{}?{query}",
-            cfg.s3_endpoint_scheme,
+            "{}://{host}/{bucket_prefix}{}?{query}",
+            storage.endpoint_scheme,
             encode_s3_path(path)
         )
     } else {
         format!(
-            "{}://{host}/{}",
-            cfg.s3_endpoint_scheme,
+            "{}://{host}/{bucket_prefix}{}",
+            storage.endpoint_scheme,
             encode_s3_path(path_with_query)
         )
     };
     Ok(Url::parse(&url)?)
+}
+
+fn request_host(storage: &StorageBackend) -> String {
+    if storage.force_path_style {
+        storage.endpoint.clone()
+    } else {
+        format!("{}.{}", storage.bucket, storage.endpoint)
+    }
 }
 
 fn encode_s3_path(path: &str) -> String {
@@ -128,6 +168,8 @@ fn filtered_upstream_headers(headers: &HeaderMap) -> BTreeMap<String, String> {
         "x-amz-copy-source-if-unmodified-since",
         "x-amz-metadata-directive",
         "x-amz-tagging-directive",
+        "x-amz-website-redirect-location",
+        "x-amz-server-side-encryption",
     ];
     headers
         .iter()
@@ -144,11 +186,13 @@ fn filtered_upstream_headers(headers: &HeaderMap) -> BTreeMap<String, String> {
 
 fn sign_headers(
     state: &AppState,
+    storage_region: &str,
+    backend_id: &str,
+    storage: &StorageBackend,
     method: &str,
     url: &Url,
     headers: &mut BTreeMap<String, String>,
 ) -> Result<()> {
-    let cfg = &state.cfg;
     let now = Utc::now();
     let amz_date = now.format("%Y%m%dT%H%M%SZ").to_string();
     let date_stamp = now.format("%Y%m%d").to_string();
@@ -180,9 +224,16 @@ fn sign_headers(
         "{method}\n{canonical_uri}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\nUNSIGNED-PAYLOAD"
     );
     let canonical_hash = hex::encode(Sha256::digest(canonical_request.as_bytes()));
-    let scope = format!("{}/{}/s3/aws4_request", date_stamp, cfg.s3_region);
+    let scope = format!("{}/{}/s3/aws4_request", date_stamp, storage.signing_region);
     let string_to_sign = format!("AWS4-HMAC-SHA256\n{amz_date}\n{scope}\n{canonical_hash}");
-    let signing_key = cached_signing_key(state, &date_stamp, "s3")?;
+    let signing_key = cached_signing_key(
+        state,
+        storage_region,
+        backend_id,
+        storage,
+        &date_stamp,
+        "s3",
+    )?;
     let mut mac = HmacSha256::new_from_slice(&signing_key)?;
     mac.update(string_to_sign.as_bytes());
     let signature = hex::encode(mac.finalize().into_bytes());
@@ -191,15 +242,29 @@ fn sign_headers(
         "authorization".into(),
         format!(
             "AWS4-HMAC-SHA256 Credential={}/{}, SignedHeaders={}, Signature={}",
-            cfg.s3_access_key, scope, signed_headers, signature
+            storage.access_key_id, scope, signed_headers, signature
         ),
     );
     Ok(())
 }
 
-fn cached_signing_key(state: &AppState, date_stamp: &str, service: &str) -> Result<Vec<u8>> {
-    let cfg = &state.cfg;
-    let cache_key = format!("{}\0{}\0{}", date_stamp, cfg.s3_region, service);
+fn cached_signing_key(
+    state: &AppState,
+    storage_region: &str,
+    backend_id: &str,
+    storage: &StorageBackend,
+    date_stamp: &str,
+    service: &str,
+) -> Result<Vec<u8>> {
+    let cache_key = format!(
+        "{}\0{}\0{}\0{}\0{}\0{}",
+        storage_region,
+        backend_id,
+        storage.access_key_id,
+        date_stamp,
+        storage.signing_region,
+        service
+    );
     if let Some(key) = state
         .signing_keys
         .read()
@@ -210,7 +275,12 @@ fn cached_signing_key(state: &AppState, date_stamp: &str, service: &str) -> Resu
         return Ok(key);
     }
 
-    let key = signing_key(&cfg.s3_secret_key, date_stamp, &cfg.s3_region, service)?;
+    let key = signing_key(
+        &storage.secret_access_key,
+        date_stamp,
+        &storage.signing_region,
+        service,
+    )?;
     state
         .signing_keys
         .write()

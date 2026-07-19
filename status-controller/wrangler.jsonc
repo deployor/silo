@@ -1,0 +1,63 @@
+{
+	"$schema": "../node_modules/wrangler/config-schema.json",
+	"name": "silo-status-controller",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-07-17",
+	"compatibility_flags": ["nodejs_compat_v2"],
+	"triggers": {
+		"crons": ["* * * * *"]
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "silo-status",
+			"database_id": "6190bf13-800b-4f7a-8a4d-e8cb2c5e6e10",
+			"migrations_dir": "migrations"
+		}
+	],
+	"hyperdrive": [
+		{
+			"binding": "DATABASE_EU",
+			"id": "6caf353a656d4864a8eb2c319f319078",
+			"localConnectionString": "postgresql://silo_ha_controller:local@127.0.0.1:25432/silo"
+		},
+		{
+			"binding": "DATABASE_US",
+			"id": "39867fb2b9ca46ad97963c9c5f4c996d",
+			"localConnectionString": "postgresql://silo_ha_controller:local@127.0.0.1:25432/silo"
+		}
+	],
+	"vars": {
+		"REGION_REGISTRY": "[{\"id\":\"eu-central\",\"label\":\"Europe — Germany\",\"flag\":\"🇩🇪\",\"origin\":\"https://eu-origin.onsilo.dev\",\"endpointHosts\":[\"onsilo.dev\",\"eu.onsilo.dev\"],\"default\":true,\"backends\":[{\"id\":\"primary\",\"label\":\"Backblaze B2 Europe\",\"provider\":\"Backblaze B2\",\"role\":\"primary\",\"canaryRef\":\"b2-eu-primary\"}]},{\"id\":\"us-east\",\"label\":\"United States — US East\",\"flag\":\"🇺🇸\",\"origin\":\"https://us-origin.onsilo.dev\",\"endpointHosts\":[\"us.onsilo.dev\"],\"backends\":[{\"id\":\"primary\",\"label\":\"Backblaze B2 US East\",\"provider\":\"Backblaze B2\",\"role\":\"primary\",\"canaryRef\":\"b2-us-primary\"}]}]",
+		"DASHBOARD_HEALTH_URL": "https://control-origin.onsilo.dev/health",
+		"MAINTENANCE_URL": "https://control-origin.onsilo.dev/api/maintenance-status",
+		"DASHBOARD_DNS_NAME": "dash.onsilo.dev",
+		"CONTROL_PLANE_ORIGIN_HOST": "control-origin.onsilo.dev",
+		"CF_ZONE_ID": "34a21ef2edadeb27a46276ee028a2192",
+		"CF_DASHBOARD_RECORD_ID": "72efab866490d5bcacca830b64fdb235",
+		"STATUS_ADMIN_ORIGINS": "https://status.onsilo.dev",
+		"AUTO_ACTIVATE_FAILOVER": "false",
+		"AUTO_PROMOTE_STORAGE": "false",
+		"AUTO_FAILOVER_DATABASE": "false",
+		"DATABASE_APP_ROLE": "silo_app",
+		"DATABASE_NAME": "silo",
+		"CLICKHOUSE_EU_HEALTH_URL": "https://logs-eu.onsilo.dev",
+		"CLICKHOUSE_US_HEALTH_URL": "https://logs-us.onsilo.dev",
+		"CLICKHOUSE_QUERY_USER": "silo_query",
+		"AUTO_REDIRECT_DASHBOARD": "false",
+		"AUTO_RECOVER": "true",
+		"FAILOVER_DRILL_APPROVED": "false"
+	},
+	"observability": {
+		"enabled": true,
+		"logs": {
+			"enabled": true,
+			"head_sampling_rate": 1,
+			"invocation_logs": true
+		},
+		"traces": {
+			"enabled": true,
+			"head_sampling_rate": 0.1
+		}
+	}
+}
