@@ -5,10 +5,12 @@ append-only access telemetry in two independent ClickHouse nodes. One copy runs
 in `eu-central`; the other runs in `us-east`.
 
 Each regional Vector collector tails structured `silo.request` events from the
-local Docker log files and sends every event to both ClickHouse nodes. Both
-sinks have independent 10 GiB disk buffers and retry indefinitely. A request
-never waits for Vector or ClickHouse. `request_id` is immutable and the
-`ReplacingMergeTree` removes retry duplicates.
+local Docker log files and sends every event to both ClickHouse nodes. Local
+and remote delivery use separate file checkpoints and separate 10 GiB disk
+buffers, so a full or unavailable remote destination cannot backpressure the
+healthy local pipeline. Both retry indefinitely. A request never waits for
+Vector or ClickHouse. `request_id` is immutable and the `ReplacingMergeTree`
+removes retry duplicates.
 
 This intentionally does not use a two-member ClickHouse Keeper cluster. Two
 consensus voters cannot safely elect a primary after a network partition.
@@ -92,11 +94,12 @@ counts, byte sums, and both ClickHouse replicas.
 ## Failure behavior
 
 - **One ClickHouse node fails:** local S3 traffic and the surviving log query
-  endpoint continue. Both collectors buffer the failed sink independently.
+  endpoint continue. Both collectors buffer the failed sink independently;
+  local ClickHouse ingestion continues even if that remote buffer fills.
 - **One entire Silo region fails:** requests served by the surviving dataplane
   are still delivered locally and buffered for the failed region.
-- **A collector restarts:** its checkpoints and sink buffers live in the
-  persistent `vector-data` volume.
+- **A collector restarts:** both independent checkpoints and sink buffers live
+  in the persistent `vector-data` volume.
 - **Both ClickHouse nodes fail:** S3 continues. Collectors buffer until their
   bounded disks fill; status reports an outage. Correctness/accounting remains
   in PostgreSQL and its durable dataplane spool.
