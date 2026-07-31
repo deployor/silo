@@ -178,42 +178,48 @@ services:
       - db-private
       - dokploy-network
 
-  pgdog-config:
+  pgpool-config:
     image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
     restart: "no"
     user: root
-    entrypoint: ["/usr/local/bin/silo-pgdog-configure"]
+    entrypoint: ["/usr/local/bin/silo-pgpool-configure"]
     environment:
       SILO_DATABASE_NAME: ${SILO_DATABASE_NAME:-silo}
       SILO_DATABASE_USER: ${SILO_DATABASE_USER:-silo_app}
       SILO_DATABASE_PASSWORD: ${SILO_DATABASE_PASSWORD:?set SILO_DATABASE_PASSWORD}
-      PGDOG_ADMIN_PASSWORD: ${PGDOG_ADMIN_PASSWORD:?set PGDOG_ADMIN_PASSWORD}
-      PGDOG_EU_HOST: postgres
-      PGDOG_EU_PORT: "5432"
-      PGDOG_US_HOST: ${PGDOG_US_HOST:-db-us.onsilo.dev}
-      PGDOG_US_PORT: ${PGDOG_US_PORT:-25432}
-      PGDOG_WORKERS: ${PGDOG_WORKERS:-4}
-      PGDOG_POOL_SIZE: ${PGDOG_POOL_SIZE:-24}
-      PGDOG_MIN_POOL_SIZE: ${PGDOG_MIN_POOL_SIZE:-2}
-    volumes: [pgdog-config:/config]
+      PGPOOL_ADMIN_PASSWORD: ${SILO_DATABASE_PASSWORD:?set SILO_DATABASE_PASSWORD}
+      POSTGRES_EU_HOST: postgres
+      POSTGRES_EU_PORT: "5432"
+      POSTGRES_US_HOST: ${POSTGRES_US_HOST:-db-us.onsilo.dev}
+      POSTGRES_US_PORT: ${POSTGRES_US_PORT:-25432}
+      PGPOOL_NUM_INIT_CHILDREN: ${PGPOOL_NUM_INIT_CHILDREN:-16}
+      PGPOOL_MAX_POOL: ${PGPOOL_MAX_POOL:-2}
+    volumes: [pgpool-config:/config]
 
-  pgdog:
-    image: ghcr.io/pgdogdev/pgdog:v0.1.51@sha256:c775624370861fd2b68d5b0affe95903132efd982cf98da3aceb2244706597ca
+  pgpool:
+    image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
     restart: unless-stopped
+    user: postgres
+    read_only: true
     security_opt: [no-new-privileges:true]
-    command: ["/usr/local/bin/pgdog", "--config", "/config/pgdog.toml", "--users", "/config/users.toml"]
+    entrypoint: ["pgpool"]
+    command: ["-n", "-f", "/config/pgpool.conf", "-F", "/config/pcp.conf", "-a", "/config/pool_hba.conf", "-k", "/config/.pgpoolkey"]
+    environment:
+      PGPASSWORD: ${SILO_DATABASE_PASSWORD:?set SILO_DATABASE_PASSWORD}
     depends_on:
-      pgdog-config: {condition: service_completed_successfully}
+      pgpool-config: {condition: service_completed_successfully}
       tls-config: {condition: service_completed_successfully}
       postgres: {condition: service_healthy}
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/"]
+      test: ["CMD-SHELL", "psql -h 127.0.0.1 -p 6432 -U ${SILO_DATABASE_USER:-silo_app} -d ${SILO_DATABASE_NAME:-silo} -Atqc 'select not pg_is_in_recovery()' | grep -qx t"]
       interval: 5s
       timeout: 3s
       retries: 10
     volumes:
-      - pgdog-config:/config:ro
+      - pgpool-config:/config:ro
       - postgres-tls:/tls:ro
+    tmpfs:
+      - /tmp:size=256m,mode=1777
     networks:
       db-private: null
       dokploy-network:
@@ -223,7 +229,7 @@ volumes:
   postgres-data: null
   postgres-socket: null
   postgres-tls: null
-  pgdog-config: null
+  pgpool-config: null
   pgbackrest-config: null
   pgbackrest-spool: null
 

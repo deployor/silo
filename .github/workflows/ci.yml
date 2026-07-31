@@ -94,7 +94,7 @@ jobs:
         run: psql -h 127.0.0.1 -U postgres -d silo -v ON_ERROR_STOP=1 -f drizzle/0005_multi_region_control_plane.sql
 
   postgres-ha-compose:
-    name: PostgreSQL HA and PgDog topology
+    name: PostgreSQL HA and Pgpool-II topology
     runs-on: ubuntu-latest
     env:
       SILO_POSTGRES_IMAGE: postgres:17.5-bookworm
@@ -105,7 +105,6 @@ jobs:
       SILO_DATABASE_PASSWORD: ci-only-app
       POSTGRES_REPLICATION_PASSWORD: ci-only-replication
       POSTGRES_HA_CONTROLLER_PASSWORD: ci-only-controller
-      PGDOG_ADMIN_PASSWORD: ci-only-pgdog
       PGBACKREST_REPO1_ENDPOINT: s3.eu.example.test
       PGBACKREST_REPO1_BUCKET: silo-db-backup-eu
       PGBACKREST_REPO1_KEY: ci-repo1-key
@@ -123,26 +122,25 @@ jobs:
           for file in deploy/postgres-ha/docker-compose.eu.yml deploy/postgres-ha/docker-compose.us.yml; do
             docker compose -f "$file" config --quiet
           done
-      - name: Validate PgDog configuration
+      - name: Build and validate Pgpool-II configuration
         run: |
           set -euo pipefail
           config_dir=$(mktemp -d)
+          docker build -t silo-postgres-pgpool-ci deploy/postgres-ha
           docker run --rm \
-            -v "$PWD/deploy/postgres-ha/pgdog-configure.sh:/configure.sh:ro" \
             -v "$config_dir:/config" \
             -e SILO_DATABASE_NAME=silo \
             -e SILO_DATABASE_USER=silo_app \
             -e SILO_DATABASE_PASSWORD=ci-only-app \
-            -e PGDOG_ADMIN_PASSWORD=ci-only-pgdog \
-            -e PGDOG_EU_HOST=db-eu.onsilo.dev \
-            -e PGDOG_US_HOST=db-us.onsilo.dev \
-            alpine:3.22 sh /configure.sh
-          touch "$config_dir/ca.crt"
+            -e PGPOOL_ADMIN_PASSWORD=ci-only-admin \
+            -e POSTGRES_EU_HOST=db-eu.onsilo.dev \
+            -e POSTGRES_US_HOST=db-us.onsilo.dev \
+            -e PGPOOL_SSL=off \
+            silo-postgres-pgpool-ci silo-pgpool-configure
           docker run --rm \
             -v "$config_dir:/config:ro" \
-            -v "$config_dir:/tls:ro" \
-            ghcr.io/pgdogdev/pgdog:v0.1.51@sha256:c775624370861fd2b68d5b0affe95903132efd982cf98da3aceb2244706597ca \
-            pgdog -c /config/pgdog.toml -u /config/users.toml configcheck
+            silo-postgres-pgpool-ci \
+            sh -ceu 'if timeout 5 pgpool -n -D -f /config/pgpool.conf -F /config/pcp.conf -a /config/pool_hba.conf -k /config/.pgpoolkey; then exit 1; else test $$? -eq 124; fi'
 
   clickhouse-log-plane:
     name: ClickHouse dual-region log topology

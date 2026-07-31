@@ -651,7 +651,7 @@ function infrastructureGraph(data) {
 		const criticalStatuses = [
 			phaseStatus(region),
 			componentStatus(data, `dataplane:${region.id}`),
-			componentStatus(data, `pgdog:${region.id}`),
+			componentStatus(data, `pgpool:${region.id}`),
 			backendStatuses.find((backend) => backend.id === region.activeBackend)
 				?.status || "unknown",
 		];
@@ -734,11 +734,11 @@ function infrastructureGraph(data) {
 			location: regionName(region),
 			width: 154,
 		});
-		const pgdog = addNode({
-			id: `pgdog:${region.id}`,
-			label: "SQL / PGDOG PATH",
+		const pgpool = addNode({
+			id: `pgpool:${region.id}`,
+			label: "SQL / PGPOOL-II",
 			meta: "local pooled DB route",
-			componentId: `pgdog:${region.id}`,
+			componentId: `pgpool:${region.id}`,
 			x: right,
 			y: y + 150,
 			kind: "database",
@@ -813,7 +813,7 @@ function infrastructureGraph(data) {
 			dataplane,
 			redis,
 			disk,
-			pgdog,
+			pgpool,
 			postgres,
 			clickhouse,
 			backendNodes,
@@ -938,19 +938,19 @@ function infrastructureGraph(data) {
 				status: componentStatus(data, `disk-cache:${layout.region.id}`),
 			},
 		);
-		const sqlEdge = addLink(layout.dataplane.id, layout.pgdog.id, "database", {
+		const sqlEdge = addLink(layout.dataplane.id, layout.pgpool.id, "database", {
 			label: "QUERY",
 			curve: 10,
-			status: componentStatus(data, `pgdog:${layout.region.id}`),
+			status: componentStatus(data, `pgpool:${layout.region.id}`),
 		});
 		const sqlReturn = addLink(
-			layout.pgdog.id,
+			layout.pgpool.id,
 			layout.dataplane.id,
 			"response",
 			{
 				label: "RESULT",
 				curve: -12,
-				status: componentStatus(data, `pgdog:${layout.region.id}`),
+				status: componentStatus(data, `pgpool:${layout.region.id}`),
 			},
 		);
 		const activeDatabase =
@@ -958,14 +958,14 @@ function infrastructureGraph(data) {
 			layout.postgres;
 		const activeDatabaseRegion =
 			data.databaseHa?.activeRegion || layout.region.id;
-		const poolEdge = addLink(layout.pgdog.id, activeDatabase.id, "database", {
+		const poolEdge = addLink(layout.pgpool.id, activeDatabase.id, "database", {
 			label: "ACTIVE DB",
 			curve: activeDatabase === layout.postgres ? 0 : index ? 58 : -58,
 			status: componentStatus(data, `postgresql:${activeDatabaseRegion}`),
 		});
 		const databaseReturn = addLink(
 			activeDatabase.id,
-			layout.pgdog.id,
+			layout.pgpool.id,
 			"response",
 			{
 				label: "ROW SET",
@@ -1001,14 +1001,14 @@ function infrastructureGraph(data) {
 				delay: 1680 + index * 300,
 				spacing: 8,
 			});
-		if (canFlow(layout.dataplane.id, layout.pgdog.id, activeDatabase.id))
+		if (canFlow(layout.dataplane.id, layout.pgpool.id, activeDatabase.id))
 			addJourney("database", [sqlEdge, poolEdge], {
 				count: 3,
 				speed: 0.34,
 				delay: 2100 + index * 300,
 				spacing: 8,
 			});
-		if (canFlow(activeDatabase.id, layout.pgdog.id, layout.dataplane.id))
+		if (canFlow(activeDatabase.id, layout.pgpool.id, layout.dataplane.id))
 			addJourney("response", [databaseReturn, sqlReturn], {
 				count: 3,
 				speed: 0.38,
@@ -1072,14 +1072,14 @@ function infrastructureGraph(data) {
 	if (controlHome) {
 		const controlSqlEdge = addLink(
 			"control",
-			controlHome.pgdog.id,
+			controlHome.pgpool.id,
 			"metadata",
 			{
 				label: "CONTROL DATA",
 				curve: narrow ? 48 : 24,
 			},
 		);
-		if (canFlow("control", controlHome.pgdog.id))
+		if (canFlow("control", controlHome.pgpool.id))
 			addJourney("metadata", [controlSqlEdge], {
 				count: 2,
 				speed: 0.3,
