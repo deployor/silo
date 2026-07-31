@@ -81,6 +81,12 @@ function checks(ok: boolean) {
 }
 
 describe("regional status safety contracts", () => {
+	test("public incidents require consecutive failed monitor rounds", () => {
+		expect(__test.incidentConfirmed(1)).toBe(false);
+		expect(__test.incidentConfirmed(2)).toBe(true);
+		expect(__test.incidentConfirmed(5)).toBe(true);
+	});
+
 	test("provider canaries support path, virtual-host, and temporary credentials", () => {
 		const credentials = __test.parseCredentialMap({
 			path: {
