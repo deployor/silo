@@ -63,7 +63,7 @@ the read-only query credential.
 Backups need dedicated B2 application keys limited to the configured backup
 prefixes. Do not reuse object-serving keys after rollout. Each node backs up to
 both `CLICKHOUSE_BACKUP_EU_URL` and `CLICKHOUSE_BACKUP_US_URL` every six hours.
-Each B2 repository retains exactly the newest 28 snapshots from each regional
+Each B2 repository retains up to the newest 28 snapshots from each regional
 node (seven days at the default interval). Therefore each repository contains
 at most 56 archives across EU and US. Set `CLICKHOUSE_BACKUP_RETENTION_COUNT`
 to change the per-region cap. The backup keys require list and delete access to
