@@ -138,8 +138,8 @@ services:
       PGDOG_US_HOST: postgres
       PGDOG_US_PORT: "5432"
       PGDOG_WORKERS: ${PGDOG_WORKERS:-4}
-      PGDOG_POOL_SIZE: ${PGDOG_POOL_SIZE:-16}
-      PGDOG_MIN_POOL_SIZE: ${PGDOG_MIN_POOL_SIZE:-2}
+      PGDOG_POOL_SIZE: ${PGDOG_POOL_SIZE:-12}
+      PGDOG_MIN_POOL_SIZE: ${PGDOG_MIN_POOL_SIZE:-1}
     volumes: [pgdog-config:/config]
 
   pgdog:

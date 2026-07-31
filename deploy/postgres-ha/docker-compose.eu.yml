@@ -193,8 +193,8 @@ services:
       PGDOG_US_HOST: ${PGDOG_US_HOST:-db-us.onsilo.dev}
       PGDOG_US_PORT: ${PGDOG_US_PORT:-25432}
       PGDOG_WORKERS: ${PGDOG_WORKERS:-4}
-      PGDOG_POOL_SIZE: ${PGDOG_POOL_SIZE:-16}
-      PGDOG_MIN_POOL_SIZE: ${PGDOG_MIN_POOL_SIZE:-2}
+      PGDOG_POOL_SIZE: ${PGDOG_POOL_SIZE:-12}
+      PGDOG_MIN_POOL_SIZE: ${PGDOG_MIN_POOL_SIZE:-1}
     volumes: [pgdog-config:/config]
 
   pgdog:

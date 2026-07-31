@@ -50,7 +50,7 @@ Cloudflare Tunnel/VPC path. Do not expose PgDog port 6432 publicly.
 Keep the application pools small even though PgDog can accept many clients.
 The shipped Silo settings use 2 Bun connections, 3 ordinary Rust connections,
 and 2 Rust writer-fence connections per process. Each regional PgDog instance
-multiplexes them onto at most 16 connections per backend, keeps two warm, and
+multiplexes them onto at most 12 connections per backend, keeps one warm, and
 randomizes six-hour connection recycling to avoid synchronized reconnects.
 
 ## Deployment order
