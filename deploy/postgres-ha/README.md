@@ -5,11 +5,11 @@ the two Silo failure domains:
 
 - Germany starts as the primary.
 - US East is a physical hot standby with a permanent replication slot.
-- Pgpool-II 4.7.2 runs locally in both regions and is the only application database
+- PgDog v0.1.51 runs locally in both regions and is the only application database
   endpoint (`silo-db-eu:6432` or `silo-db-us:6432`).
-- Both Pgpool-II nodes monitor both PostgreSQL nodes with streaming-replication
-  role checks, bounded connection pools, SCRAM authentication, and health checks.
-- The Cloudflare status Worker is the failover controller. Pgpool-II never promotes
+- Both PgDog nodes monitor both PostgreSQL nodes with automatic role discovery,
+  one-second LSN checks, bounded transaction pools, SCRAM, and health checks.
+- The Cloudflare status Worker is the failover controller. PgDog never promotes
   PostgreSQL by itself.
 - WAL and full/differential backups are encrypted client-side by pgBackRest and
   written to two independent B2 repositories.
@@ -42,16 +42,16 @@ EU DATABASE_URL=postgres://silo_app:...@silo-db-eu:6432/silo?sslmode=disable
 US DATABASE_URL=postgres://silo_app:...@silo-db-us:6432/silo?sslmode=disable
 ```
 
-The connection is plaintext only inside Docker's `dokploy-network`. Pgpool-II uses
+The connection is plaintext only inside Docker's `dokploy-network`. PgDog uses
 TLS with CA verification for every PostgreSQL connection.
 Raw PostgreSQL port 25432 must allow only the other regional server and the
-Cloudflare Tunnel/VPC path. Do not expose Pgpool-II port 6432 publicly.
+Cloudflare Tunnel/VPC path. Do not expose PgDog port 6432 publicly.
 
-Keep the application pools small even though Pgpool-II can accept many clients.
+Keep the application pools small even though PgDog can accept many clients.
 The shipped Silo settings use 2 Bun connections, 3 ordinary Rust connections,
-and 2 Rust writer-fence connections per process. Each regional Pgpool-II starts
-16 client children with at most two cached backend connections per user/database
-pair, leaving PostgreSQL maintenance and replication headroom.
+and 2 Rust writer-fence connections per process. Each regional PgDog instance
+multiplexes them onto at most 16 connections per backend, keeps two warm, and
+randomizes six-hour connection recycling to avoid synchronized reconnects.
 
 ## Deployment order
 
@@ -75,7 +75,7 @@ pair, leaving PostgreSQL maintenance and replication headroom.
 9. Create pgBackRest stanzas in both repositories, take a full backup, restore
    it to a disposable volume, and verify row counts and checksums.
 10. Put Silo in maintenance, take the final Aiven dump, restore it, re-seed the
-    US standby, then change all three Silo processes to their local Pgpool-II URL.
+    US standby, then change all three Silo processes to their local PgDog URL.
 11. Exercise EU→US promotion, S3 PUT/HEAD/GET/DELETE in both logical regions,
     stale-primary fencing, EU rewind/rejoin, and US→EU failback.
 12. Only then enable database automation. Keep Aiven read-only for a rollback

@@ -371,7 +371,7 @@ describe("regional status safety contracts", () => {
 			snapshot as never,
 		);
 		expect(components["dataplane:eu-central"]).toBe("outage");
-		expect(components["pgpool:eu-central"]).toBe("outage");
+		expect(components["pgdog:eu-central"]).toBe("outage");
 		expect(components["cache:eu-central"]).toBe("degraded");
 		expect(components["cache:us-east"]).toBe("operational");
 		expect(components["disk-cache:eu-central"]).toBe("outage");

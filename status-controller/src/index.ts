@@ -1205,17 +1205,17 @@ function deriveComponents(
 		const runtime = state.regions[region.id];
 		const homeProbe = snapshot.dataplanes[region.id];
 		const servingProbe = snapshot.dataplanes[runtime.activeDataplane];
-		const pgpoolReachable = homeProbe?.readiness.postgres;
+		const pgdogReachable = homeProbe?.readiness.postgres;
 		const diskCache = homeProbe?.readiness.diskCache;
 		const postgresProbe = snapshot.database?.[region.id];
 		const clickHouseProbe = snapshot.clickhouse?.[region.id];
 		components[`dataplane:${region.id}`] = dataplaneAvailable(homeProbe)
 			? "operational"
 			: "outage";
-		components[`pgpool:${region.id}`] =
-			pgpoolReachable === undefined
+		components[`pgdog:${region.id}`] =
+			pgdogReachable === undefined
 				? "unknown"
-				: pgpoolReachable
+				: pgdogReachable
 					? "operational"
 					: "outage";
 		components[`postgresql:${region.id}`] = !postgresProbe
@@ -3125,8 +3125,8 @@ function definitions(registry: RegionConfig[]): ComponentDefinition[] {
 			group: "regional",
 		});
 		result.push({
-			id: `pgpool:${region.id}`,
-			name: `${region.label} Pgpool-II`,
+			id: `pgdog:${region.id}`,
+			name: `${region.label} PgDog`,
 			description:
 				"Regional SQL pool and primary-routing path used by the dataplane",
 			group: "regional",
