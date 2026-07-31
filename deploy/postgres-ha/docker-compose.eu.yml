@@ -179,7 +179,7 @@ services:
       - dokploy-network
 
   pgdog-config:
-    image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
+    image: ghcr.io/deployor/silo-postgres:sha-94aba2ea77762f905706c1ae9d28805eb49add56@sha256:d9d66e180b34ef9e6cfaf67a505356717ed2172679712c123e1943652de8a7bd
     restart: "no"
     user: root
     entrypoint: ["/usr/local/bin/silo-pgdog-configure"]
