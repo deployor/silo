@@ -124,7 +124,7 @@ services:
       - dokploy-network
 
   pgpool-config:
-    image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
+    image: ghcr.io/deployor/silo-postgres:sha-be5c9f89a22b1c7a5de6044f679e88e283d07a75@sha256:5143b51496626e1075c692ef2af546f6b360d61aab532d46b2778591662e7f50
     restart: "no"
     user: root
     entrypoint: ["/usr/local/bin/silo-pgpool-configure"]
@@ -142,7 +142,7 @@ services:
     volumes: [pgpool-config:/config]
 
   pgpool:
-    image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
+    image: ghcr.io/deployor/silo-postgres:sha-be5c9f89a22b1c7a5de6044f679e88e283d07a75@sha256:5143b51496626e1075c692ef2af546f6b360d61aab532d46b2778591662e7f50
     restart: unless-stopped
     user: postgres
     read_only: true
