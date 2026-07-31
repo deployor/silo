@@ -11,7 +11,8 @@ set -eu
 
 keep="${CLICKHOUSE_BACKUP_RETENTION_COUNT:-28}"
 interval="${CLICKHOUSE_BACKUP_RETENTION_INTERVAL_SECONDS:-21600}"
-initial_delay="${CLICKHOUSE_BACKUP_RETENTION_INITIAL_DELAY_SECONDS:-900}"
+initial_delay="${CLICKHOUSE_BACKUP_RETENTION_INITIAL_DELAY_SECONDS:-30}"
+export RCLONE_CONFIG=/dev/null
 
 for value in "$keep" "$interval" "$initial_delay"; do
   case "$value" in
@@ -63,7 +64,10 @@ prune_repository() {
       awk -v keep="$keep" 'NR > keep'
   )"
 
-  [ -n "$old_files" ] || return 0
+  [ -n "$old_files" ] || {
+    echo "$repository backup retention is within the $keep-snapshot cap for $SILO_REGION"
+    return 0
+  }
   printf '%s\n' "$old_files" | while IFS= read -r file; do
     [ -n "$file" ] || continue
     case "$file" in
@@ -76,6 +80,7 @@ prune_repository() {
       --low-level-retries 10
     echo "removed expired $repository backup $SILO_REGION/$file"
   done
+  echo "$repository backup retention enforced at $keep snapshots for $SILO_REGION"
 }
 
 sleep "$initial_delay"
