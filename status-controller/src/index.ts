@@ -187,6 +187,7 @@ const RECOVERY_THRESHOLD = 10;
 const RECOVERY_STABILITY_MS = 10 * 60_000;
 const DNS_GRACE_MS = 10 * 60_000;
 const CHECK_TIMEOUT_MS = 12_000;
+const SNAPSHOT_TIMEOUT_MS = 55_000;
 const MUTATION_TIMEOUT_MS = 60_000;
 const MONITOR_LEASE_MS = 4 * 60_000;
 const AUTHORIZATION_POLL_MS = 2_000;
@@ -260,7 +261,11 @@ async function runMonitor(env: Env): Promise<void> {
 		const plannedMaintenance = Boolean(
 			state.productionMaintenance || (await getActiveMaintenance(env)),
 		);
-		const snapshot = await takeSnapshot(env, registry, state);
+		const snapshot = await withDeadline(
+			takeSnapshot(env, registry, state),
+			SNAPSHOT_TIMEOUT_MS,
+			"regional monitor snapshot timed out",
+		);
 		try {
 			await processDatabaseHealth(env, state, snapshot);
 		} catch (error) {
@@ -3408,6 +3413,23 @@ async function fetchWithDeadline(
 		return await fetch(input, { ...init, signal: controller.signal });
 	} finally {
 		clearTimeout(timer);
+	}
+}
+async function withDeadline<T>(
+	promise: Promise<T>,
+	timeoutMs: number,
+	message: string,
+): Promise<T> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			promise,
+			new Promise<never>((_, reject) => {
+				timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+			}),
+		]);
+	} finally {
+		if (timer) clearTimeout(timer);
 	}
 }
 async function sleep(milliseconds: number): Promise<void> {
