@@ -14,12 +14,6 @@ pub(crate) async fn record_ingress(state: &AppState, auth: &AuthorizeResponse, b
     }
 }
 
-pub(crate) async fn record_egress(state: &AppState, auth: &AuthorizeResponse, bytes: u64) {
-    if bytes > 0 {
-        record(state, auth, 0, bytes, false).await;
-    }
-}
-
 async fn record(
     state: &AppState,
     auth: &AuthorizeResponse,
@@ -39,33 +33,12 @@ async fn record_inner(
     egress: u64,
     count_request: bool,
 ) -> Result<()> {
-    let Some(user) = auth.user.as_ref() else {
+    if auth.user.is_none() {
         return Ok(());
-    };
-    if state.cfg.emergency_mode {
-        return record_direct_to_postgres(state, auth, ingress, egress, count_request).await;
     }
-    let mut pipe = redis::pipe();
-    if ingress > 0 {
-        pipe.incr(format!("stats:user:{}:ingress", user.id), ingress as i64);
-    }
-    if egress > 0 {
-        pipe.incr(format!("stats:user:{}:egress", user.id), egress as i64);
-    }
-    if count_request {
-        pipe.incr(format!("stats:user:{}:requests", user.id), 1);
-        pipe.sadd("stats:active:users", &user.id);
-        if let Some(bucket) = auth.bucket.as_ref() {
-            pipe.incr(format!("stats:bucket:{}:requests", bucket.id), 1);
-            pipe.sadd("stats:active:buckets", &bucket.id);
-        }
-    } else if ingress > 0 || egress > 0 {
-        pipe.sadd("stats:active:users", &user.id);
-    }
-
-    let mut conn = state.redis.clone();
-    let _: () = pipe.query_async(&mut conn).await?;
-    Ok(())
+    // Every region writes through the same idempotent Aiven/fsync-backed
+    // accounting path. Dragonfly is deliberately never authoritative.
+    record_direct_to_postgres(state, auth, ingress, egress, count_request).await
 }
 
 async fn record_direct_to_postgres(

@@ -17,6 +17,7 @@ import {
 	getOffboardingExportBucketForUser,
 } from "../lib/offboarding-export";
 import { redis } from "../lib/redis";
+import { isRegionalOriginHost } from "../lib/regions";
 import { getKeyFromRequest } from "../lib/s3/paths";
 import { S3Errors } from "../lib/s3-errors";
 import { getBucketDeepFreezeMessage } from "../services/deep-freeze-service";
@@ -40,13 +41,14 @@ type CachedKeyAuth = {
 async function getBucketFromRequest(req: Request): Promise<string | null> {
 	const url = new URL(req.url);
 	const host = url.host;
+	const isPathStyleOrigin = host === S3_DOMAIN || isRegionalOriginHost(host);
 
-	if (host.endsWith(`.${S3_DOMAIN}`) && host !== S3_DOMAIN) {
+	if (host.endsWith(`.${S3_DOMAIN}`) && !isPathStyleOrigin) {
 		return host.slice(0, -(S3_DOMAIN.length + 1));
 	}
 
 	if (
-		host === S3_DOMAIN ||
+		isPathStyleOrigin ||
 		(S3_DOMAIN === "localhost:3000" && host.startsWith("localhost"))
 	) {
 		const parts = url.pathname.split("/");

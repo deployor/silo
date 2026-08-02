@@ -1,8 +1,10 @@
-import { createHash, createHmac, randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { and, eq, isNull, lte } from "drizzle-orm";
 import { config } from "../config";
 import { db } from "../db";
 import { buckets, offboardingExportSessions, users } from "../db/schema";
+import { invalidateDataplaneAuthCache } from "./dataplane-cache";
+import { deriveOffboardingExportSecretWithKey } from "./offboarding-credentials";
 import { getInternalPath } from "./s3/paths";
 
 export const OFFBOARDING_EXPORT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -12,10 +14,13 @@ export function createOffboardingExportAccessKey() {
 }
 
 export function deriveOffboardingExportSecret(accessKey: string) {
-	return createHmac("sha256", config.hcAuth.clientSecret)
-		.update(`offboarding-export:${accessKey}`)
-		.digest("hex");
+	return deriveOffboardingExportSecretWithKey(
+		accessKey,
+		config.offboardingExportDerivationSecret,
+	);
 }
+
+export { deriveOffboardingExportSecretWithKey } from "./offboarding-credentials";
 
 export function hashOffboardingExportSecret(secret: string) {
 	return createHash("sha256").update(secret).digest("hex");
@@ -27,6 +32,8 @@ export function buildOffboardingAllowedPrefix(user: typeof users.$inferSelect) {
 		name: "",
 		userId: user.id,
 		region: "auto",
+		requestedRegion: "auto",
+		resolvedRegion: "eu-central",
 		isPublic: false,
 		isSystem: false,
 		isPaused: false,
@@ -102,6 +109,7 @@ export async function expireOffboardingExportSessions() {
 		.select({
 			id: offboardingExportSessions.id,
 			userId: offboardingExportSessions.userId,
+			accessKey: offboardingExportSessions.accessKey,
 		})
 		.from(offboardingExportSessions)
 		.where(
@@ -125,6 +133,7 @@ export async function expireOffboardingExportSessions() {
 			.update(users)
 			.set({ dataExported: true, updatedAt: now })
 			.where(eq(users.id, session.userId));
+		await invalidateDataplaneAuthCache({ accessKey: session.accessKey });
 	}
 }
 

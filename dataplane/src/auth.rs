@@ -35,6 +35,80 @@ const AUTH_QUERY_PARAMS: &[&str] = &[
     "x-amz-expires",
 ];
 
+/// Evict all locally cached authorization contexts named by the global
+/// control plane. This intentionally returns no existence information to its
+/// caller; revocation fanout is safe to repeat on every regional Dragonfly.
+pub(crate) async fn invalidate_cached_contexts(
+    state: &AppState,
+    bucket_id: Option<&str>,
+    bucket_name: Option<&str>,
+    access_keys: &[String],
+) -> Result<()> {
+    let mut names = bucket_name
+        .into_iter()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let mut keys = access_keys.to_vec();
+
+    if let Some(bucket_id) = bucket_id {
+        let row =
+            sqlx::query_scalar::<_, String>("SELECT name FROM buckets WHERE id = $1::uuid LIMIT 1")
+                .bind(bucket_id)
+                .fetch_optional(&state.pg)
+                .await?;
+        if let Some(name) = row {
+            names.push(name);
+        }
+        keys.extend(
+            sqlx::query_scalar::<_, String>(
+                "SELECT access_key FROM bucket_keys WHERE bucket_id = $1::uuid",
+            )
+            .bind(bucket_id)
+            .fetch_all(&state.pg)
+            .await?,
+        );
+    }
+
+    if let Some(bucket_name) = bucket_name {
+        keys.extend(
+            sqlx::query_scalar::<_, String>(
+                r#"
+                SELECT k.access_key
+                FROM bucket_keys k
+                JOIN buckets b ON b.id = k.bucket_id
+                WHERE b.name = $1
+                "#,
+            )
+            .bind(bucket_name)
+            .fetch_all(&state.pg)
+            .await?,
+        );
+    }
+
+    names.sort_unstable();
+    names.dedup();
+    keys.sort_unstable();
+    keys.dedup();
+    let cache_region = state.cfg.regions.local_region();
+    let mut pipe = redis::pipe();
+    for name in names {
+        pipe.del(format!("auth:rust:{cache_region}:pub:{name}"));
+        // Rollout compatibility with the pre-regional namespace.
+        pipe.del(format!("auth:rust:pub:{name}"));
+    }
+    for access_key in keys {
+        pipe.del(format!("auth:rust:{cache_region}:key:{access_key}"));
+        pipe.del(format!("auth:rust:key:{access_key}"));
+    }
+    let Some(mut conn) = state.redis.connection().await else {
+        return Ok(());
+    };
+    if let Err(error) = pipe.query_async::<()>(&mut conn).await {
+        warn!(error = %error, "auth cache invalidation failed");
+    }
+    Ok(())
+}
+
 pub(crate) async fn authorize_direct(
     state: &AppState,
     method: &Method,
@@ -143,6 +217,23 @@ pub(crate) async fn authorize_direct(
             "Access Denied",
         )));
     }
+    if context.mode == AuthMode::OffboardingExport
+        && !matches!(
+            action,
+            "GetBucketLocation"
+                | "GetObject"
+                | "HeadBucket"
+                | "HeadObject"
+                | "ListBuckets"
+                | "ListObjectsV2"
+        )
+    {
+        return Ok(Some(deny(
+            StatusCode::FORBIDDEN,
+            "AccessDenied",
+            "Offboarding export credentials are read-only.",
+        )));
+    }
     if let Some(user) = context.user.as_ref() {
         if (user.data_exported || user.files_deleted)
             && method != Method::GET
@@ -186,11 +277,6 @@ pub(crate) async fn authorize_direct(
     let auth_user = context.user.as_ref().map(|u| AuthUser {
         id: u.id.clone(),
         is_immortal: u.is_immortal,
-        storage_limit_bytes: u.storage_limit_bytes,
-        storage_usage_bytes: u.storage_usage_bytes,
-        egress_limit_bytes: u.egress_limit_bytes,
-        egress_bytes: u.egress_bytes,
-        egress_period: u.egress_period.clone(),
     });
     let root_prefix = internal_path("", auth_user.as_ref(), &context.bucket)?;
     let internal_path = if action == "ListBuckets" {
@@ -198,6 +284,15 @@ pub(crate) async fn authorize_direct(
     } else {
         internal_path(&key, auth_user.as_ref(), &context.bucket)?
     };
+    if let Some(allowed_prefix) = context.allowed_prefix.as_deref() {
+        if !root_prefix.starts_with(allowed_prefix) || !internal_path.starts_with(allowed_prefix) {
+            return Ok(Some(deny(
+                StatusCode::FORBIDDEN,
+                "AccessDenied",
+                "The export credential cannot access this prefix.",
+            )));
+        }
+    }
     let query = stripped_query(&url);
     let path_with_query = if query.is_empty() {
         internal_path
@@ -224,6 +319,9 @@ pub(crate) async fn authorize_direct(
         bucket: Some(AuthBucket {
             id: context.bucket.id,
             name: context.bucket.name,
+            resolved_region: context.bucket.resolved_region,
+            active_backend: None,
+            writer_generation: None,
         }),
         user: auth_user,
     }))
@@ -253,8 +351,17 @@ async fn signed_context(
         )));
     }
 
-    let Some(context) = get_signed_auth_context(state, access_key).await? else {
-        return Ok(None);
+    let context = match get_signed_auth_context(state, access_key).await? {
+        Some(context) => context,
+        None if access_key.starts_with("ox_") => {
+            let Some(context) =
+                get_offboarding_export_auth_context(state, access_key, requested_bucket).await?
+            else {
+                return Ok(None);
+            };
+            context
+        }
+        None => return Ok(None),
     };
     if requested_bucket.is_some_and(|requested_bucket| requested_bucket != context.bucket.name) {
         return Ok(Some(deny_context(
@@ -276,6 +383,9 @@ async fn signed_context(
             "SignatureDoesNotMatch",
             "The request signature we calculated does not match the signature you provided.",
         )));
+    }
+    if context.mode == AuthMode::OffboardingExport {
+        return Ok(Some(context));
     }
     apply_policy(state, context, true)
 }
@@ -369,6 +479,7 @@ fn deny_context(status: StatusCode, code: &str, message: &str) -> AuthContext {
         bucket: BucketAuth {
             id: String::new(),
             name: String::new(),
+            resolved_region: crate::default_storage_region(),
             user_id: None,
             is_public: false,
             is_system: false,
@@ -380,6 +491,7 @@ fn deny_context(status: StatusCode, code: &str, message: &str) -> AuthContext {
         },
         user: None,
         key: None,
+        allowed_prefix: None,
         denied: Some(deny(status, code, message)),
     }
 }
@@ -388,7 +500,10 @@ async fn get_signed_auth_context(
     state: &AppState,
     access_key: &str,
 ) -> Result<Option<AuthContext>> {
-    let cache_key = format!("auth:rust:key:{access_key}");
+    let cache_key = format!(
+        "auth:rust:{}:key:{access_key}",
+        state.cfg.regions.local_region()
+    );
     if let Some(context) = get_cached_context(state, &cache_key).await {
         return Ok(Some(context));
     }
@@ -396,7 +511,8 @@ async fn get_signed_auth_context(
     let row = sqlx::query(
         r#"
         SELECT
-          b.id::text AS bucket_id, b.name AS bucket_name, b.user_id, b.is_public, b.is_system,
+          b.id::text AS bucket_id, b.name AS bucket_name, b.resolved_region,
+          b.user_id, b.is_public, b.is_system,
           b.is_paused AS bucket_is_paused, b.pause_reason AS bucket_pause_reason,
           b.deep_freeze_state, b.deep_freeze_reason, b.cors_config,
           u.id AS user_id,
@@ -429,17 +545,118 @@ async fn get_signed_auth_context(
             is_paused: row.try_get("key_is_paused")?,
             pause_reason: row.try_get("key_pause_reason")?,
         }),
+        allowed_prefix: None,
         denied: None,
     };
     set_cached_context(state, &cache_key, &context).await;
     Ok(Some(context))
 }
 
+async fn get_offboarding_export_auth_context(
+    state: &AppState,
+    access_key: &str,
+    requested_bucket: Option<&str>,
+) -> Result<Option<AuthContext>> {
+    let Some(derivation_secret) = state.cfg.offboarding_export_derivation_secret.as_deref() else {
+        // A regional deployment without this secret safely falls back to the
+        // Bun control-plane authorizer instead of accepting an unverifiable
+        // export credential.
+        return Ok(None);
+    };
+    let row = sqlx::query(
+        r#"
+        SELECT
+          s.id::text AS export_session_id, s.secret_key_hash, s.allowed_prefix,
+          b.id::text AS bucket_id, b.name AS bucket_name, b.resolved_region,
+          b.user_id, b.is_public, b.is_system,
+          b.is_paused AS bucket_is_paused, b.pause_reason AS bucket_pause_reason,
+          b.deep_freeze_state, b.deep_freeze_reason, b.cors_config,
+          u.id AS user_id,
+          COALESCE(NULLIF(u.storage_limit_bytes, 0),
+            (SELECT default_storage_limit_bytes FROM app_settings LIMIT 1),
+            1073741824) AS storage_limit_bytes,
+          COALESCE((SELECT SUM(owned.total_bytes) FROM buckets owned WHERE owned.user_id = u.id), 0) AS storage_usage_bytes,
+          u.egress_limit_bytes, u.egress_bytes, u.egress_period,
+          u.is_immortal, u.is_locked, u.marked_as_over_age,
+          u.data_exported, u.files_deleted
+        FROM offboarding_export_sessions s
+        JOIN users u ON u.id = s.user_id
+        JOIN buckets b ON b.user_id = u.id
+        WHERE s.access_key = $1
+          AND s.revoked_at IS NULL
+          AND s.download_completed_at IS NULL
+          AND s.expires_at > now()
+          AND ($2::text IS NULL OR b.name = $2)
+        ORDER BY b.created_at ASC
+        LIMIT 1
+        "#,
+    )
+    .bind(access_key)
+    .bind(requested_bucket)
+    .fetch_optional(&state.pg)
+    .await?;
+    let Some(row) = row else {
+        return Ok(None);
+    };
+
+    let derived_secret = derive_offboarding_secret(derivation_secret, access_key)?;
+    let derived_hash = hex::encode(Sha256::digest(derived_secret.as_bytes()));
+    let stored_hash: String = row.try_get("secret_key_hash")?;
+    if !constant_time_hex_eq(&derived_hash, &stored_hash) {
+        warn!("offboarding export secret derivation does not match its stored hash");
+        return Ok(None);
+    }
+
+    let user_id: String = row.try_get("user_id")?;
+    let expected_prefix = format!("users/{}/", sanitize_user_id(&user_id));
+    let stored_prefix: String = row.try_get("allowed_prefix")?;
+    let allowed_prefix = format!("{}/", stored_prefix.trim_end_matches('/'));
+    if allowed_prefix != expected_prefix {
+        warn!("offboarding export session has an invalid allowed prefix");
+        return Ok(None);
+    }
+
+    let session_id: String = row.try_get("export_session_id")?;
+    sqlx::query(
+        r#"
+        UPDATE offboarding_export_sessions
+        SET used_at = COALESCE(used_at, now()), last_accessed_at = now(), updated_at = now()
+        WHERE id = $1::uuid
+          AND (last_accessed_at IS NULL OR last_accessed_at < now() - interval '1 minute')
+        "#,
+    )
+    .bind(&session_id)
+    .execute(&state.pg)
+    .await?;
+
+    Ok(Some(AuthContext {
+        mode: AuthMode::OffboardingExport,
+        bucket: bucket_from_row(&row),
+        user: Some(user_from_row(&row)),
+        key: Some(KeyAuth {
+            secret_key: derived_secret,
+            is_paused: false,
+            pause_reason: None,
+        }),
+        allowed_prefix: Some(allowed_prefix),
+        denied: None,
+    }))
+}
+
+fn derive_offboarding_secret(derivation_secret: &str, access_key: &str) -> Result<String> {
+    let mut mac = HmacSha256::new_from_slice(derivation_secret.as_bytes())?;
+    mac.update(format!("offboarding-export:{access_key}").as_bytes());
+    Ok(hex::encode(mac.finalize().into_bytes()))
+}
+
 async fn get_public_auth_context(
     state: &AppState,
     bucket_name: &str,
 ) -> Result<Option<AuthContext>> {
-    let cache_key = format!("auth:rust:pub:{bucket_name}");
+    let cache_key = format!(
+        "auth:rust:{}:pub:{bucket_name}",
+        state.cfg.regions.local_region()
+    );
     if let Some(context) = get_cached_context(state, &cache_key).await {
         return Ok(Some(context));
     }
@@ -447,7 +664,8 @@ async fn get_public_auth_context(
     let row = sqlx::query(
         r#"
         SELECT
-          b.id::text AS bucket_id, b.name AS bucket_name, b.user_id, b.is_public, b.is_system,
+          b.id::text AS bucket_id, b.name AS bucket_name, b.resolved_region,
+          b.user_id, b.is_public, b.is_system,
           b.is_paused AS bucket_is_paused, b.pause_reason AS bucket_pause_reason,
           b.deep_freeze_state, b.deep_freeze_reason, b.cors_config,
           u.id AS user_id,
@@ -476,6 +694,7 @@ async fn get_public_auth_context(
             .try_get::<Option<String>, _>("user_id")?
             .map(|_| user_from_row(&row)),
         key: None,
+        allowed_prefix: None,
         denied: None,
     };
     set_cached_context(state, &cache_key, &context).await;
@@ -483,7 +702,7 @@ async fn get_public_auth_context(
 }
 
 async fn get_cached_context(state: &AppState, cache_key: &str) -> Option<AuthContext> {
-    let mut conn = state.redis.clone();
+    let mut conn = state.redis.connection().await?;
     let cached: redis::RedisResult<Option<String>> = redis::cmd("GET")
         .arg(cache_key)
         .query_async(&mut conn)
@@ -502,7 +721,9 @@ async fn set_cached_context(state: &AppState, cache_key: &str, context: &AuthCon
     let Ok(value) = serde_json::to_string(context) else {
         return;
     };
-    let mut conn = state.redis.clone();
+    let Some(mut conn) = state.redis.connection().await else {
+        return;
+    };
     let result: redis::RedisResult<()> = redis::cmd("SETEX")
         .arg(cache_key)
         .arg(AUTH_CACHE_TTL_SECONDS)
@@ -518,6 +739,9 @@ fn bucket_from_row(row: &sqlx::postgres::PgRow) -> BucketAuth {
     BucketAuth {
         id: row.try_get("bucket_id").unwrap_or_default(),
         name: row.try_get("bucket_name").unwrap_or_default(),
+        resolved_region: row
+            .try_get("resolved_region")
+            .unwrap_or_else(|_| crate::default_storage_region()),
         user_id: row.try_get("user_id").unwrap_or(None),
         is_public: row.try_get("is_public").unwrap_or(false),
         is_system: row.try_get("is_system").unwrap_or(false),
@@ -1275,6 +1499,8 @@ struct AuthContext {
     bucket: BucketAuth,
     user: Option<UserAuth>,
     key: Option<KeyAuth>,
+    #[serde(default)]
+    allowed_prefix: Option<String>,
     #[serde(skip)]
     denied: Option<AuthorizeResponse>,
 }
@@ -1282,6 +1508,7 @@ struct AuthContext {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 enum AuthMode {
     Authenticated,
+    OffboardingExport,
     Public,
     Denied,
 }
@@ -1290,6 +1517,8 @@ enum AuthMode {
 struct BucketAuth {
     id: String,
     name: String,
+    #[serde(default = "crate::default_storage_region")]
+    resolved_region: String,
     user_id: Option<String>,
     is_public: bool,
     is_system: bool,
@@ -1451,6 +1680,18 @@ mod tests {
         assert_eq!(
             bucket_from_request_for_domains("onsilo.dev", &[], &url),
             None
+        );
+    }
+
+    #[test]
+    fn offboarding_secret_derivation_matches_control_plane_vector() {
+        assert_eq!(
+            derive_offboarding_secret(
+                "silo-offboarding-parity-secret-2026",
+                "ox_0123456789abcdef0123456789abcdef",
+            )
+            .unwrap(),
+            "1ba9c08e16f5e4e28fdd015ca2868327feebc31ba587b10ae8132736bd3c7038"
         );
     }
 }

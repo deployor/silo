@@ -16,12 +16,14 @@ pub(crate) async fn try_redis_object_cache(
     bucket: &AuthBucket,
     key: &str,
 ) -> Result<Option<Response<Body>>> {
-    if !state.cfg.redis_object_cache_enabled {
+    if !cache_enabled_for_bucket(state, bucket) {
         return Ok(None);
     }
-    let body_key = object_cache_body_key(&bucket.id, key);
-    let meta_key = object_cache_meta_key(&bucket.id, key);
-    let mut conn = state.redis.clone();
+    let body_key = object_cache_body_key(state, bucket, key)?;
+    let meta_key = object_cache_meta_key(state, bucket, key)?;
+    let Some(mut conn) = state.redis.connection().await else {
+        return Ok(None);
+    };
     let (body, meta): (Option<Vec<u8>>, Option<String>) = match redis::pipe()
         .get(body_key)
         .get(meta_key)
@@ -107,11 +109,13 @@ pub(crate) async fn try_redis_object_meta(
     bucket: &AuthBucket,
     key: &str,
 ) -> Result<Option<Response<Body>>> {
-    if !state.cfg.redis_object_cache_enabled {
+    if !cache_enabled_for_bucket(state, bucket) {
         return Ok(None);
     }
-    let meta_key = object_cache_meta_key(&bucket.id, key);
-    let mut conn = state.redis.clone();
+    let meta_key = object_cache_meta_key(state, bucket, key)?;
+    let Some(mut conn) = state.redis.connection().await else {
+        return Ok(None);
+    };
     let meta: Option<String> = match redis::cmd("GET").arg(meta_key).query_async(&mut conn).await {
         Ok(meta) => meta,
         Err(error) => {
@@ -136,11 +140,11 @@ pub(crate) async fn try_redis_object_size(
     bucket: &AuthBucket,
     key: &str,
 ) -> Option<u64> {
-    if !state.cfg.redis_object_cache_enabled {
+    if !cache_enabled_for_bucket(state, bucket) {
         return None;
     }
-    let meta_key = object_cache_meta_key(&bucket.id, key);
-    let mut conn = state.redis.clone();
+    let meta_key = object_cache_meta_key(state, bucket, key).ok()?;
+    let mut conn = state.redis.connection().await?;
     let meta: Option<String> = redis::cmd("GET")
         .arg(meta_key)
         .query_async(&mut conn)
@@ -168,17 +172,18 @@ pub(crate) async fn buffer_small_get_and_cache(
     }
 
     let body = res.bytes().await?;
-    if state.cfg.redis_object_cache_enabled {
-        let body_key = object_cache_body_key(&bucket.id, key);
-        let meta_key = object_cache_meta_key(&bucket.id, key);
-        let mut conn = state.redis.clone();
-        let cache_result: redis::RedisResult<()> = redis::pipe()
-            .set_ex(meta_key, serde_json::to_string(&headers)?, 21_600)
-            .set_ex(body_key, body.as_ref(), 21_600)
-            .query_async(&mut conn)
-            .await;
-        if let Err(error) = cache_result {
-            warn!(error = %error, "object cache write failed");
+    if cache_enabled_for_bucket(state, bucket) {
+        let body_key = object_cache_body_key(state, bucket, key)?;
+        let meta_key = object_cache_meta_key(state, bucket, key)?;
+        if let Some(mut conn) = state.redis.connection().await {
+            let cache_result: redis::RedisResult<()> = redis::pipe()
+                .set_ex(meta_key, serde_json::to_string(&headers)?, 21_600)
+                .set_ex(body_key, body.as_ref(), 21_600)
+                .query_async(&mut conn)
+                .await;
+            if let Err(error) = cache_result {
+                warn!(error = %error, "object cache write failed");
+            }
         }
     }
 
@@ -192,7 +197,7 @@ pub(crate) async fn cache_object_meta(
     headers: &HeaderMap,
     ttl_seconds: u64,
 ) -> Result<()> {
-    if !state.cfg.redis_object_cache_enabled {
+    if !cache_enabled_for_bucket(state, bucket) {
         return Ok(());
     }
     let mut meta = BTreeMap::new();
@@ -201,9 +206,11 @@ pub(crate) async fn cache_object_meta(
             meta.insert(name.as_str().to_string(), value_str.to_string());
         }
     }
-    let mut conn = state.redis.clone();
+    let Some(mut conn) = state.redis.connection().await else {
+        return Ok(());
+    };
     let cache_result: redis::RedisResult<()> = redis::cmd("SETEX")
-        .arg(object_cache_meta_key(&bucket.id, key))
+        .arg(object_cache_meta_key(state, bucket, key)?)
         .arg(ttl_seconds)
         .arg(serde_json::to_string(&meta)?)
         .query_async(&mut conn)
@@ -215,17 +222,27 @@ pub(crate) async fn cache_object_meta(
 }
 
 pub(crate) async fn invalidate_object_caches(state: &AppState, bucket: &AuthBucket, key: &str) {
-    state.disk_cache.invalidate(&bucket.id, key).await;
+    state.disk_cache.invalidate(bucket, key).await;
 
-    if !state.cfg.redis_object_cache_enabled {
+    if !cache_enabled_for_bucket(state, bucket) {
         return;
     }
 
-    let mut conn = state.redis.clone();
+    let (Ok(body_key), Ok(meta_key), Ok(list_version_key)) = (
+        object_cache_body_key(state, bucket, key),
+        object_cache_meta_key(state, bucket, key),
+        list_version_key(state, bucket),
+    ) else {
+        return;
+    };
+
+    let Some(mut conn) = state.redis.connection().await else {
+        return;
+    };
     let result: redis::RedisResult<()> = redis::pipe()
-        .del(object_cache_body_key(&bucket.id, key))
-        .del(object_cache_meta_key(&bucket.id, key))
-        .incr(format!("s3:listver:{}", bucket.id), 1)
+        .del(body_key)
+        .del(meta_key)
+        .incr(list_version_key, 1)
         .query_async(&mut conn)
         .await;
     if let Err(error) = result {
@@ -233,12 +250,34 @@ pub(crate) async fn invalidate_object_caches(state: &AppState, bucket: &AuthBuck
     }
 }
 
-fn object_cache_body_key(bucket_id: &str, key: &str) -> String {
-    format!("s3:body:{bucket_id}:{key}")
+fn object_cache_body_key(state: &AppState, bucket: &AuthBucket, key: &str) -> Result<String> {
+    Ok(format!(
+        "s3:{}:body:{}:{key}",
+        bucket.cache_namespace(&state.cfg)?,
+        bucket.id
+    ))
 }
 
-fn object_cache_meta_key(bucket_id: &str, key: &str) -> String {
-    format!("s3:meta:{bucket_id}:{key}")
+fn object_cache_meta_key(state: &AppState, bucket: &AuthBucket, key: &str) -> Result<String> {
+    Ok(format!(
+        "s3:{}:meta:{}:{key}",
+        bucket.cache_namespace(&state.cfg)?,
+        bucket.id
+    ))
+}
+
+fn list_version_key(state: &AppState, bucket: &AuthBucket) -> Result<String> {
+    Ok(format!(
+        "s3:{}:listver:{}",
+        bucket.cache_namespace(&state.cfg)?,
+        bucket.id
+    ))
+}
+
+fn cache_enabled_for_bucket(state: &AppState, bucket: &AuthBucket) -> bool {
+    state.cfg.redis_object_cache_enabled
+        && state.cfg.regions.is_local(&bucket.resolved_region)
+        && bucket.active_backend.is_some()
 }
 
 #[derive(Clone, Copy)]

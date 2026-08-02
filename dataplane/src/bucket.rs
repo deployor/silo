@@ -212,7 +212,6 @@ pub(crate) async fn fast_options(
 }
 
 async fn invalidate_bucket_auth_cache(state: &AppState, bucket_id: &str, bucket_name: &str) {
-    let mut conn = state.redis.clone();
     let access_keys = sqlx::query_scalar::<_, String>(
         "SELECT access_key FROM bucket_keys WHERE bucket_id = $1::uuid",
     )
@@ -220,9 +219,15 @@ async fn invalidate_bucket_auth_cache(state: &AppState, bucket_id: &str, bucket_
     .fetch_all(&state.pg)
     .await
     .unwrap_or_default();
+    let Some(mut conn) = state.redis.connection().await else {
+        return;
+    };
     let mut pipe = redis::pipe();
+    let cache_region = state.cfg.regions.local_region();
+    pipe.del(format!("auth:rust:{cache_region}:pub:{bucket_name}"));
     pipe.del(format!("auth:rust:pub:{bucket_name}"));
     for access_key in access_keys {
+        pipe.del(format!("auth:rust:{cache_region}:key:{access_key}"));
         pipe.del(format!("auth:rust:key:{access_key}"));
     }
     let _: redis::RedisResult<()> = pipe.query_async(&mut conn).await;

@@ -2,9 +2,9 @@ import { eq } from "drizzle-orm";
 import { config } from "../config";
 import { db } from "../db";
 import { buckets, users } from "../db/schema";
+import { executeDataplaneStorage } from "../lib/dataplane-storage-client";
 import { getInternalPath } from "../lib/s3/paths";
-import { s3Client } from "../lib/s3-client";
-import { parseS3Xml } from "../lib/s3-xml";
+import { parseS3Xml, requireS3XmlElement } from "../lib/s3-xml";
 import { getMaintenanceStatus } from "./maintenance-service";
 
 const PAGE_SIZE = 1000;
@@ -14,7 +14,10 @@ type S3ListBucketResult = {
 	NextContinuationToken?: string;
 };
 
-async function sumPrefixBytes(prefix: string): Promise<number> {
+async function sumPrefixBytes(
+	bucket: typeof buckets.$inferSelect,
+	prefix: string,
+): Promise<number> {
 	let continuationToken: string | null = null;
 	let totalBytes = 0;
 
@@ -27,7 +30,10 @@ async function sumPrefixBytes(prefix: string): Promise<number> {
 			query.set("continuation-token", continuationToken);
 		}
 
-		const response = await s3Client.fetch(`?${query.toString()}`, {
+		const response = await executeDataplaneStorage({
+			bucket,
+			rootPrefix: prefix,
+			pathWithQuery: `?${query.toString()}`,
 			method: "GET",
 		});
 		if (!response.ok) {
@@ -37,10 +43,12 @@ async function sumPrefixBytes(prefix: string): Promise<number> {
 		}
 
 		const xml = await response.text();
-		const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
-			xml,
-		).ListBucketResult;
-		const contents = result?.Contents
+		const result = requireS3XmlElement(
+			parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(xml)
+				.ListBucketResult,
+			"ListBucketResult",
+		);
+		const contents = result.Contents
 			? Array.isArray(result.Contents)
 				? result.Contents
 				: [result.Contents]
@@ -50,7 +58,7 @@ async function sumPrefixBytes(prefix: string): Promise<number> {
 			totalBytes += Number(item.Size || 0);
 		}
 
-		continuationToken = result?.NextContinuationToken || null;
+		continuationToken = result.NextContinuationToken || null;
 	} while (continuationToken);
 
 	return totalBytes;
@@ -128,7 +136,7 @@ export class BucketUsageReconciliationService {
 			prefix = getInternalPath("", owner, bucket);
 		}
 
-		const actualBytes = await sumPrefixBytes(prefix);
+		const actualBytes = await sumPrefixBytes(bucket, prefix);
 		const storedBytes = Number(bucket.totalBytes) || 0;
 		if (actualBytes === storedBytes) return;
 

@@ -2,6 +2,7 @@ import { errorResponse, jsonResponse } from "../../../lib/api-utils";
 import { getCurrentUser } from "../../../lib/session";
 import { updateCorsSchema } from "../../../lib/validation";
 import {
+	type CorsRule,
 	deleteCorsConfig,
 	updateCorsConfig,
 } from "../../../services/bucket-service";
@@ -28,7 +29,7 @@ export async function handleCors(req: Request): Promise<Response> {
 					return errorResponse(result.error.issues[0].message, 400);
 				}
 
-				const { rules: corsRules } = result.data;
+				const corsRules = result.data.rules as CorsRule[];
 
 				await updateCorsConfig(bucketName, user.id, corsRules, user.isAdmin);
 

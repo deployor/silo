@@ -19,6 +19,11 @@ import {
 	MdWarning,
 	MdWarningAmber,
 } from "react-icons/md";
+import {
+	getStorageRegion,
+	STORAGE_REGIONS,
+	type StorageRegionId,
+} from "../../lib/regions";
 import { AppShell } from "../components/AppShell";
 import { Modal } from "../components/ui/Modal";
 import { fetchJson, fetchText } from "../shared/api/http";
@@ -35,6 +40,7 @@ type BucketKey = {
 type BucketCreateState = {
 	name: string;
 	note: string;
+	requestedRegion: StorageRegionId;
 	error: string | null;
 	loading: boolean;
 };
@@ -66,6 +72,8 @@ type CredentialModalState = {
 
 type DashboardBucket = {
 	name: string;
+	requestedRegion: "auto" | StorageRegionId;
+	resolvedRegion: StorageRegionId;
 	keys: BucketKey[];
 	customDomains?: Array<{
 		domain: string;
@@ -221,6 +229,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 	const storageOverviewId = useId();
 	const bucketsId = useId();
 	const createBucketNameId = useId();
+	const createBucketRegionId = useId();
 	const createBucketNoteId = useId();
 	const deactivateKeyNoteId = useId();
 	const generateKeyNoteId = useId();
@@ -387,6 +396,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 		setBucketCreateModal({
 			name: "",
 			note: "Default key",
+			requestedRegion: "eu-central",
 			error: null,
 			loading: false,
 		});
@@ -409,10 +419,17 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				accessKey: string;
 				secretKey: string;
 				publicUrl: string;
+				requestedRegion: "auto" | StorageRegionId;
+				resolvedRegion: StorageRegionId;
+				endpoint: string;
 			}>("/api/dashboard/buckets", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ name, note: bucketCreateModal.note }),
+				body: JSON.stringify({
+					name,
+					note: bucketCreateModal.note,
+					requestedRegion: bucketCreateModal.requestedRegion,
+				}),
 			});
 			setCredentialModal({
 				kind: "bucket",
@@ -1401,6 +1418,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 							const bucketBusy = pendingActionKey === `bucket:${bucket.name}`;
 							const deepFreezeState = bucket.deepFreeze?.state || "active";
 							const isDeepFrozen = !!bucket.deepFreeze?.isLocked;
+							const storageRegion = getStorageRegion(bucket.resolvedRegion);
 							return (
 								<article
 									key={bucket.name}
@@ -1439,6 +1457,14 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 											) : null}
 										</h3>
 										<div className="silo-bucket-facts">
+											<span>
+												<img
+													src={storageRegion.flagUrl}
+													alt=""
+													className="mr-1 inline-block h-3 w-[18px] rounded-sm border border-white/15 object-cover align-[-1px]"
+												/>
+												{storageRegion.name}
+											</span>
 											<span>{formatBytes(bucket.totalBytes)}</span>
 											<span>
 												{bucket.totalRequests.toLocaleString()} requests
@@ -2176,7 +2202,7 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 				open={!!bucketCreateModal}
 				onClose={() => setBucketCreateModal(null)}
 				title={undefined}
-				className="max-w-md p-8"
+				className="max-w-xl p-8"
 			>
 				{bucketCreateModal ? (
 					<div className="space-y-5">
@@ -2210,6 +2236,72 @@ export function DashboardPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 								Bucket names are global and can&apos;t be changed later.
 							</p>
 						</div>
+						<fieldset>
+							<legend className="block text-sm font-bold text-text-muted mb-2 uppercase tracking-wider">
+								Storage location
+							</legend>
+							<div className="grid gap-3 sm:grid-cols-2">
+								{STORAGE_REGIONS.map((region) => {
+									const selected =
+										bucketCreateModal.requestedRegion === region.id;
+									return (
+										<label
+											key={region.id}
+											htmlFor={`${createBucketRegionId}-${region.id}`}
+											className={`relative cursor-pointer rounded-2xl border p-4 transition-colors ${
+												selected
+													? "border-hc-red bg-hc-red/10"
+													: "border-white/10 bg-black/20 hover:border-white/25 hover:bg-white/5"
+											}`}
+										>
+											<input
+												id={`${createBucketRegionId}-${region.id}`}
+												type="radio"
+												name="storage-location"
+												value={region.id}
+												checked={selected}
+												onChange={() =>
+													setBucketCreateModal((prev) =>
+														prev
+															? {
+																	...prev,
+																	requestedRegion: region.id,
+																	error: null,
+																}
+															: prev,
+													)
+												}
+												className="sr-only"
+											/>
+											<span className="flex items-start justify-between gap-3">
+												<span>
+													<span className="block text-base font-bold text-white">
+														<img
+															src={region.flagUrl}
+															alt={region.flagAlt}
+															className="mr-2 inline-block h-4 w-6 rounded-sm border border-white/15 object-cover align-[-2px]"
+														/>
+														{region.label}
+													</span>
+													<span className="mt-2 block text-xs leading-relaxed text-text-muted">
+														{region.description}
+													</span>
+												</span>
+												{region.isDefault ? (
+													<span className="rounded-full border border-white/15 bg-white/5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+														Recommended
+													</span>
+												) : null}
+											</span>
+										</label>
+									);
+								})}
+							</div>
+							<p className="mt-2 text-xs text-text-muted">
+								A bucket&apos;s storage location cannot be changed after
+								creation.
+							</p>
+						</fieldset>
 						<div>
 							<label
 								htmlFor={createBucketNoteId}

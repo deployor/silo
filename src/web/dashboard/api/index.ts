@@ -108,6 +108,8 @@ export async function handleApiRequest(req: Request): Promise<Response> {
 				},
 				buckets: bucketsWithKeys.map((b) => ({
 					name: b.name,
+					requestedRegion: b.requestedRegion || "auto",
+					resolvedRegion: b.resolvedRegion || "eu-central",
 					keys: b.keys,
 					createdAt: b.createdAt,
 					totalBytes: Number(b.totalBytes) || 0,

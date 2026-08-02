@@ -3,6 +3,7 @@ import type { buckets, users } from "../db/schema";
 
 export interface RequestContext {
 	requestId: string;
+	traceId: string;
 	startTime: number;
 	user?: typeof users.$inferSelect;
 	bucket?: typeof buckets.$inferSelect;

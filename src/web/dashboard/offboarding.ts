@@ -6,6 +6,7 @@ import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { config } from "../../config";
 import { db } from "../../db";
 import { buckets, offboardingExportSessions, users } from "../../db/schema";
+import { executeDataplaneStorage } from "../../lib/dataplane-storage-client";
 import {
 	buildOffboardingAllowedPrefix,
 	buildOffboardingRcloneCommand,
@@ -15,9 +16,13 @@ import {
 	hashOffboardingExportSecret,
 	OFFBOARDING_EXPORT_TTL_MS,
 } from "../../lib/offboarding-export";
+import {
+	getBucketStorageRegion,
+	getStorageRegion,
+	STORAGE_REGIONS,
+} from "../../lib/regions";
 import { getInternalPath } from "../../lib/s3/paths";
-import { s3Client } from "../../lib/s3-client";
-import { parseS3Xml } from "../../lib/s3-xml";
+import { parseS3Xml, requireS3XmlElement } from "../../lib/s3-xml";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
 import {
@@ -53,6 +58,20 @@ type S3TaggingResult = {
 		};
 	};
 };
+
+async function fetchOffboardingStorage(
+	user: typeof users.$inferSelect,
+	bucket: typeof buckets.$inferSelect,
+	pathWithQuery: string,
+	method: "GET" | "HEAD",
+) {
+	return executeDataplaneStorage({
+		bucket,
+		rootPrefix: getInternalPath("", user, bucket),
+		pathWithQuery,
+		method,
+	});
+}
 
 async function getS3Error(res: Response): Promise<string> {
 	try {
@@ -193,7 +212,7 @@ export async function handleOffboardingRequest(
 		}
 
 		const userBuckets = await db
-			.select({ name: buckets.name, totalBytes: buckets.totalBytes })
+			.select()
 			.from(buckets)
 			.where(eq(buckets.userId, user.id));
 
@@ -201,18 +220,33 @@ export async function handleOffboardingRequest(
 			userBuckets.map(async (bucket) => ({
 				name: bucket.name,
 				totalBytes: Number(bucket.totalBytes) || 0,
-				objectCount: await getBucketObjectCount(user, bucket.name),
+				objectCount: await getBucketObjectCount(user, bucket),
+				resolvedRegion: getBucketStorageRegion(bucket),
+				endpoint: `https://${getStorageRegion(getBucketStorageRegion(bucket)).endpoint}`,
 			})),
 		);
 
 		const endpoint = `https://${config.s3Domain}`;
-		const command = buildOffboardingRcloneCommand({
-			endpoint,
-			accessKey,
-			secretKey,
-			bucketNames: bucketDetails.map((bucket) => bucket.name),
-			destinationPath: "./silo-export",
-		});
+		const bucketsByEndpoint = new Map<string, string[]>();
+		for (const bucket of bucketDetails) {
+			const names = bucketsByEndpoint.get(bucket.endpoint) || [];
+			names.push(bucket.name);
+			bucketsByEndpoint.set(bucket.endpoint, names);
+		}
+		const commands = [...bucketsByEndpoint].map(
+			([regionalEndpoint, bucketNames]) => ({
+				endpoint: regionalEndpoint,
+				bucketNames,
+				command: buildOffboardingRcloneCommand({
+					endpoint: regionalEndpoint,
+					accessKey,
+					secretKey,
+					bucketNames,
+					destinationPath: "./silo-export",
+				}),
+			}),
+		);
+		const command = commands.map((entry) => entry.command).join("\n");
 
 		return new Response(
 			JSON.stringify({
@@ -221,6 +255,7 @@ export async function handleOffboardingRequest(
 				endpoint,
 				bucketNames: bucketDetails.map((bucket) => bucket.name),
 				buckets: bucketDetails,
+				commands,
 				expiresAt: (activeSession[0]?.expiresAt || expiresAt).toISOString(),
 				command,
 			}),
@@ -301,16 +336,8 @@ type MigrationParams = {
 
 async function getBucketObjectCount(
 	user: typeof users.$inferSelect,
-	bucketName: string,
+	bucket: typeof buckets.$inferSelect,
 ) {
-	const bucketRows = await db
-		.select()
-		.from(buckets)
-		.where(and(eq(buckets.userId, user.id), eq(buckets.name, bucketName)))
-		.limit(1);
-	const bucket = bucketRows[0];
-	if (!bucket) return 0;
-
 	const internalPrefix = getInternalPath("", user, bucket);
 	let continuationToken: string | undefined;
 	let totalObjects = 0;
@@ -322,15 +349,20 @@ async function getBucketObjectCount(
 		query.set("max-keys", "1000");
 		if (continuationToken) query.set("continuation-token", continuationToken);
 
-		const listRes = await s3Client.fetch(`?${query.toString()}`, {
-			method: "GET",
-		});
+		const listRes = await fetchOffboardingStorage(
+			user,
+			bucket,
+			`?${query.toString()}`,
+			"GET",
+		);
 		if (!listRes.ok) break;
 
 		const xml = await listRes.text();
-		const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
-			xml,
-		).ListBucketResult;
+		const result = requireS3XmlElement(
+			parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(xml)
+				.ListBucketResult,
+			"ListBucketResult",
+		);
 		const contents = result.Contents
 			? Array.isArray(result.Contents)
 				? result.Contents
@@ -530,8 +562,15 @@ async function migrateUserData(
 		});
 	}
 
-	const currentEndpoint = s3Client.getEndpoint();
-	if (cleanEndpoint.includes(currentEndpoint)) {
+	const destinationHostname = new URL(cleanEndpoint).hostname.toLowerCase();
+	const siloEndpointHosts = new Set<string>([
+		config.s3Domain.replace(/:\d+$/, "").toLowerCase(),
+		...STORAGE_REGIONS.flatMap((region) => [
+			region.endpoint,
+			region.regionalEndpoint,
+		]),
+	]);
+	if (siloEndpointHosts.has(destinationHostname)) {
 		return new Response(
 			JSON.stringify({ error: "Cannot migrate to the same Silo instance" }),
 			{ status: 400 },
@@ -752,9 +791,12 @@ async function migrateUserData(
 						if (continuationToken)
 							query.set("continuation-token", continuationToken);
 
-						const listRes = await s3Client.fetch(`?${query.toString()}`, {
-							method: "GET",
-						});
+						const listRes = await fetchOffboardingStorage(
+							user,
+							sourceBucket,
+							`?${query.toString()}`,
+							"GET",
+						);
 						if (!listRes.ok) {
 							send(
 								`Failed to list bucket ${sourceBucket.name}: ${listRes.status}`,
@@ -764,9 +806,12 @@ async function migrateUserData(
 						}
 
 						const xml = await listRes.text();
-						const result = parseS3Xml<{
-							ListBucketResult?: S3ListBucketResult;
-						}>(xml).ListBucketResult;
+						const result = requireS3XmlElement(
+							parseS3Xml<{
+								ListBucketResult?: S3ListBucketResult;
+							}>(xml).ListBucketResult,
+							"ListBucketResult",
+						);
 
 						const contents = result.Contents
 							? Array.isArray(result.Contents)
@@ -782,7 +827,12 @@ async function migrateUserData(
 							const destUrl = `${cleanEndpoint.replace(/\/+$/, "")}/${targetName}/${relativeKey}`;
 
 							try {
-								const getRes = await s3Client.fetch(key, { method: "GET" });
+								const getRes = await fetchOffboardingStorage(
+									user,
+									sourceBucket,
+									key,
+									"GET",
+								);
 								if (!getRes.ok)
 									throw new Error(`Read failed: ${getRes.status}`);
 
@@ -802,9 +852,12 @@ async function migrateUserData(
 
 								if (!contentLength) {
 									try {
-										const headRes = await s3Client.fetch(key, {
-											method: "HEAD",
-										});
+										const headRes = await fetchOffboardingStorage(
+											user,
+											sourceBucket,
+											key,
+											"HEAD",
+										);
 										if (headRes.ok) {
 											const headCL = headRes.headers.get("content-length");
 											if (headCL) {
@@ -844,9 +897,12 @@ async function migrateUserData(
 								});
 
 								try {
-									const tagRes = await s3Client.fetch(`${key}?tagging`, {
-										method: "GET",
-									});
+									const tagRes = await fetchOffboardingStorage(
+										user,
+										sourceBucket,
+										`${key}?tagging`,
+										"GET",
+									);
 									if (tagRes.ok) {
 										const tXml = await tagRes.text();
 										const tRes = parseS3Xml<S3TaggingResult>(tXml);
@@ -980,15 +1036,21 @@ async function streamUserData(user: typeof users.$inferSelect) {
 					if (continuationToken)
 						query.set("continuation-token", continuationToken);
 
-					const listRes = await s3Client.fetch(`?${query.toString()}`, {
-						method: "GET",
-					});
+					const listRes = await fetchOffboardingStorage(
+						user,
+						bucket,
+						`?${query.toString()}`,
+						"GET",
+					);
 					if (!listRes.ok) break;
 
 					const xml = await listRes.text();
-					const result = parseS3Xml<{
-						ListBucketResult?: S3ListBucketResult;
-					}>(xml).ListBucketResult;
+					const result = requireS3XmlElement(
+						parseS3Xml<{
+							ListBucketResult?: S3ListBucketResult;
+						}>(xml).ListBucketResult,
+						"ListBucketResult",
+					);
 
 					const contents = result.Contents
 						? Array.isArray(result.Contents)
@@ -1002,13 +1064,21 @@ async function streamUserData(user: typeof users.$inferSelect) {
 						const relativeKey = key.replace(internalPrefix, "");
 						const bagPath = `data/${bucket.name}/${relativeKey}`;
 
-						const fileRes = await s3Client.fetch(key, { method: "GET" });
+						const fileRes = await fetchOffboardingStorage(
+							user,
+							bucket,
+							key,
+							"GET",
+						);
 
 						const tags: Record<string, string> = {};
 						try {
-							const taggingRes = await s3Client.fetch(`${key}?tagging`, {
-								method: "GET",
-							});
+							const taggingRes = await fetchOffboardingStorage(
+								user,
+								bucket,
+								`${key}?tagging`,
+								"GET",
+							);
 							if (taggingRes.ok) {
 								const xml = await taggingRes.text();
 								const r = parseS3Xml<S3TaggingResult>(xml);

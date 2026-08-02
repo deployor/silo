@@ -11,7 +11,6 @@ use md5::{Digest, Md5};
 
 use crate::{
     cache::{invalidate_object_caches, try_redis_object_size},
-    quota::release_storage,
     response::{s3_error, with_s3_headers},
     upstream::signed_upstream_request,
     AppState, AuthBucket, AuthorizeResponse,
@@ -37,7 +36,59 @@ pub(crate) async fn fast_delete_objects(
         ensure_no_traversal(key)?;
     }
 
-    let existing_sizes = head_existing_sizes(&state, bucket, root_prefix, &requested_keys).await;
+    let existing_sizes = head_existing_sizes(&state, bucket, root_prefix, &requested_keys).await?;
+    let replication_keys = requested_keys
+        .iter()
+        .map(|key| format!("{root_prefix}{key}"))
+        .collect::<Vec<_>>();
+    let replication_events = crate::replication::prepare(
+        &state,
+        bucket,
+        &replication_keys,
+        crate::replication::Operation::Delete,
+    )
+    .await?;
+    let mut mutation_intents = Vec::with_capacity(requested_keys.len());
+    for key in &requested_keys {
+        let object_key = format!("{root_prefix}{key}");
+        let event_id = replication_events
+            .iter()
+            .find(|event| event.object_key() == object_key)
+            .map(crate::replication::PreparedEvent::event_id);
+        match crate::accounting::prepare_mutation_intent(
+            &state,
+            &bucket.resolved_region,
+            &bucket.id,
+            auth.user.as_ref().map(|user| user.id.as_str()),
+            &object_key,
+            "delete",
+            existing_sizes.get(key).copied().unwrap_or(0),
+            0,
+            None,
+            event_id,
+        )
+        .await
+        {
+            Ok(intent) => mutation_intents.push((key.clone(), intent)),
+            Err(error) => {
+                for (_, intent) in mutation_intents {
+                    let _ = crate::accounting::cancel_mutation_intent(
+                        &state,
+                        intent,
+                        "bulk delete accounting preparation failed",
+                    )
+                    .await;
+                }
+                crate::replication::cancel(
+                    &state,
+                    &replication_events,
+                    "accounting intent preparation failed",
+                )
+                .await?;
+                return Err(error);
+            }
+        }
+    }
     let rewritten_body = rewrite_delete_request(xml, root_prefix, &requested_keys);
     let md5 = BASE64.encode(Md5::digest(rewritten_body.as_bytes()));
     let mut upstream_headers = headers.clone();
@@ -46,6 +97,7 @@ pub(crate) async fn fast_delete_objects(
 
     let upstream = signed_upstream_request(
         &state,
+        bucket,
         Method::POST,
         "?delete",
         &upstream_headers,
@@ -62,24 +114,53 @@ pub(crate) async fn fast_delete_objects(
             successful_delete_keys(&response_xml, root_prefix, &requested_keys)
                 .into_iter()
                 .collect();
-        let mut deleted_bytes = 0u64;
-        for key in &deleted_keys {
-            if let Some(size) = existing_sizes.get(key) {
-                deleted_bytes = deleted_bytes.saturating_add(*size);
+        let (committed, cancelled): (Vec<_>, Vec<_>) =
+            replication_events.iter().cloned().partition(|event| {
+                event
+                    .object_key()
+                    .strip_prefix(root_prefix)
+                    .is_some_and(|key| deleted_keys.contains(key))
+            });
+        for (key, intent) in &mutation_intents {
+            if deleted_keys.contains(key) {
+                crate::accounting::commit_mutation_intent(&state, *intent).await?;
+            } else {
+                crate::accounting::cancel_mutation_intent(
+                    &state,
+                    *intent,
+                    "authoritative bulk delete did not delete this key",
+                )
+                .await?;
             }
+        }
+        crate::replication::commit(&state, &committed).await?;
+        crate::replication::cancel(
+            &state,
+            &cancelled,
+            "authoritative bulk delete did not delete this key",
+        )
+        .await?;
+        for key in &deleted_keys {
             invalidate_object_caches(&state, bucket, key).await;
         }
         if !deleted_keys.is_empty() {
             bump_list_cache(&state, bucket).await;
         }
-        if deleted_bytes > 0 {
-            if let Some(user) = auth.user.as_ref() {
-                let _ = release_storage(&state, &user.id, deleted_bytes).await;
-            }
-            if let Err(error) = commit_deleted_bytes(&state, bucket, deleted_bytes).await {
-                tracing::warn!(error = %error, "bulk delete bucket byte commit failed");
-            }
+    } else {
+        for (_, intent) in mutation_intents {
+            crate::accounting::cancel_mutation_intent(
+                &state,
+                intent,
+                "authoritative bulk delete was rejected",
+            )
+            .await?;
         }
+        crate::replication::cancel(
+            &state,
+            &replication_events,
+            "authoritative bulk delete was rejected",
+        )
+        .await?;
     }
 
     Ok(with_s3_headers(
@@ -96,29 +177,28 @@ async fn head_existing_sizes(
     bucket: &AuthBucket,
     root_prefix: &str,
     keys: &[String],
-) -> BTreeMap<String, u64> {
-    stream::iter(keys.iter().cloned())
+) -> Result<BTreeMap<String, u64>> {
+    let results = stream::iter(keys.iter().cloned())
         .map(|key| {
             let state = state.clone();
             let bucket = bucket.clone();
             let path = format!("{root_prefix}{key}");
             async move {
                 let size = cached_existing_size(&state, &bucket, &key, &path)
-                    .await
+                    .await?
                     .unwrap_or(0);
-                (key, size)
+                Ok::<_, anyhow::Error>((key, size))
             }
         })
         .buffer_unordered(32)
-        .filter_map(|(key, size)| async move {
-            if size > 0 {
-                Some((key, size))
-            } else {
-                None
-            }
-        })
-        .collect()
-        .await
+        .collect::<Vec<_>>()
+        .await;
+    let mut sizes = BTreeMap::new();
+    for result in results {
+        let (key, size) = result?;
+        sizes.insert(key, size);
+    }
+    Ok(sizes)
 }
 
 async fn cached_existing_size(
@@ -126,29 +206,40 @@ async fn cached_existing_size(
     bucket: &AuthBucket,
     key: &str,
     path: &str,
-) -> Result<u64> {
+) -> Result<Option<u64>> {
     if let Some(size) = try_redis_object_size(state, bucket, key).await {
-        return Ok(size);
+        return Ok(Some(size));
     }
     if let Some(size) = state.disk_cache.object_size(bucket, key).await {
-        return Ok(size);
+        return Ok(Some(size));
     }
-    head_existing_size(state, path).await
+    head_existing_size(state, bucket, path).await
 }
 
-async fn head_existing_size(state: &AppState, path: &str) -> Result<u64> {
+async fn head_existing_size(
+    state: &AppState,
+    bucket: &AuthBucket,
+    path: &str,
+) -> Result<Option<u64>> {
     let empty = HeaderMap::new();
-    let req = signed_upstream_request(state, Method::HEAD, path, &empty, None)?;
+    let req = signed_upstream_request(state, bucket, Method::HEAD, path, &empty, None)?;
     let res = req.send().await?;
-    if !res.status().is_success() {
-        return Ok(0);
+    if res.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(None);
     }
-    Ok(res
+    if !res.status().is_success() {
+        return Err(anyhow!(
+            "object size probe returned status {}",
+            res.status()
+        ));
+    }
+    let size = res
         .headers()
         .get(reqwest::header::CONTENT_LENGTH)
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(0))
+        .ok_or_else(|| anyhow!("object size probe omitted Content-Length"))?;
+    Ok(Some(size))
 }
 
 fn parse_delete_keys(xml: &str) -> Result<Vec<String>> {
@@ -180,13 +271,14 @@ fn rewrite_delete_request(xml: &str, root_prefix: &str, keys: &[String]) -> Stri
     out
 }
 
-fn successful_delete_keys(
+pub(crate) fn successful_delete_keys(
     response_xml: &str,
     root_prefix: &str,
     requested: &[String],
 ) -> Vec<String> {
-    let deleted = extract_tags(response_xml, "Key")
+    let deleted = extract_blocks(response_xml, "Deleted")
         .into_iter()
+        .flat_map(|block| extract_tags(block, "Key"))
         .filter_map(|key| key.strip_prefix(root_prefix).map(str::to_string))
         .collect::<Vec<_>>();
     if !deleted.is_empty() {
@@ -232,18 +324,19 @@ fn rewrite_delete_result(xml: &str, root_prefix: &str) -> String {
     out
 }
 
-async fn commit_deleted_bytes(state: &AppState, bucket: &AuthBucket, bytes: u64) -> Result<()> {
-    let bytes = i64::try_from(bytes)?;
-    crate::usage::commit_bucket_usage_delta(state, bucket, -bytes).await
-}
-
 async fn bump_list_cache(state: &AppState, bucket: &AuthBucket) {
-    if !state.cfg.redis_object_cache_enabled {
+    if !state.cfg.redis_object_cache_enabled || !state.cfg.regions.is_local(&bucket.resolved_region)
+    {
         return;
     }
-    let mut conn = state.redis.clone();
+    let Ok(namespace) = bucket.cache_namespace(&state.cfg) else {
+        return;
+    };
+    let Some(mut conn) = state.redis.connection().await else {
+        return;
+    };
     let _: redis::RedisResult<i64> = redis::cmd("INCR")
-        .arg(format!("s3:listver:{}", bucket.id))
+        .arg(format!("s3:{namespace}:listver:{}", bucket.id))
         .query_async(&mut conn)
         .await;
 }
@@ -366,4 +459,40 @@ fn access_denied(auth: &AuthorizeResponse) -> Response<Body> {
         s3_error(StatusCode::FORBIDDEN, "AccessDenied", "Access Denied"),
         auth,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::successful_delete_keys;
+
+    #[test]
+    fn bulk_delete_never_commits_embedded_error_keys() {
+        let xml = r#"<DeleteResult>
+          <Deleted><Key>users/u/b/good</Key></Deleted>
+          <Error><Key>users/u/b/retained</Key><Code>AccessDenied</Code></Error>
+        </DeleteResult>"#;
+        assert_eq!(
+            successful_delete_keys(
+                xml,
+                "users/u/b/",
+                &["good".to_string(), "retained".to_string()]
+            ),
+            vec!["good".to_string()]
+        );
+    }
+
+    #[test]
+    fn quiet_bulk_delete_commits_only_non_error_keys() {
+        let xml = r#"<DeleteResult>
+          <Error><Key>users/u/b/retained</Key><Code>AccessDenied</Code></Error>
+        </DeleteResult>"#;
+        assert_eq!(
+            successful_delete_keys(
+                xml,
+                "users/u/b/",
+                &["good".to_string(), "retained".to_string()]
+            ),
+            vec!["good".to_string()]
+        );
+    }
 }

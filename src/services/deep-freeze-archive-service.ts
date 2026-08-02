@@ -6,9 +6,9 @@ import { compress, decompress } from "@mongodb-js/zstd";
 import tar from "tar-stream";
 import { config } from "../config";
 import type { buckets, users } from "../db/schema";
+import { executeDataplaneStorage } from "../lib/dataplane-storage-client";
 import { getInternalPath } from "../lib/s3/paths";
-import { s3Client } from "../lib/s3-client";
-import { parseS3Xml } from "../lib/s3-xml";
+import { parseS3Xml, requireS3XmlElement } from "../lib/s3-xml";
 
 const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);
@@ -67,7 +67,10 @@ async function listBucketObjects(owner: UserRecord, bucket: BucketRecord) {
 		query.set("prefix", internalPrefix);
 		if (continuationToken) query.set("continuation-token", continuationToken);
 
-		const listRes = await s3Client.fetch(`?${query.toString()}`, {
+		const listRes = await executeDataplaneStorage({
+			bucket,
+			rootPrefix: internalPrefix,
+			pathWithQuery: `?${query.toString()}`,
 			method: "GET",
 		});
 		if (!listRes.ok) {
@@ -75,9 +78,11 @@ async function listBucketObjects(owner: UserRecord, bucket: BucketRecord) {
 		}
 
 		const xml = await listRes.text();
-		const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
-			xml,
-		).ListBucketResult;
+		const result = requireS3XmlElement(
+			parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(xml)
+				.ListBucketResult,
+			"ListBucketResult",
+		);
 		const contents = result.Contents
 			? Array.isArray(result.Contents)
 				? result.Contents
@@ -98,11 +103,20 @@ async function listBucketObjects(owner: UserRecord, bucket: BucketRecord) {
 	return entries;
 }
 
-async function fetchObjectBuffer(internalKey: string) {
-	const response = await s3Client.fetch(internalKey, { method: "GET" });
+async function fetchObjectBuffer(params: {
+	owner: UserRecord;
+	bucket: BucketRecord;
+	internalKey: string;
+}) {
+	const response = await executeDataplaneStorage({
+		bucket: params.bucket,
+		rootPrefix: getInternalPath("", params.owner, params.bucket),
+		pathWithQuery: params.internalKey,
+		method: "GET",
+	});
 	if (!response.ok || !response.body) {
 		throw new Error(
-			`Failed to fetch object ${internalKey} (${response.status})`,
+			`Failed to fetch object ${params.internalKey} (${response.status})`,
 		);
 	}
 	const arrayBuffer = await new Response(response.body).arrayBuffer();
@@ -136,7 +150,11 @@ export async function buildDeepFreezeArchive(params: {
 	pack.on("data", (chunk: Buffer) => chunks.push(chunk));
 
 	for (const object of objects) {
-		const { buffer, headers } = await fetchObjectBuffer(object.internalKey);
+		const { buffer, headers } = await fetchObjectBuffer({
+			owner: params.owner,
+			bucket: params.bucket,
+			internalKey: object.internalKey,
+		});
 		const checksumSha256 = crypto
 			.createHash("sha256")
 			.update(buffer)
@@ -185,7 +203,10 @@ export async function buildDeepFreezeArchive(params: {
 		.update(compressedTar)
 		.digest("hex");
 
-	const archiveUpload = await s3Client.fetch(params.archiveKey, {
+	const archiveUpload = await executeDataplaneStorage({
+		bucket: params.bucket,
+		rootPrefix: params.archiveKey,
+		pathWithQuery: params.archiveKey,
 		method: "PUT",
 		body: compressedTar,
 		headers: {
@@ -200,7 +221,10 @@ export async function buildDeepFreezeArchive(params: {
 		);
 	}
 
-	const manifestUpload = await s3Client.fetch(params.manifestKey, {
+	const manifestUpload = await executeDataplaneStorage({
+		bucket: params.bucket,
+		rootPrefix: params.manifestKey,
+		pathWithQuery: params.manifestKey,
 		method: "PUT",
 		body: compressedManifest,
 		headers: {
@@ -225,8 +249,16 @@ export async function buildDeepFreezeArchive(params: {
 	} satisfies DeepFreezeArchiveBuildResult;
 }
 
-export async function readDeepFreezeManifest(manifestKey: string) {
-	const response = await s3Client.fetch(manifestKey, { method: "GET" });
+export async function readDeepFreezeManifest(params: {
+	bucket: BucketRecord;
+	manifestKey: string;
+}) {
+	const response = await executeDataplaneStorage({
+		bucket: params.bucket,
+		rootPrefix: params.manifestKey,
+		pathWithQuery: params.manifestKey,
+		method: "GET",
+	});
 	if (!response.ok || !response.body) {
 		throw new Error(`Failed to read Deep Freeze manifest (${response.status})`);
 	}
@@ -237,8 +269,16 @@ export async function readDeepFreezeManifest(manifestKey: string) {
 	return JSON.parse(jsonBuffer.toString("utf-8")) as DeepFreezeManifestEntry[];
 }
 
-export async function extractDeepFreezeArchive(archiveKey: string) {
-	const response = await s3Client.fetch(archiveKey, { method: "GET" });
+export async function extractDeepFreezeArchive(params: {
+	bucket: BucketRecord;
+	archiveKey: string;
+}) {
+	const response = await executeDataplaneStorage({
+		bucket: params.bucket,
+		rootPrefix: params.archiveKey,
+		pathWithQuery: params.archiveKey,
+		method: "GET",
+	});
 	if (!response.ok || !response.body) {
 		throw new Error(`Failed to read Deep Freeze archive (${response.status})`);
 	}
@@ -260,7 +300,10 @@ export async function restoreDeepFreezeArchive(params: {
 		totalBytes: number;
 	}) => Promise<void> | void;
 }) {
-	const tarBuffer = await extractDeepFreezeArchive(params.archiveKey);
+	const tarBuffer = await extractDeepFreezeArchive({
+		bucket: params.bucket,
+		archiveKey: params.archiveKey,
+	});
 	const extract = tar.extract();
 	const entries = new Map<string, Buffer>();
 
@@ -293,9 +336,12 @@ export async function restoreDeepFreezeArchive(params: {
 			throw new Error(`Checksum mismatch while restoring ${item.key}`);
 		}
 		const liveKey = getInternalPath(item.key, params.owner, params.bucket);
-		const putRes = await s3Client.fetch(liveKey, {
+		const putRes = await executeDataplaneStorage({
+			bucket: params.bucket,
+			rootPrefix: getInternalPath("", params.owner, params.bucket),
+			pathWithQuery: liveKey,
 			method: "PUT",
-			body: buffer,
+			body: new Uint8Array(buffer),
 			headers: {
 				"Content-Type": item.contentType || "application/octet-stream",
 				"Content-Length": String(buffer.length),
@@ -321,6 +367,8 @@ export async function restoreDeepFreezeArchive(params: {
 }
 
 export async function deleteLiveBucketObjects(params: {
+	owner: UserRecord;
+	bucket: BucketRecord;
 	manifest: DeepFreezeManifestEntry[];
 	onProgress?: (progress: {
 		processedObjects: number;
@@ -334,7 +382,10 @@ export async function deleteLiveBucketObjects(params: {
 	let processedBytes = 0;
 
 	for (const item of params.manifest) {
-		const deleteRes = await s3Client.fetch(item.internalKey, {
+		const deleteRes = await executeDataplaneStorage({
+			bucket: params.bucket,
+			rootPrefix: getInternalPath("", params.owner, params.bucket),
+			pathWithQuery: item.internalKey,
 			method: "DELETE",
 		});
 		if (!deleteRes.ok) {

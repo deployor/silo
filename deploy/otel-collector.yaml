@@ -1,0 +1,87 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  hostmetrics:
+    root_path: /hostfs
+    collection_interval: 30s
+    scrapers:
+      cpu: {}
+      disk: {}
+      filesystem:
+        exclude_mount_points:
+          mount_points: ["^/dev($|/)", "^/proc($|/)", "^/sys($|/)", "^/run/docker/netns($|/)", "^/var/lib/docker($|/)"]
+          match_type: regexp
+      load: {}
+      memory: {}
+      network: {}
+      paging: {}
+      processes: {}
+  filelog/docker:
+    include:
+      - /var/lib/docker/containers/*/*.log
+    include_file_path: true
+    start_at: end
+    operators:
+      - type: json_parser
+        id: docker-json
+      - type: move
+        from: attributes.log
+        to: body
+      - type: remove
+        field: attributes.stream
+      - type: remove
+        field: attributes.time
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 384
+    spike_limit_mib: 96
+  resourcedetection:
+    detectors: [system, env]
+    timeout: 2s
+    override: false
+  resource/silo:
+    attributes:
+      - key: deployment.environment
+        value: production
+        action: upsert
+      - key: host.name
+        value: ${env:SILO_INSTANCE_ID}
+        action: upsert
+      - key: silo.region
+        value: ${env:SILO_REGION}
+        action: upsert
+  batch:
+    send_batch_size: 1024
+    timeout: 5s
+
+exporters:
+  otlp/signoz:
+    endpoint: ${env:SIGNOZ_OTLP_ENDPOINT}
+    headers:
+      signoz-ingestion-key: ${env:SIGNOZ_INGESTION_KEY}
+    tls:
+      insecure: false
+
+service:
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, resource/silo, batch]
+      exporters: [otlp/signoz]
+    metrics:
+      receivers: [otlp, hostmetrics]
+      processors: [memory_limiter, resourcedetection, resource/silo, batch]
+      exporters: [otlp/signoz]
+    logs:
+      receivers: [otlp, filelog/docker]
+      processors: [memory_limiter, resourcedetection, resource/silo, batch]
+      exporters: [otlp/signoz]

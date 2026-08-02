@@ -1,37 +1,72 @@
 import { randomBytes } from "node:crypto";
 import { AwsClient } from "aws4fetch";
-import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { config } from "../../config";
 import { db } from "../../db";
 import {
+	adminAuditLogs,
+	bucketDeletionTombstones,
 	bucketKeys,
 	buckets,
-	requestLogs,
+	dataplaneMutationIntents,
 	sessions,
 	users,
 } from "../../db/schema";
 import { jsonResponse } from "../../lib/api-utils";
+import { invalidateDataplaneAuthCache } from "../../lib/dataplane-cache";
+import {
+	beginDataplaneBucketTeardown,
+	executeDataplaneStorage,
+	releaseDataplaneBucketTeardown,
+} from "../../lib/dataplane-storage-client";
 import { getDiskCacheStats } from "../../lib/disk-cache";
 import { redis } from "../../lib/redis";
+import { isStorageRegionId } from "../../lib/regions";
 import { buildCorsConfig } from "../../lib/s3/cors";
 import { deleteBucketContents, getInternalPath } from "../../lib/s3/paths";
-import { s3Client } from "../../lib/s3-client";
-import { parseS3Xml } from "../../lib/s3-xml";
+import { parseS3Xml, requireS3XmlElement } from "../../lib/s3-xml";
 import { getCurrentUser } from "../../lib/session";
 import { render } from "../../lib/view-engine";
+import {
+	deleteBucket as deleteBucketService,
+	emptyBucket as emptyBucketService,
+} from "../../services/bucket-service";
 import {
 	getMaintenanceStatus,
 	MAINTENANCE_ERROR,
 } from "../../services/maintenance-service";
+import { requestLogStore } from "../../services/request-log-store";
 import {
 	getAppSettings,
 	updateAppSettings,
 } from "../../services/settings-service";
+import {
+	authorizeStorageBackendPromotion,
+	listStorageRegionBackends,
+	listStorageRegionStatuses,
+	promoteStorageBackend,
+	registerStorageRegionBackend,
+	revokeStorageBackendPromotion,
+	startStorageBackendBootstrap,
+	updateStorageRegionBackendStatus,
+} from "../../services/storage-backend-service";
 import { handleAdminRedemptionsRequest } from "../redemptions";
 
 function secureFlag(): string {
 	return config.isProduction ? "; Secure" : "";
+}
+
+function adminJson(value: unknown, status = 200) {
+	return new Response(
+		JSON.stringify(value, (_key, item) =>
+			typeof item === "bigint" ? item.toString() : item,
+		),
+		{
+			status,
+			headers: { "Content-Type": "application/json" },
+		},
+	);
 }
 
 type AdminUpdateUserQuotaBody = {
@@ -43,6 +78,24 @@ type S3ListContentsItem = {
 	Key: string;
 	Size: number;
 };
+
+async function fetchAdminBucketStorage(
+	bucket: typeof buckets.$inferSelect,
+	owner: typeof users.$inferSelect,
+	pathWithQuery: string,
+	init: RequestInit & {
+		method: "GET" | "HEAD" | "PUT" | "POST" | "DELETE";
+	},
+) {
+	return executeDataplaneStorage({
+		bucket,
+		rootPrefix: getInternalPath("", owner, bucket),
+		pathWithQuery,
+		method: init.method,
+		headers: init.headers,
+		body: init.body,
+	});
+}
 
 type S3ListBucketResult = {
 	Contents?: S3ListContentsItem | S3ListContentsItem[];
@@ -204,8 +257,36 @@ async function getCacheStatsJson() {
 				).toFixed(1)
 			: "0";
 
-	// Get S3 circuit breaker state
-	const circuit = s3Client.getCircuitState();
+	const storageBackends = (await listStorageRegionStatuses()).map(
+		(backend) => ({
+			regionId: backend.regionId,
+			backendId: backend.activeBackendId,
+			backendGeneration: backend.backendGeneration.toString(),
+			bucketName: backend.bucketName,
+			provider: backend.provider,
+			state:
+				backend.status === "active" && backend.lastVerifiedAt
+					? "closed"
+					: "unavailable",
+			failures: 0,
+			replicationCheckpoint: backend.replicationCheckpoint.toString(),
+			requiredReplicationCheckpoint:
+				backend.requiredReplicationCheckpoint.toString(),
+		}),
+	);
+	const circuit = {
+		state: storageBackends.some((backend) => backend.state === "unavailable")
+			? "open"
+			: storageBackends.some((backend) => backend.state === "open")
+				? "open"
+				: storageBackends.some((backend) => backend.state === "half-open")
+					? "half-open"
+					: "closed",
+		failures: storageBackends.reduce(
+			(sum, backend) => sum + backend.failures,
+			0,
+		),
+	};
 
 	return {
 		redis: {
@@ -239,6 +320,7 @@ async function getCacheStatsJson() {
 		system: {
 			circuitState: circuit.state,
 			circuitFailures: circuit.failures,
+			storageBackends,
 			uptime: formatUptime(Math.floor(process.uptime())),
 		},
 	};
@@ -343,8 +425,19 @@ async function getUserBuckets(userId: string) {
 }
 
 async function listAdminBuckets(url: URL) {
-	const limit = Number.parseInt(url.searchParams.get("limit") || "50", 10);
-	const offset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
+	const parsedLimit = Number.parseInt(
+		url.searchParams.get("limit") || "50",
+		10,
+	);
+	const parsedOffset = Number.parseInt(
+		url.searchParams.get("offset") || "0",
+		10,
+	);
+	const limit = Math.max(
+		1,
+		Math.min(Number.isFinite(parsedLimit) ? parsedLimit : 50, 250),
+	);
+	const offset = Math.max(0, Number.isFinite(parsedOffset) ? parsedOffset : 0);
 	const search = url.searchParams.get("search")?.trim();
 	const pausedOnly = url.searchParams.get("pausedOnly") === "true";
 	const sortBy = url.searchParams.get("sortBy") || "totalRequests";
@@ -367,38 +460,6 @@ async function listAdminBuckets(url: URL) {
 
 	const conditions = filters.length > 0 ? and(...filters) : undefined;
 
-	const orderFn = sortOrder === "asc" ? asc : desc;
-	const orderBy = (() => {
-		switch (sortBy) {
-			case "name":
-				return orderFn(buckets.name);
-			case "totalBytes":
-				return orderFn(buckets.totalBytes);
-			case "egressBytes":
-				return orderFn(
-					sql<number>`COALESCE(sum(${requestLogs.egressBytes}), 0)`.mapWith(
-						Number,
-					),
-				);
-			case "getRequests":
-				return orderFn(
-					sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'GET' then 1 else 0 end), 0)`.mapWith(
-						Number,
-					),
-				);
-			case "putRequests":
-				return orderFn(
-					sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'PUT' then 1 else 0 end), 0)`.mapWith(
-						Number,
-					),
-				);
-			case "updatedAt":
-				return orderFn(buckets.updatedAt);
-			default:
-				return orderFn(buckets.totalRequests);
-		}
-	})();
-
 	const query = db
 		.select({
 			id: buckets.id,
@@ -409,61 +470,66 @@ async function listAdminBuckets(url: URL) {
 			isPaused: buckets.isPaused,
 			pauseReason: buckets.pauseReason,
 			totalBytes: buckets.totalBytes,
-			totalRequests: buckets.totalRequests,
-			getRequests:
-				sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'GET' then 1 else 0 end), 0)`.mapWith(
-					Number,
-				),
-			putRequests:
-				sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'PUT' then 1 else 0 end), 0)`.mapWith(
-					Number,
-				),
-			deleteRequests:
-				sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'DELETE' then 1 else 0 end), 0)`.mapWith(
-					Number,
-				),
-			headRequests:
-				sql<number>`COALESCE(sum(case when ${requestLogs.method} = 'HEAD' then 1 else 0 end), 0)`.mapWith(
-					Number,
-				),
-			egressBytes:
-				sql<number>`COALESCE(sum(${requestLogs.egressBytes}), 0)`.mapWith(
-					Number,
-				),
-			ingressBytes:
-				sql<number>`COALESCE(sum(${requestLogs.ingressBytes}), 0)`.mapWith(
-					Number,
-				),
+			transactionalTotalRequests: buckets.totalRequests,
 			updatedAt: buckets.updatedAt,
 			createdAt: buckets.createdAt,
 		})
 		.from(buckets)
-		.leftJoin(users, eq(buckets.userId, users.id))
-		.leftJoin(requestLogs, eq(requestLogs.bucketName, buckets.name))
-		.groupBy(buckets.id, users.id)
-		.orderBy(orderBy)
-		.limit(limit)
-		.offset(offset);
+		.leftJoin(users, eq(buckets.userId, users.id));
 
 	if (conditions) {
 		query.where(conditions);
 	}
 
-	const rows = await query;
-
-	const countQuery = db
-		.select({ count: sql<number>`count(*)` })
-		.from(buckets)
-		.leftJoin(users, eq(buckets.userId, users.id));
-	if (conditions) {
-		countQuery.where(conditions);
-	}
-	const countRes = await countQuery;
-	const total = Number(countRes[0]?.count || 0);
+	const [bucketRows, requestAggregates] = await Promise.all([
+		query,
+		requestLogStore.bucketAggregates().catch((error) => {
+			console.error("ClickHouse request aggregates unavailable:", error);
+			return new Map();
+		}),
+	]);
+	const rows = bucketRows.map((bucket) => {
+		const aggregate = requestAggregates.get(bucket.name);
+		return {
+			...bucket,
+			totalRequests:
+				aggregate?.totalRequests ||
+				Number(bucket.transactionalTotalRequests || 0),
+			getRequests: aggregate?.getRequests || 0,
+			putRequests: aggregate?.putRequests || 0,
+			deleteRequests: aggregate?.deleteRequests || 0,
+			headRequests: aggregate?.headRequests || 0,
+			egressBytes: aggregate?.egressBytes || 0,
+			ingressBytes: aggregate?.ingressBytes || 0,
+		};
+	});
+	const sortable = new Set([
+		"name",
+		"totalBytes",
+		"totalRequests",
+		"egressBytes",
+		"getRequests",
+		"putRequests",
+		"updatedAt",
+	]);
+	const sortKey = sortable.has(sortBy) ? sortBy : "totalRequests";
+	rows.sort((left, right) => {
+		const a = left[sortKey as keyof typeof left];
+		const b = right[sortKey as keyof typeof right];
+		const comparison =
+			a instanceof Date && b instanceof Date
+				? a.getTime() - b.getTime()
+				: typeof a === "number" && typeof b === "number"
+					? a - b
+					: String(a ?? "").localeCompare(String(b ?? ""));
+		return sortOrder === "asc" ? comparison : -comparison;
+	});
+	const total = rows.length;
+	const page = rows.slice(offset, offset + limit);
 
 	return new Response(
 		JSON.stringify({
-			buckets: rows,
+			buckets: page,
 			total,
 			limit,
 			offset,
@@ -550,7 +616,7 @@ async function runAdminSpeedtest(req: Request) {
 		accessKeyId: key[0].accessKey,
 		secretAccessKey: key[0].secretKey,
 		service: "s3",
-		region: config.s3.region || "auto",
+		region: config.s3SigningRegion || "auto",
 	});
 
 	const payloadSizeBytes = sizeMb * 1024 * 1024;
@@ -1340,14 +1406,21 @@ async function getBucketDetails(bucketName: string) {
 			query.set("prefix", internalPrefix);
 			query.set("max-keys", "50");
 
-			const s3Res = await s3Client.fetch(`?${query.toString()}`, {
-				method: "GET",
-			});
+			const s3Res = await fetchAdminBucketStorage(
+				bucket[0],
+				owner[0],
+				`?${query.toString()}`,
+				{
+					method: "GET",
+				},
+			);
 			if (s3Res.ok) {
 				const xml = await s3Res.text();
-				const result = parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(
-					xml,
-				).ListBucketResult;
+				const result = requireS3XmlElement(
+					parseS3Xml<{ ListBucketResult?: S3ListBucketResult }>(xml)
+						.ListBucketResult,
+					"ListBucketResult",
+				);
 				if (result.Contents) {
 					const contents: S3ListContentsItem[] = Array.isArray(result.Contents)
 						? (result.Contents as S3ListContentsItem[])
@@ -1399,7 +1472,12 @@ async function previewFile(bucketName: string, url: URL) {
 	const internalKey = getInternalPath(key, owner[0], bucket[0]);
 
 	try {
-		const s3Res = await s3Client.fetch(internalKey, { method: "GET" });
+		const s3Res = await fetchAdminBucketStorage(
+			bucket[0],
+			owner[0],
+			internalKey,
+			{ method: "GET" },
+		);
 		if (!s3Res.ok) return new Response(s3Res.body, { status: s3Res.status });
 
 		const headers = new Headers(s3Res.headers);
@@ -1419,6 +1497,7 @@ async function pauseBucket(bucketName: string, req: Request) {
 		.update(buckets)
 		.set({ isPaused: body.isPaused, pauseReason: body.pauseReason || null })
 		.where(eq(buckets.name, bucketName));
+	await invalidateDataplaneAuthCache({ bucketName });
 	return new Response("Updated", { status: 200 });
 }
 
@@ -1427,6 +1506,7 @@ async function resetBucketCors(bucketName: string) {
 		.update(buckets)
 		.set({ corsConfig: JSON.stringify(buildCorsConfig()) })
 		.where(eq(buckets.name, bucketName));
+	await invalidateDataplaneAuthCache({ bucketName });
 	return new Response("Reset", { status: 200 });
 }
 
@@ -1439,56 +1519,139 @@ async function deleteBucket(bucketName: string, url: URL) {
 		.where(eq(buckets.name, bucketName))
 		.limit(1);
 
-	if (bucket.length > 0) {
-		let owner: (typeof users.$inferSelect)[] = [];
-		if (bucket[0].userId) {
-			owner = await db
-				.select()
-				.from(users)
-				.where(eq(users.id, bucket[0].userId))
-				.limit(1);
-		}
-
-		if (owner.length > 0) {
-			// Normal Bucket Deletion or Emptying
-			if (isReset) {
-				// Just empty, don't delete
-				const internalPrefix = getInternalPath("", owner[0], bucket[0]);
-				try {
-					await deleteBucketContents(internalPrefix);
-
-					// Reset usage stats (bytes only, keep requests?)
-					await db
-						.update(buckets)
-						.set({ totalBytes: 0 })
-						.where(eq(buckets.id, bucket[0].id));
-
-					return new Response("Emptied", { status: 200 });
-				} catch (e) {
-					console.error("Failed to empty bucket:", e);
-					return new Response("Failed to empty bucket", { status: 500 });
-				}
-			}
-
-			const internalPrefix = getInternalPath("", owner[0], bucket[0]);
-			try {
-				await deleteBucketContents(internalPrefix);
-			} catch (e) {
-				console.error("Failed to empty bucket during admin delete:", e);
-			}
-		}
+	if (bucket.length === 0) {
+		return new Response("Not Found", { status: 404 });
 	}
 
-	await db.delete(buckets).where(eq(buckets.name, bucketName));
-	return new Response("Deleted", { status: 200 });
+	try {
+		if (!bucket[0].isSystem) {
+			if (isReset) {
+				await emptyBucketService(bucketName, "admin-control-plane", true);
+				return new Response("Emptied", { status: 200 });
+			}
+			await deleteBucketService(bucketName, "admin-control-plane", true);
+			return new Response("Deleted", { status: 200 });
+		}
+
+		// System buckets have no owner but still need the same storage and
+		// accounting proof before their metadata can be removed.
+		const originalPause = {
+			isPaused: bucket[0].isPaused,
+			pauseReason: bucket[0].pauseReason,
+		};
+		await db
+			.update(buckets)
+			.set({
+				isPaused: true,
+				pauseReason: isReset
+					? "Admin empty operation in progress"
+					: "Admin deletion in progress",
+				updatedAt: new Date(),
+			})
+			.where(eq(buckets.id, bucket[0].id));
+		await invalidateDataplaneAuthCache({ bucketName });
+
+		const internalPrefix = getInternalPath("", null, bucket[0]);
+		await deleteBucketContents(internalPrefix, bucket[0]);
+		const teardownToken = await beginDataplaneBucketTeardown(bucket[0]);
+		if (isReset) {
+			try {
+				await db
+					.update(buckets)
+					.set({
+						totalBytes: 0,
+						isPaused: originalPause.isPaused,
+						pauseReason: originalPause.pauseReason,
+						updatedAt: new Date(),
+					})
+					.where(eq(buckets.id, bucket[0].id));
+			} catch (error) {
+				await releaseDataplaneBucketTeardown(bucket[0], teardownToken).catch(
+					(releaseError) =>
+						console.error(
+							"Failed to release rejected system-bucket reset",
+							releaseError,
+						),
+				);
+				throw error;
+			}
+			await releaseDataplaneBucketTeardown(bucket[0], teardownToken).catch(
+				(error) =>
+					console.error(
+						"Failed to release completed system-bucket reset",
+						error,
+					),
+			);
+			await invalidateDataplaneAuthCache({ bucketName });
+			return new Response("Emptied", { status: 200 });
+		}
+
+		try {
+			await db.transaction(async (tx) => {
+				await tx
+					.delete(dataplaneMutationIntents)
+					.where(
+						and(
+							eq(dataplaneMutationIntents.bucketId, bucket[0].id),
+							inArray(dataplaneMutationIntents.state, ["applied", "cancelled"]),
+						),
+					);
+				await tx
+					.insert(bucketDeletionTombstones)
+					.values({
+						bucketId: bucket[0].id,
+						bucketName: bucket[0].name,
+						ownerUserId: null,
+						requestedRegion: bucket[0].requestedRegion,
+						resolvedRegion: bucket[0].resolvedRegion,
+						rootPrefix: internalPrefix,
+						deletedByUserId: "admin-control-plane",
+					})
+					.onConflictDoNothing();
+				await tx.delete(buckets).where(eq(buckets.id, bucket[0].id));
+			});
+		} catch (error) {
+			await releaseDataplaneBucketTeardown(bucket[0], teardownToken).catch(
+				(releaseError) =>
+					console.error(
+						"Failed to release rejected system-bucket fence",
+						releaseError,
+					),
+			);
+			throw error;
+		}
+		await releaseDataplaneBucketTeardown(bucket[0], teardownToken).catch(
+			(error) =>
+				console.error("Failed to release finalized system-bucket fence", error),
+		);
+		await invalidateDataplaneAuthCache({ bucketName });
+		return new Response("Deleted", { status: 200 });
+	} catch (error) {
+		console.error("Admin bucket teardown failed:", error);
+		return new Response("Bucket storage could not be safely finalized", {
+			status: 502,
+		});
+	}
 }
 
 async function pauseKey(keyId: string, req: Request) {
 	const body = await req.json();
+	const [key] = await db
+		.select({ accessKey: bucketKeys.accessKey, bucketName: buckets.name })
+		.from(bucketKeys)
+		.innerJoin(buckets, eq(bucketKeys.bucketId, buckets.id))
+		.where(eq(bucketKeys.id, keyId))
+		.limit(1);
 	await db
 		.update(bucketKeys)
 		.set({ isPaused: body.isPaused, pauseReason: body.pauseReason || null })
 		.where(eq(bucketKeys.id, keyId));
+	if (key) {
+		await invalidateDataplaneAuthCache({
+			bucketName: key.bucketName,
+			accessKey: key.accessKey,
+		});
+	}
 	return new Response("Updated", { status: 200 });
 }
 
@@ -1510,7 +1673,19 @@ async function updateKeyNote(keyId: string, req: Request) {
 }
 
 async function deleteKey(keyId: string) {
+	const [key] = await db
+		.select({ accessKey: bucketKeys.accessKey, bucketName: buckets.name })
+		.from(bucketKeys)
+		.innerJoin(buckets, eq(bucketKeys.bucketId, buckets.id))
+		.where(eq(bucketKeys.id, keyId))
+		.limit(1);
 	await db.delete(bucketKeys).where(eq(bucketKeys.id, keyId));
+	if (key) {
+		await invalidateDataplaneAuthCache({
+			bucketName: key.bucketName,
+			accessKey: key.accessKey,
+		});
+	}
 	return new Response("Deleted", { status: 200 });
 }
 
@@ -1537,10 +1712,23 @@ async function deleteFile(bucketName: string, url: URL) {
 
 			// Get file size first to update quota
 			try {
-				const headRes = await s3Client.fetch(internalKey, { method: "HEAD" });
+				const headRes = await fetchAdminBucketStorage(
+					bucket[0],
+					owner[0],
+					internalKey,
+					{ method: "HEAD" },
+				);
 				const size = Number(headRes.headers.get("content-length") || 0);
 
-				await s3Client.fetch(internalKey, { method: "DELETE" });
+				const deleteRes = await fetchAdminBucketStorage(
+					bucket[0],
+					owner[0],
+					internalKey,
+					{ method: "DELETE" },
+				);
+				if (!deleteRes.ok) {
+					throw new Error(`Storage delete failed (${deleteRes.status})`);
+				}
 
 				if (size > 0) {
 					await db
@@ -1552,6 +1740,7 @@ async function deleteFile(bucketName: string, url: URL) {
 				}
 			} catch (e) {
 				console.error("Failed to delete file (admin):", e);
+				return new Response("Failed to delete file", { status: 502 });
 			}
 		}
 	}
@@ -1559,108 +1748,80 @@ async function deleteFile(bucketName: string, url: URL) {
 }
 
 async function listLogs(url: URL) {
-	const limit = Number.parseInt(url.searchParams.get("limit") || "50", 10);
-	const offset = Number.parseInt(url.searchParams.get("offset") || "0", 10);
+	const requestedLimit = Number.parseInt(
+		url.searchParams.get("limit") || "50",
+		10,
+	);
+	const requestedOffset = Number.parseInt(
+		url.searchParams.get("offset") || "0",
+		10,
+	);
+	const limit = Math.max(
+		1,
+		Math.min(Number.isFinite(requestedLimit) ? requestedLimit : 50, 250),
+	);
+	const offset = Math.max(
+		0,
+		Number.isFinite(requestedOffset) ? requestedOffset : 0,
+	);
 	const search = url.searchParams.get("search");
 	const bucketFilter = url.searchParams.get("bucket");
 	const methodFilter = url.searchParams.get("method");
 	const statusFilter = url.searchParams.get("status");
 	const ipFilter = url.searchParams.get("ip");
-	const sortBy = url.searchParams.get("sortBy") || "createdAt";
-	const sortOrder = url.searchParams.get("sortOrder") || "desc";
-
-	const filters = [];
-
-	if (search) {
-		filters.push(
-			or(
-				ilike(requestLogs.path, `%${search}%`),
-				ilike(requestLogs.method, `%${search}%`),
-				ilike(requestLogs.bucketName, `%${search}%`),
-				ilike(users.email, `%${search}%`),
-				ilike(requestLogs.userAgent, `%${search}%`),
-				ilike(requestLogs.ipAddress, `%${search}%`),
-				ilike(requestLogs.requesterId, `%${search}%`),
-				// Cast status code to text for search
-				sql`CAST(${requestLogs.statusCode} AS TEXT) ILIKE ${`%${search}%`}`,
-			),
-		);
-	}
-
-	if (bucketFilter) {
-		filters.push(eq(requestLogs.bucketName, bucketFilter));
-	}
-	if (methodFilter) {
-		filters.push(eq(requestLogs.method, methodFilter));
-	}
-	if (statusFilter) {
-		filters.push(eq(requestLogs.statusCode, Number.parseInt(statusFilter, 10)));
-	}
-	if (ipFilter) {
-		filters.push(eq(requestLogs.ipAddress, ipFilter));
-	}
-
-	const conditions = filters.length > 0 ? and(...filters) : undefined;
-
-	const orderFn = sortOrder === "asc" ? asc : desc;
-	const orderBy = (() => {
-		switch (sortBy) {
-			case "latencyMs":
-				return orderFn(requestLogs.latencyMs);
-			case "ingressBytes":
-				return orderFn(requestLogs.ingressBytes);
-			case "egressBytes":
-				return orderFn(requestLogs.egressBytes);
-			case "statusCode":
-				return orderFn(requestLogs.statusCode);
-			default:
-				return orderFn(requestLogs.createdAt);
-		}
-	})();
-
-	const logsQuery = db
-		.select({
-			id: requestLogs.id,
-			method: requestLogs.method,
-			path: requestLogs.path,
-			statusCode: requestLogs.statusCode,
-			latencyMs: requestLogs.latencyMs,
-			createdAt: requestLogs.createdAt,
-			bucketName: requestLogs.bucketName,
-			ownerEmail: users.email,
-			ipAddress: requestLogs.ipAddress,
-			ingressBytes: requestLogs.ingressBytes,
-			egressBytes: requestLogs.egressBytes,
-			userAgent: requestLogs.userAgent,
-			requesterId: requestLogs.requesterId,
-			requestId: requestLogs.id,
-		})
-		.from(requestLogs)
-		.leftJoin(users, eq(requestLogs.ownerId, users.id))
-		.orderBy(orderBy)
-		.limit(limit)
-		.offset(offset);
-
-	if (conditions) {
-		logsQuery.where(conditions);
-	}
-
-	const logs = await logsQuery;
-
-	let total = 0;
-	if (conditions) {
-		const countRes = await db
-			.select({ count: sql<number>`count(*)` })
-			.from(requestLogs)
-			.leftJoin(users, eq(requestLogs.ownerId, users.id))
-			.where(conditions);
-		total = Number(countRes[0].count);
-	} else {
-		const countRes = await db
-			.select({ count: sql<number>`count(*)` })
-			.from(requestLogs);
-		total = Number(countRes[0].count);
-	}
+	const regionFilter = url.searchParams.get("region");
+	const storageRegionFilter = url.searchParams.get("storageRegion");
+	const actionFilter = url.searchParams.get("action");
+	const allowedSorts = new Set([
+		"createdAt",
+		"latencyMs",
+		"ingressBytes",
+		"egressBytes",
+		"statusCode",
+	]);
+	const requestedSort = url.searchParams.get("sortBy") || "createdAt";
+	const sortBy = (
+		allowedSorts.has(requestedSort) ? requestedSort : "createdAt"
+	) as
+		| "createdAt"
+		| "latencyMs"
+		| "ingressBytes"
+		| "egressBytes"
+		| "statusCode";
+	const parsedStatus = statusFilter
+		? Number.parseInt(statusFilter, 10)
+		: undefined;
+	const { logs, total } = await requestLogStore.list({
+		limit,
+		offset,
+		search,
+		bucket: bucketFilter,
+		method: methodFilter,
+		status:
+			parsedStatus !== undefined && parsedStatus >= 0 && parsedStatus <= 999
+				? parsedStatus
+				: undefined,
+		ip: ipFilter,
+		region: regionFilter,
+		storageRegion: storageRegionFilter,
+		action: actionFilter,
+		sortBy,
+		sortOrder: url.searchParams.get("sortOrder") === "asc" ? "asc" : "desc",
+	});
+	const ownerIds = [
+		...new Set(logs.map((log) => log.ownerId).filter(Boolean)),
+	] as string[];
+	const ownerRows = ownerIds.length
+		? await db
+				.select({ id: users.id, email: users.email })
+				.from(users)
+				.where(inArray(users.id, ownerIds))
+		: [];
+	const ownerEmails = new Map(
+		ownerRows.map((owner) => [owner.id, owner.email]),
+	);
+	for (const log of logs)
+		log.ownerEmail = log.ownerId ? ownerEmails.get(log.ownerId) || null : null;
 
 	return new Response(
 		JSON.stringify({
@@ -1693,7 +1854,8 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	if (
 		maintenance.fullMaintenanceMode &&
 		path !== "/admin/settings" &&
-		path !== "/api/admin/settings"
+		path !== "/api/admin/settings" &&
+		!path.startsWith("/api/admin/storage/")
 	) {
 		return new Response(MAINTENANCE_ERROR, { status: 503 });
 	}
@@ -1748,6 +1910,176 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 	if (path.startsWith("/api/admin/")) {
 		if (!user.isAdmin) {
 			return new Response("Forbidden", { status: 403 });
+		}
+
+		if (path === "/api/admin/storage/backends" && req.method === "GET") {
+			const region = url.searchParams.get("region");
+			if (region && !isStorageRegionId(region)) {
+				return adminJson({ error: "Unknown storage region" }, 400);
+			}
+			const regionId = region && isStorageRegionId(region) ? region : undefined;
+			return adminJson(await listStorageRegionBackends(regionId));
+		}
+
+		if (path === "/api/admin/storage/backends" && req.method === "POST") {
+			const body = await req.json().catch(() => null);
+			const parsed = z
+				.object({
+					regionId: z.string().refine(isStorageRegionId),
+					backendId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/),
+					provider: z.string().min(1).max(128),
+					bucketName: z.string().min(1).max(255).nullable().optional(),
+					role: z.enum(["primary", "replica"]).optional(),
+				})
+				.safeParse(body);
+			if (!parsed.success) {
+				return adminJson(
+					{ error: parsed.error.issues[0]?.message || "Invalid body" },
+					400,
+				);
+			}
+			const { backendId, provider } = parsed.data;
+			if (!backendId || !provider) {
+				return adminJson(
+					{ error: "Backend ID and provider are required" },
+					400,
+				);
+			}
+			try {
+				return adminJson(
+					await registerStorageRegionBackend({
+						backendId,
+						provider,
+						bucketName: parsed.data.bucketName,
+						role: parsed.data.role,
+						regionId: parsed.data.regionId as Parameters<
+							typeof registerStorageRegionBackend
+						>[0]["regionId"],
+						actor: user.id,
+					}),
+					201,
+				);
+			} catch (error) {
+				return adminJson(
+					{
+						error:
+							error instanceof Error ? error.message : "Registration failed",
+					},
+					409,
+				);
+			}
+		}
+
+		const storageBackendActionMatch = path.match(
+			/^\/api\/admin\/storage\/backends\/([a-z0-9-]+)\/([a-z0-9-]+)\/(authorize|promote|bootstrap|bootstrap-retry)$/,
+		);
+		if (storageBackendActionMatch) {
+			const [, regionId, backendId, action] = storageBackendActionMatch;
+			if (!isStorageRegionId(regionId)) {
+				return adminJson({ error: "Unknown storage region" }, 400);
+			}
+			try {
+				if (
+					(action === "bootstrap" || action === "bootstrap-retry") &&
+					req.method === "POST"
+				) {
+					const body = await req.json().catch(() => null);
+					const parsed = z
+						.object({ reason: z.string().trim().min(1).max(2_000) })
+						.safeParse(body);
+					if (!parsed.success) {
+						return adminJson(
+							{ error: "Storage bootstrap reason is required" },
+							400,
+						);
+					}
+					return adminJson(
+						await startStorageBackendBootstrap({
+							regionId,
+							targetBackendId: backendId,
+							actor: user.id,
+							reason: parsed.data.reason,
+							retry: action === "bootstrap-retry",
+						}),
+						202,
+					);
+				}
+				if (action === "authorize" && req.method === "POST") {
+					return adminJson(
+						await authorizeStorageBackendPromotion({
+							regionId,
+							targetBackendId: backendId,
+							actor: user.id,
+						}),
+					);
+				}
+				if (action === "authorize" && req.method === "DELETE") {
+					return adminJson(
+						await revokeStorageBackendPromotion({
+							regionId,
+							targetBackendId: backendId,
+							actor: user.id,
+						}),
+					);
+				}
+				if (action === "promote" && req.method === "POST") {
+					const body = await req.json().catch(() => null);
+					const parsed = z
+						.object({ reason: z.string().trim().min(1).max(2_000) })
+						.safeParse(body);
+					if (!parsed.success) {
+						return adminJson({ error: "Promotion reason is required" }, 400);
+					}
+					return adminJson(
+						await promoteStorageBackend({
+							regionId,
+							targetBackendId: backendId,
+							actor: user.id,
+							reason: parsed.data.reason,
+						}),
+					);
+				}
+				return adminJson({ error: "Method not allowed" }, 405);
+			} catch (error) {
+				return adminJson(
+					{
+						error: error instanceof Error ? error.message : "Operation failed",
+					},
+					409,
+				);
+			}
+		}
+
+		const storageBackendMatch = path.match(
+			/^\/api\/admin\/storage\/backends\/([a-z0-9-]+)\/([a-z0-9-]+)$/,
+		);
+		if (storageBackendMatch && req.method === "PATCH") {
+			const [, regionId, backendId] = storageBackendMatch;
+			if (!isStorageRegionId(regionId)) {
+				return adminJson({ error: "Unknown storage region" }, 400);
+			}
+			const body = await req.json().catch(() => null);
+			const parsed = z
+				.object({ status: z.enum(["standby", "unavailable", "disabled"]) })
+				.safeParse(body);
+			if (!parsed.success) {
+				return adminJson({ error: "Invalid backend status" }, 400);
+			}
+			try {
+				return adminJson(
+					await updateStorageRegionBackendStatus({
+						regionId,
+						backendId,
+						status: parsed.data.status,
+						actor: user.id,
+					}),
+				);
+			} catch (error) {
+				return adminJson(
+					{ error: error instanceof Error ? error.message : "Update failed" },
+					409,
+				);
+			}
 		}
 
 		// Cache stats API
@@ -1813,23 +2145,16 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					})
 					.where(eq(sessions.id, sessionId));
 
-				// Audit log (very lightweight; will show up in Admin Logs)
-				await db.insert(requestLogs).values({
-					bucketId: null,
-					bucketName: null,
-					ownerId: targetUserId,
-					requesterId: user.id,
-					method: "ADMIN",
-					path: `impersonate:start:${targetUserId}`,
-					statusCode: 200,
-					ingressBytes: 0,
-					egressBytes: 0,
+				await db.insert(adminAuditLogs).values({
+					targetUserId,
+					actorUserId: user.id,
+					action: "impersonate.start",
 					ipAddress:
 						req.headers.get("x-forwarded-for") ||
 						req.headers.get("cf-connecting-ip") ||
 						"unknown",
 					userAgent: req.headers.get("user-agent") || "Admin",
-					latencyMs: 0,
+					metadata: { expiresAt: impersonationExpiresAt.toISOString() },
 				});
 
 				const headers = new Headers({ "Content-Type": "application/json" });
@@ -1895,23 +2220,16 @@ export async function handleAdminRequest(req: Request): Promise<Response> {
 					})
 					.where(eq(sessions.id, sessionId));
 
-				// Audit log
-				await db.insert(requestLogs).values({
-					bucketId: null,
-					bucketName: null,
-					ownerId: sess[0].impersonatedUserId,
-					requesterId: user.id,
-					method: "ADMIN",
-					path: `impersonate:stop:${sess[0].impersonatedUserId}`,
-					statusCode: 200,
-					ingressBytes: 0,
-					egressBytes: 0,
+				await db.insert(adminAuditLogs).values({
+					targetUserId: sess[0].impersonatedUserId,
+					actorUserId: user.id,
+					action: "impersonate.stop",
 					ipAddress:
 						req.headers.get("x-forwarded-for") ||
 						req.headers.get("cf-connecting-ip") ||
 						"unknown",
 					userAgent: req.headers.get("user-agent") || "Admin",
-					latencyMs: 0,
+					metadata: {},
 				});
 
 				const headers = new Headers({ "Content-Type": "application/json" });

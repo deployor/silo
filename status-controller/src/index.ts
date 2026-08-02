@@ -1,941 +1,3661 @@
-export interface Env {
-	DB: D1Database;
-	PRIMARY_HEALTH_URL: string;
-	PRIMARY_READY_URL: string;
-	DATAPLANE_INTERNAL_SECRET: string;
-	PRIMARY_S3_CANARY_URL: string;
-	PRIMARY_DASHBOARD_URL?: string;
-	PRIMARY_MAINTENANCE_URL?: string;
-	DASHBOARD_URL?: string;
-	EMERGENCY_HEALTH_URL?: string;
-	EMERGENCY_READY_URL?: string;
-	EMERGENCY_S3_CANARY_URL?: string;
-	CANARY_ACCESS_KEY_ID: string;
-	CANARY_SECRET_ACCESS_KEY: string;
-	CANARY_BUCKET: string;
-	CANARY_REGION?: string;
-	GITHUB_OWNER: string;
-	GITHUB_REPO: string;
-	GITHUB_DISPATCH_TOKEN: string;
-	STATUS_CALLBACK_URL: string;
-	STATUS_CALLBACK_SECRET: string;
-	STATUS_ADMIN_SECRET: string;
-	STATUS_INCIDENT_PASSWORD?: string;
-	STATUS_BOOTSTRAP_SECRET: string;
-	BOOTSTRAP_ENCRYPTION_KEY: string;
-	STATUS_ADMIN_ORIGINS?: string;
-	CF_DNS_TOKEN: string;
-	CF_ZONE_ID: string;
-	CF_S3_RECORD_ID: string;
-	S3_DNS_NAME?: string;
-	PRIMARY_IPV4: string;
-	PRIMARY_IPV6?: string;
-	CF_EMERGENCY_RECORD_ID: string;
-	EMERGENCY_DNS_NAME?: string;
-	CF_DASHBOARD_RECORD_ID?: string;
-	DASHBOARD_DNS_NAME?: string;
-	PRIMARY_DASHBOARD_IPV4?: string;
-	AUTO_PROVISION_FAILOVER?: string;
-	AUTO_REDIRECT_DASHBOARD?: string;
-	AUTO_ACTIVATE_FAILOVER?: string;
-	FAILOVER_DRILL_APPROVED?: string;
-	AUTO_RECOVER?: string;
-	ALERT_WEBHOOK_URL?: string;
-	CLOUDFLARE_API_BASE?: string;
-	GITHUB_API_BASE?: string;
-}
+import {
+	type DatabaseProbe,
+	enableSynchronousReplication,
+	fenceDatabase,
+	probeDatabase,
+	promoteDatabase,
+	promotionEligible,
+	unfenceDatabase,
+} from "./database-ha";
 
-type Component = "s3Api" | "uploads" | "downloads" | "deletes" | "authentication" | "postgres" | "redis" | "backingStorage" | "writerLease" | "dashboard" | "failover";
 type ComponentStatus = "operational" | "degraded" | "outage" | "unknown";
-type FailoverPhase = "inactive" | "investigating" | "provisioning" | "ready" | "active" | "recovering" | "failed";
+type OverallStatus = "operational" | "degraded" | "major_outage";
+type RegionPhase =
+	| "normal"
+	| "investigating"
+	| "ready"
+	| "activating"
+	| "active"
+	| "failing_back"
+	| "credential_cleanup"
+	| "blocked";
+type ProviderPhase =
+	| "normal"
+	| "investigating"
+	| "ready"
+	| "promoting"
+	| "replica_active"
+	| "blocked";
 
-type ReadinessChecks = {
-	ok: boolean;
-	postgres?: boolean;
-	redis?: boolean;
-	storage?: boolean;
-	activeWriter?: boolean;
+type BackendConfig = {
+	id: string;
+	label: string;
+	provider: string;
+	role: "primary" | "replica";
+	canaryRef: string;
+};
+
+type RegionConfig = {
+	id: string;
+	label: string;
+	flag: string;
+	origin: string;
+	endpointHosts: string[];
+	default: boolean;
+	backends: BackendConfig[];
+};
+
+type CanaryCredential = {
+	endpoint: string;
+	bucket: string;
+	accessKeyId: string;
+	secretAccessKey: string;
+	sessionToken?: string;
+	signingRegion: string;
+	prefix: string;
+	addressingStyle: "path" | "virtual";
 };
 
 type OperationChecks = {
+	configured: boolean;
 	authentication: boolean;
 	upload: boolean;
 	download: boolean;
 	delete: boolean;
 };
 
-type ProbeChecks = {
-	health: boolean;
-	ready: boolean;
-	canary: boolean;
-	dashboard?: boolean;
-	readiness?: ReadinessChecks;
-	operations?: OperationChecks;
+type ReplicationGate = {
+	caughtUp: boolean;
+	fresh: boolean;
+	authorized: boolean;
+	checkpoint?: string;
+	checkpointAgeSeconds?: number;
+	lagObjects?: number;
 };
 
-type StatusState = {
-	overall: "operational" | "degraded" | "major_outage";
-	components: Record<Component, ComponentStatus>;
+type AccountingReadiness = {
+	durable: boolean;
+	pending: number;
+	unsafe: boolean;
+};
+
+type DiskCacheReadiness = {
+	enabled: boolean;
+	writable: boolean;
+	totalBytes?: number;
+	maxTotalBytes?: number;
+};
+
+type ReadinessChecks = {
+	ok: boolean;
+	region?: string;
+	postgres?: boolean;
+	regionalSchema?: boolean;
+	redis?: boolean;
+	diskCache?: DiskCacheReadiness;
+	accounting?: AccountingReadiness;
+	storage?: boolean;
+	storageRegions: Record<string, boolean>;
+	failoverRegions: string[];
+	activeWriterRegions: Record<string, number>;
+	activeStorageBackends: Record<string, string>;
+	backendGenerations: Record<string, number>;
+	storageBackends: Record<string, Record<string, boolean>>;
+	replication: Record<string, Record<string, ReplicationGate>>;
+};
+
+type DataplaneProbe = {
+	health: boolean;
+	readiness: ReadinessChecks;
+};
+
+type BackendProbe = {
+	checks: OperationChecks;
+	operational: boolean;
+};
+
+type RegionRuntime = {
+	phase: RegionPhase;
+	providerPhase: ProviderPhase;
+	activeDataplane: string;
+	failoverDataplane?: string;
+	activeBackend: string;
+	writerGeneration?: number;
+	backendGeneration?: number;
 	consecutiveFailures: number;
 	consecutiveRecoveries: number;
 	recoveryHealthySince?: string;
-	failoverPhase: FailoverPhase;
-	provisioningStep: "idle" | "checking_primary" | "server_requested" | "server_online" | "starting_dataplane" | "verifying_storage" | "verified" | "active" | "failed";
-	emergencyServerId?: number;
-	emergencyIp?: string;
-	activeIncidentId?: string;
+	cleanupAfter?: string;
+	cleanupNotified: boolean;
+	cleanupRequested: boolean;
 	manualRecoveryLock: boolean;
-	destroyAfter?: string;
-	productionMaintenance?: { title: string; message: string; startsAt: string; lastVerifiedAt: string };
+	backendFailures: Record<string, number>;
+};
+
+type StatusState = {
+	overall: OverallStatus;
+	components: Record<string, ComponentStatus>;
+	regions: Record<string, RegionRuntime>;
+	database: {
+		phase: "normal" | "investigating" | "promoting" | "active" | "blocked";
+		activeRegion: "eu-central" | "us-east";
+		generation: number;
+		consecutiveFailures: number;
+		synchronousConfirmed: boolean;
+	};
+	activeIncidentId?: string;
+	productionMaintenance?: {
+		title: string;
+		message: string;
+		startsAt: string;
+		lastVerifiedAt: string;
+	};
 	updatedAt: string;
 };
 
-const STATE_ID = "current";
+type MonitorSnapshot = {
+	dashboard: boolean;
+	database?: Record<string, DatabaseProbe>;
+	clickhouse?: Record<string, ClickHouseProbe>;
+	dataplanes: Record<string, DataplaneProbe>;
+	backends: Record<string, Record<string, BackendProbe>>;
+	logical: Record<string, OperationChecks>;
+	homeReadOnly: Record<string, boolean>;
+};
+
+type ClickHouseProbe = {
+	reachable: boolean;
+	recentRows: number;
+	latestEventAt?: string;
+	error?: string;
+};
+
+type ComponentDefinition = {
+	id: string;
+	name: string;
+	description: string;
+	group: "global" | "regional" | "backends";
+};
+
+const STATE_ID = "regional-v1";
 const FAILURE_THRESHOLD = 5;
 const RECOVERY_THRESHOLD = 10;
-const GRACE_MS = 10 * 60 * 1000;
+const RECOVERY_STABILITY_MS = 10 * 60_000;
+const DNS_GRACE_MS = 10 * 60_000;
 const CHECK_TIMEOUT_MS = 12_000;
-
-const defaultState = (): StatusState => ({
-	overall: "operational",
-	components: {
-		s3Api: "unknown", uploads: "unknown", downloads: "unknown", deletes: "unknown", authentication: "unknown", postgres: "unknown", redis: "unknown", backingStorage: "unknown", writerLease: "unknown", dashboard: "unknown", failover: "operational",
-	},
-	consecutiveFailures: 0,
-	consecutiveRecoveries: 0,
-	failoverPhase: "inactive",
-	provisioningStep: "idle",
-	manualRecoveryLock: false,
-	updatedAt: new Date().toISOString(),
-});
+const MUTATION_TIMEOUT_MS = 60_000;
+const MONITOR_LEASE_MS = 4 * 60_000;
+const AUTHORIZATION_POLL_MS = 2_000;
+const AUTHORIZATION_TIMEOUT_MS = 55_000;
 
 export default {
-	async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+	async scheduled(
+		_controller: ScheduledController,
+		env: Env,
+		ctx: ExecutionContext,
+	): Promise<void> {
 		ctx.waitUntil(runMonitor(env));
 	},
 	async fetch(request: Request, env: Env): Promise<Response> {
 		const url = new URL(request.url);
 		try {
-			if (url.hostname === (env.S3_DNS_NAME || "onsilo.dev")) return outageFallback(request);
-			if (url.hostname === (env.DASHBOARD_DNS_NAME || "dash.onsilo.dev")) return dashboardStatusRedirect();
-			if (request.method === "OPTIONS") return corsPreflight(request, env, url.pathname);
-			if (request.method === "GET" && url.pathname === "/api/status") return json(await publicStatus(env));
-			if (request.method === "POST" && url.pathname.startsWith("/api/bootstrap/")) return bootstrap(request, env, url.pathname.slice(15));
-			if (request.method === "POST" && url.pathname.startsWith("/api/callback/")) return callback(request, env, url.pathname.slice(14));
-			if (url.pathname === "/api/admin/incidents" || url.pathname.startsWith("/api/admin/incidents/") || url.pathname.startsWith("/api/admin/notes/")) return incidentAdmin(request, env, url.pathname);
-			if (url.pathname === "/api/admin/maintenance" || url.pathname.startsWith("/api/admin/maintenance/")) return maintenanceAdmin(request, env, url.pathname);
-			if (request.method === "GET" && url.pathname === "/api/admin/operations") return operationsAdmin(request, env);
-			if (request.method === "POST" && url.pathname.startsWith("/api/admin/")) return admin(request, env, url.pathname.slice(11));
+			const registry = parseRegistry(env.REGION_REGISTRY);
+			if (
+				registry.some((region) => region.endpointHosts.includes(url.hostname))
+			)
+				return outageFallback(request);
+			if (url.hostname === env.DASHBOARD_DNS_NAME)
+				return dashboardStatusRedirect();
+			if (request.method === "OPTIONS")
+				return corsPreflight(request, env, url.pathname);
+			if (request.method === "GET" && url.pathname === "/api/status")
+				return json(await publicStatus(env, registry));
+			if (
+				url.pathname === "/api/admin/incidents" ||
+				url.pathname.startsWith("/api/admin/incidents/") ||
+				url.pathname.startsWith("/api/admin/notes/")
+			)
+				return incidentAdmin(request, env, url.pathname, registry);
+			if (
+				url.pathname === "/api/admin/maintenance" ||
+				url.pathname.startsWith("/api/admin/maintenance/")
+			)
+				return maintenanceAdmin(request, env, url.pathname);
+			if (request.method === "GET" && url.pathname === "/api/admin/operations")
+				return operationsAdmin(request, env, registry);
+			if (request.method === "POST" && url.pathname.startsWith("/api/admin/"))
+				return operationsAction(request, env, url.pathname.slice(11), registry);
 			return json({ error: "not found" }, 404);
 		} catch (error) {
-			console.error("request failed", error);
-			if (url.pathname.startsWith("/api/admin/")) {
-				return adminJson(request, env, { error: error instanceof Error ? error.message : "admin action failed" }, 500);
-			}
+			logError("request_failed", error, {
+				method: request.method,
+				path: url.pathname,
+			});
+			if (url.pathname.startsWith("/api/admin/"))
+				return adminJson(request, env, { error: errorMessage(error) }, 500);
 			return json({ error: "request failed" }, 500);
 		}
 	},
-};
+} satisfies ExportedHandler<Env>;
 
-async function runMonitor(env: Env) {
-	const state = await getState(env);
-	const productionMaintenance = await checkProductionMaintenance(env);
-	if (productionMaintenance) {
-		const now = new Date().toISOString();
-		state.productionMaintenance = {
-			title: productionMaintenance.fullMaintenanceMode ? "Full application maintenance" : "S3 maintenance",
-			message: productionMaintenance.fullMaintenanceMode ? "Silo is temporarily offline for planned application maintenance." : "S3 storage is temporarily unavailable for planned maintenance.",
-			startsAt: state.productionMaintenance?.startsAt || now,
-			lastVerifiedAt: now,
-		};
-	} else if (productionMaintenance === false || (state.productionMaintenance && Date.now() - Date.parse(state.productionMaintenance.lastVerifiedAt) > 3 * 60_000)) {
-		state.productionMaintenance = undefined;
+async function runMonitor(env: Env): Promise<void> {
+	const leaseHolder = crypto.randomUUID();
+	if (!(await acquireMonitorLease(env, leaseHolder))) {
+		console.log(
+			JSON.stringify({
+				event: "regional_monitor_skipped",
+				reason: "monitor lease is held",
+			}),
+		);
+		return;
 	}
-	const previousDashboard = state.components.dashboard;
-	const checks = await checkPrimary(env, state.failoverPhase === "active");
-	setS3Components(state, checks);
-	state.components.dashboard = checks.dashboard ? "operational" : "outage";
-	if (!checks.dashboard && previousDashboard !== "outage" && autoRedirectDashboard(env)) await pointDashboardAtStatus(env);
-	const primaryHealthy = checks.health && checks.ready && checks.canary;
-	const plannedMaintenance = state.productionMaintenance || await getActiveMaintenance(env);
-	if (plannedMaintenance && ["inactive", "investigating"].includes(state.failoverPhase)) {
-		state.consecutiveFailures = 0;
-		state.consecutiveRecoveries = 0;
-		state.failoverPhase = "inactive";
-		state.provisioningStep = "idle";
-		state.overall = "degraded";
-		state.components = Object.fromEntries(Object.entries(state.components).map(([component, status]) => [component, status === "outage" ? "degraded" : status])) as Record<Component, ComponentStatus>;
-		state.components.failover = "operational";
-		if (state.activeIncidentId) await resolveIncident(env, state, "Monitoring entered the scheduled maintenance window; emergency failover was not required.");
+	try {
+		const registry = parseRegistry(env.REGION_REGISTRY);
+		const state = await getState(env, registry);
+		await refreshProductionMaintenance(env, state);
+		const plannedMaintenance = Boolean(
+			state.productionMaintenance || (await getActiveMaintenance(env)),
+		);
+		const snapshot = await takeSnapshot(env, registry, state);
+		try {
+			await processDatabaseHealth(env, state, snapshot);
+		} catch (error) {
+			state.database.phase = "blocked";
+			logError("database_ha_automation_blocked", error, {
+				activeRegion: state.database.activeRegion,
+				generation: state.database.generation,
+			});
+		}
+
+		for (const region of registry) {
+			const providerWasBlocked =
+				state.regions[region.id].providerPhase === "blocked";
+			try {
+				await processProviderHealth(
+					env,
+					state,
+					snapshot,
+					region,
+					plannedMaintenance,
+				);
+			} catch (error) {
+				state.regions[region.id].providerPhase = "blocked";
+				if (providerWasBlocked)
+					logError("regional_automation_still_blocked", error, {
+						region: region.id,
+						subsystem: "provider",
+					});
+				else
+					await recordAutomationFailure(env, state, region, "provider", error);
+			}
+			const dataplaneWasBlocked = state.regions[region.id].phase === "blocked";
+			try {
+				await processDataplaneHealth(
+					env,
+					registry,
+					state,
+					snapshot,
+					region,
+					plannedMaintenance,
+				);
+			} catch (error) {
+				state.regions[region.id].phase = "blocked";
+				if (dataplaneWasBlocked)
+					logError("regional_automation_still_blocked", error, {
+						region: region.id,
+						subsystem: "dataplane",
+					});
+				else
+					await recordAutomationFailure(env, state, region, "dataplane", error);
+			}
+		}
+
+		state.components = deriveComponents(registry, state, snapshot);
+		state.overall = deriveOverall(registry, state.components);
+		if (plannedMaintenance) {
+			state.overall = "degraded";
+			for (const [id, value] of Object.entries(state.components)) {
+				if (value === "outage") state.components[id] = "degraded";
+			}
+		}
+
+		const allNormal = registry.every((region) => {
+			const runtime = state.regions[region.id];
+			return runtime.phase === "normal" && runtime.providerPhase === "normal";
+		});
+		if (
+			allNormal &&
+			state.overall === "operational" &&
+			state.activeIncidentId
+		) {
+			await resolveIncident(
+				env,
+				state,
+				"All regional dataplanes, active storage backends, and signed S3 canaries recovered.",
+			);
+		}
+
 		state.updatedAt = new Date().toISOString();
-		await recordAvailability(env, state, true);
+		await recordAvailability(env, state, plannedMaintenance);
 		await putState(env, state);
+		console.log(
+			JSON.stringify({
+				event: "regional_monitor_complete",
+				overall: state.overall,
+				components: state.components,
+				regions: publicRegionStates(registry, state),
+				updatedAt: state.updatedAt,
+			}),
+		);
+	} finally {
+		await releaseMonitorLease(env, leaseHolder).catch((error) =>
+			logError("monitor_lease_release_failed", error),
+		);
+	}
+}
+
+async function acquireMonitorLease(env: Env, holder: string): Promise<boolean> {
+	const now = new Date().toISOString();
+	const expiresAt = new Date(Date.now() + MONITOR_LEASE_MS).toISOString();
+	await env.DB.prepare(
+		"INSERT OR IGNORE INTO status_monitor_leases (id, holder, expires_at) VALUES (?, ?, ?)",
+	)
+		.bind(STATE_ID, holder, expiresAt)
+		.run();
+	const result = await env.DB.prepare(
+		"UPDATE status_monitor_leases SET holder = ?, expires_at = ? WHERE id = ? AND (holder = ? OR datetime(expires_at) <= datetime(?))",
+	)
+		.bind(holder, expiresAt, STATE_ID, holder, now)
+		.run();
+	return Number(result.meta.changes || 0) === 1;
+}
+
+async function releaseMonitorLease(env: Env, holder: string): Promise<void> {
+	await env.DB.prepare(
+		"DELETE FROM status_monitor_leases WHERE id = ? AND holder = ?",
+	)
+		.bind(STATE_ID, holder)
+		.run();
+}
+
+async function processDatabaseHealth(
+	env: Env,
+	state: StatusState,
+	snapshot: MonitorSnapshot,
+): Promise<void> {
+	if (!snapshot.database) return;
+	const databaseEnv = env as Env & {
+		DATABASE_EU?: Hyperdrive;
+		DATABASE_US?: Hyperdrive;
+		AUTO_FAILOVER_DATABASE?: string;
+		DATABASE_APP_ROLE?: string;
+		DATABASE_NAME?: string;
+	};
+	const probes = Object.values(snapshot.database);
+	const primaries = probes.filter(
+		(probe) => probe.reachable && probe.role === "primary",
+	);
+	if (primaries.length > 1) {
+		const authoritative = primaries.find(
+			(probe) =>
+				probe.region === state.database.activeRegion &&
+				probe.generation === state.database.generation,
+		);
+		for (const stale of primaries.filter((probe) => probe !== authoritative)) {
+			const binding =
+				stale.region === "eu-central"
+					? databaseEnv.DATABASE_EU
+					: databaseEnv.DATABASE_US;
+			if (binding)
+				await fenceDatabase(
+					binding,
+					databaseEnv.DATABASE_APP_ROLE || "silo_app",
+					databaseEnv.DATABASE_NAME || "silo",
+				);
+		}
+		throw new Error(
+			"multiple PostgreSQL primaries detected; stale nodes fenced",
+		);
+	}
+
+	const active = snapshot.database[state.database.activeRegion];
+	if (
+		active.reachable &&
+		active.role === "primary" &&
+		active.activeRegion === state.database.activeRegion
+	) {
+		if (active.defaultTransactionReadOnly) {
+			const binding =
+				state.database.activeRegion === "eu-central"
+					? databaseEnv.DATABASE_EU
+					: databaseEnv.DATABASE_US;
+			if (!binding)
+				throw new Error("active database Hyperdrive binding is missing");
+			await unfenceDatabase(
+				binding,
+				databaseEnv.DATABASE_APP_ROLE || "silo_app",
+				databaseEnv.DATABASE_NAME || "silo",
+				state.database.generation,
+				state.database.activeRegion,
+			);
+		}
+		state.database.phase =
+			state.database.activeRegion === "eu-central" ? "normal" : "active";
+		state.database.generation = active.generation || state.database.generation;
+		state.database.consecutiveFailures = 0;
+		state.database.synchronousConfirmed ||= active.replication.some(
+			(peer) => peer.state === "streaming" && peer.syncState === "sync",
+		);
 		return;
 	}
 
-	if (state.failoverPhase === "recovering" && !primaryHealthy) {
-		// A relapse during DNS grace is a new outage: do not delete the VM.
-		if (state.emergencyIp) await activateEmergency(env, state, "The primary relapsed during DNS grace. Traffic returned to the healthy emergency server.");
-		state.destroyAfter = undefined;
-		state.consecutiveRecoveries = 0;
-		state.recoveryHealthySince = undefined;
+	state.database.consecutiveFailures += 1;
+	state.database.phase = "investigating";
+	if (state.database.consecutiveFailures < FAILURE_THRESHOLD) return;
+	const candidateRegion =
+		state.database.activeRegion === "eu-central" ? "us-east" : "eu-central";
+	const candidate = snapshot.database[candidateRegion];
+	if (
+		!state.database.synchronousConfirmed ||
+		!promotionEligible(candidate, state.database.generation)
+	) {
+		state.database.phase = "blocked";
+		return;
+	}
+	if (
+		databaseEnv.AUTO_FAILOVER_DATABASE !== "true" ||
+		env.FAILOVER_DRILL_APPROVED !== "true"
+	) {
+		state.database.phase = "blocked";
+		return;
+	}
+	const binding =
+		candidateRegion === "eu-central"
+			? databaseEnv.DATABASE_EU
+			: databaseEnv.DATABASE_US;
+	if (!binding) throw new Error("promotion Hyperdrive binding is missing");
+	state.database.phase = "promoting";
+	const promoted = await promoteDatabase(
+		candidateRegion,
+		binding,
+		state.database.generation,
+		databaseEnv.DATABASE_APP_ROLE || "silo_app",
+		databaseEnv.DATABASE_NAME || "silo",
+	);
+	state.database.activeRegion = candidateRegion;
+	state.database.generation =
+		promoted.generation || state.database.generation + 1;
+	state.database.consecutiveFailures = 0;
+	state.database.synchronousConfirmed = false;
+	state.database.phase = candidateRegion === "eu-central" ? "normal" : "active";
+}
+
+async function recordAutomationFailure(
+	env: Env,
+	state: StatusState,
+	region: RegionConfig,
+	subsystem: "dataplane" | "provider",
+	error: unknown,
+): Promise<void> {
+	logError("regional_automation_blocked", error, {
+		region: region.id,
+		subsystem,
+	});
+	await ensureIncident(
+		env,
+		state,
+		`${region.flag} ${region.label} ${subsystem} automation hit a safety gate. No additional traffic or storage transition was attempted.`,
+		`${region.label} automation blocked`,
+	);
+	await addUpdate(
+		env,
+		state,
+		"identified",
+		`${region.flag} ${region.label} ${subsystem} failover is blocked pending operator review.`,
+	);
+	await notifyMaintainers(
+		env,
+		"regional_automation_blocked",
+		`${region.id} ${subsystem} automation blocked: ${errorMessage(error)}`,
+	);
+}
+
+async function processDataplaneHealth(
+	env: Env,
+	registry: RegionConfig[],
+	state: StatusState,
+	snapshot: MonitorSnapshot,
+	region: RegionConfig,
+	plannedMaintenance: boolean,
+): Promise<void> {
+	const runtime = state.regions[region.id];
+	const home = snapshot.dataplanes[region.id];
+	const activeBackendHealthy =
+		snapshot.backends[region.id]?.[runtime.activeBackend]?.operational === true;
+	const logicalHealthy = operationChecksPassed(snapshot.logical[region.id]);
+	const homeAvailable = dataplaneAvailable(home);
+	if (
+		home?.health &&
+		home.readiness.accounting?.unsafe === true &&
+		runtime.phase !== "active"
+	) {
+		const newlyBlocked = runtime.phase !== "blocked";
+		runtime.phase = "blocked";
+		if (newlyBlocked)
+			await ensureIncident(
+				env,
+				state,
+				`${region.flag} ${region.label} reports an unsafe accounting spool. Automated writer transfer is blocked until it is reconciled.`,
+				`${region.label} accounting safety block`,
+			);
+		return;
 	}
 
-	if (state.failoverPhase === "active" || state.failoverPhase === "recovering") {
-		if (state.failoverPhase === "active") {
-			const emergency = await checkEmergency(env);
-			setS3Components(state, emergency);
-			state.components.dashboard = "outage";
-			state.components.failover = emergency.health && emergency.ready && emergency.canary ? "operational" : "outage";
-			state.overall = state.components.failover === "operational" ? "degraded" : "major_outage";
+	if (runtime.phase === "active") {
+		const active = snapshot.dataplanes[runtime.activeDataplane];
+		if (!dataplaneAvailable(active) || !logicalHealthy) {
+			await ensureIncident(
+				env,
+				state,
+				`${region.flag} ${region.label} failover traffic is not passing its protected checks.`,
+				"Regional failover disruption",
+			);
+		}
+		const recovered =
+			homeAvailable && snapshot.homeReadOnly[region.id] && activeBackendHealthy;
+		if (recovered) {
+			runtime.recoveryHealthySince ||= new Date().toISOString();
+			runtime.consecutiveRecoveries += 1;
 		} else {
-			state.components.failover = "degraded";
-			state.overall = "degraded";
+			runtime.recoveryHealthySince = undefined;
+			runtime.consecutiveRecoveries = 0;
 		}
-		if (primaryHealthy) {
-			state.recoveryHealthySince ||= new Date().toISOString();
-			state.consecutiveRecoveries += 1;
-		} else {
-			state.consecutiveRecoveries = 0;
-			state.recoveryHealthySince = undefined;
+		const stable =
+			runtime.recoveryHealthySince &&
+			Date.now() - Date.parse(runtime.recoveryHealthySince) >=
+				RECOVERY_STABILITY_MS;
+		if (
+			!plannedMaintenance &&
+			!runtime.manualRecoveryLock &&
+			env.AUTO_RECOVER !== "false" &&
+			stable &&
+			runtime.consecutiveRecoveries >= RECOVERY_THRESHOLD
+		) {
+			await failbackDataplane(env, state, snapshot, region, runtime);
 		}
-		const primaryHealthyForTenMinutes = Boolean(state.recoveryHealthySince) && Date.now() - Date.parse(state.recoveryHealthySince!) >= 10 * 60 * 1000;
-		if (state.failoverPhase === "active" && state.consecutiveRecoveries >= RECOVERY_THRESHOLD && primaryHealthyForTenMinutes && autoRecover(env, state)) {
-			await activatePrimary(env);
-			state.failoverPhase = "recovering";
-			state.destroyAfter = new Date(Date.now() + GRACE_MS).toISOString();
-			await addUpdate(env, state, "monitoring", "Primary stayed healthy for ten minutes. DNS returned to the primary; keeping the emergency server during DNS grace.");
-		}
-		if (state.failoverPhase === "recovering" && state.destroyAfter && Date.parse(state.destroyAfter) <= Date.now()) {
-			await dispatch(env, "destroy_emergency", { server_id: state.emergencyServerId, primary_dns_confirmed: true, safe_to_delete: false, resolve_incident: true, accounting_required: true, incident_id: state.activeIncidentId });
-			state.destroyAfter = undefined;
-			await addUpdate(env, state, "monitoring", "Recovery grace period elapsed; requesting emergency server cleanup.");
-		}
-		if (state.failoverPhase === "recovering" && checks.dashboard && previousDashboard !== "operational" && autoRedirectDashboard(env)) {
-			await pointDashboardAtPrimary(env);
-		}
-	} else if (primaryHealthy) {
-		state.consecutiveFailures = 0;
-		if (state.failoverPhase === "investigating") {
-			state.failoverPhase = "inactive";
-			state.provisioningStep = "idle";
-			if (checks.dashboard) await resolveIncident(env, state, "Primary recovered before failover was required.");
-			else await addUpdate(env, state, "monitoring", "S3 recovered; the dashboard remains unavailable.");
-		} else if (state.failoverPhase === "failed") {
-			await pointS3AtPrimary(env);
-			if (checks.dashboard && autoRedirectDashboard(env)) await pointDashboardAtPrimary(env);
-			state.failoverPhase = "inactive";
-			state.provisioningStep = "idle";
-			state.components.failover = "operational";
-			await resolveIncident(env, state, "The primary recovered after emergency provisioning failed.");
-		}
-		if (!checks.dashboard) {
-			state.overall = "degraded";
-			state.components.failover = "operational";
-			if (!state.activeIncidentId) {
-				await openIncident(env, state, "Dashboard availability is being investigated.", "Dashboard disruption");
-				await notifyMaintainers(env, "dashboard_outage", "The dashboard is unavailable; S3 remains operational.");
-			}
-			else if (previousDashboard !== "outage") await addUpdate(env, state, "investigating", "The dashboard is unavailable. S3 storage remains operational.");
-		} else {
-			state.overall = "operational";
-			state.components.failover = "operational";
-			if (previousDashboard !== "operational" && autoRedirectDashboard(env)) await pointDashboardAtPrimary(env);
-			if (state.activeIncidentId) await resolveIncident(env, state, "The dashboard recovered. All services are operational.");
-		}
-	} else {
-		state.consecutiveFailures += 1;
-		state.consecutiveRecoveries = 0;
-		if (state.consecutiveFailures === 1) {
-			state.failoverPhase = "investigating";
-			state.provisioningStep = "checking_primary";
-			state.overall = "degraded";
-			await openIncident(env, state, "S3 service availability is being investigated.");
-			await notifyMaintainers(env, "investigating", "Silo failed its first complete S3 monitoring round.");
-		}
-		if (state.consecutiveFailures >= FAILURE_THRESHOLD && ["investigating", "inactive"].includes(state.failoverPhase)) {
-			state.overall = "major_outage";
-			state.components.failover = "degraded";
-			if (autoProvision(env)) {
-				state.failoverPhase = "provisioning";
-				state.provisioningStep = "server_requested";
-				if (autoRedirectDashboard(env)) await pointDashboardAtStatus(env);
-				await dispatch(env, "provision_emergency", { callback_url: env.STATUS_CALLBACK_URL, incident_id: state.activeIncidentId });
-				await addUpdate(env, state, "identified", "Outage confirmed after five failed checks. Requesting the emergency S3 server.");
-				await notifyMaintainers(env, "major_outage", "Silo failed five consecutive checks. Hetzner provisioning has started.");
-			} else if (state.consecutiveFailures === FAILURE_THRESHOLD) {
-				await addUpdate(env, state, "identified", "Outage confirmed after five failed checks. Automatic Hetzner provisioning is disabled; an operator can start it from the incident desk.");
-				await notifyMaintainers(env, "major_outage", "Silo failed five consecutive checks. Automatic Hetzner provisioning is disabled and operator action is required.");
-			}
-		}
+		return;
 	}
 
-	state.updatedAt = new Date().toISOString();
-	await recordAvailability(env, state);
-	await putState(env, state);
+	if (runtime.phase === "credential_cleanup") {
+		const homeStillHealthy =
+			homeAvailable && operationChecksPassed(snapshot.logical[region.id]);
+		if (!homeStillHealthy && runtime.failoverDataplane) {
+			const target = runtime.failoverDataplane;
+			if (
+				dataplaneAvailable(snapshot.dataplanes[target]) &&
+				(eligibleFailoverTarget(registry, snapshot, region.id, target) ||
+					hasFailoverHook(env.FAILOVER_ACTIVATION_URLS, region.id, target))
+			) {
+				await activateDataplaneFailover(env, state, snapshot, region, target);
+			}
+			return;
+		}
+		if (
+			runtime.cleanupAfter &&
+			Date.parse(runtime.cleanupAfter) <= Date.now() &&
+			runtime.failoverDataplane
+		) {
+			if (
+				!runtime.cleanupRequested &&
+				hasFailoverHook(
+					env.FAILOVER_DEACTIVATION_URLS,
+					region.id,
+					runtime.failoverDataplane,
+				)
+			) {
+				await callFailoverHook(
+					env,
+					"deactivate",
+					region.id,
+					runtime.failoverDataplane,
+				);
+				runtime.cleanupRequested = true;
+				await addUpdate(
+					env,
+					state,
+					"monitoring",
+					`${region.flag} ${region.label} DNS grace completed; remote credentials are being revoked from ${runtime.failoverDataplane}.`,
+				);
+			}
+			const standby = snapshot.dataplanes[runtime.failoverDataplane];
+			if (
+				dataplaneAvailable(standby) &&
+				!standby.readiness.failoverRegions.includes(region.id)
+			) {
+				runtime.phase = "normal";
+				runtime.failoverDataplane = undefined;
+				runtime.cleanupAfter = undefined;
+				runtime.cleanupNotified = false;
+				runtime.cleanupRequested = false;
+				runtime.consecutiveFailures = 0;
+				runtime.consecutiveRecoveries = 0;
+				runtime.recoveryHealthySince = undefined;
+				await addUpdate(
+					env,
+					state,
+					"resolved",
+					`${region.flag} ${region.label} DNS grace completed and the remote Infisical credential was revoked.`,
+				);
+			} else if (!runtime.cleanupNotified) {
+				runtime.cleanupNotified = true;
+				await addUpdate(
+					env,
+					state,
+					"monitoring",
+					`${region.flag} ${region.label} is healthy at home. Recovery remains open until the remote failover credential is removed from ${runtime.failoverDataplane}.`,
+				);
+				await notifyMaintainers(
+					env,
+					"credential_cleanup_required",
+					`Remove ${region.id} failover credentials from ${runtime.failoverDataplane} after DNS grace.`,
+				);
+			}
+		}
+		return;
+	}
+
+	if (plannedMaintenance) {
+		runtime.consecutiveFailures = 0;
+		runtime.phase = "normal";
+		return;
+	}
+
+	// A physical backend outage is handled by the provider state machine and
+	// must never masquerade as a dataplane outage.
+	const dataplaneFailure =
+		!homeAvailable || (!logicalHealthy && activeBackendHealthy);
+	if (!dataplaneFailure) {
+		runtime.consecutiveFailures = 0;
+		if (["investigating", "ready", "blocked"].includes(runtime.phase))
+			runtime.phase = "normal";
+		return;
+	}
+
+	runtime.consecutiveFailures += 1;
+	if (runtime.consecutiveFailures === 1) {
+		runtime.phase = "investigating";
+		await ensureIncident(
+			env,
+			state,
+			`${region.flag} ${region.label} dataplane failed its first complete protected check. Traffic has not moved.`,
+			`${region.label} dataplane disruption`,
+		);
+		await notifyMaintainers(
+			env,
+			"regional_investigating",
+			`${region.id} failed its first complete dataplane check.`,
+		);
+	}
+	if (runtime.consecutiveFailures < FAILURE_THRESHOLD) return;
+	if (!activeBackendHealthy) {
+		runtime.phase = "blocked";
+		return;
+	}
+
+	const target = chooseFailoverCandidate(env, registry, snapshot, region.id);
+	if (!target) {
+		runtime.phase = "blocked";
+		if (runtime.consecutiveFailures === FAILURE_THRESHOLD) {
+			await addUpdate(
+				env,
+				state,
+				"identified",
+				`${region.flag} ${region.label} failed five checks, but no surviving dataplane reports authorized access to its active backend. DNS and writer ownership were left unchanged.`,
+			);
+			await notifyMaintainers(
+				env,
+				"failover_authorization_required",
+				`Authorize ${region.id} on a healthy peer through Infisical; no traffic was moved.`,
+			);
+		}
+		return;
+	}
+
+	runtime.phase = "ready";
+	if (autoActivate(env))
+		await activateDataplaneFailover(env, state, snapshot, region, target);
 }
 
-function componentStatus(value: boolean | undefined, fallback?: boolean): ComponentStatus {
-	const resolved = value ?? fallback;
-	return resolved === undefined ? "unknown" : resolved ? "operational" : "outage";
+async function processProviderHealth(
+	env: Env,
+	state: StatusState,
+	snapshot: MonitorSnapshot,
+	region: RegionConfig,
+	plannedMaintenance: boolean,
+): Promise<void> {
+	const runtime = state.regions[region.id];
+	const serving = snapshot.dataplanes[runtime.activeDataplane];
+	const authoritativeActive =
+		serving?.readiness.activeStorageBackends[region.id];
+	if (
+		authoritativeActive &&
+		region.backends.some((backend) => backend.id === authoritativeActive)
+	)
+		runtime.activeBackend = authoritativeActive;
+	const activeProbe = snapshot.backends[region.id]?.[runtime.activeBackend];
+	const activeHealthy = activeProbe?.operational === true;
+	const defaultBackend = primaryBackend(region).id;
+
+	if (activeHealthy) {
+		runtime.backendFailures[runtime.activeBackend] = 0;
+		runtime.providerPhase =
+			runtime.activeBackend === defaultBackend ? "normal" : "replica_active";
+		return;
+	}
+	if (plannedMaintenance || !activeProbe?.checks.configured) return;
+
+	runtime.backendFailures[runtime.activeBackend] =
+		(runtime.backendFailures[runtime.activeBackend] || 0) + 1;
+	const failures = runtime.backendFailures[runtime.activeBackend];
+	if (failures === 1) {
+		runtime.providerPhase = "investigating";
+		await ensureIncident(
+			env,
+			state,
+			`${region.flag} ${region.label} active physical backend ${runtime.activeBackend} failed its first direct signed canary.`,
+			`${region.label} storage disruption`,
+		);
+	}
+	if (failures < FAILURE_THRESHOLD) return;
+
+	const candidate = chooseBackendCandidate(region, runtime, snapshot);
+	if (!candidate) {
+		runtime.providerPhase = "blocked";
+		if (failures === FAILURE_THRESHOLD)
+			await addUpdate(
+				env,
+				state,
+				"identified",
+				`${region.flag} ${region.label} active backend failed five canaries. No replica reported a fresh, caught-up, explicitly authorized checkpoint, so promotion was refused.`,
+			);
+		return;
+	}
+	runtime.providerPhase = "ready";
+	if (autoPromoteStorage(env))
+		await promoteBackend(env, state, snapshot, region, runtime, candidate);
 }
 
-function setS3Components(state: StatusState, checks: ProbeChecks) {
-	state.components.s3Api = componentStatus(checks.health && checks.ready);
-	state.components.uploads = componentStatus(checks.operations?.upload, checks.canary);
-	state.components.downloads = componentStatus(checks.operations?.download, checks.canary);
-	state.components.deletes = componentStatus(checks.operations?.delete, checks.canary);
-	state.components.authentication = componentStatus(checks.operations?.authentication, checks.canary);
-	state.components.postgres = componentStatus(checks.readiness?.postgres, checks.ready);
-	state.components.redis = componentStatus(checks.readiness?.redis, checks.ready);
-	state.components.backingStorage = componentStatus(checks.readiness?.storage, checks.ready);
-	state.components.writerLease = componentStatus(checks.readiness?.activeWriter, checks.ready);
+async function activateDataplaneFailover(
+	env: Env,
+	state: StatusState,
+	snapshot: MonitorSnapshot,
+	region: RegionConfig,
+	targetRegionId: string,
+): Promise<void> {
+	const runtime = state.regions[region.id];
+	runtime.phase = "activating";
+	runtime.failoverDataplane = targetRegionId;
+	await ensureFailoverAuthorization(env, region.id, targetRegionId);
+	const authorized = await checkReadiness(
+		`${targetOrigin(env, targetRegionId)}/ready`,
+		env.DATAPLANE_INTERNAL_SECRET,
+	);
+	if (!readinessCanServe(authorized, region.id, true))
+		throw new Error(
+			`failover target ${targetRegionId} did not prove authorized access to ${region.id}`,
+		);
+	const source = snapshot.dataplanes[region.id];
+	if (dataplaneAvailable(source)) {
+		await setDrain(env, region.origin, region.id, true);
+		await flushAccounting(env, region.origin, region.id);
+	}
+	await setDrain(env, targetOrigin(env, targetRegionId), region.id, false);
+	const generation = await claimWriter(
+		env,
+		targetOrigin(env, targetRegionId),
+		region.id,
+	);
+	const verified = await checkReadiness(
+		`${targetOrigin(env, targetRegionId)}/ready`,
+		env.DATAPLANE_INTERNAL_SECRET,
+	);
+	if (verified.activeWriterRegions[region.id] !== generation)
+		throw new Error(
+			`writer generation ${generation} was not confirmed by ${targetRegionId}`,
+		);
+	const logicalCredential = canarySecrets(env).logical[region.id];
+	if (
+		!logicalCredential ||
+		!operationChecksPassed(
+			await s3CanaryChecks(
+				logicalCredential,
+				targetOrigin(env, targetRegionId),
+			),
+		)
+	)
+		throw new Error(
+			`signed ${region.id} canary failed on ${targetRegionId} after writer claim`,
+		);
+	await routeRegionTo(env, region, targetRegionId);
+	runtime.activeDataplane = targetRegionId;
+	runtime.writerGeneration = generation;
+	runtime.phase = "active";
+	runtime.consecutiveRecoveries = 0;
+	runtime.recoveryHealthySince = undefined;
+	await addUpdate(
+		env,
+		state,
+		"monitoring",
+		`${region.flag} ${region.label} writer generation ${generation} moved to ${targetRegionId} after five failed rounds and a signed canary. Its logical storage region and active physical backend did not change.`,
+	);
+	await notifyMaintainers(
+		env,
+		"regional_failover_active",
+		`${targetRegionId} is securely serving ${region.id}.`,
+	);
 }
 
-async function checkPrimary(env: Env, readOnly = false) {
-	const [health, readiness, dashboard] = await Promise.all([
-		ok(env.PRIMARY_HEALTH_URL), checkReadiness(env.PRIMARY_READY_URL, env.DATAPLANE_INTERNAL_SECRET), ok(env.PRIMARY_DASHBOARD_URL || env.DASHBOARD_URL || ""),
-	]);
-	const operations = readOnly
-		? await readOnlyOperationChecks(env, env.PRIMARY_S3_CANARY_URL).catch(() => failedOperationChecks())
-		: await s3CanaryChecks(env, env.PRIMARY_S3_CANARY_URL).catch(() => failedOperationChecks());
-	const canary = readOnly ? operations.authentication : operationChecksPassed(operations);
-	return { health, ready: readiness.ok, dashboard, canary, readiness, operations };
+async function failbackDataplane(
+	env: Env,
+	state: StatusState,
+	snapshot: MonitorSnapshot,
+	region: RegionConfig,
+	runtime: RegionRuntime,
+): Promise<void> {
+	const targetId = runtime.activeDataplane;
+	if (targetId === region.id) return;
+	if (!snapshot.homeReadOnly[region.id])
+		throw new Error(`${region.id} read-only recovery canary did not pass`);
+	runtime.phase = "failing_back";
+	await setDrain(env, targetOrigin(env, targetId), region.id, true);
+	await flushAccounting(env, targetOrigin(env, targetId), region.id);
+	await flushAccounting(env, region.origin, region.id);
+	await setDrain(env, region.origin, region.id, false);
+	const generation = await claimWriter(env, region.origin, region.id);
+	const verified = await checkReadiness(
+		`${region.origin}/ready`,
+		env.DATAPLANE_INTERNAL_SECRET,
+	);
+	if (verified.activeWriterRegions[region.id] !== generation)
+		throw new Error(`home writer generation ${generation} was not confirmed`);
+	const credential = canarySecrets(env).logical[region.id];
+	if (
+		!credential ||
+		!operationChecksPassed(await s3CanaryChecks(credential, region.origin))
+	)
+		throw new Error(
+			`${region.id} home write canary failed after writer transfer`,
+		);
+	await routeRegionTo(env, region, region.id);
+	runtime.failoverDataplane = targetId;
+	runtime.activeDataplane = region.id;
+	runtime.writerGeneration = generation;
+	runtime.phase = "credential_cleanup";
+	runtime.cleanupAfter = new Date(Date.now() + DNS_GRACE_MS).toISOString();
+	runtime.cleanupNotified = false;
+	runtime.cleanupRequested = false;
+	await addUpdate(
+		env,
+		state,
+		"monitoring",
+		`${region.flag} ${region.label} drained remote writes and accounting, claimed home generation ${generation}, passed a signed canary, and returned DNS. Remote credentials remain until DNS grace completes.`,
+	);
 }
 
-async function checkEmergency(env: Env) {
-	const origin = env.EMERGENCY_S3_CANARY_URL || `https://${env.EMERGENCY_DNS_NAME || "emergency-origin.onsilo.dev"}`;
-	const [health, readiness] = await Promise.all([
-		ok(env.EMERGENCY_HEALTH_URL || `${origin}/health`),
-		checkReadiness(env.EMERGENCY_READY_URL || `${origin}/ready`, env.DATAPLANE_INTERNAL_SECRET),
-	]);
-	const operations = await s3CanaryChecks(env, origin).catch(() => failedOperationChecks());
-	return { health, ready: readiness.ok, canary: operationChecksPassed(operations), readiness, operations };
+async function promoteBackend(
+	env: Env,
+	state: StatusState,
+	snapshot: MonitorSnapshot,
+	region: RegionConfig,
+	runtime: RegionRuntime,
+	targetBackendId: string,
+): Promise<void> {
+	const serving = snapshot.dataplanes[runtime.activeDataplane];
+	const gate = serving?.readiness.replication[region.id]?.[targetBackendId];
+	if (!gate?.caughtUp || !gate.fresh || !gate.authorized || !gate.checkpoint)
+		throw new Error(
+			`backend ${targetBackendId} is not caught up, fresh, and authorized`,
+		);
+	if (!snapshot.backends[region.id]?.[targetBackendId]?.operational)
+		throw new Error(
+			`backend ${targetBackendId} direct canary is not operational`,
+		);
+	runtime.providerPhase = "promoting";
+	const url = new URL(
+		"/api/internal/storage/promote",
+		targetOrigin(env, runtime.activeDataplane),
+	);
+	const response = await fetchWithDeadline(
+		url,
+		{
+			method: "POST",
+			headers: {
+				"x-dataplane-secret": env.DATAPLANE_INTERNAL_SECRET,
+				"content-type": "application/json",
+			},
+			body: JSON.stringify({
+				region: region.id,
+				targetBackendId,
+				expectedBackendGeneration:
+					serving.readiness.backendGenerations[region.id],
+				actor: "silo-status-controller",
+				reason: `authorized provider failover after ${FAILURE_THRESHOLD} failed active-backend canaries; replication checkpoint ${gate.checkpoint}`,
+			}),
+		},
+		MUTATION_TIMEOUT_MS,
+	);
+	if (!response.ok)
+		throw new Error(`protected backend promotion failed: ${response.status}`);
+	const value = await responseJsonRecord(response);
+	const generation =
+		numberField(value, "newBackendGeneration") ??
+		numberField(value, "generation");
+	const confirmedBackend =
+		stringField(value, "toBackendId") ?? stringField(value, "backendId");
+	if (confirmedBackend !== targetBackendId || generation === undefined)
+		throw new Error(
+			"promotion response did not confirm backend and generation",
+		);
+	const logicalCredential = canarySecrets(env).logical[region.id];
+	if (
+		!logicalCredential ||
+		!operationChecksPassed(
+			await s3CanaryChecks(
+				logicalCredential,
+				targetOrigin(env, runtime.activeDataplane),
+			),
+		)
+	)
+		throw new Error("logical S3 canary failed after backend promotion");
+	runtime.activeBackend = targetBackendId;
+	runtime.backendGeneration = generation;
+	runtime.providerPhase =
+		targetBackendId === primaryBackend(region).id ? "normal" : "replica_active";
+	await addUpdate(
+		env,
+		state,
+		"monitoring",
+		`${region.flag} ${region.label} physical backend generation ${generation} moved to ${targetBackendId} only after direct canaries and an authorized fresh replication checkpoint. Logical region and public DNS were unchanged.`,
+	);
 }
 
-async function checkProductionMaintenance(env: Env) {
-	if (!env.PRIMARY_MAINTENANCE_URL) return false;
+async function takeSnapshot(
+	env: Env,
+	registry: RegionConfig[],
+	state: StatusState,
+): Promise<MonitorSnapshot> {
+	const databaseEnv = env as Env & {
+		DATABASE_EU?: Hyperdrive;
+		DATABASE_US?: Hyperdrive;
+	};
+	const database =
+		databaseEnv.DATABASE_EU && databaseEnv.DATABASE_US
+			? (Object.fromEntries(
+					await Promise.all([
+						probeDatabase("eu-central", databaseEnv.DATABASE_EU).then(
+							(probe) => ["eu-central", probe] as const,
+						),
+						probeDatabase("us-east", databaseEnv.DATABASE_US).then(
+							(probe) => ["us-east", probe] as const,
+						),
+					]),
+				) as Record<"eu-central" | "us-east", DatabaseProbe>)
+			: undefined;
+	const clickhouseEnv = env as Env & {
+		CLICKHOUSE_EU_HEALTH_URL?: string;
+		CLICKHOUSE_US_HEALTH_URL?: string;
+		CLICKHOUSE_QUERY_USER?: string;
+		CLICKHOUSE_QUERY_PASSWORD?: string;
+	};
+	const clickhouse =
+		clickhouseEnv.CLICKHOUSE_EU_HEALTH_URL &&
+		clickhouseEnv.CLICKHOUSE_US_HEALTH_URL &&
+		clickhouseEnv.CLICKHOUSE_QUERY_PASSWORD
+			? await Promise.all([
+					probeClickHouse(
+						clickhouseEnv.CLICKHOUSE_EU_HEALTH_URL,
+						clickhouseEnv.CLICKHOUSE_QUERY_USER || "silo_query",
+						clickhouseEnv.CLICKHOUSE_QUERY_PASSWORD,
+					).then((probe) => ["eu-central", probe] as const),
+					probeClickHouse(
+						clickhouseEnv.CLICKHOUSE_US_HEALTH_URL,
+						clickhouseEnv.CLICKHOUSE_QUERY_USER || "silo_query",
+						clickhouseEnv.CLICKHOUSE_QUERY_PASSWORD,
+					).then((probe) => ["us-east", probe] as const),
+				]).then(
+					(entries) =>
+						Object.fromEntries(entries) as Record<
+							"eu-central" | "us-east",
+							ClickHouseProbe
+						>,
+				)
+			: undefined;
+	const dataplaneEntries = await Promise.all(
+		registry.map(async (region) => {
+			const [health, readiness] = await Promise.all([
+				ok(`${region.origin}/health`),
+				checkReadiness(`${region.origin}/ready`, env.DATAPLANE_INTERNAL_SECRET),
+			]);
+			return [
+				region.id,
+				{ health, readiness } satisfies DataplaneProbe,
+			] as const;
+		}),
+	);
+	const dataplanes = Object.fromEntries(dataplaneEntries);
+	const secrets = canarySecrets(env);
+	const backendEntries = await Promise.all(
+		registry.map(async (region) => {
+			const probes = await Promise.all(
+				region.backends.map(async (backend) => {
+					const credential = secrets.backends[backend.canaryRef];
+					const checks = credential
+						? await s3CanaryChecks(credential, credential.endpoint).catch(
+								failedOperationChecks,
+							)
+						: failedOperationChecks();
+					return [
+						backend.id,
+						{
+							checks,
+							operational: operationChecksPassed(checks),
+						} satisfies BackendProbe,
+					] as const;
+				}),
+			);
+			return [region.id, Object.fromEntries(probes)] as const;
+		}),
+	);
+	const backends = Object.fromEntries(backendEntries);
+	const logicalEntries = await Promise.all(
+		registry.map(async (region) => {
+			const credential = secrets.logical[region.id];
+			const servingRegion = state.regions[region.id].activeDataplane;
+			const checks = credential
+				? await s3CanaryChecks(
+						credential,
+						targetOriginFromRegistry(registry, servingRegion),
+					).catch(failedOperationChecks)
+				: failedOperationChecks();
+			return [region.id, checks] as const;
+		}),
+	);
+	const readEntries = await Promise.all(
+		registry.map(async (region) => {
+			const credential = secrets.logical[region.id];
+			return [
+				region.id,
+				credential ? await readOnlyCanary(credential, region.origin) : false,
+			] as const;
+		}),
+	);
+	return {
+		dashboard: await ok(env.DASHBOARD_HEALTH_URL),
+		database,
+		clickhouse,
+		dataplanes,
+		backends,
+		logical: Object.fromEntries(logicalEntries),
+		homeReadOnly: Object.fromEntries(readEntries),
+	};
+}
+
+function deriveComponents(
+	registry: RegionConfig[],
+	state: StatusState,
+	snapshot: MonitorSnapshot,
+): Record<string, ComponentStatus> {
+	const components: Record<string, ComponentStatus> = {
+		"control-plane": snapshot.dashboard ? "operational" : "outage",
+		"database-ha-controller": "operational",
+	};
+	const postgresValues = Object.values(snapshot.dataplanes)
+		.filter((probe) => probe.health)
+		.map((probe) => probe.readiness.postgres)
+		.filter((value): value is boolean => typeof value === "boolean");
+	components["aiven-postgresql"] =
+		postgresValues.length === 0
+			? "unknown"
+			: postgresValues.every(Boolean)
+				? "operational"
+				: postgresValues.some(Boolean)
+					? "degraded"
+					: "outage";
+	if (snapshot.database) {
+		const probes = Object.values(snapshot.database);
+		const reachable = probes.filter((probe) => probe.reachable);
+		const primaries = reachable.filter((probe) => probe.role === "primary");
+		const replicas = reachable.filter((probe) => probe.role === "replica");
+		const generations = new Set(
+			reachable.map((probe) => probe.generation).filter(Number.isFinite),
+		);
+		components["postgresql-ha"] =
+			primaries.length > 1 || reachable.length === 0
+				? "outage"
+				: primaries.length === 1 &&
+						replicas.length === 1 &&
+						generations.size === 1 &&
+						primaries[0].activeRegion === primaries[0].region
+					? "operational"
+					: primaries.length === 1
+						? "degraded"
+						: "outage";
+		const primary = primaries[0];
+		const synchronous = primary?.replication.some(
+			(peer) => peer.state === "streaming" && peer.syncState === "sync",
+		);
+		components["postgresql-replication"] =
+			replicas.length === 1 && synchronous ? "operational" : "outage";
+	}
+	if (snapshot.clickhouse) {
+		const probes = Object.values(snapshot.clickhouse);
+		const reachable = probes.filter((probe) => probe.reachable);
+		components["clickhouse-logs"] =
+			reachable.length === 2
+				? "operational"
+				: reachable.length === 1
+					? "degraded"
+					: "outage";
+		const [eu, us] = probes;
+		const eventSkew =
+			eu.latestEventAt && us.latestEventAt
+				? Math.abs(Date.parse(eu.latestEventAt) - Date.parse(us.latestEventAt))
+				: 0;
+		const rowSkew = Math.abs(eu.recentRows - us.recentRows);
+		components["clickhouse-log-redundancy"] =
+			reachable.length === 2 && eventSkew <= 60_000 && rowSkew <= 100
+				? "operational"
+				: reachable.length > 0
+					? "degraded"
+					: "outage";
+	}
+	let logicalHealthy = 0;
+	for (const region of registry) {
+		const runtime = state.regions[region.id];
+		const homeProbe = snapshot.dataplanes[region.id];
+		const servingProbe = snapshot.dataplanes[runtime.activeDataplane];
+		const pgDogReachable = homeProbe?.readiness.postgres;
+		const diskCache = homeProbe?.readiness.diskCache;
+		const postgresProbe = snapshot.database?.[region.id];
+		const clickHouseProbe = snapshot.clickhouse?.[region.id];
+		components[`dataplane:${region.id}`] = dataplaneAvailable(homeProbe)
+			? "operational"
+			: "outage";
+		components[`pgdog:${region.id}`] =
+			pgDogReachable === undefined
+				? "unknown"
+				: pgDogReachable
+					? "operational"
+					: "outage";
+		components[`postgresql:${region.id}`] = !postgresProbe
+			? "unknown"
+			: postgresProbe.reachable
+				? "operational"
+				: "outage";
+		components[`clickhouse:${region.id}`] = !clickHouseProbe
+			? "unknown"
+			: clickHouseProbe.reachable
+				? "operational"
+				: "outage";
+		components[`accounting:${region.id}`] = !servingProbe?.readiness.accounting
+			? "unknown"
+			: servingProbe.readiness.accounting.durable &&
+					!servingProbe.readiness.accounting.unsafe
+				? "operational"
+				: "outage";
+		components[`cache:${region.id}`] =
+			homeProbe?.readiness.redis === undefined
+				? "unknown"
+				: homeProbe.readiness.redis
+					? "operational"
+					: "degraded";
+		components[`disk-cache:${region.id}`] = !diskCache
+			? "unknown"
+			: !diskCache.enabled
+				? "degraded"
+				: diskCache.writable
+					? "operational"
+					: "outage";
+		const logicalChecks = snapshot.logical[region.id];
+		for (const operation of [
+			"authentication",
+			"upload",
+			"download",
+			"delete",
+		] as const)
+			components[`operation:${region.id}:${operation}`] =
+				!logicalChecks?.configured
+					? "unknown"
+					: logicalChecks[operation]
+						? "operational"
+						: "outage";
+		for (const backend of region.backends) {
+			const probe = snapshot.backends[region.id]?.[backend.id];
+			components[`backend:${region.id}:${backend.id}`] = !probe?.checks
+				.configured
+				? "unknown"
+				: probe.operational
+					? "operational"
+					: "outage";
+		}
+		const activeProbe = snapshot.backends[region.id]?.[runtime.activeBackend];
+		const activeHealthy = activeProbe?.operational === true;
+		const physicalFailure = region.backends.some(
+			(backend) =>
+				snapshot.backends[region.id]?.[backend.id]?.checks.configured &&
+				!snapshot.backends[region.id][backend.id].operational,
+		);
+		components[`storage:${region.id}`] = !activeProbe?.checks.configured
+			? "unknown"
+			: !activeHealthy
+				? "outage"
+				: runtime.activeBackend !== primaryBackend(region).id || physicalFailure
+					? "degraded"
+					: "operational";
+		if (region.backends.length > 1) {
+			const serving = snapshot.dataplanes[runtime.activeDataplane];
+			const gates = region.backends
+				.filter((backend) => backend.id !== runtime.activeBackend)
+				.map(
+					(backend) => serving?.readiness.replication[region.id]?.[backend.id],
+				);
+			components[`replication:${region.id}`] =
+				gates.length && gates.every((gate) => gate?.caughtUp && gate.fresh)
+					? "operational"
+					: gates.some((gate) => gate?.caughtUp)
+						? "degraded"
+						: "outage";
+		}
+		if (operationChecksPassed(snapshot.logical[region.id])) logicalHealthy += 1;
+	}
+	if (logicalHealthy === 0) components["global-s3"] = "outage";
+	else if (
+		logicalHealthy < registry.length ||
+		registry.some(
+			(region) =>
+				state.regions[region.id].phase !== "normal" ||
+				state.regions[region.id].providerPhase !== "normal",
+		)
+	)
+		components["global-s3"] = "degraded";
+	else components["global-s3"] = "operational";
+	return components;
+}
+
+function deriveOverall(
+	registry: RegionConfig[],
+	components: Record<string, ComponentStatus>,
+): OverallStatus {
+	if (
+		(components["postgresql-ha"] ?? components["aiven-postgresql"]) ===
+			"outage" ||
+		components["global-s3"] === "outage" ||
+		registry.some(
+			(region) =>
+				components[`storage:${region.id}`] === "outage" ||
+				components[`accounting:${region.id}`] === "outage",
+		)
+	)
+		return "major_outage";
+	return Object.values(components).every((status) => status === "operational")
+		? "operational"
+		: "degraded";
+}
+
+function chooseFailoverTarget(
+	registry: RegionConfig[],
+	snapshot: MonitorSnapshot,
+	storageRegion: string,
+): string | undefined {
+	return registry
+		.map((region) => region.id)
+		.find(
+			(candidate) =>
+				candidate !== storageRegion &&
+				eligibleFailoverTarget(registry, snapshot, storageRegion, candidate),
+		);
+}
+
+function chooseFailoverCandidate(
+	env: Env,
+	registry: RegionConfig[],
+	snapshot: MonitorSnapshot,
+	storageRegion: string,
+): string | undefined {
+	return (
+		chooseFailoverTarget(registry, snapshot, storageRegion) ||
+		registry
+			.map((region) => region.id)
+			.find(
+				(candidate) =>
+					candidate !== storageRegion &&
+					dataplaneAvailable(snapshot.dataplanes[candidate]) &&
+					hasFailoverHook(
+						env.FAILOVER_ACTIVATION_URLS,
+						storageRegion,
+						candidate,
+					),
+			)
+	);
+}
+
+function failoverHookMap(raw: string | undefined): Record<string, string> {
+	if (!raw?.trim()) return {};
 	try {
-		const response = await fetchWithDeadline(env.PRIMARY_MAINTENANCE_URL, { redirect: "manual" });
-		if (!response.ok) return null;
-		const value = await response.json<{ s3MaintenanceMode?: unknown; fullMaintenanceMode?: unknown }>();
-		return value.s3MaintenanceMode === true || value.fullMaintenanceMode === true
-			? { s3MaintenanceMode: value.s3MaintenanceMode === true, fullMaintenanceMode: value.fullMaintenanceMode === true }
-			: false;
-	} catch { return null; }
+		const value: unknown = JSON.parse(raw);
+		return stringMap(value);
+	} catch {
+		return {};
+	}
 }
 
-async function ok(url: string, readinessSecret?: string) {
-	if (!url) return false;
-	try { return (await fetchWithDeadline(url, { redirect: "manual", headers: readinessSecret ? { "x-dataplane-secret": readinessSecret } : undefined })).ok; }
-	catch { return false; }
+function hasFailoverHook(
+	raw: string | undefined,
+	storageRegion: string,
+	targetRegion: string,
+): boolean {
+	return Boolean(failoverHookMap(raw)[`${storageRegion}:${targetRegion}`]);
 }
 
-async function checkReadiness(url: string, readinessSecret: string): Promise<ReadinessChecks> {
-	if (!url) return { ok: false };
-	try {
-		const response = await fetchWithDeadline(url, { redirect: "manual", headers: { "x-dataplane-secret": readinessSecret } });
-		const value = await response.json<{ postgres?: unknown; redis?: unknown; storage?: unknown; activeWriter?: unknown }>().catch(() => ({}));
+async function ensureFailoverAuthorization(
+	env: Env,
+	storageRegion: string,
+	targetRegion: string,
+): Promise<void> {
+	const readinessUrl = `${targetOrigin(env, targetRegion)}/ready`;
+	let readiness = await checkReadiness(
+		readinessUrl,
+		env.DATAPLANE_INTERNAL_SECRET,
+	);
+	if (readinessCanServe(readiness, storageRegion, true)) return;
+	if (
+		!hasFailoverHook(env.FAILOVER_ACTIVATION_URLS, storageRegion, targetRegion)
+	) {
+		throw new Error(
+			`no failover authorization hook is configured for ${storageRegion}:${targetRegion}`,
+		);
+	}
+	await callFailoverHook(env, "activate", storageRegion, targetRegion);
+	const deadline = Date.now() + AUTHORIZATION_TIMEOUT_MS;
+	while (Date.now() < deadline) {
+		await sleep(AUTHORIZATION_POLL_MS);
+		readiness = await checkReadiness(
+			readinessUrl,
+			env.DATAPLANE_INTERNAL_SECRET,
+		);
+		if (readinessCanServe(readiness, storageRegion, true)) return;
+	}
+	throw new Error(
+		`failover authorization for ${storageRegion}:${targetRegion} did not become ready before the deadline`,
+	);
+}
+
+async function callFailoverHook(
+	env: Env,
+	action: "activate" | "deactivate",
+	storageRegion: string,
+	targetRegion: string,
+): Promise<void> {
+	const raw =
+		action === "activate"
+			? env.FAILOVER_ACTIVATION_URLS
+			: env.FAILOVER_DEACTIVATION_URLS;
+	const endpoint = failoverHookMap(raw)[`${storageRegion}:${targetRegion}`];
+	if (!endpoint)
+		throw new Error(
+			`no ${action} hook is configured for ${storageRegion}:${targetRegion}`,
+		);
+	const url = new URL(endpoint);
+	if (url.protocol !== "https:")
+		throw new Error("failover authorization hooks must use HTTPS");
+	if (!env.FAILOVER_HOOK_SECRET || env.FAILOVER_HOOK_SECRET.length < 32)
+		throw new Error("FAILOVER_HOOK_SECRET must contain at least 32 characters");
+	const requestedAt = new Date().toISOString();
+	const requestId = crypto.randomUUID();
+	const body = JSON.stringify({
+		action,
+		storageRegion,
+		targetDataplaneRegion: targetRegion,
+		requestedAt,
+		requestId,
+	});
+	const signature = hex(await hmacBytes(env.FAILOVER_HOOK_SECRET, body));
+	const response = await fetchWithDeadline(
+		url,
+		{
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				"idempotency-key": requestId,
+				"x-silo-request-timestamp": requestedAt,
+				"x-silo-signature": `sha256=${signature}`,
+			},
+			body,
+		},
+		MUTATION_TIMEOUT_MS,
+	);
+	if (!response.ok)
+		throw new Error(
+			`${action} hook for ${storageRegion}:${targetRegion} failed with ${response.status}`,
+		);
+}
+
+function eligibleFailoverTarget(
+	registry: RegionConfig[],
+	snapshot: MonitorSnapshot,
+	storageRegion: string,
+	candidate: string,
+): boolean {
+	if (!registry.some((region) => region.id === candidate)) return false;
+	const probe = snapshot.dataplanes[candidate];
+	return (
+		dataplaneAvailable(probe) &&
+		readinessCanServe(probe.readiness, storageRegion, true)
+	);
+}
+
+function chooseBackendCandidate(
+	region: RegionConfig,
+	runtime: RegionRuntime,
+	snapshot: MonitorSnapshot,
+): string | undefined {
+	const serving = snapshot.dataplanes[runtime.activeDataplane];
+	return region.backends.find((backend) => {
+		if (
+			backend.id === runtime.activeBackend ||
+			!snapshot.backends[region.id]?.[backend.id]?.operational
+		)
+			return false;
+		const gate = serving?.readiness.replication[region.id]?.[backend.id];
+		return (
+			gate?.caughtUp === true &&
+			gate.fresh === true &&
+			gate.authorized === true &&
+			Boolean(gate.checkpoint)
+		);
+	})?.id;
+}
+
+function dataplaneAvailable(probe: DataplaneProbe | undefined): boolean {
+	return Boolean(
+		probe?.health &&
+			probe.readiness.postgres === true &&
+			probe.readiness.regionalSchema === true &&
+			probe.readiness.accounting?.durable === true &&
+			probe.readiness.accounting.unsafe === false,
+	);
+}
+
+function readinessCanServe(
+	readiness: ReadinessChecks,
+	storageRegion: string,
+	requireFailoverAuthorization: boolean,
+): boolean {
+	return (
+		readiness.postgres === true &&
+		readiness.regionalSchema === true &&
+		readiness.accounting?.durable === true &&
+		readiness.accounting.unsafe === false &&
+		readiness.storageRegions[storageRegion] === true &&
+		(!requireFailoverAuthorization ||
+			readiness.failoverRegions.includes(storageRegion))
+	);
+}
+
+function primaryBackend(region: RegionConfig): BackendConfig {
+	return (
+		region.backends.find((backend) => backend.role === "primary") ||
+		region.backends[0]
+	);
+}
+
+function targetOrigin(env: Env, regionId: string): string {
+	return targetOriginFromRegistry(parseRegistry(env.REGION_REGISTRY), regionId);
+}
+
+function targetOriginFromRegistry(
+	registry: RegionConfig[],
+	regionId: string,
+): string {
+	const region = registry.find((candidate) => candidate.id === regionId);
+	if (!region) throw new Error(`unknown region ${regionId}`);
+	return region.origin.replace(/\/$/, "");
+}
+
+function parseRegistry(raw: string): RegionConfig[] {
+	const value: unknown = JSON.parse(raw);
+	if (!Array.isArray(value) || value.length < 2)
+		throw new Error("REGION_REGISTRY must contain at least two regions");
+	const ids = new Set<string>();
+	const hosts = new Set<string>();
+	const regions = value.map((item): RegionConfig => {
+		if (!isRecord(item)) throw new Error("invalid region registry entry");
+		const id = requiredString(item.id, "region.id");
+		if (
+			!/^[a-z0-9][a-z0-9-]{1,39}$/.test(id) ||
+			id.endsWith("-") ||
+			ids.has(id)
+		)
+			throw new Error(`invalid or duplicate region ID ${id}`);
+		ids.add(id);
+		if (!Array.isArray(item.endpointHosts) || item.endpointHosts.length === 0)
+			throw new Error(`${id} requires endpointHosts`);
+		const endpointHosts = item.endpointHosts.map((host) => {
+			const value = requiredString(host, `${id}.endpointHost`).toLowerCase();
+			if (
+				!/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(
+					value,
+				)
+			)
+				throw new Error(
+					`${id}.endpointHost must be a hostname without a scheme, port, or path`,
+				);
+			return value;
+		});
+		for (const host of endpointHosts) {
+			if (hosts.has(host))
+				throw new Error(`endpoint ${host} has more than one home region`);
+			hosts.add(host);
+		}
+		if (!Array.isArray(item.backends) || item.backends.length === 0)
+			throw new Error(`${id} requires at least one backend`);
+		const backendIds = new Set<string>();
+		const backends = item.backends.map((backend): BackendConfig => {
+			if (!isRecord(backend)) throw new Error(`invalid backend for ${id}`);
+			const backendId = requiredString(backend.id, `${id}.backend.id`);
+			if (
+				!/^[a-z0-9][a-z0-9-]{0,62}$/.test(backendId) ||
+				backendIds.has(backendId)
+			)
+				throw new Error(`invalid or duplicate backend ${id}/${backendId}`);
+			backendIds.add(backendId);
+			const role =
+				backend.role === "replica"
+					? "replica"
+					: backend.role === "primary"
+						? "primary"
+						: undefined;
+			if (!role) throw new Error(`invalid role for ${id}/${backendId}`);
+			return {
+				id: backendId,
+				label: requiredString(backend.label, `${id}/${backendId}.label`),
+				provider: requiredString(
+					backend.provider,
+					`${id}/${backendId}.provider`,
+				),
+				role,
+				canaryRef: requiredString(
+					backend.canaryRef,
+					`${id}/${backendId}.canaryRef`,
+				),
+			};
+		});
+		if (backends.filter((backend) => backend.role === "primary").length !== 1)
+			throw new Error(`${id} must have exactly one primary backend`);
+		const origin = requiredString(item.origin, `${id}.origin`);
+		const originUrl = new URL(origin);
+		if (
+			originUrl.protocol !== "https:" ||
+			originUrl.username ||
+			originUrl.password ||
+			originUrl.search ||
+			originUrl.hash ||
+			(originUrl.pathname !== "/" && originUrl.pathname !== "")
+		)
+			throw new Error(`${id}.origin must be a clean HTTPS origin`);
 		return {
+			id,
+			label: requiredString(item.label, `${id}.label`),
+			flag: requiredString(item.flag, `${id}.flag`),
+			origin: originUrl.origin,
+			endpointHosts,
+			default: item.default === true,
+			backends,
+		};
+	});
+	if (regions.filter((region) => region.default).length !== 1)
+		throw new Error("REGION_REGISTRY must have exactly one default region");
+	return regions;
+}
+
+function canarySecrets(env: Env): {
+	logical: Record<string, CanaryCredential>;
+	backends: Record<string, CanaryCredential>;
+} {
+	const value: unknown = JSON.parse(env.REGION_CANARIES);
+	if (!isRecord(value)) throw new Error("REGION_CANARIES must be an object");
+	return {
+		logical: parseCredentialMap(value.logical),
+		backends: parseCredentialMap(value.backends),
+	};
+}
+
+function parseCredentialMap(value: unknown): Record<string, CanaryCredential> {
+	if (!isRecord(value)) return {};
+	const output: Record<string, CanaryCredential> = {};
+	for (const [key, item] of Object.entries(value)) {
+		if (!isRecord(item)) continue;
+		try {
+			const endpoint = new URL(
+				requiredString(item.endpoint, `${key}.endpoint`),
+			);
+			if (
+				endpoint.protocol !== "https:" ||
+				endpoint.username ||
+				endpoint.password ||
+				endpoint.search ||
+				endpoint.hash ||
+				(endpoint.pathname !== "/" && endpoint.pathname !== "")
+			) {
+				throw new Error(`${key}.endpoint must be a clean HTTPS origin`);
+			}
+			const bucket = requiredString(item.bucket, `${key}.bucket`);
+			if (
+				!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket) ||
+				bucket.includes("..")
+			) {
+				throw new Error(
+					`${key}.bucket must be a DNS-compatible S3 bucket name`,
+				);
+			}
+			const addressingStyle =
+				item.addressingStyle === undefined || item.addressingStyle === "path"
+					? "path"
+					: item.addressingStyle === "virtual"
+						? "virtual"
+						: undefined;
+			if (!addressingStyle)
+				throw new Error(`${key}.addressingStyle must be path or virtual`);
+			if (addressingStyle === "virtual" && bucket.includes(".")) {
+				throw new Error(
+					`${key}.bucket cannot contain dots with virtual addressing over TLS; use path addressing`,
+				);
+			}
+			output[key] = {
+				endpoint: endpoint.origin,
+				bucket,
+				accessKeyId: requiredString(item.accessKeyId, `${key}.accessKeyId`),
+				secretAccessKey: requiredString(
+					item.secretAccessKey,
+					`${key}.secretAccessKey`,
+				),
+				sessionToken:
+					typeof item.sessionToken === "string" && item.sessionToken.trim()
+						? item.sessionToken.trim()
+						: undefined,
+				signingRegion: requiredString(
+					item.signingRegion,
+					`${key}.signingRegion`,
+				),
+				prefix:
+					typeof item.prefix === "string" && item.prefix
+						? item.prefix.replace(/^\/+|\/+$/g, "")
+						: "__silo_healthcheck/status",
+				addressingStyle,
+			};
+		} catch (error) {
+			throw new Error(`invalid canary ${key}: ${errorMessage(error)}`);
+		}
+	}
+	return output;
+}
+
+async function checkReadiness(
+	url: string,
+	secret: string,
+): Promise<ReadinessChecks> {
+	const empty = (): ReadinessChecks => ({
+		ok: false,
+		storageRegions: {},
+		failoverRegions: [],
+		activeWriterRegions: {},
+		activeStorageBackends: {},
+		backendGenerations: {},
+		storageBackends: {},
+		replication: {},
+	});
+	try {
+		const response = await fetchWithDeadline(url, {
+			redirect: "manual",
+			headers: { "x-dataplane-secret": secret },
+		});
+		const value: Record<string, unknown> = await responseJsonRecord(
+			response,
+		).catch(() => ({}));
+		const active = activeBackendMaps(value.activeBackends);
+		return {
+			...empty(),
 			ok: response.ok,
-			postgres: typeof value.postgres === "boolean" ? value.postgres : undefined,
-			redis: typeof value.redis === "boolean" ? value.redis : undefined,
-			storage: typeof value.storage === "boolean" ? value.storage : undefined,
-			activeWriter: typeof value.activeWriter === "boolean" ? value.activeWriter : undefined,
+			region: stringField(value, "region"),
+			postgres: booleanField(value, "postgres"),
+			regionalSchema: booleanField(value, "regionalSchema"),
+			redis: booleanField(value, "redis"),
+			diskCache: diskCacheReadiness(value.diskCache),
+			storage: booleanField(value, "storage"),
+			accounting: accountingReadiness(value.accounting),
+			storageRegions: booleanMap(value.storageRegions),
+			failoverRegions: stringArray(value.failoverRegions),
+			activeWriterRegions: numberMap(value.activeWriterRegions),
+			activeStorageBackends: {
+				...active.ids,
+				...stringMap(value.activeStorageBackends),
+			},
+			backendGenerations: {
+				...active.generations,
+				...numberMap(value.backendGenerations),
+			},
+			storageBackends: nestedBooleanMap(value.storageBackends),
+			replication: replicationMap(value.replication),
 		};
 	} catch {
-		return { ok: false };
+		return empty();
 	}
 }
 
-async function fetchWithDeadline(input: string | URL, init: RequestInit = {}) {
-	const controller = new AbortController();
-	const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
-	try { return await fetch(input, { ...init, signal: controller.signal }); }
-	finally { clearTimeout(timer); }
+function diskCacheReadiness(value: unknown): DiskCacheReadiness | undefined {
+	if (
+		!isRecord(value) ||
+		typeof value.enabled !== "boolean" ||
+		typeof value.writable !== "boolean"
+	)
+		return undefined;
+	const totalBytes = finiteNumber(value.totalBytes);
+	const maxTotalBytes = finiteNumber(value.maxTotalBytes);
+	return {
+		enabled: value.enabled,
+		writable: value.writable,
+		totalBytes:
+			totalBytes !== undefined && totalBytes >= 0 ? totalBytes : undefined,
+		maxTotalBytes:
+			maxTotalBytes !== undefined && maxTotalBytes >= 0
+				? maxTotalBytes
+				: undefined,
+	};
 }
 
-async function s3Canary(env: Env, target: string) {
-	return operationChecksPassed(await s3CanaryChecks(env, target));
+function accountingReadiness(value: unknown): AccountingReadiness | undefined {
+	if (!isRecord(value)) return undefined;
+	const pending = finiteNumber(value.pending);
+	if (
+		value.durable !== true ||
+		typeof value.unsafe !== "boolean" ||
+		pending === undefined ||
+		pending < 0
+	)
+		return undefined;
+	return { durable: true, unsafe: value.unsafe, pending };
 }
 
-function failedOperationChecks(): OperationChecks {
-	return { authentication: false, upload: false, download: false, delete: false };
+function activeBackendMaps(value: unknown): {
+	ids: Record<string, string>;
+	generations: Record<string, number>;
+} {
+	const ids: Record<string, string> = {};
+	const generations: Record<string, number> = {};
+	if (!isRecord(value)) return { ids, generations };
+	for (const [region, backend] of Object.entries(value)) {
+		if (!isRecord(backend)) continue;
+		const id = stringField(backend, "backendId");
+		const generation = numberField(backend, "backendGeneration");
+		if (id) ids[region] = id;
+		if (generation !== undefined) generations[region] = generation;
+	}
+	return { ids, generations };
 }
 
-function operationChecksPassed(checks: OperationChecks) {
-	return checks.authentication && checks.upload && checks.download && checks.delete;
+function replicationMap(
+	value: unknown,
+): Record<string, Record<string, ReplicationGate>> {
+	if (!isRecord(value)) return {};
+	const output: Record<string, Record<string, ReplicationGate>> = {};
+	for (const [region, backends] of Object.entries(value)) {
+		if (!isRecord(backends)) continue;
+		output[region] = {};
+		for (const [backend, gate] of Object.entries(backends)) {
+			if (!isRecord(gate)) continue;
+			output[region][backend] = {
+				caughtUp: gate.caughtUp === true,
+				fresh: gate.fresh === true,
+				authorized: gate.authorized === true,
+				checkpoint:
+					typeof gate.checkpoint === "string" ? gate.checkpoint : undefined,
+				checkpointAgeSeconds: finiteNumber(gate.checkpointAgeSeconds),
+				lagObjects: finiteNumber(gate.lagObjects),
+			};
+		}
+	}
+	return output;
 }
 
-async function readOnlyOperationChecks(env: Env, target: string): Promise<OperationChecks> {
-	if (!target || !env.CANARY_ACCESS_KEY_ID || !env.CANARY_SECRET_ACCESS_KEY || !env.CANARY_BUCKET) return failedOperationChecks();
-	const authentication = (await signedFetch(env, target, "HEAD", `/${env.CANARY_BUCKET}`)).ok;
-	return { authentication, upload: false, download: false, delete: false };
-}
-
-async function s3CanaryChecks(env: Env, target: string): Promise<OperationChecks> {
-	if (!target || !env.CANARY_ACCESS_KEY_ID || !env.CANARY_SECRET_ACCESS_KEY || !env.CANARY_BUCKET) return failedOperationChecks();
-	const authentication = (await signedFetch(env, target, "HEAD", `/${env.CANARY_BUCKET}`)).ok;
-	if (!authentication) return failedOperationChecks();
-	const key = `__silo_healthcheck/${crypto.randomUUID()}`;
-	const body = `silo canary ${new Date().toISOString()}`;
-	const put = await signedFetch(env, target, "PUT", `/${env.CANARY_BUCKET}/${key}`, body);
-	if (!put.ok) return { authentication, upload: false, download: false, delete: false };
+async function s3CanaryChecks(
+	credential: CanaryCredential,
+	target: string,
+): Promise<OperationChecks> {
+	const authentication = (await signedFetch(credential, target, "HEAD")).ok;
+	if (!authentication)
+		return {
+			configured: true,
+			authentication,
+			upload: false,
+			download: false,
+			delete: false,
+		};
+	const key = `${credential.prefix}/${crypto.randomUUID()}`;
+	const body = `silo status canary ${new Date().toISOString()}`;
+	const put = await signedFetch(credential, target, "PUT", key, body);
+	if (!put.ok)
+		return {
+			configured: true,
+			authentication,
+			upload: false,
+			download: false,
+			delete: false,
+		};
 	let download = false;
 	try {
-		const get = await signedFetch(env, target, "GET", `/${env.CANARY_BUCKET}/${key}`);
-		download = get.ok && await get.text() === body;
+		const get = await signedFetch(credential, target, "GET", key);
+		download = get.ok && (await get.text()) === body;
 	} catch {
 		download = false;
 	}
 	try {
-		const deletion = await signedFetch(env, target, "DELETE", `/${env.CANARY_BUCKET}/${key}`);
-		return { authentication, upload: true, download, delete: deletion.ok };
+		const deletion = await signedFetch(credential, target, "DELETE", key);
+		return {
+			configured: true,
+			authentication,
+			upload: true,
+			download,
+			delete: deletion.ok,
+		};
 	} catch {
-		return { authentication, upload: true, download, delete: false };
+		return {
+			configured: true,
+			authentication,
+			upload: true,
+			download,
+			delete: false,
+		};
 	}
 }
 
-async function signedFetch(env: Env, origin: string, method: string, path: string, body = "") {
-	const url = new URL(path, origin);
+async function readOnlyCanary(
+	credential: CanaryCredential,
+	target: string,
+): Promise<boolean> {
+	try {
+		return (await signedFetch(credential, target, "HEAD")).ok;
+	} catch {
+		return false;
+	}
+}
+
+function failedOperationChecks(): OperationChecks {
+	return {
+		configured: false,
+		authentication: false,
+		upload: false,
+		download: false,
+		delete: false,
+	};
+}
+function operationChecksPassed(checks: OperationChecks | undefined): boolean {
+	return Boolean(
+		checks?.configured &&
+			checks.authentication &&
+			checks.upload &&
+			checks.download &&
+			checks.delete,
+	);
+}
+
+async function signedFetch(
+	credential: CanaryCredential,
+	origin: string,
+	method: string,
+	key?: string,
+	body = "",
+): Promise<Response> {
+	const url = s3RequestUrl(credential, origin, key);
 	const now = new Date();
 	const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
 	const day = amzDate.slice(0, 8);
-	const region = env.CANARY_REGION || "auto";
 	const payloadHash = await sha256(body);
-	const headers: Record<string, string> = { host: url.host, "x-amz-content-sha256": payloadHash, "x-amz-date": amzDate };
+	const headers: Record<string, string> = {
+		host: url.host,
+		"x-amz-content-sha256": payloadHash,
+		"x-amz-date": amzDate,
+	};
 	if (body) headers["content-type"] = "text/plain";
+	if (credential.sessionToken)
+		headers["x-amz-security-token"] = credential.sessionToken;
 	const signedNames = Object.keys(headers).sort();
-	const canonicalHeaders = signedNames.map((name) => `${name}:${headers[name]}\n`).join("");
-	const canonical = `${method}\n${url.pathname.split("/").map(encodeURIComponent).join("/")}\n${url.searchParams.toString()}\n${canonicalHeaders}\n${signedNames.join(";")}\n${payloadHash}`;
-	const scope = `${day}/${region}/s3/aws4_request`;
+	const canonicalHeaders = signedNames
+		.map((name) => `${name}:${headers[name]}\n`)
+		.join("");
+	const canonicalPath = url.pathname
+		.split("/")
+		.map((segment) => awsEncode(decodePathSegment(segment)))
+		.join("/");
+	const canonicalQuery = [...url.searchParams.entries()]
+		.map(([key, value]) => [awsEncode(key), awsEncode(value)] as const)
+		.sort(
+			([leftKey, leftValue], [rightKey, rightValue]) =>
+				leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue),
+		)
+		.map(([key, value]) => `${key}=${value}`)
+		.join("&");
+	const canonical = `${method}\n${canonicalPath}\n${canonicalQuery}\n${canonicalHeaders}\n${signedNames.join(";")}\n${payloadHash}`;
+	const scope = `${day}/${credential.signingRegion}/s3/aws4_request`;
 	const stringToSign = `AWS4-HMAC-SHA256\n${amzDate}\n${scope}\n${await sha256(canonical)}`;
-	const signingKey = await awsSigningKey(env.CANARY_SECRET_ACCESS_KEY, day, region);
-	const signature = await hmacHex(signingKey, stringToSign);
-	headers.authorization = `AWS4-HMAC-SHA256 Credential=${env.CANARY_ACCESS_KEY_ID}/${scope}, SignedHeaders=${signedNames.join(";")}, Signature=${signature}`;
+	const signingKey = await awsSigningKey(
+		credential.secretAccessKey,
+		day,
+		credential.signingRegion,
+	);
+	headers.authorization = `AWS4-HMAC-SHA256 Credential=${credential.accessKeyId}/${scope}, SignedHeaders=${signedNames.join(";")}, Signature=${await hmacHex(signingKey, stringToSign)}`;
 	return fetchWithDeadline(url, { method, headers, body: body || undefined });
 }
 
-async function awsSigningKey(secret: string, day: string, region: string) {
+function s3RequestUrl(
+	credential: CanaryCredential,
+	origin: string,
+	key?: string,
+): URL {
+	const url = new URL(origin);
+	if (
+		url.protocol !== "https:" ||
+		url.username ||
+		url.password ||
+		url.search ||
+		url.hash ||
+		(url.pathname !== "/" && url.pathname !== "")
+	) {
+		throw new Error("S3 canary target must be a clean HTTPS origin");
+	}
+	const objectPath = key ? `/${key.replace(/^\/+/, "")}` : "/";
+	if (credential.addressingStyle === "virtual") {
+		url.hostname = `${credential.bucket}.${url.hostname}`;
+		url.pathname = objectPath;
+	} else {
+		url.pathname = `/${credential.bucket}${key ? objectPath : ""}`;
+	}
+	return url;
+}
+
+function awsEncode(value: string): string {
+	return encodeURIComponent(value).replace(
+		/[!'()*]/g,
+		(character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+	);
+}
+
+function decodePathSegment(value: string): string {
+	try {
+		return decodeURIComponent(value);
+	} catch {
+		return value;
+	}
+}
+
+async function awsSigningKey(
+	secret: string,
+	day: string,
+	region: string,
+): Promise<ArrayBuffer> {
 	let key = await hmacBytes(`AWS4${secret}`, day);
-	key = await hmacBytes(key, region); key = await hmacBytes(key, "s3"); return hmacBytes(key, "aws4_request");
+	key = await hmacBytes(key, region);
+	key = await hmacBytes(key, "s3");
+	return hmacBytes(key, "aws4_request");
 }
-async function hmacBytes(key: string | ArrayBuffer, value: string) { return crypto.subtle.sign("HMAC", await crypto.subtle.importKey("raw", typeof key === "string" ? new TextEncoder().encode(key) : key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]), new TextEncoder().encode(value)); }
-async function hmacHex(key: ArrayBuffer, value: string) { return hex(await hmacBytes(key, value)); }
-async function sha256(value: string) { return hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))); }
-function hex(value: ArrayBuffer) { return [...new Uint8Array(value)].map((byte) => byte.toString(16).padStart(2, "0")).join(""); }
-
-async function bootstrap(request: Request, env: Env, action: string) {
-	if (action === "register") {
-		if (!secretMatches(request, env.STATUS_BOOTSTRAP_SECRET)) return json({ error: "unauthorized" }, 401);
-		const input = await request.json<{ runtime?: unknown; incidentId?: unknown }>().catch(() => ({}));
-		if (typeof input.runtime !== "string" || !input.runtime || input.runtime.length > 32_000) return json({ error: "invalid runtime payload" }, 400);
-		const token = randomToken();
-		const reportToken = randomToken();
-		const encrypted = await encryptBootstrap(env, JSON.stringify({ runtime: input.runtime, reportToken }));
-		const now = new Date();
-		const expiresAt = new Date(now.getTime() + 10 * 60_000).toISOString();
-		await env.DB.batch([
-			env.DB.prepare("INSERT INTO bootstrap_sessions (id, token_hash, report_token_hash, incident_id, ciphertext, iv, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-				.bind(crypto.randomUUID(), await sha256(token), await sha256(reportToken), String(input.incidentId || ""), encrypted.ciphertext, encrypted.iv, expiresAt, now.toISOString()),
-			env.DB.prepare("DELETE FROM bootstrap_sessions WHERE datetime(expires_at) < datetime('now', '-1 day')"),
-		]);
-		return json({ token, expiresAt });
-	}
-
-	if (action === "exchange") {
-		const token = bearerToken(request);
-		if (!token) return json({ error: "unauthorized" }, 401);
-		const row = await env.DB.prepare("SELECT id, ciphertext, iv, expires_at AS expiresAt, exchanged_at AS exchangedAt FROM bootstrap_sessions WHERE token_hash = ?")
-			.bind(await sha256(token)).first<{ id: string; ciphertext: string; iv: string; expiresAt: string; exchangedAt: string | null }>();
-		if (!row || row.exchangedAt || Date.parse(row.expiresAt) <= Date.now()) return json({ error: "bootstrap token expired or already used" }, 410);
-		const claimed = await env.DB.prepare("UPDATE bootstrap_sessions SET exchanged_at = ? WHERE id = ? AND exchanged_at IS NULL AND datetime(expires_at) > datetime('now')")
-			.bind(new Date().toISOString(), row.id).run();
-		if (Number(claimed.meta.changes || 0) !== 1) return json({ error: "bootstrap token already used" }, 409);
-		return new Response(await decryptBootstrap(env, row.ciphertext, row.iv), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
-	}
-
-	if (action === "report") {
-		const token = bearerToken(request);
-		if (!token) return json({ error: "unauthorized" }, 401);
-		const row = await env.DB.prepare("SELECT id, incident_id AS incidentId, expires_at AS expiresAt, exchanged_at AS exchangedAt, reported_at AS reportedAt FROM bootstrap_sessions WHERE report_token_hash = ?")
-			.bind(await sha256(token)).first<{ id: string; incidentId: string; expiresAt: string; exchangedAt: string | null; reportedAt: string | null }>();
-		if (!row || !row.exchangedAt || row.reportedAt || Date.parse(row.expiresAt) + 30 * 60_000 <= Date.now()) return json({ error: "report token invalid or already used" }, 410);
-		const input = await request.json<{ dataplane?: unknown; caddy?: unknown; valkey?: unknown }>().catch(() => ({}));
-		const digest = (value: unknown) => typeof value === "string" && /^[A-Za-z0-9./:_@-]{1,500}$/.test(value) ? value : "unavailable";
-		const dataplane = digest(input.dataplane), caddy = digest(input.caddy), valkey = digest(input.valkey);
-		const claimed = await env.DB.prepare("UPDATE bootstrap_sessions SET reported_at = ? WHERE id = ? AND reported_at IS NULL").bind(new Date().toISOString(), row.id).run();
-		if (Number(claimed.meta.changes || 0) !== 1) return json({ error: "digest report already received" }, 409);
-		if (row.incidentId) await env.DB.prepare("INSERT INTO incident_updates (incident_id, status, message, created_at) VALUES (?, ?, ?, ?)")
-			.bind(row.incidentId, "monitoring", `Emergency image digests: dataplane ${dataplane}; Caddy ${caddy}; Valkey ${valkey}.`, new Date().toISOString()).run();
-		return json({ ok: true });
-	}
-	return json({ error: "not found" }, 404);
+async function hmacBytes(
+	key: string | ArrayBuffer,
+	value: string,
+): Promise<ArrayBuffer> {
+	return crypto.subtle.sign(
+		"HMAC",
+		await crypto.subtle.importKey(
+			"raw",
+			typeof key === "string" ? new TextEncoder().encode(key) : key,
+			{ name: "HMAC", hash: "SHA-256" },
+			false,
+			["sign"],
+		),
+		new TextEncoder().encode(value),
+	);
+}
+async function hmacHex(key: ArrayBuffer, value: string): Promise<string> {
+	return hex(await hmacBytes(key, value));
+}
+async function sha256(value: string): Promise<string> {
+	return hex(
+		await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)),
+	);
+}
+function hex(value: ArrayBuffer): string {
+	return [...new Uint8Array(value)]
+		.map((byte) => byte.toString(16).padStart(2, "0"))
+		.join("");
 }
 
-function bearerToken(request: Request) { const value = request.headers.get("authorization") || ""; return value.startsWith("Bearer ") ? value.slice(7) : ""; }
-function randomToken() { return bytesToBase64(crypto.getRandomValues(new Uint8Array(32))).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", ""); }
-async function bootstrapKey(env: Env) {
-	const bytes = base64ToBytes(env.BOOTSTRAP_ENCRYPTION_KEY);
-	if (bytes.byteLength !== 32) throw new Error("BOOTSTRAP_ENCRYPTION_KEY must be base64-encoded 32 bytes");
-	return crypto.subtle.importKey("raw", bytes, "AES-GCM", false, ["encrypt", "decrypt"]);
-}
-async function encryptBootstrap(env: Env, plaintext: string) {
-	const iv = crypto.getRandomValues(new Uint8Array(12));
-	const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await bootstrapKey(env), new TextEncoder().encode(plaintext));
-	return { ciphertext: bytesToBase64(new Uint8Array(ciphertext)), iv: bytesToBase64(iv) };
-}
-async function decryptBootstrap(env: Env, ciphertext: string, iv: string) {
-	const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(iv) }, await bootstrapKey(env), base64ToBytes(ciphertext));
-	return new TextDecoder().decode(plaintext);
-}
-function bytesToBase64(bytes: Uint8Array) { let binary = ""; for (const byte of bytes) binary += String.fromCharCode(byte); return btoa(binary); }
-function base64ToBytes(value: string) { const binary = atob(value); return Uint8Array.from(binary, (character) => character.charCodeAt(0)); }
-
-async function callback(request: Request, env: Env, action: string) {
-	if (!secretMatches(request, env.STATUS_CALLBACK_SECRET)) return json({ error: "unauthorized" }, 401);
-	const payload = await request.json<Record<string, unknown>>().catch(() => ({}));
-	const state = await getState(env);
-	const callbackIncidentId = String(payload.incident_id || "");
-	if (action !== "destroyed" && callbackIncidentId && callbackIncidentId !== state.activeIncidentId) {
-		const staleServerId = Number(payload.server_id);
-		if (Number.isFinite(staleServerId) && staleServerId > 0) {
-			await dispatch(env, "destroy_emergency", { server_id: staleServerId, safe_to_delete: true, primary_dns_confirmed: false, resolve_incident: false, accounting_required: false, incident_id: callbackIncidentId });
-		}
-		return json({ error: "stale incident callback" }, 409);
-	}
-	if (action === "destroyed" && state.activeIncidentId && callbackIncidentId !== state.activeIncidentId) return json({ error: "stale incident callback" }, 409);
-	if (action === "provisioning") {
-		state.emergencyServerId = Number(payload.server_id);
-		state.emergencyIp = String(payload.ip || "");
-		state.failoverPhase = "provisioning";
-		state.provisioningStep = "server_online";
-		await pointEmergencyHostnameAt(env, state.emergencyIp);
-		await addUpdate(env, state, "identified", "Emergency server requested and its temporary hostname is being prepared.");
-	} else if (action === "starting") {
-		state.failoverPhase = "provisioning";
-		state.provisioningStep = "starting_dataplane";
-		await addUpdate(env, state, "identified", "Emergency server is online and starting the Silo dataplane.");
-	} else if (action === "verifying") {
-		state.failoverPhase = "provisioning";
-		state.provisioningStep = "verifying_storage";
-		await addUpdate(env, state, "monitoring", "Dataplane is ready; verifying signed storage operations.");
-	} else if (action === "ready") {
-		state.emergencyServerId = Number(payload.server_id || state.emergencyServerId);
-		state.emergencyIp = String(payload.ip || state.emergencyIp || "");
-		state.failoverPhase = "ready";
-		state.provisioningStep = "verified";
-		await addUpdate(env, state, "monitoring", "Emergency server passed readiness and signed S3 canaries.");
-		if (autoActivate(env)) {
-			const primary = await checkPrimary(env);
-			if (primary.health && primary.ready && primary.canary) {
-				await pointS3AtPrimary(env);
-				if (primary.dashboard) await pointDashboardAtPrimary(env);
-				await dispatch(env, "destroy_emergency", { server_id: state.emergencyServerId, safe_to_delete: true, primary_dns_confirmed: true, resolve_incident: false, accounting_required: false, incident_id: state.activeIncidentId });
-				state.failoverPhase = "inactive";
-				state.provisioningStep = "idle";
-				state.components.failover = "operational";
-				state.overall = primary.dashboard ? "operational" : "degraded";
-				await resolveIncident(env, state, "The primary recovered while the emergency server was starting, so traffic stayed on the primary.");
-			} else {
-				await activateEmergency(env, state, "Automatic failover activated after readiness checks passed.");
-			}
-		}
-	} else if (action === "failed") {
-		const serverId = Number(payload.server_id || state.emergencyServerId);
-		const accountingRequired = ["verifying_storage", "verified", "active"].includes(state.provisioningStep);
-		if (Number.isFinite(serverId) && serverId > 0) state.emergencyServerId = serverId;
-		const primary = await checkPrimary(env);
-		if (primary.health && primary.ready && primary.canary) {
-			await pointS3AtPrimary(env);
-			if (primary.dashboard) await pointDashboardAtPrimary(env);
-			state.failoverPhase = "inactive"; state.components.failover = "operational";
-			state.provisioningStep = "idle";
-			state.overall = primary.dashboard ? "operational" : "degraded";
-			await resolveIncident(env, state, "The primary recovered while emergency provisioning was failing; traffic remained on the primary.");
-		} else {
-			state.failoverPhase = "failed"; state.components.failover = "outage";
-			state.provisioningStep = "failed";
-			await pointS3AtFallback(env);
-			if (autoRedirectDashboard(env)) await pointDashboardAtStatus(env);
-			await addUpdate(env, state, "identified", `Emergency provisioning failed: ${String(payload.message || "unknown error")}`);
-			await notifyMaintainers(env, "failover_failed", "The emergency provisioning workflow failed; S3 is serving the safe 503 fallback.");
-		}
-		if (state.emergencyServerId) {
-			await dispatch(env, "destroy_emergency", { server_id: state.emergencyServerId, safe_to_delete: true, primary_dns_confirmed: false, resolve_incident: false, accounting_required: accountingRequired, incident_id: state.activeIncidentId });
-		}
-	} else if (action === "flush-failed") {
-		state.destroyAfter = undefined;
-		await addUpdate(env, state, "identified", "Emergency accounting could not be flushed to Aiven. Hetzner teardown was stopped; the VM is being retained for recovery.");
-		await notifyMaintainers(env, "accounting_flush_failed", "Hetzner teardown was blocked because emergency accounting could not be verified in Aiven.");
-	} else if (action === "destroyed") {
-		state.emergencyIp = undefined;
-		state.emergencyServerId = undefined;
-		state.recoveryHealthySince = undefined;
-		state.destroyAfter = undefined;
-		state.manualRecoveryLock = false;
-		state.consecutiveFailures = 0;
-		state.consecutiveRecoveries = 0;
-		if (payload.resolve_incident === true) {
-			state.failoverPhase = "inactive"; state.provisioningStep = "idle"; state.components.failover = "operational"; state.overall = state.components.dashboard === "operational" ? "operational" : "degraded";
-			await resolveIncident(env, state, "Primary recovery completed and the emergency server was deleted.");
-			await notifyMaintainers(env, "recovered", "Primary recovery completed and the temporary Hetzner server was deleted.");
-		}
-	}
-	state.updatedAt = new Date().toISOString(); await putState(env, state); return json({ ok: true });
+async function setDrain(
+	env: Env,
+	origin: string,
+	region: string,
+	enabled: boolean,
+): Promise<void> {
+	const response = await internalPost(env, origin, "/api/internal/drain", {
+		region,
+		enabled,
+	});
+	if (!response.ok) throw new Error(`region drain failed: ${response.status}`);
 }
 
-async function incidentAdmin(request: Request, env: Env, pathname: string) {
-	if (!adminOriginAllowed(request, env)) return adminJson(request, env, { error: "origin not allowed" }, 403);
-	if (!secretMatches(request, env.STATUS_INCIDENT_PASSWORD || env.STATUS_ADMIN_SECRET)) return adminJson(request, env, { error: "unauthorized" }, 401);
-
-	if (request.method === "GET" && pathname === "/api/admin/incidents") {
-		const state = await getState(env);
-		const incidents = await env.DB.prepare("SELECT id, status, title, started_at AS startedAt, resolved_at AS resolvedAt, acknowledged_at AS acknowledgedAt, acknowledgement_message AS acknowledgementMessage FROM incidents ORDER BY datetime(started_at) DESC LIMIT 25").all();
-		const notes = await env.DB.prepare("SELECT id, incident_id AS incidentId, message, created_at AS createdAt, updated_at AS updatedAt FROM incident_notes ORDER BY datetime(created_at) DESC LIMIT 250").all();
-		return adminJson(request, env, { activeIncidentId: state.activeIncidentId, incidents: incidents.results, notes: notes.results });
-	}
-
-	const incidentMatch = pathname.match(/^\/api\/admin\/incidents\/([^/]+)\/(acknowledge|notes)$/);
-	if (request.method === "POST" && incidentMatch) {
-		const incidentId = decodeURIComponent(incidentMatch[1]);
-		const incident = await env.DB.prepare("SELECT id, status, acknowledged_at AS acknowledgedAt FROM incidents WHERE id = ?").bind(incidentId).first<{ id: string; status: string; acknowledgedAt: string | null }>();
-		if (!incident) return adminJson(request, env, { error: "incident not found" }, 404);
-		const input = await request.json<{ message?: unknown }>().catch(() => ({}));
-		if (incidentMatch[2] === "acknowledge") {
-			if (incident.status !== "open") return adminJson(request, env, { error: "only open incidents can be acknowledged" }, 409);
-			if (incident.acknowledgedAt) return adminJson(request, env, { ok: true, alreadyAcknowledged: true });
-			const message = optionalMessage(input.message, 500) || "The Silo team has acknowledged this incident and is investigating.";
-			const now = new Date().toISOString();
-			await env.DB.prepare("UPDATE incidents SET acknowledged_at = ?, acknowledgement_message = ? WHERE id = ?").bind(now, message, incidentId).run();
-			await env.DB.prepare("INSERT INTO incident_updates (incident_id, status, message, created_at) VALUES (?, ?, ?, ?)").bind(incidentId, "acknowledged", message, now).run();
-			return adminJson(request, env, { ok: true, acknowledgedAt: now });
-		}
-
-		const message = requiredMessage(input.message, 2_000);
-		if (message instanceof Response) return withAdminCors(request, env, message);
-		const now = new Date().toISOString();
-		const id = crypto.randomUUID();
-		await env.DB.prepare("INSERT INTO incident_notes (id, incident_id, message, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").bind(id, incidentId, message, now, now).run();
-		return adminJson(request, env, { ok: true, note: { id, incidentId, message, createdAt: now, updatedAt: now } }, 201);
-	}
-
-	const noteMatch = pathname.match(/^\/api\/admin\/notes\/([^/]+)$/);
-	if (noteMatch && ["PATCH", "DELETE"].includes(request.method)) {
-		const noteId = decodeURIComponent(noteMatch[1]);
-		const note = await env.DB.prepare("SELECT id FROM incident_notes WHERE id = ?").bind(noteId).first<{ id: string }>();
-		if (!note) return adminJson(request, env, { error: "note not found" }, 404);
-		if (request.method === "DELETE") {
-			await env.DB.prepare("DELETE FROM incident_notes WHERE id = ?").bind(noteId).run();
-			return adminJson(request, env, { ok: true });
-		}
-		const input = await request.json<{ message?: unknown }>().catch(() => ({}));
-		const message = requiredMessage(input.message, 2_000);
-		if (message instanceof Response) return withAdminCors(request, env, message);
-		const updatedAt = new Date().toISOString();
-		await env.DB.prepare("UPDATE incident_notes SET message = ?, updated_at = ? WHERE id = ?").bind(message, updatedAt, noteId).run();
-		return adminJson(request, env, { ok: true, updatedAt });
-	}
-
-	return adminJson(request, env, { error: "not found" }, 404);
+async function flushAccounting(
+	env: Env,
+	origin: string,
+	region: string,
+): Promise<void> {
+	const response = await internalPost(
+		env,
+		origin,
+		"/api/internal/accounting/flush",
+		{ region },
+	);
+	if (!response.ok)
+		throw new Error(`accounting flush failed: ${response.status}`);
+	const value = await responseJsonRecord(response);
+	if (
+		numberField(value, "pending") !== 0 ||
+		value.unsafe_state === true ||
+		value.unsafeState === true
+	)
+		throw new Error(`accounting flush for ${region} was not safe and empty`);
 }
 
-async function operationsAdmin(request: Request, env: Env) {
-	if (!adminOriginAllowed(request, env)) return adminJson(request, env, { error: "origin not allowed" }, 403);
-	if (!secretMatches(request, env.STATUS_ADMIN_SECRET)) return adminJson(request, env, { error: "unauthorized" }, 401);
-	const state = await getState(env);
-	return adminJson(request, env, {
-		failoverPhase: state.failoverPhase,
-		provisioningStep: state.provisioningStep,
-		emergencyAvailable: Boolean(state.emergencyServerId && state.emergencyIp),
-		manualRecoveryLock: state.manualRecoveryLock,
-		productionMaintenance: state.productionMaintenance || null,
-		automation: {
-			provision: autoProvision(env),
-			redirectDashboard: autoRedirectDashboard(env),
-			activate: autoActivate(env),
-			recover: autoRecover(env, state),
+async function claimWriter(
+	env: Env,
+	origin: string,
+	region: string,
+): Promise<number> {
+	const response = await internalPost(
+		env,
+		origin,
+		"/api/internal/writer/claim",
+		{ region },
+	);
+	if (!response.ok) throw new Error(`writer claim failed: ${response.status}`);
+	const generation = numberField(
+		await responseJsonRecord(response),
+		"generation",
+	);
+	if (generation === undefined)
+		throw new Error("writer claim did not return a generation");
+	return generation;
+}
+
+async function internalPost(
+	env: Env,
+	origin: string,
+	pathname: string,
+	body: Record<string, unknown>,
+): Promise<Response> {
+	const url = new URL(pathname, origin);
+	return fetchWithDeadline(
+		url,
+		{
+			method: "POST",
+			headers: {
+				"x-dataplane-secret": env.DATAPLANE_INTERNAL_SECRET,
+				"content-type": "application/json",
+			},
+			body: JSON.stringify(body),
 		},
-		destroyAfter: state.destroyAfter || null,
+		MUTATION_TIMEOUT_MS,
+	);
+}
+
+async function routeRegionTo(
+	env: Env,
+	region: RegionConfig,
+	targetRegionId: string,
+): Promise<void> {
+	const target = parseRegistry(env.REGION_REGISTRY).find(
+		(candidate) => candidate.id === targetRegionId,
+	);
+	if (!target) throw new Error(`unknown DNS target ${targetRegionId}`);
+	const targetHost = new URL(target.origin).hostname;
+	const recordIds = jsonStringMap(env.CF_ENDPOINT_RECORD_IDS);
+	for (const hostname of region.endpointHosts) {
+		const recordId = recordIds[hostname];
+		if (!recordId)
+			throw new Error(`missing Cloudflare record ID for ${hostname}`);
+		await cloudflare(
+			env,
+			`/zones/${env.CF_ZONE_ID}/dns_records/${recordId}`,
+			"PUT",
+			{
+				type: "CNAME",
+				name: hostname,
+				content: targetHost,
+				ttl: 60,
+				proxied: false,
+			},
+		);
+	}
+}
+
+async function pointDashboardAtStatus(env: Env): Promise<void> {
+	await cloudflare(
+		env,
+		`/zones/${env.CF_ZONE_ID}/dns_records/${env.CF_DASHBOARD_RECORD_ID}`,
+		"PUT",
+		{
+			type: "A",
+			name: env.DASHBOARD_DNS_NAME,
+			content: "192.0.2.1",
+			ttl: 1,
+			proxied: true,
+		},
+	);
+}
+
+async function pointDashboardAtControlPlane(env: Env): Promise<void> {
+	await cloudflare(
+		env,
+		`/zones/${env.CF_ZONE_ID}/dns_records/${env.CF_DASHBOARD_RECORD_ID}`,
+		"PUT",
+		{
+			type: "CNAME",
+			name: env.DASHBOARD_DNS_NAME,
+			content: env.CONTROL_PLANE_ORIGIN_HOST,
+			ttl: 60,
+			proxied: false,
+		},
+	);
+}
+
+async function cloudflare(
+	env: Env,
+	path: string,
+	method: string,
+	body?: unknown,
+): Promise<void> {
+	const response = await fetchWithDeadline(
+		`${env.CLOUDFLARE_API_BASE || "https://api.cloudflare.com/client/v4"}${path}`,
+		{
+			method,
+			headers: {
+				authorization: `Bearer ${env.CF_DNS_TOKEN}`,
+				...(body ? { "content-type": "application/json" } : {}),
+			},
+			body: body ? JSON.stringify(body) : undefined,
+		},
+		MUTATION_TIMEOUT_MS,
+	);
+	if (!response.ok)
+		throw new Error(`Cloudflare DNS update failed: ${response.status}`);
+	const value: unknown = await response.json().catch(() => null);
+	if (isRecord(value) && value.success === false)
+		throw new Error("Cloudflare DNS update was rejected");
+}
+
+async function refreshProductionMaintenance(
+	env: Env,
+	state: StatusState,
+): Promise<void> {
+	const previousDashboard = state.components["control-plane"];
+	const maintenance = await checkProductionMaintenance(env);
+	if (maintenance) {
+		const now = new Date().toISOString();
+		state.productionMaintenance = {
+			title: maintenance.fullMaintenanceMode
+				? "Full application maintenance"
+				: "S3 maintenance",
+			message: maintenance.fullMaintenanceMode
+				? "Silo is temporarily offline for planned application maintenance."
+				: "S3 storage is temporarily unavailable for planned maintenance.",
+			startsAt: state.productionMaintenance?.startsAt || now,
+			lastVerifiedAt: now,
+		};
+	} else if (
+		maintenance === false ||
+		(state.productionMaintenance &&
+			Date.now() - Date.parse(state.productionMaintenance.lastVerifiedAt) >
+				3 * 60_000)
+	)
+		state.productionMaintenance = undefined;
+	const dashboard = await ok(env.DASHBOARD_HEALTH_URL);
+	if (
+		!dashboard &&
+		previousDashboard !== "outage" &&
+		autoRedirectDashboard(env)
+	)
+		await pointDashboardAtStatus(env);
+	if (dashboard && previousDashboard === "outage" && autoRedirectDashboard(env))
+		await pointDashboardAtControlPlane(env);
+}
+
+async function checkProductionMaintenance(
+	env: Env,
+): Promise<
+	false | null | { s3MaintenanceMode: boolean; fullMaintenanceMode: boolean }
+> {
+	try {
+		const response = await fetchWithDeadline(env.MAINTENANCE_URL, {
+			redirect: "manual",
+		});
+		if (!response.ok) return null;
+		const value = await responseJsonRecord(response);
+		return value.s3MaintenanceMode === true ||
+			value.fullMaintenanceMode === true
+			? {
+					s3MaintenanceMode: value.s3MaintenanceMode === true,
+					fullMaintenanceMode: value.fullMaintenanceMode === true,
+				}
+			: false;
+	} catch {
+		return null;
+	}
+}
+
+function defaultState(registry: RegionConfig[]): StatusState {
+	const regions: Record<string, RegionRuntime> = {};
+	for (const region of registry)
+		regions[region.id] = {
+			phase: "normal",
+			providerPhase: "normal",
+			activeDataplane: region.id,
+			activeBackend: primaryBackend(region).id,
+			consecutiveFailures: 0,
+			consecutiveRecoveries: 0,
+			cleanupNotified: false,
+			cleanupRequested: false,
+			manualRecoveryLock: false,
+			backendFailures: Object.fromEntries(
+				region.backends.map((backend) => [backend.id, 0]),
+			),
+		};
+	return {
+		overall: "operational",
+		components: {},
+		regions,
+		database: {
+			phase: "normal",
+			activeRegion: "eu-central",
+			generation: 1,
+			consecutiveFailures: 0,
+			synchronousConfirmed: false,
+		},
+		updatedAt: new Date().toISOString(),
+	};
+}
+
+async function getState(
+	env: Env,
+	registry: RegionConfig[],
+): Promise<StatusState> {
+	const state = defaultState(registry);
+	const row = await env.DB.prepare(
+		"SELECT value FROM status_state WHERE id = ?",
+	)
+		.bind(STATE_ID)
+		.first<{ value: string }>();
+	if (!row) return state;
+	try {
+		const value: unknown = JSON.parse(row.value);
+		if (!isRecord(value)) return state;
+		state.overall =
+			value.overall === "major_outage" || value.overall === "degraded"
+				? value.overall
+				: "operational";
+		state.components = componentMap(value.components);
+		state.activeIncidentId =
+			typeof value.activeIncidentId === "string"
+				? value.activeIncidentId
+				: undefined;
+		state.updatedAt =
+			typeof value.updatedAt === "string" ? value.updatedAt : state.updatedAt;
+		if (isRecord(value.database)) {
+			state.database.phase = [
+				"normal",
+				"investigating",
+				"promoting",
+				"active",
+				"blocked",
+			].includes(String(value.database.phase))
+				? (value.database.phase as typeof state.database.phase)
+				: "normal";
+			state.database.activeRegion =
+				value.database.activeRegion === "us-east" ? "us-east" : "eu-central";
+			state.database.generation = finiteNumber(value.database.generation) || 1;
+			state.database.consecutiveFailures =
+				finiteNumber(value.database.consecutiveFailures) || 0;
+			state.database.synchronousConfirmed =
+				value.database.synchronousConfirmed === true;
+		}
+		if (isRecord(value.productionMaintenance))
+			state.productionMaintenance = {
+				title: requiredString(
+					value.productionMaintenance.title,
+					"maintenance.title",
+				),
+				message: requiredString(
+					value.productionMaintenance.message,
+					"maintenance.message",
+				),
+				startsAt: requiredString(
+					value.productionMaintenance.startsAt,
+					"maintenance.startsAt",
+				),
+				lastVerifiedAt: requiredString(
+					value.productionMaintenance.lastVerifiedAt,
+					"maintenance.lastVerifiedAt",
+				),
+			};
+		if (isRecord(value.regions))
+			for (const region of registry) {
+				const persisted = value.regions[region.id];
+				if (!isRecord(persisted)) continue;
+				const runtime = state.regions[region.id];
+				runtime.phase = regionPhase(persisted.phase);
+				runtime.providerPhase = providerPhase(persisted.providerPhase);
+				runtime.activeDataplane =
+					typeof persisted.activeDataplane === "string" &&
+					registry.some((item) => item.id === persisted.activeDataplane)
+						? persisted.activeDataplane
+						: region.id;
+				runtime.failoverDataplane =
+					typeof persisted.failoverDataplane === "string"
+						? persisted.failoverDataplane
+						: undefined;
+				runtime.activeBackend =
+					typeof persisted.activeBackend === "string" &&
+					region.backends.some(
+						(backend) => backend.id === persisted.activeBackend,
+					)
+						? persisted.activeBackend
+						: primaryBackend(region).id;
+				runtime.writerGeneration = finiteNumber(persisted.writerGeneration);
+				runtime.backendGeneration = finiteNumber(persisted.backendGeneration);
+				runtime.consecutiveFailures =
+					finiteNumber(persisted.consecutiveFailures) || 0;
+				runtime.consecutiveRecoveries =
+					finiteNumber(persisted.consecutiveRecoveries) || 0;
+				runtime.recoveryHealthySince =
+					typeof persisted.recoveryHealthySince === "string"
+						? persisted.recoveryHealthySince
+						: undefined;
+				runtime.cleanupAfter =
+					typeof persisted.cleanupAfter === "string"
+						? persisted.cleanupAfter
+						: undefined;
+				runtime.cleanupNotified = persisted.cleanupNotified === true;
+				runtime.cleanupRequested = persisted.cleanupRequested === true;
+				runtime.manualRecoveryLock = persisted.manualRecoveryLock === true;
+				runtime.backendFailures = {
+					...runtime.backendFailures,
+					...numberMap(persisted.backendFailures),
+				};
+			}
+	} catch (error) {
+		logError("state_parse_failed", error);
+	}
+	return state;
+}
+
+async function putState(env: Env, state: StatusState): Promise<void> {
+	await env.DB.prepare(
+		"INSERT INTO status_state (id, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+	)
+		.bind(STATE_ID, JSON.stringify(state), state.updatedAt)
+		.run();
+}
+
+async function recordAvailability(
+	env: Env,
+	state: StatusState,
+	plannedMaintenance: boolean,
+): Promise<void> {
+	const global =
+		plannedMaintenance || state.components["global-s3"] === "operational"
+			? 1
+			: 0;
+	const dashboard =
+		plannedMaintenance || state.components["control-plane"] === "operational"
+			? 1
+			: 0;
+	const statements = [
+		env.DB.prepare(
+			"INSERT INTO uptime_checks (s3_operational, dashboard_operational, recorded_at) VALUES (?, ?, ?)",
+		).bind(global, dashboard, state.updatedAt),
+		...Object.entries(state.components).map(([id, status]) =>
+			env.DB.prepare(
+				"INSERT OR REPLACE INTO component_uptime_checks (component_id, operational, planned_maintenance, recorded_at) VALUES (?, ?, ?, ?)",
+			).bind(
+				id,
+				plannedMaintenance || status === "operational" ? 1 : 0,
+				plannedMaintenance ? 1 : 0,
+				state.updatedAt,
+			),
+		),
+		env.DB.prepare(
+			"DELETE FROM uptime_checks WHERE datetime(recorded_at) < datetime('now', '-91 days')",
+		),
+		env.DB.prepare(
+			"DELETE FROM component_uptime_checks WHERE datetime(recorded_at) < datetime('now', '-91 days')",
+		),
+	];
+	await env.DB.batch(statements);
+}
+
+async function operationsAdmin(
+	request: Request,
+	env: Env,
+	registry: RegionConfig[],
+): Promise<Response> {
+	if (!adminOriginAllowed(request, env))
+		return adminJson(request, env, { error: "origin not allowed" }, 403);
+	if (!(await secretMatches(request, env.STATUS_ADMIN_SECRET)))
+		return adminJson(request, env, { error: "unauthorized" }, 401);
+	const state = await getState(env, registry);
+	const snapshot = await takeSnapshot(env, registry, state);
+	const databaseAutomation = env as Env & { AUTO_FAILOVER_DATABASE?: string };
+	return adminJson(request, env, {
+		databaseHa: {
+			controller: "cloudflare-worker",
+			...state.database,
+			configured: Boolean(snapshot.database),
+			probes: snapshot.database || null,
+			automation: {
+				failover: databaseAutomation.AUTO_FAILOVER_DATABASE === "true",
+				drillApproved: env.FAILOVER_DRILL_APPROVED === "true",
+			},
+		},
+		regions: registry.map((region) => ({
+			id: region.id,
+			label: `${region.flag} ${region.label}`,
+			...state.regions[region.id],
+			backends: region.backends.map((backend) => ({
+				id: backend.id,
+				label: backend.label,
+				role: backend.role,
+				operational:
+					snapshot.backends[region.id]?.[backend.id]?.operational ?? false,
+				replication:
+					snapshot.dataplanes[state.regions[region.id].activeDataplane]
+						?.readiness.replication[region.id]?.[backend.id] || null,
+			})),
+		})),
+		automation: {
+			activateDataplane: autoActivate(env),
+			promoteStorage: autoPromoteStorage(env),
+			redirectDashboard: autoRedirectDashboard(env),
+			recover: env.AUTO_RECOVER !== "false",
+		},
+		productionMaintenance: state.productionMaintenance || null,
 		updatedAt: state.updatedAt,
 	});
 }
 
-async function maintenanceAdmin(request: Request, env: Env, pathname: string) {
-	if (!adminOriginAllowed(request, env)) return adminJson(request, env, { error: "origin not allowed" }, 403);
-	if (!secretMatches(request, env.STATUS_ADMIN_SECRET)) return adminJson(request, env, { error: "unauthorized" }, 401);
-	if (request.method === "GET" && pathname === "/api/admin/maintenance") {
-		return adminJson(request, env, { maintenance: await listMaintenance(env) });
-	}
-
-	const idMatch = pathname.match(/^\/api\/admin\/maintenance\/([^/]+)$/);
-	if (request.method === "DELETE" && idMatch) {
-		const result = await env.DB.prepare("DELETE FROM maintenance_windows WHERE id = ?").bind(decodeURIComponent(idMatch[1])).run();
-		if (Number(result.meta.changes || 0) !== 1) return adminJson(request, env, { error: "maintenance window not found" }, 404);
-		return adminJson(request, env, { ok: true, maintenance: await listMaintenance(env) });
-	}
-
-	if ((request.method === "POST" && pathname === "/api/admin/maintenance") || (request.method === "PATCH" && idMatch)) {
-		const input = await request.json<{ title?: unknown; message?: unknown; startsAt?: unknown; endsAt?: unknown }>().catch(() => ({}));
-		const title = typeof input.title === "string" ? input.title.trim() : "";
-		const message = typeof input.message === "string" ? input.message.trim() : "";
-		const startsAt = typeof input.startsAt === "string" ? new Date(input.startsAt) : new Date(NaN);
-		const endsAt = typeof input.endsAt === "string" ? new Date(input.endsAt) : new Date(NaN);
-		if (!title || title.length > 120) return adminJson(request, env, { error: "title must be 1 to 120 characters" }, 400);
-		if (!message || message.length > 1_000) return adminJson(request, env, { error: "message must be 1 to 1000 characters" }, 400);
-		if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime())) return adminJson(request, env, { error: "valid start and end times are required" }, 400);
-		if (endsAt <= startsAt) return adminJson(request, env, { error: "maintenance must end after it starts" }, 400);
-		if (endsAt.getTime() - startsAt.getTime() > 7 * 24 * 60 * 60_000) return adminJson(request, env, { error: "maintenance cannot exceed seven days" }, 400);
-		const id = idMatch ? decodeURIComponent(idMatch[1]) : crypto.randomUUID();
-		if (idMatch) {
-			const result = await env.DB.prepare("UPDATE maintenance_windows SET title = ?, message = ?, starts_at = ?, ends_at = ? WHERE id = ?").bind(title, message, startsAt.toISOString(), endsAt.toISOString(), id).run();
-			if (Number(result.meta.changes || 0) !== 1) return adminJson(request, env, { error: "maintenance window not found" }, 404);
-		} else {
-			await env.DB.prepare("INSERT INTO maintenance_windows (id, title, message, starts_at, ends_at) VALUES (?, ?, ?, ?, ?)").bind(id, title, message, startsAt.toISOString(), endsAt.toISOString()).run();
+async function operationsAction(
+	request: Request,
+	env: Env,
+	action: string,
+	registry: RegionConfig[],
+): Promise<Response> {
+	if (!adminOriginAllowed(request, env))
+		return adminJson(request, env, { error: "origin not allowed" }, 403);
+	if (!(await secretMatches(request, env.STATUS_ADMIN_SECRET)))
+		return adminJson(request, env, { error: "unauthorized" }, 401);
+	const input = await requestJsonRecord(request);
+	const regionId = stringField(input, "region");
+	const region = registry.find((candidate) => candidate.id === regionId);
+	const databaseAction = action.startsWith("database-");
+	if (!databaseAction && !region)
+		return adminJson(request, env, { error: "valid region is required" }, 400);
+	const leaseHolder = crypto.randomUUID();
+	if (!(await acquireMonitorLease(env, leaseHolder)))
+		return adminJson(
+			request,
+			env,
+			{ error: "another regional transition is already running" },
+			409,
+		);
+	try {
+		const state = await getState(env, registry);
+		const snapshot = await takeSnapshot(env, registry, state);
+		if (databaseAction) {
+			const databaseEnv = env as Env & {
+				DATABASE_EU?: Hyperdrive;
+				DATABASE_US?: Hyperdrive;
+				DATABASE_APP_ROLE?: string;
+				DATABASE_NAME?: string;
+			};
+			if (!snapshot.database)
+				return adminJson(
+					request,
+					env,
+					{ error: "database Hyperdrive bindings are not configured" },
+					409,
+				);
+			if (action === "database-enable-sync") {
+				const binding =
+					state.database.activeRegion === "eu-central"
+						? databaseEnv.DATABASE_EU
+						: databaseEnv.DATABASE_US;
+				if (!binding)
+					return adminJson(
+						request,
+						env,
+						{ error: "active database Hyperdrive binding is missing" },
+						409,
+					);
+				const standbyApplicationName =
+					stringField(input, "standbyApplicationName") ||
+					(state.database.activeRegion === "eu-central"
+						? "silo_us"
+						: "silo_eu");
+				await enableSynchronousReplication(
+					binding,
+					standbyApplicationName,
+					state.database.generation,
+				);
+				state.database.synchronousConfirmed = true;
+			} else if (action === "database-promote") {
+				if (regionId !== "eu-central" && regionId !== "us-east")
+					return adminJson(
+						request,
+						env,
+						{ error: "valid database region is required" },
+						400,
+					);
+				if (regionId === state.database.activeRegion)
+					return adminJson(
+						request,
+						env,
+						{ error: "target is already the active database region" },
+						409,
+					);
+				const candidate = snapshot.database[regionId];
+				if (
+					!state.database.synchronousConfirmed ||
+					!promotionEligible(candidate, state.database.generation)
+				)
+					return adminJson(
+						request,
+						env,
+						{ error: "target did not pass the lossless promotion gate" },
+						409,
+					);
+				const binding =
+					regionId === "eu-central"
+						? databaseEnv.DATABASE_EU
+						: databaseEnv.DATABASE_US;
+				if (!binding)
+					return adminJson(
+						request,
+						env,
+						{ error: "target database Hyperdrive binding is missing" },
+						409,
+					);
+				const promoted = await promoteDatabase(
+					regionId,
+					binding,
+					state.database.generation,
+					databaseEnv.DATABASE_APP_ROLE || "silo_app",
+					databaseEnv.DATABASE_NAME || "silo",
+				);
+				state.database.activeRegion = regionId;
+				state.database.generation =
+					promoted.generation || state.database.generation + 1;
+				state.database.consecutiveFailures = 0;
+				state.database.synchronousConfirmed = false;
+				state.database.phase = regionId === "eu-central" ? "normal" : "active";
+			} else if (action === "database-fence-stale") {
+				if (regionId !== "eu-central" && regionId !== "us-east")
+					return adminJson(
+						request,
+						env,
+						{ error: "valid database region is required" },
+						400,
+					);
+				if (regionId === state.database.activeRegion)
+					return adminJson(
+						request,
+						env,
+						{ error: "refusing to fence the active database region" },
+						409,
+					);
+				const binding =
+					regionId === "eu-central"
+						? databaseEnv.DATABASE_EU
+						: databaseEnv.DATABASE_US;
+				if (!binding)
+					return adminJson(
+						request,
+						env,
+						{ error: "target database Hyperdrive binding is missing" },
+						409,
+					);
+				await fenceDatabase(
+					binding,
+					databaseEnv.DATABASE_APP_ROLE || "silo_app",
+					databaseEnv.DATABASE_NAME || "silo",
+				);
+			} else {
+				return adminJson(request, env, { error: "unknown action" }, 404);
+			}
+			state.updatedAt = new Date().toISOString();
+			await putState(env, state);
+			return adminJson(request, env, { ok: true, databaseHa: state.database });
 		}
-		return adminJson(request, env, { ok: true, id, maintenance: await listMaintenance(env) }, idMatch ? 200 : 201);
+		if (!region)
+			return adminJson(
+				request,
+				env,
+				{ error: "valid region is required" },
+				400,
+			);
+		const runtime = state.regions[region.id];
+		if (action === "activate-failover") {
+			const target = chooseFailoverCandidate(
+				env,
+				registry,
+				snapshot,
+				region.id,
+			);
+			if (!target)
+				return adminJson(
+					request,
+					env,
+					{ error: "no healthy peer or authorization hook is available" },
+					409,
+				);
+			await activateDataplaneFailover(env, state, snapshot, region, target);
+		} else if (action === "force-failback") {
+			if (runtime.phase !== "active")
+				return adminJson(
+					request,
+					env,
+					{ error: "region is not running on a peer" },
+					409,
+				);
+			if (
+				!snapshot.homeReadOnly[region.id] ||
+				!dataplaneAvailable(snapshot.dataplanes[region.id])
+			)
+				return adminJson(
+					request,
+					env,
+					{ error: "home dataplane has not passed recovery checks" },
+					409,
+				);
+			await failbackDataplane(env, state, snapshot, region, runtime);
+		} else if (
+			action === "hold-auto-recovery" ||
+			action === "resume-auto-recovery"
+		) {
+			runtime.manualRecoveryLock = action === "hold-auto-recovery";
+			await addUpdate(
+				env,
+				state,
+				"monitoring",
+				`${region.flag} ${region.label} automatic failback ${runtime.manualRecoveryLock ? "held" : "resumed"} by an operator.`,
+			);
+		} else if (action === "promote-backend") {
+			const backendId = stringField(input, "backendId");
+			if (
+				!backendId ||
+				!region.backends.some((backend) => backend.id === backendId)
+			)
+				return adminJson(
+					request,
+					env,
+					{ error: "valid backendId is required" },
+					400,
+				);
+			await promoteBackend(env, state, snapshot, region, runtime, backendId);
+		} else return adminJson(request, env, { error: "unknown action" }, 404);
+		state.updatedAt = new Date().toISOString();
+		await putState(env, state);
+		return adminJson(request, env, { ok: true, region: runtime });
+	} finally {
+		await releaseMonitorLease(env, leaseHolder).catch((error) =>
+			logError("operator_lease_release_failed", error),
+		);
 	}
+}
 
+async function incidentAdmin(
+	request: Request,
+	env: Env,
+	pathname: string,
+	registry: RegionConfig[],
+): Promise<Response> {
+	if (!adminOriginAllowed(request, env))
+		return adminJson(request, env, { error: "origin not allowed" }, 403);
+	if (
+		!(await secretMatches(
+			request,
+			env.STATUS_INCIDENT_PASSWORD || env.STATUS_ADMIN_SECRET,
+		))
+	)
+		return adminJson(request, env, { error: "unauthorized" }, 401);
+	if (request.method === "GET" && pathname === "/api/admin/incidents") {
+		const state = await getState(env, registry);
+		const incidents = await env.DB.prepare(
+			"SELECT id, status, title, started_at AS startedAt, resolved_at AS resolvedAt, acknowledged_at AS acknowledgedAt, acknowledgement_message AS acknowledgementMessage FROM incidents ORDER BY datetime(started_at) DESC LIMIT 25",
+		).all();
+		const notes = await env.DB.prepare(
+			"SELECT id, incident_id AS incidentId, message, created_at AS createdAt, updated_at AS updatedAt FROM incident_notes ORDER BY datetime(created_at) DESC LIMIT 250",
+		).all();
+		return adminJson(request, env, {
+			activeIncidentId: state.activeIncidentId,
+			incidents: incidents.results,
+			notes: notes.results,
+		});
+	}
+	const incidentMatch = pathname.match(
+		/^\/api\/admin\/incidents\/([^/]+)\/(acknowledge|notes)$/,
+	);
+	if (request.method === "POST" && incidentMatch) {
+		const incidentId = decodeURIComponent(incidentMatch[1]);
+		const incident = await env.DB.prepare(
+			"SELECT id, status, acknowledged_at AS acknowledgedAt FROM incidents WHERE id = ?",
+		)
+			.bind(incidentId)
+			.first<{ id: string; status: string; acknowledgedAt: string | null }>();
+		if (!incident)
+			return adminJson(request, env, { error: "incident not found" }, 404);
+		const input = await requestJsonRecord(request);
+		if (incidentMatch[2] === "acknowledge") {
+			if (incident.status !== "open")
+				return adminJson(
+					request,
+					env,
+					{ error: "only open incidents can be acknowledged" },
+					409,
+				);
+			if (incident.acknowledgedAt)
+				return adminJson(request, env, { ok: true, alreadyAcknowledged: true });
+			const message =
+				optionalMessage(input.message, 500) ||
+				"The Silo team has acknowledged this incident and is investigating.";
+			const now = new Date().toISOString();
+			await env.DB.batch([
+				env.DB.prepare(
+					"UPDATE incidents SET acknowledged_at = ?, acknowledgement_message = ? WHERE id = ?",
+				).bind(now, message, incidentId),
+				env.DB.prepare(
+					"INSERT INTO incident_updates (incident_id, status, message, created_at) VALUES (?, ?, ?, ?)",
+				).bind(incidentId, "acknowledged", message, now),
+			]);
+			return adminJson(request, env, { ok: true, acknowledgedAt: now });
+		}
+		const message = requiredMessage(input.message, 2_000);
+		if (message instanceof Response)
+			return withAdminCors(request, env, message);
+		const now = new Date().toISOString(),
+			id = crypto.randomUUID();
+		await env.DB.prepare(
+			"INSERT INTO incident_notes (id, incident_id, message, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+		)
+			.bind(id, incidentId, message, now, now)
+			.run();
+		return adminJson(
+			request,
+			env,
+			{
+				ok: true,
+				note: { id, incidentId, message, createdAt: now, updatedAt: now },
+			},
+			201,
+		);
+	}
+	const noteMatch = pathname.match(/^\/api\/admin\/notes\/([^/]+)$/);
+	if (noteMatch && ["PATCH", "DELETE"].includes(request.method)) {
+		const noteId = decodeURIComponent(noteMatch[1]);
+		if (
+			!(await env.DB.prepare("SELECT id FROM incident_notes WHERE id = ?")
+				.bind(noteId)
+				.first())
+		)
+			return adminJson(request, env, { error: "note not found" }, 404);
+		if (request.method === "DELETE") {
+			await env.DB.prepare("DELETE FROM incident_notes WHERE id = ?")
+				.bind(noteId)
+				.run();
+			return adminJson(request, env, { ok: true });
+		}
+		const message = requiredMessage(
+			(await requestJsonRecord(request)).message,
+			2_000,
+		);
+		if (message instanceof Response)
+			return withAdminCors(request, env, message);
+		const updatedAt = new Date().toISOString();
+		await env.DB.prepare(
+			"UPDATE incident_notes SET message = ?, updated_at = ? WHERE id = ?",
+		)
+			.bind(message, updatedAt, noteId)
+			.run();
+		return adminJson(request, env, { ok: true, updatedAt });
+	}
 	return adminJson(request, env, { error: "not found" }, 404);
 }
 
-async function listMaintenance(env: Env) {
-	const result = await env.DB.prepare("SELECT id, title, message, starts_at AS startsAt, ends_at AS endsAt FROM maintenance_windows WHERE datetime(ends_at) >= datetime('now') ORDER BY datetime(starts_at) ASC LIMIT 25").all();
-	return result.results;
+async function maintenanceAdmin(
+	request: Request,
+	env: Env,
+	pathname: string,
+): Promise<Response> {
+	if (!adminOriginAllowed(request, env))
+		return adminJson(request, env, { error: "origin not allowed" }, 403);
+	if (!(await secretMatches(request, env.STATUS_ADMIN_SECRET)))
+		return adminJson(request, env, { error: "unauthorized" }, 401);
+	if (request.method === "GET" && pathname === "/api/admin/maintenance") {
+		const rows = await env.DB.prepare(
+			"SELECT id, title, message, starts_at AS startsAt, ends_at AS endsAt FROM maintenance_windows WHERE datetime(ends_at) >= datetime('now', '-1 day') ORDER BY datetime(starts_at) ASC LIMIT 50",
+		).all();
+		return adminJson(request, env, { maintenance: rows.results });
+	}
+	if (request.method === "POST" && pathname === "/api/admin/maintenance") {
+		const input = await requestJsonRecord(request);
+		const title = requiredMessage(input.title, 120),
+			message = requiredMessage(input.message, 1_000);
+		if (title instanceof Response) return withAdminCors(request, env, title);
+		if (message instanceof Response)
+			return withAdminCors(request, env, message);
+		const startsAt = typeof input.startsAt === "string" ? input.startsAt : "",
+			endsAt = typeof input.endsAt === "string" ? input.endsAt : "";
+		if (
+			!Date.parse(startsAt) ||
+			!Date.parse(endsAt) ||
+			Date.parse(endsAt) <= Date.parse(startsAt)
+		)
+			return adminJson(
+				request,
+				env,
+				{ error: "invalid maintenance range" },
+				400,
+			);
+		const id = crypto.randomUUID();
+		await env.DB.prepare(
+			"INSERT INTO maintenance_windows (id, title, message, starts_at, ends_at) VALUES (?, ?, ?, ?, ?)",
+		)
+			.bind(id, title, message, startsAt, endsAt)
+			.run();
+		return adminJson(request, env, { ok: true, id }, 201);
+	}
+	const match = pathname.match(/^\/api\/admin\/maintenance\/([^/]+)$/);
+	if (request.method === "DELETE" && match) {
+		await env.DB.prepare("DELETE FROM maintenance_windows WHERE id = ?")
+			.bind(decodeURIComponent(match[1]))
+			.run();
+		return adminJson(request, env, { ok: true });
+	}
+	return adminJson(request, env, { error: "not found" }, 404);
 }
 
-function optionalMessage(value: unknown, maxLength: number) {
-	if (typeof value !== "string") return "";
-	return value.trim().slice(0, maxLength);
-}
-
-function requiredMessage(value: unknown, maxLength: number): string | Response {
-	if (typeof value !== "string" || !value.trim()) return json({ error: "message is required" }, 400);
-	const message = value.trim();
-	if (message.length > maxLength) return json({ error: `message must be ${maxLength} characters or fewer` }, 400);
-	return message;
-}
-
-async function admin(request: Request, env: Env, action: string) {
-	if (!adminOriginAllowed(request, env)) return adminJson(request, env, { error: "origin not allowed" }, 403);
-	if (!secretMatches(request, env.STATUS_ADMIN_SECRET)) return adminJson(request, env, { error: "unauthorized" }, 401);
-	const state = await getState(env);
-	if (action === "provision") {
-		if (["provisioning", "ready", "active", "recovering"].includes(state.failoverPhase)) return adminJson(request, env, { error: "an emergency recovery path already exists" }, 409);
-		const incidentId = state.activeIncidentId || crypto.randomUUID();
-		await dispatch(env, "provision_emergency", { callback_url: env.STATUS_CALLBACK_URL, incident_id: incidentId });
-		if (!state.activeIncidentId) {
-			state.activeIncidentId = incidentId;
-			await env.DB.prepare("INSERT INTO incidents (id, status, title, started_at) VALUES (?, ?, ?, ?)").bind(incidentId, "open", "Emergency recovery drill", new Date().toISOString()).run();
-		}
-		state.failoverPhase = "provisioning";
-		state.provisioningStep = "server_requested";
-		state.overall = "degraded";
-		await addUpdate(env, state, "monitoring", "Emergency provisioning started manually. Dashboard traffic remains on the healthy primary.");
-	}
-	else if (action === "activate") {
-		if (state.failoverPhase !== "ready" || state.provisioningStep !== "verified") return adminJson(request, env, { error: "emergency must pass readiness and storage verification before activation" }, 409);
-		if (!state.emergencyIp) return adminJson(request, env, { error: "emergency server has no IP" }, 409);
-		await activateEmergency(env, state, "Emergency failover activated manually.");
-	}
-	else if (action === "force-failback") {
-		if (state.failoverPhase !== "active") return adminJson(request, env, { error: "failback is only available while emergency traffic is active" }, 409);
-		await activatePrimary(env); await pointDashboardAtPrimary(env); state.failoverPhase = "recovering"; state.destroyAfter = new Date(Date.now() + GRACE_MS).toISOString(); await addUpdate(env, state, "monitoring", "The Aiven writer lease and DNS returned to primary manually; emergency cleanup will wait ten minutes.");
-	}
-	else if (action === "disable-auto-recovery") {
-		if (!["active", "recovering"].includes(state.failoverPhase)) return adminJson(request, env, { error: "there is no active recovery to hold" }, 409);
-		state.manualRecoveryLock = true; await addUpdate(env, state, "monitoring", "Automatic recovery disabled by an administrator.");
-	}
-	else if (action === "abort" || action === "destroy") {
-		if (!state.emergencyServerId) return adminJson(request, env, { error: "there is no emergency server to delete" }, 409);
-		const accountingRequired = ["active", "recovering"].includes(state.failoverPhase); const resolving = state.failoverPhase === "recovering"; await dispatch(env, "destroy_emergency", { server_id: state.emergencyServerId, safe_to_delete: !accountingRequired, primary_dns_confirmed: resolving, resolve_incident: resolving, accounting_required: accountingRequired, incident_id: state.activeIncidentId }); await addUpdate(env, state, "monitoring", "Emergency server cleanup requested manually.");
-	}
-	else return adminJson(request, env, { error: "unknown action" }, 404);
-	state.updatedAt = new Date().toISOString(); await putState(env, state); return adminJson(request, env, { ok: true, state });
-}
-
-async function activateEmergency(env: Env, state: StatusState, message: string) {
-	if (!state.emergencyIp) throw new Error("cannot activate an emergency server without an IP");
-	const emergencyReady = env.EMERGENCY_READY_URL || `https://${env.EMERGENCY_DNS_NAME || "emergency-origin.onsilo.dev"}/ready`;
-	await setDrain(env, emergencyReady, false);
-	await claimWriter(env, emergencyReady);
-	const origin = env.EMERGENCY_S3_CANARY_URL || `https://${env.EMERGENCY_DNS_NAME || "emergency-origin.onsilo.dev"}`;
-	if (!await s3Canary(env, origin).catch(() => false)) {
-		await claimWriter(env, env.PRIMARY_READY_URL).catch(() => undefined);
-		throw new Error("emergency write canary failed after writer lease transfer");
-	}
-	try {
-		await pointS3AtEmergency(env, state.emergencyIp);
-	} catch (error) {
-		await claimWriter(env, env.PRIMARY_READY_URL).catch(() => undefined);
-		throw error;
-	}
-	await pointDashboardAtStatus(env);
-	state.failoverPhase = "active"; state.provisioningStep = "active"; state.overall = "degraded";
-	setS3Components(state, { health: true, ready: true, canary: true });
-	state.components.dashboard = "outage"; state.components.failover = "operational"; state.consecutiveRecoveries = 0; state.recoveryHealthySince = undefined;
-	await addUpdate(env, state, "monitoring", message);
-	await notifyMaintainers(env, "failover_active", "S3 traffic is now using the temporary Hetzner dataplane.");
-}
-async function activatePrimaryWriter(env: Env) {
-	await claimWriter(env, env.PRIMARY_READY_URL);
-	if (!await s3Canary(env, env.PRIMARY_S3_CANARY_URL).catch(() => false)) {
-		throw new Error("primary write canary failed after writer lease transfer");
-	}
-}
-async function activatePrimary(env: Env) {
-	const emergencyReady = env.EMERGENCY_READY_URL || `https://${env.EMERGENCY_DNS_NAME || "emergency-origin.onsilo.dev"}/ready`;
-	await setDrain(env, emergencyReady, true);
-	try {
-		await activatePrimaryWriter(env);
-		await pointS3AtPrimary(env);
-	} catch (error) {
-		await claimWriter(env, emergencyReady).catch(() => undefined);
-		await setDrain(env, emergencyReady, false).catch(() => undefined);
-		throw error;
-	}
-}
-async function claimWriter(env: Env, readinessUrl: string) {
-	const url = new URL(readinessUrl);
-	url.pathname = "/api/internal/writer/claim";
-	url.search = "";
-	const response = await fetch(url, { method: "POST", headers: { "x-dataplane-secret": env.DATAPLANE_INTERNAL_SECRET } });
-	if (!response.ok) throw new Error(`writer lease transfer failed: ${response.status}`);
-}
-async function setDrain(env: Env, readinessUrl: string, enabled: boolean) {
-	const url = new URL(readinessUrl);
-	url.pathname = "/api/internal/drain";
-	url.search = "";
-	const response = await fetch(url, { method: "POST", headers: { "x-dataplane-secret": env.DATAPLANE_INTERNAL_SECRET, "content-type": "application/json" }, body: JSON.stringify({ enabled }) });
-	if (!response.ok) throw new Error(`dataplane drain update failed: ${response.status}`);
-}
-function autoActivate(env: Env) { return env.AUTO_ACTIVATE_FAILOVER === "true" && env.FAILOVER_DRILL_APPROVED === "true"; }
-function autoProvision(env: Env) { return env.AUTO_PROVISION_FAILOVER === "true" && env.FAILOVER_DRILL_APPROVED === "true"; }
-function autoRedirectDashboard(env: Env) { return env.AUTO_REDIRECT_DASHBOARD === "true" && env.FAILOVER_DRILL_APPROVED === "true"; }
-function autoRecover(env: Env, state: StatusState) { return env.AUTO_RECOVER !== "false" && !state.manualRecoveryLock; }
-
-async function pointS3AtEmergency(env: Env, ip: string) { await updateARecord(env, env.CF_S3_RECORD_ID, env.S3_DNS_NAME || "onsilo.dev", ip); await removePrimaryAaaa(env); }
-async function pointS3AtPrimary(env: Env) { await updateARecord(env, env.CF_S3_RECORD_ID, env.S3_DNS_NAME || "onsilo.dev", env.PRIMARY_IPV4); await restorePrimaryAaaa(env); }
-async function pointS3AtFallback(env: Env) { await cloudflare(env, `/zones/${env.CF_ZONE_ID}/dns_records/${env.CF_S3_RECORD_ID}`, "PUT", { type: "A", name: env.S3_DNS_NAME || "onsilo.dev", content: "192.0.2.1", ttl: 1, proxied: true }); await removePrimaryAaaa(env); }
-async function pointDashboardAtStatus(env: Env) {
-	if (!env.CF_DASHBOARD_RECORD_ID) return;
-	await cloudflare(env, `/zones/${env.CF_ZONE_ID}/dns_records/${env.CF_DASHBOARD_RECORD_ID}`, "PUT", { type: "A", name: env.DASHBOARD_DNS_NAME || "dash.onsilo.dev", content: "192.0.2.1", ttl: 1, proxied: true });
-}
-async function pointDashboardAtPrimary(env: Env) {
-	if (!env.CF_DASHBOARD_RECORD_ID) return;
-	await cloudflare(env, `/zones/${env.CF_ZONE_ID}/dns_records/${env.CF_DASHBOARD_RECORD_ID}`, "PUT", { type: "A", name: env.DASHBOARD_DNS_NAME || "dash.onsilo.dev", content: env.PRIMARY_DASHBOARD_IPV4 || env.PRIMARY_IPV4, ttl: 60, proxied: false });
-}
-async function pointEmergencyHostnameAt(env: Env, ip: string) { if (ip) await updateARecord(env, env.CF_EMERGENCY_RECORD_ID, env.EMERGENCY_DNS_NAME || "emergency-origin.onsilo.dev", ip); }
-async function updateARecord(env: Env, id: string, name: string, content: string) { await cloudflare(env, `/zones/${env.CF_ZONE_ID}/dns_records/${id}`, "PUT", { type: "A", name, content, ttl: 60, proxied: false }); }
-async function removePrimaryAaaa(env: Env) {
-	for (const record of await listDnsRecords(env, "AAAA", env.S3_DNS_NAME || "onsilo.dev")) {
-		await cloudflare(env, `/zones/${env.CF_ZONE_ID}/dns_records/${record.id}`, "DELETE");
-	}
-}
-async function restorePrimaryAaaa(env: Env) {
-	if (!env.PRIMARY_IPV6) return;
-	const name = env.S3_DNS_NAME || "onsilo.dev";
-	const records = await listDnsRecords(env, "AAAA", name);
-	if (records.some((record) => record.content === env.PRIMARY_IPV6)) return;
-	for (const record of records) await cloudflare(env, `/zones/${env.CF_ZONE_ID}/dns_records/${record.id}`, "DELETE");
-	await cloudflare(env, `/zones/${env.CF_ZONE_ID}/dns_records`, "POST", { type: "AAAA", name, content: env.PRIMARY_IPV6, ttl: 60, proxied: false });
-}
-async function listDnsRecords(env: Env, type: string, name: string) {
-	const result = await cloudflare<{ result: Array<{ id: string; content: string }> }>(env, `/zones/${env.CF_ZONE_ID}/dns_records?type=${encodeURIComponent(type)}&name=${encodeURIComponent(name)}`, "GET");
-	return result.result || [];
-}
-async function cloudflare<T = unknown>(env: Env, path: string, method: string, body?: unknown): Promise<T> {
-	const response = await fetch(`${env.CLOUDFLARE_API_BASE || "https://api.cloudflare.com/client/v4"}${path}`, { method, headers: { authorization: `Bearer ${env.CF_DNS_TOKEN}`, ...(body ? { "content-type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
-	if (!response.ok) throw new Error(`Cloudflare DNS update failed: ${response.status}`);
-	if (response.status === 204) return {} as T;
-	return response.json<T>();
-}
-
-async function dispatch(env: Env, eventType: string, clientPayload: Record<string, unknown>) {
-	if (!env.GITHUB_DISPATCH_TOKEN || !env.GITHUB_OWNER || !env.GITHUB_REPO) throw new Error("GitHub dispatch is not configured");
-	const response = await fetch(`${env.GITHUB_API_BASE || "https://api.github.com"}/repos/${env.GITHUB_OWNER}/${env.GITHUB_REPO}/dispatches`, { method: "POST", headers: { accept: "application/vnd.github+json", authorization: `Bearer ${env.GITHUB_DISPATCH_TOKEN}`, "content-type": "application/json", "user-agent": "silo-status-controller" }, body: JSON.stringify({ event_type: eventType, client_payload: clientPayload }) });
-	if (!response.ok) throw new Error(`GitHub dispatch failed: ${response.status}`);
-}
-
-async function notifyMaintainers(env: Env, event: string, message: string) {
-	if (!env.ALERT_WEBHOOK_URL) return;
-	try {
-		await fetch(env.ALERT_WEBHOOK_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source: "silo-status", event, message, statusUrl: "https://status.onsilo.dev" }) });
-	} catch {
-		// Alerting must never prevent failover state or DNS changes from progressing.
-	}
-}
-
-async function recordAvailability(env: Env, state: StatusState, plannedMaintenance = false) {
-	const s3Operational = plannedMaintenance || [state.components.s3Api, state.components.uploads, state.components.downloads, state.components.authentication].every((value) => value === "operational") ? 1 : 0;
-	const dashboardOperational = plannedMaintenance || state.components.dashboard === "operational" ? 1 : 0;
-	await env.DB.batch([
-		env.DB.prepare("INSERT INTO uptime_checks (s3_operational, dashboard_operational, recorded_at) VALUES (?, ?, ?)").bind(s3Operational, dashboardOperational, state.updatedAt),
-		env.DB.prepare("DELETE FROM uptime_checks WHERE datetime(recorded_at) < datetime('now', '-91 days')"),
-	]);
-}
-
-async function getActiveMaintenance(env: Env) {
-	return env.DB.prepare("SELECT id, title, message, starts_at AS startsAt, ends_at AS endsAt FROM maintenance_windows WHERE datetime(starts_at) <= datetime('now') AND datetime(ends_at) >= datetime('now') ORDER BY datetime(starts_at) ASC LIMIT 1").first<{ id: string; title: string; message: string; startsAt: string; endsAt: string }>();
-}
-
-async function getState(env: Env): Promise<StatusState> { const row = await env.DB.prepare("SELECT value FROM status_state WHERE id = ?").bind(STATE_ID).first<{ value: string }>(); return row ? { ...defaultState(), ...JSON.parse(row.value) } : defaultState(); }
-async function putState(env: Env, state: StatusState) { await env.DB.prepare("INSERT INTO status_state (id, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(STATE_ID, JSON.stringify(state), state.updatedAt).run(); }
-async function openIncident(env: Env, state: StatusState, message: string, title = "S3 service disruption") { if (state.activeIncidentId) { await addUpdate(env, state, "investigating", message); return; } const id = crypto.randomUUID(); state.activeIncidentId = id; await env.DB.prepare("INSERT INTO incidents (id, status, title, started_at) VALUES (?, ?, ?, ?)").bind(id, "open", title, new Date().toISOString()).run(); await addUpdate(env, state, "investigating", message); }
-async function addUpdate(env: Env, state: StatusState, status: string, message: string) { if (!state.activeIncidentId) return; await env.DB.prepare("INSERT INTO incident_updates (incident_id, status, message, created_at) VALUES (?, ?, ?, ?)").bind(state.activeIncidentId, status, message, new Date().toISOString()).run(); }
-async function resolveIncident(env: Env, state: StatusState, message: string) { await addUpdate(env, state, "resolved", message); if (state.activeIncidentId) await env.DB.prepare("UPDATE incidents SET status = 'resolved', resolved_at = ? WHERE id = ?").bind(new Date().toISOString(), state.activeIncidentId).run(); state.activeIncidentId = undefined; }
-async function publicStatus(env: Env) {
-	const state = await getState(env);
-	const incidents = await env.DB.prepare("SELECT id, status, title, started_at AS startedAt, resolved_at AS resolvedAt, acknowledged_at AS acknowledgedAt, acknowledgement_message AS acknowledgementMessage FROM incidents ORDER BY datetime(started_at) DESC LIMIT 10").all();
-	const updates = state.activeIncidentId ? await env.DB.prepare("SELECT status, message, created_at as createdAt FROM incident_updates WHERE incident_id = ? ORDER BY id DESC LIMIT 20").bind(state.activeIncidentId).all() : { results: [] };
-	const notes = await env.DB.prepare("SELECT id, incident_id AS incidentId, message, created_at AS createdAt, updated_at AS updatedAt FROM incident_notes ORDER BY datetime(created_at) DESC LIMIT 100").all();
-	const uptime = await env.DB.prepare("SELECT COUNT(*) AS samples, COALESCE(SUM(s3_operational), 0) AS s3Ok, COALESCE(SUM(dashboard_operational), 0) AS dashboardOk, MIN(recorded_at) AS firstAt FROM uptime_checks WHERE datetime(recorded_at) >= datetime('now', '-90 days')").first<{ samples: number; s3Ok: number; dashboardOk: number; firstAt: string | null }>();
-	const uptimeHistory = await env.DB.prepare("SELECT substr(recorded_at, 1, 10) AS day, COUNT(*) AS samples, SUM(s3_operational) AS s3Ok, SUM(dashboard_operational) AS dashboardOk FROM uptime_checks WHERE datetime(recorded_at) >= datetime('now', '-90 days') GROUP BY substr(recorded_at, 1, 10) ORDER BY day ASC").all<{ day: string; samples: number; s3Ok: number; dashboardOk: number }>();
-	const maintenance = await env.DB.prepare("SELECT id, title, message, starts_at AS startsAt, ends_at AS endsAt FROM maintenance_windows WHERE datetime(ends_at) >= datetime('now') ORDER BY datetime(starts_at) ASC LIMIT 10").all();
-	const productionMaintenance = state.productionMaintenance ? { id: "production-maintenance", title: state.productionMaintenance.title, message: state.productionMaintenance.message, startsAt: state.productionMaintenance.startsAt, endsAt: null } : null;
-	const activeMaintenance = productionMaintenance || (maintenance.results as Array<{ startsAt: string; endsAt: string }>).find((window) => Date.parse(window.startsAt) <= Date.now() && Date.parse(window.endsAt) >= Date.now()) || null;
-	const publishedMaintenance = productionMaintenance ? [productionMaintenance, ...maintenance.results] : maintenance.results;
-	const healthyMinutes = state.recoveryHealthySince ? Math.max(0, Math.floor((Date.now() - Date.parse(state.recoveryHealthySince)) / 60_000)) : 0;
-	const uptimeSamples = Number(uptime?.samples || 0);
-	const uptimeStart = uptime?.firstAt ? Math.max(Date.parse(uptime.firstAt), Date.now() - 90 * 24 * 60 * 60 * 1000) : Date.now();
-	const expectedSamples = uptimeSamples ? Math.max(uptimeSamples, Math.floor((Date.now() - uptimeStart) / 60_000) + 1) : 0;
-	const uptimePercent = (successful: number) => expectedSamples ? Math.round((100_000 * Number(successful || 0)) / expectedSamples) / 1000 : null;
-	const history = (uptimeHistory.results || []).map((row) => ({
+async function publicStatus(
+	env: Env,
+	registry: RegionConfig[],
+): Promise<unknown> {
+	const state = await getState(env, registry);
+	const databaseAutomation = env as Env & { AUTO_FAILOVER_DATABASE?: string };
+	const incidents = await env.DB.prepare(
+		"SELECT id, status, title, started_at AS startedAt, resolved_at AS resolvedAt, acknowledged_at AS acknowledgedAt, acknowledgement_message AS acknowledgementMessage FROM incidents ORDER BY datetime(started_at) DESC LIMIT 10",
+	).all();
+	const updates = state.activeIncidentId
+		? await env.DB.prepare(
+				"SELECT status, message, created_at AS createdAt FROM incident_updates WHERE incident_id = ? ORDER BY id DESC LIMIT 30",
+			)
+				.bind(state.activeIncidentId)
+				.all()
+		: { results: [] };
+	const notes = await env.DB.prepare(
+		"SELECT id, incident_id AS incidentId, message, created_at AS createdAt, updated_at AS updatedAt FROM incident_notes ORDER BY datetime(created_at) DESC LIMIT 100",
+	).all();
+	const maintenance = await env.DB.prepare(
+		"SELECT id, title, message, starts_at AS startsAt, ends_at AS endsAt FROM maintenance_windows WHERE datetime(ends_at) >= datetime('now') ORDER BY datetime(starts_at) ASC LIMIT 10",
+	).all();
+	const uptime = await env.DB.prepare(
+		"SELECT COUNT(*) AS samples, COALESCE(SUM(s3_operational), 0) AS s3Ok, COALESCE(SUM(dashboard_operational), 0) AS dashboardOk, MIN(recorded_at) AS firstAt FROM uptime_checks WHERE datetime(recorded_at) >= datetime('now', '-90 days')",
+	).first<{
+		samples: number;
+		s3Ok: number;
+		dashboardOk: number;
+		firstAt: string | null;
+	}>();
+	const uptimeHistory = await env.DB.prepare(
+		"SELECT substr(recorded_at, 1, 10) AS day, COUNT(*) AS samples, SUM(s3_operational) AS s3Ok, SUM(dashboard_operational) AS dashboardOk FROM uptime_checks WHERE datetime(recorded_at) >= datetime('now', '-90 days') GROUP BY substr(recorded_at, 1, 10) ORDER BY day ASC",
+	).all<{ day: string; samples: number; s3Ok: number; dashboardOk: number }>();
+	const componentUptime = await env.DB.prepare(
+		"SELECT component_id AS componentId, COUNT(*) AS samples, SUM(operational) AS operational, SUM(planned_maintenance) AS plannedMaintenance, MIN(recorded_at) AS firstAt FROM component_uptime_checks WHERE datetime(recorded_at) >= datetime('now', '-90 days') GROUP BY component_id",
+	).all<{
+		componentId: string;
+		samples: number;
+		operational: number;
+		plannedMaintenance: number;
+		firstAt: string;
+	}>();
+	const componentDefinitions = definitions(registry);
+	const production = state.productionMaintenance
+		? {
+				id: "production-maintenance",
+				...state.productionMaintenance,
+				endsAt: null,
+			}
+		: null;
+	const activeMaintenance =
+		production ||
+		(maintenance.results as Array<{ startsAt: string; endsAt: string }>).find(
+			(item) =>
+				Date.parse(item.startsAt) <= Date.now() &&
+				Date.parse(item.endsAt) >= Date.now(),
+		) ||
+		null;
+	const samples = Number(uptime?.samples || 0);
+	const uptimeStart = uptime?.firstAt
+		? Math.max(Date.parse(uptime.firstAt), Date.now() - 90 * 24 * 60 * 60_000)
+		: Date.now();
+	const expectedSamples = samples
+		? Math.max(samples, Math.floor((Date.now() - uptimeStart) / 60_000) + 1)
+		: 0;
+	const percent = (value: number, denominator = expectedSamples) =>
+		denominator
+			? Math.round((100_000 * Number(value || 0)) / denominator) / 1000
+			: null;
+	const history = uptimeHistory.results.map((row) => ({
 		day: row.day,
 		samples: Number(row.samples || 0),
-		s3: Number(row.samples) ? Math.round((10_000 * Number(row.s3Ok || 0)) / Number(row.samples)) / 100 : null,
-		dashboard: Number(row.samples) ? Math.round((10_000 * Number(row.dashboardOk || 0)) / Number(row.samples)) / 100 : null,
+		s3: percent(row.s3Ok, Number(row.samples)),
+		dashboard: percent(row.dashboardOk, Number(row.samples)),
 	}));
-	const components = { ...defaultState().components, ...state.components };
-	return { overall: state.overall, components, failoverPhase: state.failoverPhase, provisioningStep: state.provisioningStep, activeIncidentId: state.activeIncidentId, updatedAt: state.updatedAt, activeMaintenance, recovery: { successfulChecks: Math.min(state.consecutiveRecoveries, RECOVERY_THRESHOLD), requiredChecks: RECOVERY_THRESHOLD, healthyMinutes: Math.min(healthyMinutes, 10), requiredHealthyMinutes: 10, cleanupAfter: state.destroyAfter }, uptime: { windowDays: 90, samples: uptimeSamples, expectedSamples, s3: uptimePercent(uptime?.s3Ok || 0), dashboard: uptimePercent(uptime?.dashboardOk || 0), history }, maintenance: publishedMaintenance, incidents: incidents.results, updates: updates.results, notes: notes.results };
+	const componentAvailability = Object.fromEntries(
+		componentUptime.results.map((row) => {
+			const firstAt = Math.max(
+				Date.parse(row.firstAt),
+				Date.now() - 90 * 24 * 60 * 60_000,
+			);
+			const expected = Math.max(
+				Number(row.samples),
+				Math.floor((Date.now() - firstAt) / 60_000) + 1,
+			);
+			return [
+				row.componentId,
+				{
+					samples: Number(row.samples),
+					expectedSamples: expected,
+					plannedMaintenanceSamples: Number(row.plannedMaintenance),
+					availability: percent(row.operational, expected),
+				},
+			];
+		}),
+	);
+	const legacyComponents: Record<string, ComponentStatus> = {
+		dashboard: state.components["control-plane"] || "unknown",
+		database:
+			state.components["postgresql-ha"] ||
+			state.components["aiven-postgresql"] ||
+			"unknown",
+		storage: state.components["global-s3"] || "unknown",
+		s3Api: state.components["global-s3"] || "unknown",
+		uploads: state.components["global-s3"] || "unknown",
+		downloads: state.components["global-s3"] || "unknown",
+		authentication: state.components["global-s3"] || "unknown",
+	};
+	return {
+		overall: state.overall,
+		databaseHa: {
+			controller: "cloudflare-worker",
+			...state.database,
+			configured: "postgresql-ha" in state.components,
+			automationEnabled: databaseAutomation.AUTO_FAILOVER_DATABASE === "true",
+			drillApproved: env.FAILOVER_DRILL_APPROVED === "true",
+		},
+		components: { ...state.components, ...legacyComponents },
+		componentDefinitions,
+		componentAvailability,
+		regions: publicRegionStates(registry, state),
+		failoverPhase: aggregatePhase(registry, state),
+		activeIncidentId: state.activeIncidentId,
+		updatedAt: state.updatedAt,
+		activeMaintenance,
+		maintenance: production
+			? [production, ...maintenance.results]
+			: maintenance.results,
+		incidents: incidents.results,
+		updates: updates.results,
+		notes: notes.results,
+		uptime: {
+			windowDays: 90,
+			samples,
+			expectedSamples,
+			s3: percent(uptime?.s3Ok || 0),
+			dashboard: percent(uptime?.dashboardOk || 0),
+			history,
+		},
+	};
 }
-function secretMatches(request: Request, expected: string) { return Boolean(expected) && request.headers.get("authorization") === `Bearer ${expected}`; }
-function json(value: unknown, status = 200) { return new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json", "cache-control": "no-store", "access-control-allow-origin": "*" } }); }
-function adminOrigins(env: Env) { return (env.STATUS_ADMIN_ORIGINS || "https://status.onsilo.dev").split(",").map((origin) => origin.trim()).filter(Boolean); }
-function adminOriginAllowed(request: Request, env: Env) { const origin = request.headers.get("origin"); return !origin || adminOrigins(env).includes(origin); }
-function adminJson(request: Request, env: Env, value: unknown, status = 200) { return withAdminCors(request, env, new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } })); }
-function withAdminCors(request: Request, env: Env, response: Response) {
+
+function definitions(registry: RegionConfig[]): ComponentDefinition[] {
+	const result: ComponentDefinition[] = [
+		{
+			id: "control-plane",
+			name: "Silo Dashboard and Control Plane",
+			description: "Global Bun control plane",
+			group: "global",
+		},
+		{
+			id: "aiven-postgresql",
+			name: "PostgreSQL Primary",
+			description: "Authoritative global metadata and coordination",
+			group: "global",
+		},
+		{
+			id: "postgresql-ha",
+			name: "Silo PostgreSQL HA",
+			description:
+				"EU primary, US hot standby, and Cloudflare-controlled promotion",
+			group: "global",
+		},
+		{
+			id: "database-ha-controller",
+			name: "Database HA Controller",
+			description:
+				"Independent Cloudflare Worker witness, fencing, and promotion controller",
+			group: "global",
+		},
+		{
+			id: "postgresql-replication",
+			name: "PostgreSQL Cross-region Replication",
+			description: "Synchronous WAL durability and replica freshness",
+			group: "global",
+		},
+		{
+			id: "clickhouse-logs",
+			name: "Request Log Analytics",
+			description: "EU and US ClickHouse query availability",
+			group: "global",
+		},
+		{
+			id: "clickhouse-log-redundancy",
+			name: "Request Log Redundancy",
+			description: "Durable dual-region delivery and recent-event parity",
+			group: "global",
+		},
+	];
+	for (const region of registry) {
+		result.push({
+			id: `dataplane:${region.id}`,
+			name: `${region.label} Dataplane`,
+			description: `Preferred ingress in ${region.id}`,
+			group: "regional",
+		});
+		result.push({
+			id: `pgdog:${region.id}`,
+			name: `${region.label} PgDog`,
+			description:
+				"Regional SQL pool and primary-routing path used by the dataplane",
+			group: "regional",
+		});
+		result.push({
+			id: `postgresql:${region.id}`,
+			name: `${region.label} PostgreSQL`,
+			description: "Direct physical PostgreSQL node and HA role probe",
+			group: "regional",
+		});
+		result.push({
+			id: `clickhouse:${region.id}`,
+			name: `${region.label} ClickHouse`,
+			description:
+				"Direct regional request-log query endpoint and recent-event probe",
+			group: "regional",
+		});
+		result.push({
+			id: `storage:${region.id}`,
+			name: `${region.label} Storage`,
+			description: "Logical storage region",
+			group: "regional",
+		});
+		result.push({
+			id: `accounting:${region.id}`,
+			name: `${region.label} Accounting Safety`,
+			description: "Durable regional accounting spool and replay state",
+			group: "regional",
+		});
+		result.push({
+			id: `cache:${region.id}`,
+			name: `${region.label} Dragonfly Cache`,
+			description:
+				"Local acceleration tier; durable serving remains available without it",
+			group: "regional",
+		});
+		result.push({
+			id: `disk-cache:${region.id}`,
+			name: `${region.label} Disk Cache`,
+			description: "Local dataplane object-cache volume and live write probe",
+			group: "regional",
+		});
+		for (const [operation, name, description] of [
+			["authentication", "Signed authentication", "AWS SigV4 request accepted"],
+			["upload", "Object upload", "Signed PUT object canary"],
+			[
+				"download",
+				"Object download",
+				"Signed GET object and body verification",
+			],
+			["delete", "Object deletion", "Signed DELETE object canary"],
+		] as const)
+			result.push({
+				id: `operation:${region.id}:${operation}`,
+				name: `${region.label} ${name}`,
+				description,
+				group: "regional",
+			});
+		for (const backend of region.backends)
+			result.push({
+				id: `backend:${region.id}:${backend.id}`,
+				name: backend.label,
+				description: `${backend.provider} physical ${backend.role} backend`,
+				group: "backends",
+			});
+		if (region.backends.length > 1)
+			result.push({
+				id: `replication:${region.id}`,
+				name: `${region.label} Replication`,
+				description: "Checkpoint freshness and replica lag",
+				group: "backends",
+			});
+	}
+	result.push({
+		id: "global-s3",
+		name: "Global S3 Availability",
+		description: "Signed operations through every logical region",
+		group: "global",
+	});
+	return result;
+}
+
+function publicRegionStates(
+	registry: RegionConfig[],
+	state: StatusState,
+): unknown[] {
+	return registry.map((region) => ({
+		id: region.id,
+		label: region.label,
+		flag: region.flag,
+		homeDataplane: region.id,
+		activeDataplane: state.regions[region.id].activeDataplane,
+		activeBackend: state.regions[region.id].activeBackend,
+		phase: state.regions[region.id].phase,
+		providerPhase: state.regions[region.id].providerPhase,
+		writerGeneration: state.regions[region.id].writerGeneration,
+		backendGeneration: state.regions[region.id].backendGeneration,
+		recovery: {
+			successfulChecks: state.regions[region.id].consecutiveRecoveries,
+			requiredChecks: RECOVERY_THRESHOLD,
+			cleanupAfter: state.regions[region.id].cleanupAfter,
+		},
+	}));
+}
+function aggregatePhase(registry: RegionConfig[], state: StatusState): string {
+	const phases = registry.map((region) => state.regions[region.id].phase);
+	if (phases.includes("active")) return "active";
+	if (phases.includes("credential_cleanup") || phases.includes("failing_back"))
+		return "recovering";
+	if (phases.includes("activating")) return "ready";
+	if (phases.includes("ready")) return "ready";
+	if (phases.includes("blocked")) return "failed";
+	if (phases.includes("investigating")) return "investigating";
+	return "inactive";
+}
+function autoActivate(env: Env): boolean {
+	return (
+		env.AUTO_ACTIVATE_FAILOVER === "true" &&
+		env.FAILOVER_DRILL_APPROVED === "true"
+	);
+}
+function autoPromoteStorage(env: Env): boolean {
+	return (
+		env.AUTO_PROMOTE_STORAGE === "true" &&
+		env.FAILOVER_DRILL_APPROVED === "true"
+	);
+}
+function autoRedirectDashboard(env: Env): boolean {
+	return (
+		env.AUTO_REDIRECT_DASHBOARD === "true" &&
+		env.FAILOVER_DRILL_APPROVED === "true"
+	);
+}
+
+async function ensureIncident(
+	env: Env,
+	state: StatusState,
+	message: string,
+	title: string,
+): Promise<void> {
+	if (state.activeIncidentId) {
+		await addUpdate(env, state, "investigating", message);
+		return;
+	}
+	const id = crypto.randomUUID();
+	state.activeIncidentId = id;
+	await env.DB.prepare(
+		"INSERT INTO incidents (id, status, title, started_at) VALUES (?, ?, ?, ?)",
+	)
+		.bind(id, "open", title, new Date().toISOString())
+		.run();
+	await addUpdate(env, state, "investigating", message);
+}
+async function addUpdate(
+	env: Env,
+	state: StatusState,
+	status: string,
+	message: string,
+): Promise<void> {
+	if (!state.activeIncidentId) return;
+	await env.DB.prepare(
+		"INSERT INTO incident_updates (incident_id, status, message, created_at) VALUES (?, ?, ?, ?)",
+	)
+		.bind(state.activeIncidentId, status, message, new Date().toISOString())
+		.run();
+}
+async function resolveIncident(
+	env: Env,
+	state: StatusState,
+	message: string,
+): Promise<void> {
+	await addUpdate(env, state, "resolved", message);
+	if (state.activeIncidentId)
+		await env.DB.prepare(
+			"UPDATE incidents SET status = 'resolved', resolved_at = ? WHERE id = ?",
+		)
+			.bind(new Date().toISOString(), state.activeIncidentId)
+			.run();
+	state.activeIncidentId = undefined;
+}
+async function notifyMaintainers(
+	env: Env,
+	event: string,
+	message: string,
+): Promise<void> {
+	if (!env.ALERT_WEBHOOK_URL) return;
+	try {
+		await fetch(env.ALERT_WEBHOOK_URL, {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify({
+				source: "silo-status",
+				event,
+				message,
+				statusUrl: "https://status.onsilo.dev",
+			}),
+		});
+	} catch (error) {
+		logError("alert_delivery_failed", error, { event });
+	}
+}
+async function getActiveMaintenance(env: Env): Promise<unknown> {
+	return env.DB.prepare(
+		"SELECT id, title, message, starts_at AS startsAt, ends_at AS endsAt FROM maintenance_windows WHERE datetime(starts_at) <= datetime('now') AND datetime(ends_at) >= datetime('now') ORDER BY datetime(starts_at) ASC LIMIT 1",
+	).first();
+}
+
+async function ok(url: string): Promise<boolean> {
+	if (!url) return false;
+	try {
+		return (await fetchWithDeadline(url, { redirect: "manual" })).ok;
+	} catch {
+		return false;
+	}
+}
+async function probeClickHouse(
+	url: string,
+	user: string,
+	password: string,
+): Promise<ClickHouseProbe> {
+	try {
+		const endpoint = new URL(url);
+		if (endpoint.protocol !== "https:") throw new Error("HTTPS is required");
+		endpoint.searchParams.set("database", "silo_logs");
+		const response = await fetchWithDeadline(
+			endpoint,
+			{
+				method: "POST",
+				headers: {
+					Authorization: `Basic ${btoa(`${user}:${password}`)}`,
+					"Content-Type": "text/plain; charset=utf-8",
+				},
+				body: `SELECT uniqExact(request_id) AS recentRows,
+					concat(toString(max(event_time), 'UTC'), 'Z') AS latestEventAt
+				FROM request_logs FINAL
+				WHERE event_time >= now() - INTERVAL 15 MINUTE
+				FORMAT JSONEachRow`,
+			},
+			8_000,
+		);
+		if (!response.ok)
+			throw new Error(`ClickHouse returned HTTP ${response.status}`);
+		const row = JSON.parse((await response.text()).trim()) as {
+			recentRows?: string | number;
+			latestEventAt?: string;
+		};
+		return {
+			reachable: true,
+			recentRows: Number(row.recentRows || 0),
+			latestEventAt: row.latestEventAt || undefined,
+		};
+	} catch (error) {
+		return {
+			reachable: false,
+			recentRows: 0,
+			error: error instanceof Error ? error.message : String(error),
+		};
+	}
+}
+async function fetchWithDeadline(
+	input: string | URL,
+	init: RequestInit = {},
+	timeoutMs = CHECK_TIMEOUT_MS,
+): Promise<Response> {
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), timeoutMs);
+	try {
+		return await fetch(input, { ...init, signal: controller.signal });
+	} finally {
+		clearTimeout(timer);
+	}
+}
+async function sleep(milliseconds: number): Promise<void> {
+	await new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+async function responseJsonRecord(
+	response: Response,
+): Promise<Record<string, unknown>> {
+	const value: unknown = await response.json();
+	if (!isRecord(value)) throw new Error("expected a JSON object");
+	return value;
+}
+async function requestJsonRecord(
+	request: Request,
+): Promise<Record<string, unknown>> {
+	try {
+		const value: unknown = await request.json();
+		return isRecord(value) ? value : {};
+	} catch {
+		return {};
+	}
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function requiredString(value: unknown, name: string): string {
+	if (typeof value !== "string" || !value.trim())
+		throw new Error(`${name} must be a non-empty string`);
+	return value.trim();
+}
+function stringField(
+	value: Record<string, unknown>,
+	key: string,
+): string | undefined {
+	return typeof value[key] === "string" ? value[key] : undefined;
+}
+function numberField(
+	value: Record<string, unknown>,
+	key: string,
+): number | undefined {
+	return finiteNumber(value[key]);
+}
+function booleanField(
+	value: Record<string, unknown>,
+	key: string,
+): boolean | undefined {
+	return typeof value[key] === "boolean" ? value[key] : undefined;
+}
+function finiteNumber(value: unknown): number | undefined {
+	return typeof value === "number" && Number.isFinite(value)
+		? value
+		: undefined;
+}
+function stringArray(value: unknown): string[] {
+	return Array.isArray(value)
+		? value.filter((item): item is string => typeof item === "string")
+		: [];
+}
+function stringMap(value: unknown): Record<string, string> {
+	if (!isRecord(value)) return {};
+	return Object.fromEntries(
+		Object.entries(value).filter(
+			(entry): entry is [string, string] => typeof entry[1] === "string",
+		),
+	);
+}
+function jsonStringMap(value: string): Record<string, string> {
+	const parsed: unknown = JSON.parse(value);
+	return stringMap(parsed);
+}
+function booleanMap(value: unknown): Record<string, boolean> {
+	if (!isRecord(value)) return {};
+	return Object.fromEntries(
+		Object.entries(value).filter(
+			(entry): entry is [string, boolean] => typeof entry[1] === "boolean",
+		),
+	);
+}
+function numberMap(value: unknown): Record<string, number> {
+	if (!isRecord(value)) return {};
+	return Object.fromEntries(
+		Object.entries(value).filter(
+			(entry): entry is [string, number] =>
+				typeof entry[1] === "number" && Number.isFinite(entry[1]),
+		),
+	);
+}
+function nestedBooleanMap(
+	value: unknown,
+): Record<string, Record<string, boolean>> {
+	if (!isRecord(value)) return {};
+	return Object.fromEntries(
+		Object.entries(value).map(([key, item]) => [key, booleanMap(item)]),
+	);
+}
+function componentMap(value: unknown): Record<string, ComponentStatus> {
+	if (!isRecord(value)) return {};
+	const output: Record<string, ComponentStatus> = {};
+	for (const [id, status] of Object.entries(value))
+		if (
+			status === "operational" ||
+			status === "degraded" ||
+			status === "outage" ||
+			status === "unknown"
+		)
+			output[id] = status;
+	return output;
+}
+function regionPhase(value: unknown): RegionPhase {
+	return value === "investigating" ||
+		value === "ready" ||
+		value === "activating" ||
+		value === "active" ||
+		value === "failing_back" ||
+		value === "credential_cleanup" ||
+		value === "blocked"
+		? value
+		: "normal";
+}
+function providerPhase(value: unknown): ProviderPhase {
+	return value === "investigating" ||
+		value === "ready" ||
+		value === "promoting" ||
+		value === "replica_active" ||
+		value === "blocked"
+		? value
+		: "normal";
+}
+function errorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : "operation failed";
+}
+function logError(
+	event: string,
+	error: unknown,
+	fields: Record<string, unknown> = {},
+): void {
+	console.error(
+		JSON.stringify({ event, error: errorMessage(error), ...fields }),
+	);
+}
+
+function optionalMessage(value: unknown, maxLength: number): string {
+	return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+function requiredMessage(value: unknown, maxLength: number): string | Response {
+	const message = optionalMessage(value, maxLength);
+	return message ? message : json({ error: "message is required" }, 400);
+}
+async function secretMatches(
+	request: Request,
+	expected: string,
+): Promise<boolean> {
+	const provided = request.headers.get("authorization") || "";
+	if (!expected) return false;
+	const encoder = new TextEncoder();
+	const [left, right] = await Promise.all([
+		crypto.subtle.digest("SHA-256", encoder.encode(provided)),
+		crypto.subtle.digest("SHA-256", encoder.encode(`Bearer ${expected}`)),
+	]);
+	const leftBytes = new Uint8Array(left),
+		rightBytes = new Uint8Array(right);
+	let difference = leftBytes.length ^ rightBytes.length;
+	for (
+		let index = 0;
+		index < Math.max(leftBytes.length, rightBytes.length);
+		index += 1
+	)
+		difference |= (leftBytes[index] || 0) ^ (rightBytes[index] || 0);
+	return difference === 0;
+}
+function json(value: unknown, status = 200): Response {
+	return new Response(JSON.stringify(value), {
+		status,
+		headers: {
+			"content-type": "application/json",
+			"cache-control": "no-store",
+			"access-control-allow-origin": "*",
+		},
+	});
+}
+function adminOrigins(env: Env): string[] {
+	return (env.STATUS_ADMIN_ORIGINS || "https://status.onsilo.dev")
+		.split(",")
+		.map((origin) => origin.trim())
+		.filter(Boolean);
+}
+function adminOriginAllowed(request: Request, env: Env): boolean {
+	const origin = request.headers.get("origin");
+	return !origin || adminOrigins(env).includes(origin);
+}
+function adminJson(
+	request: Request,
+	env: Env,
+	value: unknown,
+	status = 200,
+): Response {
+	return withAdminCors(
+		request,
+		env,
+		new Response(JSON.stringify(value), {
+			status,
+			headers: {
+				"content-type": "application/json",
+				"cache-control": "no-store",
+			},
+		}),
+	);
+}
+function withAdminCors(
+	request: Request,
+	env: Env,
+	response: Response,
+): Response {
 	const origin = request.headers.get("origin");
 	if (!origin || !adminOrigins(env).includes(origin)) return response;
 	const headers = new Headers(response.headers);
 	headers.set("access-control-allow-origin", origin);
 	headers.set("access-control-allow-headers", "authorization, content-type");
-	headers.set("access-control-allow-methods", "GET, POST, PATCH, DELETE, OPTIONS");
+	headers.set(
+		"access-control-allow-methods",
+		"GET, POST, PATCH, DELETE, OPTIONS",
+	);
 	headers.set("vary", "Origin");
-	return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+	return new Response(response.body, {
+		status: response.status,
+		statusText: response.statusText,
+		headers,
+	});
 }
-function corsPreflight(request: Request, env: Env, pathname: string) {
-	if (pathname.startsWith("/api/admin/") && !adminOriginAllowed(request, env)) return new Response(null, { status: 403 });
-	if (!pathname.startsWith("/api/admin/")) return new Response(null, { status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, OPTIONS" } });
+function corsPreflight(request: Request, env: Env, pathname: string): Response {
+	if (pathname.startsWith("/api/admin/") && !adminOriginAllowed(request, env))
+		return new Response(null, { status: 403 });
+	if (!pathname.startsWith("/api/admin/"))
+		return new Response(null, {
+			status: 204,
+			headers: {
+				"access-control-allow-origin": "*",
+				"access-control-allow-methods": "GET, OPTIONS",
+			},
+		});
 	return withAdminCors(request, env, new Response(null, { status: 204 }));
 }
-function outageFallback(request: Request) {
+function outageFallback(request: Request): Response {
 	const url = new URL(request.url);
-	const acceptsHtml = request.method === "GET" && url.pathname === "/" && request.headers.get("accept")?.includes("text/html");
-	if (acceptsHtml) return new Response("<!doctype html><meta name=\"viewport\" content=\"width=device-width\"><title>Silo is recovering</title><style>body{margin:0;display:grid;min-height:100vh;place-items:center;background:#101217;color:#e0e6ed;font:16px system-ui,sans-serif}main{max-width:42rem;padding:2rem;border-left:5px solid #ec3750}h1{font:700 italic clamp(2.7rem,10vw,6rem)/.9 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-.08em;margin:0;color:#fff}p{line-height:1.6}a{color:#ff5d79;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}</style><main><h1>Silo is recovering.</h1><p>We are restoring storage service. Your client can retry shortly.</p><p><a href=\"https://status.onsilo.dev\">See live status →</a></p></main>", { status: 503, headers: { "content-type": "text/html; charset=utf-8", "retry-after": "60", "cache-control": "no-store" } });
+	if (
+		request.method === "GET" &&
+		url.pathname === "/" &&
+		request.headers.get("accept")?.includes("text/html")
+	)
+		return new Response(
+			"<!doctype html><meta name=viewport content='width=device-width'><title>Silo is recovering</title><main><h1>Silo is recovering.</h1><p>Storage traffic is being restored safely. Retry shortly or see <a href='https://status.onsilo.dev'>status.onsilo.dev</a>.</p></main>",
+			{
+				status: 503,
+				headers: {
+					"content-type": "text/html; charset=utf-8",
+					"retry-after": "60",
+					"cache-control": "no-store",
+				},
+			},
+		);
 	const requestId = crypto.randomUUID();
-	return new Response(`<?xml version="1.0" encoding="UTF-8"?><Error><Code>ServiceUnavailable</Code><Message>Please reduce your request rate.</Message><RequestId>${requestId}</RequestId><HostId>silo-emergency-fallback</HostId></Error>`, { status: 503, headers: { "content-type": "application/xml", "retry-after": "60", "cache-control": "no-store", "x-silo-failover": "fallback", "x-amz-request-id": requestId } });
+	return new Response(
+		`<?xml version="1.0" encoding="UTF-8"?><Error><Code>ServiceUnavailable</Code><Message>Please retry shortly.</Message><RequestId>${requestId}</RequestId><HostId>silo-regional-fallback</HostId></Error>`,
+		{
+			status: 503,
+			headers: {
+				"content-type": "application/xml",
+				"retry-after": "60",
+				"cache-control": "no-store",
+				"x-silo-failover": "fallback",
+				"x-amz-request-id": requestId,
+			},
+		},
+	);
 }
-function dashboardStatusRedirect() {
+function dashboardStatusRedirect(): Response {
 	return Response.redirect("https://status.onsilo.dev", 302);
 }
+
+// Pure state-machine helpers are exported as one deliberately narrow surface
+// so failover safety contracts can be regression-tested without starting a
+// Worker or exposing operational endpoints.
+export const __test = {
+	parseRegistry,
+	parseCredentialMap,
+	s3RequestUrl,
+	dataplaneAvailable,
+	readinessCanServe,
+	chooseBackendCandidate,
+	deriveComponents,
+	deriveOverall,
+};

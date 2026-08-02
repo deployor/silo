@@ -1,0 +1,232 @@
+services:
+  tls-config:
+    image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
+    restart: "no"
+    user: root
+    entrypoint: ["/usr/local/bin/silo-tls-configure"]
+    environment:
+      POSTGRES_TLS_CA_B64: ${POSTGRES_TLS_CA_B64:?set POSTGRES_TLS_CA_B64}
+      POSTGRES_TLS_CERT_B64: ${POSTGRES_TLS_CERT_B64:?set POSTGRES_TLS_CERT_B64}
+      POSTGRES_TLS_KEY_B64: ${POSTGRES_TLS_KEY_B64:?set POSTGRES_TLS_KEY_B64}
+    volumes: [postgres-tls:/tls]
+
+  pgbackrest-config:
+    image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
+    restart: "no"
+    user: root
+    entrypoint: ["/usr/local/bin/silo-pgbackrest-configure"]
+    environment:
+      PGBACKREST_REPO1_ENDPOINT: ${PGBACKREST_REPO1_ENDPOINT:?set PGBACKREST_REPO1_ENDPOINT}
+      PGBACKREST_REPO1_BUCKET: ${PGBACKREST_REPO1_BUCKET:?set PGBACKREST_REPO1_BUCKET}
+      PGBACKREST_REPO1_REGION: ${PGBACKREST_REPO1_REGION:-auto}
+      PGBACKREST_REPO1_KEY: ${PGBACKREST_REPO1_KEY:?set PGBACKREST_REPO1_KEY}
+      PGBACKREST_REPO1_KEY_SECRET: ${PGBACKREST_REPO1_KEY_SECRET:?set PGBACKREST_REPO1_KEY_SECRET}
+      PGBACKREST_REPO2_ENDPOINT: ${PGBACKREST_REPO2_ENDPOINT:?set PGBACKREST_REPO2_ENDPOINT}
+      PGBACKREST_REPO2_BUCKET: ${PGBACKREST_REPO2_BUCKET:?set PGBACKREST_REPO2_BUCKET}
+      PGBACKREST_REPO2_REGION: ${PGBACKREST_REPO2_REGION:-auto}
+      PGBACKREST_REPO2_KEY: ${PGBACKREST_REPO2_KEY:?set PGBACKREST_REPO2_KEY}
+      PGBACKREST_REPO2_KEY_SECRET: ${PGBACKREST_REPO2_KEY_SECRET:?set PGBACKREST_REPO2_KEY_SECRET}
+      PGBACKREST_CIPHER_PASS: ${PGBACKREST_CIPHER_PASS:?set PGBACKREST_CIPHER_PASS}
+    volumes:
+      - pgbackrest-config:/config
+      - pgbackrest-spool:/spool
+
+  postgres:
+    image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
+    restart: unless-stopped
+    stop_grace_period: 2m
+    shm_size: 1gb
+    security_opt: [no-new-privileges:true]
+    entrypoint: ["/usr/local/bin/silo-primary-entrypoint"]
+    environment:
+      POSTGRES_DB: ${SILO_DATABASE_NAME:-silo}
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD}
+      POSTGRES_INITDB_ARGS: --data-checksums --auth-host=scram-sha-256
+      SILO_DATABASE_NAME: ${SILO_DATABASE_NAME:-silo}
+      SILO_DATABASE_USER: ${SILO_DATABASE_USER:-silo_app}
+      SILO_DATABASE_PASSWORD: ${SILO_DATABASE_PASSWORD:?set SILO_DATABASE_PASSWORD}
+      POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER:-silo_replicator}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:?set POSTGRES_REPLICATION_PASSWORD}
+      POSTGRES_HA_CONTROLLER_USER: ${POSTGRES_HA_CONTROLLER_USER:-silo_ha_controller}
+      POSTGRES_HA_CONTROLLER_PASSWORD: ${POSTGRES_HA_CONTROLLER_PASSWORD:?set POSTGRES_HA_CONTROLLER_PASSWORD}
+      POSTGRES_EU_PUBLIC_IP: ${POSTGRES_EU_PUBLIC_IP:-77.90.16.198}
+      POSTGRES_US_PUBLIC_IP: ${POSTGRES_US_PUBLIC_IP:-89.106.84.89}
+      POSTGRES_MIGRATION_PUBLIC_IP: ${POSTGRES_MIGRATION_PUBLIC_IP:-}
+    command:
+      - postgres
+      - -c
+      - listen_addresses=*
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/tls/server.crt
+      - -c
+      - ssl_key_file=/tls/server.key
+      - -c
+      - ssl_ca_file=/tls/ca.crt
+      - -c
+      - ssl_min_protocol_version=TLSv1.3
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      - -c
+      - wal_keep_size=4096MB
+      - -c
+      - hot_standby=on
+      - -c
+      - hot_standby_feedback=on
+      - -c
+      - track_commit_timestamp=on
+      - -c
+      - max_connections=160
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - effective_cache_size=3GB
+      - -c
+      - maintenance_work_mem=256MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=16
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - max_wal_size=4GB
+      - -c
+      - min_wal_size=1GB
+      - -c
+      - idle_in_transaction_session_timeout=120000
+      - -c
+      - log_lock_waits=on
+      - -c
+      - deadlock_timeout=2s
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=pgbackrest --config=/etc/pgbackrest/pgbackrest.conf --stanza=silo archive-push %p
+      - -c
+      - archive_timeout=60s
+    depends_on:
+      tls-config: {condition: service_completed_successfully}
+      pgbackrest-config: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB && psql -U $$POSTGRES_USER -d $$POSTGRES_DB -Atqc 'select not pg_is_in_recovery()' | grep -qx t"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    ports: ["${POSTGRES_PUBLIC_PORT:-25432}:5432"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - postgres-socket:/var/run/postgresql
+      - postgres-tls:/tls:ro
+      - pgbackrest-config:/etc/pgbackrest:ro
+      - pgbackrest-spool:/var/spool/pgbackrest
+    networks:
+      - db-private
+      - dokploy-network
+
+  pgbackrest-bootstrap:
+    image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
+    restart: "no"
+    user: postgres
+    entrypoint:
+      - pgbackrest
+      - --config=/etc/pgbackrest/pgbackrest.conf
+      - --stanza=silo
+      - stanza-create
+    depends_on:
+      postgres: {condition: service_healthy}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data:ro
+      - postgres-socket:/var/run/postgresql
+      - pgbackrest-config:/etc/pgbackrest:ro
+      - pgbackrest-spool:/var/spool/pgbackrest
+    networks:
+      - db-private
+      - dokploy-network
+
+  pgbackrest-initial-backup:
+    image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
+    profiles: [backup]
+    restart: "no"
+    user: postgres
+    entrypoint:
+      - pgbackrest
+      - --config=/etc/pgbackrest/pgbackrest.conf
+      - --stanza=silo
+      - --type=full
+      - backup
+    depends_on:
+      postgres: {condition: service_healthy}
+      pgbackrest-bootstrap: {condition: service_completed_successfully}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data:ro
+      - postgres-socket:/var/run/postgresql
+      - pgbackrest-config:/etc/pgbackrest:ro
+      - pgbackrest-spool:/var/spool/pgbackrest
+    networks:
+      - db-private
+      - dokploy-network
+
+  pgdog-config:
+    image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
+    restart: "no"
+    user: root
+    entrypoint: ["/usr/local/bin/silo-pgdog-configure"]
+    environment:
+      SILO_DATABASE_NAME: ${SILO_DATABASE_NAME:-silo}
+      SILO_DATABASE_USER: ${SILO_DATABASE_USER:-silo_app}
+      SILO_DATABASE_PASSWORD: ${SILO_DATABASE_PASSWORD:?set SILO_DATABASE_PASSWORD}
+      PGDOG_ADMIN_PASSWORD: ${PGDOG_ADMIN_PASSWORD:?set PGDOG_ADMIN_PASSWORD}
+      PGDOG_EU_HOST: postgres
+      PGDOG_EU_PORT: "5432"
+      PGDOG_US_HOST: ${PGDOG_US_HOST:-db-us.onsilo.dev}
+      PGDOG_US_PORT: ${PGDOG_US_PORT:-25432}
+      PGDOG_WORKERS: ${PGDOG_WORKERS:-4}
+      PGDOG_POOL_SIZE: ${PGDOG_POOL_SIZE:-24}
+      PGDOG_MIN_POOL_SIZE: ${PGDOG_MIN_POOL_SIZE:-2}
+    volumes: [pgdog-config:/config]
+
+  pgdog:
+    image: ghcr.io/pgdogdev/pgdog:v0.1.48@sha256:c8d900deea2f760b5b9711d2582e8bfdf64caa45d42ad3683567e90efc3bf646
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    command: ["/usr/local/bin/pgdog", "--config", "/config/pgdog.toml", "--users", "/config/users.toml"]
+    depends_on:
+      pgdog-config: {condition: service_completed_successfully}
+      tls-config: {condition: service_completed_successfully}
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - pgdog-config:/config:ro
+      - postgres-tls:/tls:ro
+    networks:
+      db-private: null
+      dokploy-network:
+        aliases: [silo-db-eu]
+
+volumes:
+  postgres-data: null
+  postgres-socket: null
+  postgres-tls: null
+  pgdog-config: null
+  pgbackrest-config: null
+  pgbackrest-spool: null
+
+networks:
+  db-private: {internal: true}
+  dokploy-network: {external: true}

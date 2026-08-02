@@ -1,4 +1,4 @@
-FROM oven/bun:1 AS base
+FROM oven/bun:1.3.14 AS base
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /usr/src/app
 

@@ -1,4 +1,4 @@
-FROM rust:1-bookworm AS builder
+FROM rust:1.93.1-bookworm AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 WORKDIR /usr/src/app
 
@@ -9,7 +9,8 @@ RUN cargo build --release
 FROM debian:bookworm-slim AS release
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates curl && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    install -d -o nobody -g nogroup /var/cache/silo-dataplane
 
 COPY --from=builder /usr/src/app/target/release/silo-dataplane /usr/local/bin/silo-dataplane
 

@@ -1,0 +1,15 @@
+# Copy to .dev.vars for local development only. Production values are Worker
+# secrets (`wrangler secret put`); never commit real credentials or topology.
+DATAPLANE_INTERNAL_SECRET=replace-me
+REGION_CANARIES={"logical":{},"backends":{}}
+CF_DNS_TOKEN=replace-me
+CF_ZONE_ID=replace-me
+CF_ENDPOINT_RECORD_IDS={"onsilo.dev":"record-id","eu.onsilo.dev":"record-id","us.onsilo.dev":"record-id"}
+CF_DASHBOARD_RECORD_ID=record-id
+STATUS_ADMIN_SECRET=replace-me
+STATUS_INCIDENT_PASSWORD=replace-me
+ALERT_WEBHOOK_URL=
+CLOUDFLARE_API_BASE=https://api.cloudflare.com/client/v4
+FAILOVER_ACTIVATION_URLS={}
+FAILOVER_DEACTIVATION_URLS={}
+FAILOVER_HOOK_SECRET=replace-with-at-least-32-random-characters

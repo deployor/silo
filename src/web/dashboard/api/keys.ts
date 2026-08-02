@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../../../db";
 import { bucketKeys, buckets } from "../../../db/schema";
 import { errorResponse, jsonResponse } from "../../../lib/api-utils";
@@ -6,6 +6,8 @@ import {
 	buildBucketUrlExample,
 	parseBucketCustomDomains,
 } from "../../../lib/bucket-domains";
+import { invalidateDataplaneAuthCache } from "../../../lib/dataplane-cache";
+import { getBucketStorageRegion, getStorageRegion } from "../../../lib/regions";
 import { getCurrentUser } from "../../../lib/session";
 import { bucketNameSchema } from "../../../lib/validation";
 import {
@@ -81,6 +83,8 @@ export async function handleKeys(req: Request): Promise<Response> {
 			const publicUrl = buildBucketUrlExample({
 				bucketName,
 				customDomains: parseBucketCustomDomains(access.bucket.customDomains),
+				s3Domain: getStorageRegion(getBucketStorageRegion(access.bucket))
+					.endpoint,
 			});
 			return jsonResponse({ ...keys, publicUrl });
 		} catch (e) {
@@ -158,6 +162,17 @@ export async function handleKeys(req: Request): Promise<Response> {
 			}
 
 			if (body.isPaused !== undefined) {
+				const [key] = await db
+					.select({ accessKey: bucketKeys.accessKey })
+					.from(bucketKeys)
+					.where(
+						and(
+							eq(bucketKeys.id, keyId),
+							eq(bucketKeys.bucketId, access.bucket.id),
+						),
+					)
+					.limit(1);
+				if (!key) throw new Error("Key not found");
 				await db
 					.update(bucketKeys)
 					.set({
@@ -167,7 +182,16 @@ export async function handleKeys(req: Request): Promise<Response> {
 								? body.pauseReason.trim() || null
 								: null,
 					})
-					.where(eq(bucketKeys.id, keyId));
+					.where(
+						and(
+							eq(bucketKeys.id, keyId),
+							eq(bucketKeys.bucketId, access.bucket.id),
+						),
+					);
+				await invalidateDataplaneAuthCache({
+					bucketName,
+					accessKey: key.accessKey,
+				});
 			}
 
 			return jsonResponse({ ok: true });

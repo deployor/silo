@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use axum::{
-    body::Body,
+    body::{Body, Bytes},
     http::{HeaderMap, Method, Response, StatusCode},
 };
 use futures_util::StreamExt;
@@ -8,7 +8,10 @@ use tracing::warn;
 
 use crate::{
     cache::{invalidate_object_caches, try_redis_object_size},
-    quota::{clear_multipart_upload, register_multipart_upload, release_multipart_upload},
+    quota::{
+        clear_multipart_upload, multipart_completed_size, register_multipart_upload,
+        release_multipart_upload,
+    },
     response::{reqwest_to_s3_response, s3_error, with_s3_headers},
     upstream::signed_upstream_request,
     AppState, AuthBucket, AuthorizeResponse,
@@ -20,8 +23,14 @@ pub(crate) async fn fast_list_multipart_uploads(
     headers: &HeaderMap,
 ) -> Result<Response<Body>> {
     let query = list_multipart_uploads_query(&auth)?;
-    let upstream =
-        signed_upstream_request(&state, Method::GET, &format!("?{query}"), headers, None)?;
+    let upstream = signed_upstream_request(
+        &state,
+        auth_bucket(&auth)?,
+        Method::GET,
+        &format!("?{query}"),
+        headers,
+        None,
+    )?;
     let res = upstream.send().await?;
     let status = res.status();
     let xml = res.text().await?;
@@ -42,6 +51,7 @@ pub(crate) async fn fast_list_parts(
 ) -> Result<Response<Body>> {
     let upstream = signed_upstream_request(
         &state,
+        auth_bucket(&auth)?,
         Method::GET,
         auth.path_with_query.as_deref().unwrap_or(""),
         headers,
@@ -66,6 +76,7 @@ pub(crate) async fn fast_create_multipart_upload(
     headers: &HeaderMap,
     writer_generation: i64,
 ) -> Result<Response<Body>> {
+    let bucket = auth_bucket(&auth)?;
     let lookup_path = auth
         .path_with_query
         .as_deref()
@@ -73,16 +84,18 @@ pub(crate) async fn fast_create_multipart_upload(
         .split_once('?')
         .map(|(p, _)| p)
         .unwrap_or("");
-    let existing_size = if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref())
-    {
+    let existing_size = if let Some(key) = auth.key.as_ref() {
         cached_existing_size(&state, bucket, key, lookup_path)
-            .await
+            .await?
             .unwrap_or(0)
     } else {
-        head_existing_size(&state, lookup_path).await.unwrap_or(0)
+        head_existing_size(&state, bucket, lookup_path)
+            .await?
+            .unwrap_or(0)
     };
     let upstream = signed_upstream_request(
         &state,
+        bucket,
         Method::POST,
         auth.path_with_query.as_deref().unwrap_or(""),
         headers,
@@ -96,15 +109,22 @@ pub(crate) async fn fast_create_multipart_upload(
         if let (Some(bucket), Some(upload_id)) =
             (auth.bucket.as_ref(), extract_first_tag(&xml, "UploadId"))
         {
-            if let Err(error) =
-                crate::writer::register_multipart(&state, &bucket.id, &upload_id, writer_generation)
-                    .await
+            if let Err(error) = crate::writer::register_multipart(
+                &state,
+                &bucket.id,
+                &bucket.resolved_region,
+                bucket.active_backend()?,
+                &upload_id,
+                writer_generation,
+            )
+            .await
             {
                 let root = auth.root_prefix.as_deref().unwrap_or("");
                 let key = auth.key.as_deref().unwrap_or("");
                 let abort_path = format!("{root}{key}?uploadId={upload_id}");
                 let _ = signed_upstream_request(
                     &state,
+                    bucket,
                     Method::DELETE,
                     &abort_path,
                     &HeaderMap::new(),
@@ -115,31 +135,25 @@ pub(crate) async fn fast_create_multipart_upload(
                 return Err(anyhow!("failed to fence multipart upload: {error}"));
             }
             if let Some(user) = auth.user.as_ref() {
-                if !user.is_immortal {
-                    if let Err(error) = register_multipart_upload(
+                if let Err(error) =
+                    register_multipart_upload(&state, &user.id, bucket, &upload_id, existing_size)
+                        .await
+                {
+                    let root = auth.root_prefix.as_deref().unwrap_or("");
+                    let key = auth.key.as_deref().unwrap_or("");
+                    let abort_path = format!("{root}{key}?uploadId={upload_id}");
+                    let _ = signed_upstream_request(
                         &state,
-                        &user.id,
-                        &bucket.id,
-                        &upload_id,
-                        existing_size,
-                    )
-                    .await
-                    {
-                        let root = auth.root_prefix.as_deref().unwrap_or("");
-                        let key = auth.key.as_deref().unwrap_or("");
-                        let abort_path = format!("{root}{key}?uploadId={upload_id}");
-                        let _ = signed_upstream_request(
-                            &state,
-                            Method::DELETE,
-                            &abort_path,
-                            &HeaderMap::new(),
-                            None,
-                        )?
-                        .send()
-                        .await;
-                        let _ = crate::writer::clear_multipart(&state, &upload_id).await;
-                        return Err(anyhow!("failed to register multipart quota: {error}"));
-                    }
+                        bucket,
+                        Method::DELETE,
+                        &abort_path,
+                        &HeaderMap::new(),
+                        None,
+                    )?
+                    .send()
+                    .await;
+                    let _ = crate::writer::clear_multipart(&state, &upload_id).await;
+                    return Err(anyhow!("failed to register multipart quota: {error}"));
                 }
             }
         }
@@ -177,7 +191,17 @@ pub(crate) async fn fast_complete_multipart_upload(
         .as_ref()
         .map(|bucket| bucket.id.as_str())
         .unwrap_or("");
-    if !crate::writer::multipart_matches(&state, bucket_id, upload_id, writer_generation).await? {
+    let bucket = auth_bucket(&auth)?;
+    if !crate::writer::multipart_matches(
+        &state,
+        bucket_id,
+        &bucket.resolved_region,
+        bucket.active_backend()?,
+        upload_id,
+        writer_generation,
+    )
+    .await?
+    {
         return Ok(with_s3_headers(
             s3_error(
                 StatusCode::CONFLICT,
@@ -194,45 +218,76 @@ pub(crate) async fn fast_complete_multipart_upload(
         .split_once('?')
         .map(|(p, _)| p)
         .unwrap_or("");
-    let existing_size = if let (Some(bucket), Some(key)) = (auth.bucket.as_ref(), auth.key.as_ref())
-    {
+    let existing_size = if let Some(key) = auth.key.as_ref() {
         cached_existing_size(&state, bucket, key, lookup_path)
-            .await
+            .await?
             .unwrap_or(0)
     } else {
-        head_existing_size(&state, lookup_path).await.unwrap_or(0)
+        head_existing_size(&state, bucket, lookup_path)
+            .await?
+            .unwrap_or(0)
     };
-    let content_length = headers
-        .get(axum::http::header::CONTENT_LENGTH)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.parse::<u64>().ok());
+    let completion_body = read_body_limited(body, 2 * 1024 * 1024).await?;
+    let part_numbers = completion_part_numbers(&completion_body)?;
+    let user = auth
+        .user
+        .as_ref()
+        .ok_or_else(|| anyhow!("multipart completion is missing its user"))?;
+    let expected_final_size =
+        multipart_completed_size(&state, &user.id, &bucket.id, upload_id, &part_numbers).await?;
+    let content_length = Some(completion_body.len() as u64);
+    let replication_events = crate::replication::prepare(
+        &state,
+        bucket,
+        &[lookup_path.to_string()],
+        crate::replication::Operation::Put,
+    )
+    .await?;
+    let mutation_intent = match crate::accounting::prepare_mutation_intent(
+        &state,
+        &bucket.resolved_region,
+        &bucket.id,
+        Some(&user.id),
+        lookup_path,
+        "put",
+        existing_size,
+        expected_final_size,
+        None,
+        replication_events
+            .first()
+            .map(crate::replication::PreparedEvent::event_id),
+    )
+    .await
+    {
+        Ok(intent) => intent,
+        Err(error) => {
+            crate::replication::cancel(
+                &state,
+                &replication_events,
+                "accounting intent preparation failed",
+            )
+            .await?;
+            return Err(error);
+        }
+    };
     let upstream = signed_upstream_request(
         &state,
+        bucket,
         Method::POST,
         auth.path_with_query.as_deref().unwrap_or(""),
         headers,
         content_length,
     )?
-    .body(reqwest::Body::wrap_stream(
-        body.into_data_stream()
-            .map(|r| r.map_err(std::io::Error::other)),
-    ));
+    .body(completion_body);
     let res = upstream.send().await?;
     let status = res.status();
     let xml = res.text().await?;
 
-    if status.is_success() {
-        if let Err(error) = crate::writer::clear_multipart(&state, upload_id).await {
-            warn!(error = %error, "failed to clear multipart writer generation");
-        }
+    let embedded_error = xml.contains("<Error>") || xml.contains("<Error ");
+    if status.is_success() && !embedded_error {
         if let (Some(user), Some(bucket), Some(key)) =
             (auth.user.as_ref(), auth.bucket.as_ref(), auth.key.as_ref())
         {
-            if let Err(error) =
-                clear_multipart_upload(&state, &user.id, &bucket.id, upload_id).await
-            {
-                warn!(error = %error, "failed to clear multipart quota");
-            }
             let path_without_query = auth
                 .path_with_query
                 .as_deref()
@@ -240,20 +295,40 @@ pub(crate) async fn fast_complete_multipart_upload(
                 .split_once('?')
                 .map(|(path, _)| path)
                 .unwrap_or(auth.path_with_query.as_deref().unwrap_or(""));
-            let final_size = head_existing_size(&state, path_without_query)
-                .await
-                .unwrap_or(0);
-            let shrink = existing_size.saturating_sub(final_size);
-            if shrink > 0 {
-                let _ = crate::quota::release_storage(&state, &user.id, shrink).await;
+            let final_size = head_existing_size(&state, bucket, path_without_query)
+                .await?
+                .ok_or_else(|| anyhow!("completed multipart object size could not be verified"))?;
+            if final_size != expected_final_size {
+                return Err(anyhow!(
+                    "completed multipart object size differs from durable part accounting"
+                ));
             }
-            if let Err(error) = commit_bucket_delta(&state, bucket, final_size, existing_size).await
+            crate::accounting::commit_mutation_intent(&state, mutation_intent).await?;
+            crate::replication::commit(&state, &replication_events).await?;
+            if let Err(error) =
+                clear_multipart_upload(&state, &user.id, &bucket.id, upload_id).await
             {
-                warn!(error = %error, "failed to commit multipart bucket size");
+                warn!(error = %error, "failed to clear multipart quota");
             }
             invalidate_object_caches(&state, bucket, key).await;
             bump_list_cache(&state, bucket).await;
         }
+        if let Err(error) = crate::writer::clear_multipart(&state, upload_id).await {
+            warn!(error = %error, "failed to clear multipart writer generation");
+        }
+    } else {
+        crate::accounting::cancel_mutation_intent(
+            &state,
+            mutation_intent,
+            "authoritative multipart completion was rejected",
+        )
+        .await?;
+        crate::replication::cancel(
+            &state,
+            &replication_events,
+            "authoritative multipart completion was rejected",
+        )
+        .await?;
     }
 
     let rewritten = rewrite_multipart_xml(&xml, auth.root_prefix.as_deref().unwrap_or(""));
@@ -287,7 +362,17 @@ pub(crate) async fn fast_abort_multipart_upload(
         .as_ref()
         .map(|bucket| bucket.id.as_str())
         .unwrap_or("");
-    if !crate::writer::multipart_matches(&state, bucket_id, upload_id, writer_generation).await? {
+    let bucket = auth_bucket(&auth)?;
+    if !crate::writer::multipart_matches(
+        &state,
+        bucket_id,
+        &bucket.resolved_region,
+        bucket.active_backend()?,
+        upload_id,
+        writer_generation,
+    )
+    .await?
+    {
         return Ok(with_s3_headers(
             s3_error(
                 StatusCode::CONFLICT,
@@ -299,6 +384,7 @@ pub(crate) async fn fast_abort_multipart_upload(
     }
     let upstream = signed_upstream_request(
         &state,
+        bucket,
         Method::DELETE,
         auth.path_with_query.as_deref().unwrap_or(""),
         headers,
@@ -362,19 +448,30 @@ fn prefix_query_param(
     }
 }
 
-async fn head_existing_size(state: &AppState, path: &str) -> Result<u64> {
+async fn head_existing_size(
+    state: &AppState,
+    bucket: &AuthBucket,
+    path: &str,
+) -> Result<Option<u64>> {
     let empty = HeaderMap::new();
-    let req = signed_upstream_request(state, Method::HEAD, path, &empty, None)?;
+    let req = signed_upstream_request(state, bucket, Method::HEAD, path, &empty, None)?;
     let res = req.send().await?;
-    if !res.status().is_success() {
-        return Ok(0);
+    if res.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(None);
     }
-    Ok(res
+    if !res.status().is_success() {
+        return Err(anyhow!(
+            "object size probe returned status {}",
+            res.status()
+        ));
+    }
+    let size = res
         .headers()
         .get(reqwest::header::CONTENT_LENGTH)
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(0))
+        .ok_or_else(|| anyhow!("object size probe omitted Content-Length"))?;
+    Ok(Some(size))
 }
 
 async fn cached_existing_size(
@@ -382,38 +479,31 @@ async fn cached_existing_size(
     bucket: &AuthBucket,
     key: &str,
     path: &str,
-) -> Result<u64> {
+) -> Result<Option<u64>> {
     if let Some(size) = try_redis_object_size(state, bucket, key).await {
-        return Ok(size);
+        return Ok(Some(size));
     }
     if let Some(size) = state.disk_cache.object_size(bucket, key).await {
-        return Ok(size);
+        return Ok(Some(size));
     }
-    head_existing_size(state, path).await
+    head_existing_size(state, bucket, path).await
 }
 
 async fn bump_list_cache(state: &AppState, bucket: &AuthBucket) {
-    if !state.cfg.redis_object_cache_enabled {
+    if !state.cfg.redis_object_cache_enabled || !state.cfg.regions.is_local(&bucket.resolved_region)
+    {
         return;
     }
-    let mut conn = state.redis.clone();
+    let Ok(namespace) = bucket.cache_namespace(&state.cfg) else {
+        return;
+    };
+    let Some(mut conn) = state.redis.connection().await else {
+        return;
+    };
     let _: redis::RedisResult<i64> = redis::cmd("INCR")
-        .arg(format!("s3:listver:{}", bucket.id))
+        .arg(format!("s3:{namespace}:listver:{}", bucket.id))
         .query_async(&mut conn)
         .await;
-}
-
-async fn commit_bucket_delta(
-    state: &AppState,
-    bucket: &AuthBucket,
-    final_size: u64,
-    existing_size: u64,
-) -> Result<()> {
-    let delta = i128::from(final_size) - i128::from(existing_size);
-    if delta == 0 {
-        return Ok(());
-    }
-    crate::usage::commit_bucket_usage_delta(state, bucket, i64::try_from(delta)?).await
 }
 
 fn rewrite_multipart_xml(xml: &str, root_prefix: &str) -> String {
@@ -425,6 +515,48 @@ fn rewrite_multipart_xml(xml: &str, root_prefix: &str) -> String {
         rewritten = strip_prefix_from_xml_tag(&rewritten, tag, root_prefix);
     }
     rewritten
+}
+
+async fn read_body_limited(body: Body, limit: usize) -> Result<Bytes> {
+    let mut stream = body.into_data_stream();
+    let mut out = Vec::new();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk?;
+        if out.len().saturating_add(chunk.len()) > limit {
+            return Err(anyhow!("multipart completion body is too large"));
+        }
+        out.extend_from_slice(&chunk);
+    }
+    Ok(Bytes::from(out))
+}
+
+fn completion_part_numbers(body: &[u8]) -> Result<Vec<i32>> {
+    let xml =
+        std::str::from_utf8(body).map_err(|_| anyhow!("multipart completion XML is not UTF-8"))?;
+    let mut rest = xml;
+    let mut parts = Vec::new();
+    while let Some(start) = rest.find("<Part>") {
+        let block = &rest[start + "<Part>".len()..];
+        let end = block
+            .find("</Part>")
+            .ok_or_else(|| anyhow!("multipart completion XML is malformed"))?;
+        let block = &block[..end];
+        let part = extract_first_tag(block, "PartNumber")
+            .ok_or_else(|| anyhow!("multipart completion part has no PartNumber"))?
+            .parse::<i32>()?;
+        parts.push(part);
+        rest = &rest[start + "<Part>".len() + end + "</Part>".len()..];
+    }
+    if parts.is_empty() || parts.len() > 10_000 {
+        return Err(anyhow!("multipart completion has no valid parts"));
+    }
+    Ok(parts)
+}
+
+fn auth_bucket(auth: &AuthorizeResponse) -> Result<&AuthBucket> {
+    auth.bucket
+        .as_ref()
+        .ok_or_else(|| anyhow!("authorized multipart request is missing bucket metadata"))
 }
 
 fn strip_prefix_from_xml_tag(xml: &str, tag: &str, root_prefix: &str) -> String {
@@ -455,4 +587,19 @@ fn extract_first_tag(xml: &str, tag: &str) -> Option<String> {
     let start = xml.find(&open)? + open.len();
     let end = xml[start..].find(&close)?;
     Some(xml[start..start + end].to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::completion_part_numbers;
+
+    #[test]
+    fn parses_exact_multipart_completion_parts() {
+        let body = br#"<CompleteMultipartUpload>
+          <Part><PartNumber>1</PartNumber><ETag>&quot;a&quot;</ETag></Part>
+          <Part><PartNumber>3</PartNumber><ETag>&quot;c&quot;</ETag></Part>
+        </CompleteMultipartUpload>"#;
+        assert_eq!(completion_part_numbers(body).unwrap(), vec![1, 3]);
+        assert!(completion_part_numbers(b"<CompleteMultipartUpload/>").is_err());
+    }
 }
