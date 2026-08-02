@@ -212,180 +212,122 @@ export function DocsPage({ bootstrap }: { bootstrap: AppBootstrap }) {
 					<div className="p-6 md:p-12 pt-0 md:pt-12">
 						{activeSection === "what-is-s3" ? (
 							<div id="what-is-s3" className="section-content active">
-								<article className="s3-docs">
-									<div className="s3-docs-kicker">
-										SILO DOCS / THE SHORT VERSION
-									</div>
-									<header className="s3-docs-hero">
-										<div>
-											<p className="s3-docs-number">A REALLY QUICK EXPLAINER</p>
-											<h1>
-												S3 is where apps <strong>put their files.</strong>
-											</h1>
-											<p className="s3-docs-lede">
-												Amazon S3 is an object-storage service. It gives
-												software a simple way to upload a file, get it back
-												later, and keep it out of the way in the meantime.
-											</p>
-										</div>
-										<div className="s3-origin">
-											<img src="/assets/images/aws.png" alt="AWS" />
-											<p>S3 started at Amazon.</p>
-											<p>
-												Its API became the common way to speak to object
-												storage.
-											</p>
-										</div>
-									</header>
+								<h1 className="text-4xl font-bold mb-6 text-white">
+									What is S3?
+								</h1>
+								<p className="text-lg mb-6 text-text-muted leading-relaxed">
+									S3 is a way for apps to store files. Your app sends a request
+									to an S3 server, and the server saves the file so you can
+									fetch it again later.
+								</p>
+								<p className="text-lg mb-8 text-text-muted leading-relaxed">
+									Amazon created S3, which stands for Simple Storage Service.
+									The way its API works became so common that loads of other
+									storage providers support it too. Silo is one of them.
+								</p>
 
-									<section
-										className="s3-not-drive"
-										aria-labelledby="not-drive-title"
-									>
-										<div>
-											<p className="s3-section-label">WHAT IT IS — AND ISN'T</p>
-											<h2 id="not-drive-title">It is not Google Drive.</h2>
-											<p>
-												Google Drive is an app you use. It has a file browser,
-												sharing, accounts, comments, and syncing. S3 is the
-												boring storage bit underneath: an API your code can
-												call.
-											</p>
-										</div>
-										<div className="s3-compare">
-											<div className="s3-compare-card">
-												<span>AN APP</span>
-												<strong>Google Drive</strong>
-												<p>folders · sharing · sync · a UI for people</p>
-											</div>
-											<div className="s3-compare-card s3-compare-card-active">
-												<span>AN API</span>
-												<strong>S3</strong>
-												<p>
-													upload · download · list · delete · code talks to it
-												</p>
-											</div>
-										</div>
-										<p className="s3-nextcloud-note">
-											Put an S3 backend behind an app like{" "}
-											<strong>Nextcloud</strong>, and you get the Drive-like
-											experience. Nextcloud is the app; S3 is the storage it
-											talks to.
-										</p>
-									</section>
+								<div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-lg mb-10">
+									<p className="text-yellow-100 leading-relaxed">
+										<strong>S3 is not Google Drive.</strong> Google Drive is a
+										finished app for people. S3 is storage for other apps to
+										use.
+									</p>
+								</div>
 
-									<section className="s3-flow" aria-labelledby="flow-title">
-										<div className="s3-section-heading">
-											<p className="s3-section-label">HOW ONE UPLOAD WORKS</p>
-											<h2 id="flow-title">
-												Your app sends a request. Storage keeps the file.
-											</h2>
-											<p className="s3-section-copy">
-												Your code uses a library or the command line to ask an
-												endpoint to store a file. The endpoint checks your key,
-												finds the right bucket, and saves the object.
-											</p>
-										</div>
-										<div
-											className="s3-flow-line"
-											role="img"
-											aria-label="An app sends an S3 request to Silo, which stores the file as an object"
-										>
-											<div className="s3-flow-node s3-flow-app">
-												<span className="s3-node-icon">{"{ }"}</span>
-												<strong>Your app or tool</strong>
-												<small>SDK · CLI · Nextcloud</small>
-											</div>
-											<div className="s3-flow-arrow" aria-hidden="true">
-												<span>PUT THE FILE</span>
-											</div>
-											<div className="s3-flow-node s3-flow-silo">
-												<span className="s3-node-icon">S</span>
-												<strong>S3 endpoint</strong>
-												<small>Silo · S3 · R2 · more</small>
-											</div>
-											<div
-												className="s3-flow-arrow s3-flow-arrow-short"
-												aria-hidden="true"
-											/>
-											<div className="s3-flow-node s3-flow-storage">
-												<span className="s3-node-icon">▣</span>
-												<strong>Bucket</strong>
-												<small>file is stored as an object</small>
-											</div>
-										</div>
-									</section>
+								<h2 className="text-2xl font-bold mb-4 text-white">
+									What does that actually mean?
+								</h2>
+								<p className="mb-6 text-text-muted leading-relaxed">
+									With Google Drive, you open a website, drag files around,
+									share folders, and sync them to your laptop. All of that is
+									part of the Drive app.
+								</p>
+								<p className="mb-6 text-text-muted leading-relaxed">
+									S3 does not give you that whole app. It gives code a set of
+									standard commands: upload an object, download it, list what is
+									stored, or delete it. That is why S3 can sit underneath almost
+									any kind of app.
+								</p>
+								<p className="mb-10 text-text-muted leading-relaxed">
+									For example, <strong>Nextcloud</strong> can use S3 for its
+									storage. Nextcloud provides the nice Drive-like interface,
+									accounts, sharing, and syncing. S3 just keeps the files.
+								</p>
 
-									<section className="s3-terms" aria-labelledby="terms-title">
-										<div className="s3-section-heading">
-											<p className="s3-section-label">
-												THE THREE WORDS THAT MATTER
-											</p>
-											<h2 id="terms-title">
-												A bucket, an object, and its name.
-											</h2>
-										</div>
-										<div className="s3-term-grid">
-											<div className="s3-term">
-												<span>01</span>
-												<h3>Bucket</h3>
-												<p>A named home for a project’s stored files.</p>
-											</div>
-											<div className="s3-term">
-												<span>02</span>
-												<h3>Object</h3>
-												<p>
-													The file itself, plus useful details like its type and
-													size.
-												</p>
-											</div>
-											<div className="s3-term">
-												<span>03</span>
-												<h3>Key</h3>
-												<p>
-													The object’s address inside the bucket, like{" "}
-													<code>sprites/robot.png</code>.
-												</p>
-											</div>
-										</div>
-									</section>
+								<h2 className="text-2xl font-bold mb-4 text-white">
+									How S3 is structured
+								</h2>
+								<p className="mb-6 text-text-muted leading-relaxed">
+									There are three words you need to know:
+								</p>
+								<ul className="list-disc list-inside space-y-3 text-text-muted mb-8">
+									<li>
+										A <strong>bucket</strong> is a named place for your
+										project's files, a bit like the top-level folder.
+									</li>
+									<li>
+										An <strong>object</strong> is the file itself plus a few
+										details about it, such as its type and size.
+									</li>
+									<li>
+										A <strong>key</strong> is the object's name inside the
+										bucket, such as <code>sprites/robot.png</code>.
+									</li>
+								</ul>
+								<CodeBlock
+									code={`bucket: my-game-assets\nkey:    sprites/robot.png\nobject: the actual robot.png file`}
+								/>
 
-									<section
-										className="s3-example"
-										aria-labelledby="example-title"
-									>
-										<div>
-											<p className="s3-section-label">
-												WHAT YOUR CODE ACTUALLY SAYS
-											</p>
-											<h2 id="example-title">“Put this file here.”</h2>
-											<p>
-												This request puts <code>robot.png</code> in the
-												<code>my-game-assets</code> bucket at the key{" "}
-												<code>sprites/robot.png</code>. A later GET request can
-												fetch it back.
-											</p>
-										</div>
-										<pre>
-											<code>PUT /my-game-assets/sprites/robot.png</code>
-										</pre>
-									</section>
+								<h2 className="text-2xl font-bold mb-4 mt-10 text-white">
+									What happens when you upload a file?
+								</h2>
+								<ol className="list-decimal list-inside space-y-3 text-text-muted mb-8">
+									<li>Your app connects to an S3 endpoint, such as Silo.</li>
+									<li>
+										It proves who it is using an access key and secret key.
+									</li>
+									<li>It says which bucket and key the file should use.</li>
+									<li>The storage server saves the object.</li>
+									<li>Your app can request the same object again later.</li>
+								</ol>
+								<CodeBlock code="PUT /my-game-assets/sprites/robot.png" />
+								<p className="mb-10 text-text-muted leading-relaxed">
+									You normally do not write that request by hand. An S3 library,
+									the AWS CLI, rclone, or an app like Nextcloud does it for you.
+								</p>
 
-									<footer className="s3-docs-footer">
-										<p>
-											Why people care: S3's API is so widely supported that the
-											same AWS SDK, CLI, or rclone setup can often talk to
-											Amazon S3, Cloudflare R2, Backblaze, or Silo. Usually you
-											just change the endpoint and credentials.
-										</p>
-										<a
-											href={dashboardHref || "/auth/login"}
-											className="s3-start-link"
-										>
-											Open Silo <span aria-hidden="true">↗</span>
-										</a>
-									</footer>
-								</article>
+								<h2 className="text-2xl font-bold mb-4 text-white">
+									Why does everyone use the S3 API?
+								</h2>
+								<p className="mb-6 text-text-muted leading-relaxed">
+									It is supported everywhere. A huge number of apps and
+									developer tools already know how to talk to S3. Amazon S3,
+									Cloudflare R2, Backblaze B2, and Silo are different storage
+									services, but they can all understand much of the same S3
+									language.
+								</p>
+								<p className="mb-10 text-text-muted leading-relaxed">
+									That means you can often move an app between providers by
+									changing its endpoint and credentials instead of rewriting the
+									upload code.
+								</p>
+
+								<h2 className="text-2xl font-bold mb-4 text-white">
+									Where Silo fits
+								</h2>
+								<p className="mb-6 text-text-muted leading-relaxed">
+									Silo gives Hack Clubbers S3-compatible storage without making
+									everyone set up a full cloud account. You create a bucket, get
+									your keys, point an S3-compatible tool at Silo, and start
+									storing files.
+								</p>
+								<a
+									href={dashboardHref || "/auth/login"}
+									className="inline-flex items-center gap-2 text-hc-red hover:underline font-bold"
+								>
+									Open the Silo dashboard
+									<PhIcon className="ph ph-arrow-up-right" />
+								</a>
 							</div>
 						) : null}
 
