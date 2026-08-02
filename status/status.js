@@ -736,7 +736,7 @@ function infrastructureGraph(data) {
 		});
 		const pgdog = addNode({
 			id: `pgdog:${region.id}`,
-			label: "SQL / PGDOG PATH",
+			label: "SQL / PGDOG",
 			meta: "local pooled DB route",
 			componentId: `pgdog:${region.id}`,
 			x: right,

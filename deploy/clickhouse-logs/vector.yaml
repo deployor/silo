@@ -1,7 +1,18 @@
 data_dir: /var/lib/vector
 
 sources:
+  # Keep this source ID stable: its checkpoint is the existing local-delivery
+  # checkpoint from before the pipelines were isolated.
   docker_json:
+    type: file
+    include:
+      - /var/lib/docker/containers/*/*.log
+    read_from: end
+    ignore_older_secs: 86400
+
+  # A separate source gives remote delivery its own checkpoint and backpressure
+  # boundary. A full/unavailable remote sink cannot pause local ingestion.
+  docker_json_remote:
     type: file
     include:
       - /var/lib/docker/containers/*/*.log
@@ -17,6 +28,47 @@ transforms:
   access_requests:
     type: remap
     inputs: [silo_request_candidates]
+    drop_on_abort: true
+    source: |-
+      outer = parse_json!(string!(.message))
+      event = object!(parse_json!(strip_whitespace(string!(outer.log))))
+      if exists(event.fields) {
+        event = merge(event, object!(event.fields), deep: true)
+      }
+      if event.event != "silo.request" {
+        abort
+      }
+      parsed_event_time = parse_timestamp!(string!(event.event_time), format: "%+")
+      . = {
+        "event_time": format_timestamp!(parsed_event_time, format: "%Y-%m-%d %H:%M:%S.%3f"),
+        "request_id": string!(event.request_id),
+        "region": string(event.region) ?? "unknown",
+        "service": string(event.service) ?? "unknown",
+        "instance": string(event.instance) ?? "unknown",
+        "storage_region": string(event.storage_region) ?? "",
+        "action": string(event.action) ?? "",
+        "bucket_id": string(event.bucket_id) ?? "",
+        "bucket_name": string(event.bucket_name) ?? "",
+        "owner_id": string(event.owner_id) ?? "",
+        "requester_id": string(event.requester_id) ?? "",
+        "method": string!(event.method),
+        "path": string!(event.path),
+        "status_code": to_int!(event.status_code),
+        "ingress_bytes": to_int(event.ingress_bytes) ?? 0,
+        "egress_bytes": to_int(event.egress_bytes) ?? 0,
+        "latency_ms": to_int(event.latency_ms) ?? 0,
+        "ip_address": string(event.ip_address) ?? "",
+        "user_agent": string(event.user_agent) ?? ""
+      }
+
+  silo_request_candidates_remote:
+    type: filter
+    inputs: [docker_json_remote]
+    condition: contains(string!(.message), "silo.request")
+
+  access_requests_remote:
+    type: remap
+    inputs: [silo_request_candidates_remote]
     drop_on_abort: true
     source: |-
       outer = parse_json!(string!(.message))
@@ -78,7 +130,7 @@ sinks:
 
   clickhouse_remote:
     type: clickhouse
-    inputs: [access_requests]
+    inputs: [access_requests_remote]
     endpoint: ${CLICKHOUSE_REMOTE_URL}
     database: silo_logs
     table: request_logs

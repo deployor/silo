@@ -92,6 +92,29 @@ services:
     volumes:
       - ./backup-loop.sh:/backup/backup-loop.sh:ro
 
+  clickhouse-backup-retention:
+    image: rclone/rclone:1.75.0@sha256:b06aed988cf5967de7c25be5925240983981c757f4ed1ac9d2fa659d51d60548
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      SILO_REGION: ${SILO_REGION}
+      CLICKHOUSE_BACKUP_RETENTION_COUNT: ${CLICKHOUSE_BACKUP_RETENTION_COUNT:-28}
+      CLICKHOUSE_BACKUP_RETENTION_INTERVAL_SECONDS: ${CLICKHOUSE_BACKUP_RETENTION_INTERVAL_SECONDS:-21600}
+      CLICKHOUSE_BACKUP_RETENTION_INITIAL_DELAY_SECONDS: ${CLICKHOUSE_BACKUP_RETENTION_INITIAL_DELAY_SECONDS:-30}
+      CLICKHOUSE_BACKUP_EU_URL: ${CLICKHOUSE_BACKUP_EU_URL}
+      CLICKHOUSE_BACKUP_EU_KEY_ID: ${CLICKHOUSE_BACKUP_EU_KEY_ID}
+      CLICKHOUSE_BACKUP_EU_KEY_SECRET: ${CLICKHOUSE_BACKUP_EU_KEY_SECRET}
+      CLICKHOUSE_BACKUP_US_URL: ${CLICKHOUSE_BACKUP_US_URL}
+      CLICKHOUSE_BACKUP_US_KEY_ID: ${CLICKHOUSE_BACKUP_US_KEY_ID}
+      CLICKHOUSE_BACKUP_US_KEY_SECRET: ${CLICKHOUSE_BACKUP_US_KEY_SECRET}
+    entrypoint: [/bin/sh, /retention/backup-retention-loop.sh]
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - ./backup-retention-loop.sh:/retention/backup-retention-loop.sh:ro
+
 volumes:
   clickhouse-data:
   clickhouse-logs:

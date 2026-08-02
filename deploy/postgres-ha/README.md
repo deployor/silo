@@ -5,11 +5,10 @@ the two Silo failure domains:
 
 - Germany starts as the primary.
 - US East is a physical hot standby with a permanent replication slot.
-- PgDog runs locally in both regions and is the only application database
+- PgDog v0.1.51 runs locally in both regions and is the only application database
   endpoint (`silo-db-eu:6432` or `silo-db-us:6432`).
-- Both PgDog nodes monitor both PostgreSQL nodes with `role = "auto"`, one-second
-  LSN checks, transaction pooling, prepared statements, health checks, and
-  OpenMetrics.
+- Both PgDog nodes monitor both PostgreSQL nodes with automatic role discovery,
+  one-second LSN checks, bounded transaction pools, SCRAM, and health checks.
 - The Cloudflare status Worker is the failover controller. PgDog never promotes
   PostgreSQL by itself.
 - WAL and full/differential backups are encrypted client-side by pgBackRest and
@@ -44,14 +43,15 @@ US DATABASE_URL=postgres://silo_app:...@silo-db-us:6432/silo?sslmode=disable
 ```
 
 The connection is plaintext only inside Docker's `dokploy-network`. PgDog uses
-TLS 1.3 with full certificate verification for every PostgreSQL connection.
+TLS with CA verification for every PostgreSQL connection.
 Raw PostgreSQL port 25432 must allow only the other regional server and the
 Cloudflare Tunnel/VPC path. Do not expose PgDog port 6432 publicly.
 
 Keep the application pools small even though PgDog can accept many clients.
 The shipped Silo settings use 2 Bun connections, 3 ordinary Rust connections,
-and 2 Rust writer-fence connections per process. PgDog multiplexes these onto a
-24-connection backend pool while leaving PostgreSQL maintenance headroom.
+and 2 Rust writer-fence connections per process. Each regional PgDog instance
+multiplexes them onto at most 12 connections per backend, keeps one warm, and
+randomizes six-hour connection recycling to avoid synchronized reconnects.
 
 ## Deployment order
 

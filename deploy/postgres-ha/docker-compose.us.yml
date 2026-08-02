@@ -40,8 +40,8 @@ services:
     entrypoint: ["/usr/local/bin/silo-standby-entrypoint"]
     environment:
       PGDATA: /var/lib/postgresql/data
-      PRIMARY_DATABASE_HOST: ${PGDOG_EU_HOST:-db-eu.onsilo.dev}
-      PRIMARY_DATABASE_PORT: ${PGDOG_EU_PORT:-25432}
+      PRIMARY_DATABASE_HOST: ${POSTGRES_EU_HOST:-db-eu.onsilo.dev}
+      PRIMARY_DATABASE_PORT: ${POSTGRES_EU_PORT:-25432}
       POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER:-silo_replicator}
       POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:?set POSTGRES_REPLICATION_PASSWORD}
       POSTGRES_REPLICATION_SLOT: silo_us
@@ -124,7 +124,7 @@ services:
       - dokploy-network
 
   pgdog-config:
-    image: ${SILO_POSTGRES_IMAGE:?set SILO_POSTGRES_IMAGE}
+    image: ghcr.io/deployor/silo-postgres:sha-60851afcb2f13b2e2be7c6b555883aaa36571d13@sha256:27cf0095ba69fc60e01eb1f38151a2539da5a78202b3d09ea242ec57a95082b4
     restart: "no"
     user: root
     entrypoint: ["/usr/local/bin/silo-pgdog-configure"]
@@ -138,13 +138,17 @@ services:
       PGDOG_US_HOST: postgres
       PGDOG_US_PORT: "5432"
       PGDOG_WORKERS: ${PGDOG_WORKERS:-4}
-      PGDOG_POOL_SIZE: ${PGDOG_POOL_SIZE:-24}
-      PGDOG_MIN_POOL_SIZE: ${PGDOG_MIN_POOL_SIZE:-2}
+      PGDOG_POOL_SIZE: ${PGDOG_POOL_SIZE:-12}
+      PGDOG_MIN_POOL_SIZE: ${PGDOG_MIN_POOL_SIZE:-1}
     volumes: [pgdog-config:/config]
 
   pgdog:
-    image: ghcr.io/pgdogdev/pgdog:v0.1.48@sha256:c8d900deea2f760b5b9711d2582e8bfdf64caa45d42ad3683567e90efc3bf646
+    image: ghcr.io/pgdogdev/pgdog:v0.1.51@sha256:c775624370861fd2b68d5b0affe95903132efd982cf98da3aceb2244706597ca
     restart: unless-stopped
+    user: "65532:65532"
+    read_only: true
+    init: true
+    stop_grace_period: 30s
     security_opt: [no-new-privileges:true]
     command: ["/usr/local/bin/pgdog", "--config", "/config/pgdog.toml", "--users", "/config/users.toml"]
     depends_on:
@@ -159,6 +163,10 @@ services:
     volumes:
       - pgdog-config:/config:ro
       - postgres-tls:/tls:ro
+    tmpfs:
+      - /tmp:size=64m,mode=1777,uid=65532,gid=65532
+    ulimits:
+      nofile: {soft: 65536, hard: 65536}
     networks:
       db-private: null
       dokploy-network:

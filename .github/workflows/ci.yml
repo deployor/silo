@@ -141,7 +141,7 @@ jobs:
           docker run --rm \
             -v "$config_dir:/config:ro" \
             -v "$config_dir:/tls:ro" \
-            ghcr.io/pgdogdev/pgdog:v0.1.48@sha256:c8d900deea2f760b5b9711d2582e8bfdf64caa45d42ad3683567e90efc3bf646 \
+            ghcr.io/pgdogdev/pgdog:v0.1.51@sha256:c775624370861fd2b68d5b0affe95903132efd982cf98da3aceb2244706597ca \
             pgdog -c /config/pgdog.toml -u /config/users.toml configcheck
 
   clickhouse-log-plane:

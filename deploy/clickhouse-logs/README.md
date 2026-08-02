@@ -5,10 +5,12 @@ append-only access telemetry in two independent ClickHouse nodes. One copy runs
 in `eu-central`; the other runs in `us-east`.
 
 Each regional Vector collector tails structured `silo.request` events from the
-local Docker log files and sends every event to both ClickHouse nodes. Both
-sinks have independent 10 GiB disk buffers and retry indefinitely. A request
-never waits for Vector or ClickHouse. `request_id` is immutable and the
-`ReplacingMergeTree` removes retry duplicates.
+local Docker log files and sends every event to both ClickHouse nodes. Local
+and remote delivery use separate file checkpoints and separate 10 GiB disk
+buffers, so a full or unavailable remote destination cannot backpressure the
+healthy local pipeline. Both retry indefinitely. A request never waits for
+Vector or ClickHouse. `request_id` is immutable and the `ReplacingMergeTree`
+removes retry duplicates.
 
 This intentionally does not use a two-member ClickHouse Keeper cluster. Two
 consensus voters cannot safely elect a primary after a network partition.
@@ -63,6 +65,11 @@ the read-only query credential.
 Backups need dedicated B2 application keys limited to the configured backup
 prefixes. Do not reuse object-serving keys after rollout. Each node backs up to
 both `CLICKHOUSE_BACKUP_EU_URL` and `CLICKHOUSE_BACKUP_US_URL` every six hours.
+Each B2 repository retains up to the newest 28 snapshots from each regional
+node (seven days at the default interval). Therefore each repository contains
+at most 56 archives across EU and US. Set `CLICKHOUSE_BACKUP_RETENTION_COUNT`
+to change the per-region cap. The backup keys require list and delete access to
+their dedicated prefixes so the retention sidecar can enforce the limit.
 
 ## Rollout order
 
@@ -87,11 +94,12 @@ counts, byte sums, and both ClickHouse replicas.
 ## Failure behavior
 
 - **One ClickHouse node fails:** local S3 traffic and the surviving log query
-  endpoint continue. Both collectors buffer the failed sink independently.
+  endpoint continue. Both collectors buffer the failed sink independently;
+  local ClickHouse ingestion continues even if that remote buffer fills.
 - **One entire Silo region fails:** requests served by the surviving dataplane
   are still delivered locally and buffered for the failed region.
-- **A collector restarts:** its checkpoints and sink buffers live in the
-  persistent `vector-data` volume.
+- **A collector restarts:** both independent checkpoints and sink buffers live
+  in the persistent `vector-data` volume.
 - **Both ClickHouse nodes fail:** S3 continues. Collectors buffer until their
   bounded disks fill; status reports an outage. Correctness/accounting remains
   in PostgreSQL and its durable dataplane spool.

@@ -179,10 +179,15 @@ type ComponentDefinition = {
 
 const STATE_ID = "regional-v1";
 const FAILURE_THRESHOLD = 5;
+// A single failed probe remains visible in component uptime, but it is not
+// enough evidence to publish an incident. This filters isolated network and
+// canary failures without delaying the five-round failover safety gate.
+const INCIDENT_THRESHOLD = 2;
 const RECOVERY_THRESHOLD = 10;
 const RECOVERY_STABILITY_MS = 10 * 60_000;
 const DNS_GRACE_MS = 10 * 60_000;
 const CHECK_TIMEOUT_MS = 12_000;
+const SNAPSHOT_TIMEOUT_MS = 55_000;
 const MUTATION_TIMEOUT_MS = 60_000;
 const MONITOR_LEASE_MS = 4 * 60_000;
 const AUTHORIZATION_POLL_MS = 2_000;
@@ -256,7 +261,11 @@ async function runMonitor(env: Env): Promise<void> {
 		const plannedMaintenance = Boolean(
 			state.productionMaintenance || (await getActiveMaintenance(env)),
 		);
-		const snapshot = await takeSnapshot(env, registry, state);
+		const snapshot = await withDeadline(
+			takeSnapshot(env, registry, state),
+			SNAPSHOT_TIMEOUT_MS,
+			"regional monitor snapshot timed out",
+		);
 		try {
 			await processDatabaseHealth(env, state, snapshot);
 		} catch (error) {
@@ -326,7 +335,7 @@ async function runMonitor(env: Env): Promise<void> {
 		if (
 			allNormal &&
 			state.overall === "operational" &&
-			state.activeIncidentId
+			(state.activeIncidentId || (await hasOpenIncident(env)))
 		) {
 			await resolveIncident(
 				env,
@@ -684,18 +693,19 @@ async function processDataplaneHealth(
 	runtime.consecutiveFailures += 1;
 	if (runtime.consecutiveFailures === 1) {
 		runtime.phase = "investigating";
-		await ensureIncident(
-			env,
-			state,
-			`${region.flag} ${region.label} dataplane failed its first complete protected check. Traffic has not moved.`,
-			`${region.label} dataplane disruption`,
-		);
 		await notifyMaintainers(
 			env,
 			"regional_investigating",
 			`${region.id} failed its first complete dataplane check.`,
 		);
 	}
+	if (runtime.consecutiveFailures === INCIDENT_THRESHOLD)
+		await ensureIncident(
+			env,
+			state,
+			`${region.flag} ${region.label} dataplane failed ${INCIDENT_THRESHOLD} consecutive complete protected checks. Traffic has not moved.`,
+			`${region.label} dataplane disruption`,
+		);
 	if (runtime.consecutiveFailures < FAILURE_THRESHOLD) return;
 	if (!activeBackendHealthy) {
 		runtime.phase = "blocked";
@@ -759,10 +769,12 @@ async function processProviderHealth(
 	const failures = runtime.backendFailures[runtime.activeBackend];
 	if (failures === 1) {
 		runtime.providerPhase = "investigating";
+	}
+	if (failures === INCIDENT_THRESHOLD) {
 		await ensureIncident(
 			env,
 			state,
-			`${region.flag} ${region.label} active physical backend ${runtime.activeBackend} failed its first direct signed canary.`,
+			`${region.flag} ${region.label} active physical backend ${runtime.activeBackend} failed ${INCIDENT_THRESHOLD} consecutive direct signed canaries.`,
 			`${region.label} storage disruption`,
 		);
 	}
@@ -988,18 +1000,22 @@ async function takeSnapshot(
 		DATABASE_EU?: Hyperdrive;
 		DATABASE_US?: Hyperdrive;
 	};
-	const database =
+	const databasePromise =
 		databaseEnv.DATABASE_EU && databaseEnv.DATABASE_US
-			? (Object.fromEntries(
-					await Promise.all([
-						probeDatabase("eu-central", databaseEnv.DATABASE_EU).then(
-							(probe) => ["eu-central", probe] as const,
-						),
-						probeDatabase("us-east", databaseEnv.DATABASE_US).then(
-							(probe) => ["us-east", probe] as const,
-						),
-					]),
-				) as Record<"eu-central" | "us-east", DatabaseProbe>)
+			? Promise.all([
+					probeDatabase("eu-central", databaseEnv.DATABASE_EU).then(
+						(probe) => ["eu-central", probe] as const,
+					),
+					probeDatabase("us-east", databaseEnv.DATABASE_US).then(
+						(probe) => ["us-east", probe] as const,
+					),
+				]).then(
+					(entries) =>
+						Object.fromEntries(entries) as Record<
+							"eu-central" | "us-east",
+							DatabaseProbe
+						>,
+				)
 			: undefined;
 	const clickhouseEnv = env as Env & {
 		CLICKHOUSE_EU_HEALTH_URL?: string;
@@ -1007,11 +1023,11 @@ async function takeSnapshot(
 		CLICKHOUSE_QUERY_USER?: string;
 		CLICKHOUSE_QUERY_PASSWORD?: string;
 	};
-	const clickhouse =
+	const clickhousePromise =
 		clickhouseEnv.CLICKHOUSE_EU_HEALTH_URL &&
 		clickhouseEnv.CLICKHOUSE_US_HEALTH_URL &&
 		clickhouseEnv.CLICKHOUSE_QUERY_PASSWORD
-			? await Promise.all([
+			? Promise.all([
 					probeClickHouse(
 						clickhouseEnv.CLICKHOUSE_EU_HEALTH_URL,
 						clickhouseEnv.CLICKHOUSE_QUERY_USER || "silo_query",
@@ -1030,7 +1046,7 @@ async function takeSnapshot(
 						>,
 				)
 			: undefined;
-	const dataplaneEntries = await Promise.all(
+	const dataplaneEntriesPromise = Promise.all(
 		registry.map(async (region) => {
 			const [health, readiness] = await Promise.all([
 				ok(`${region.origin}/health`),
@@ -1042,9 +1058,8 @@ async function takeSnapshot(
 			] as const;
 		}),
 	);
-	const dataplanes = Object.fromEntries(dataplaneEntries);
 	const secrets = canarySecrets(env);
-	const backendEntries = await Promise.all(
+	const backendEntriesPromise = Promise.all(
 		registry.map(async (region) => {
 			const probes = await Promise.all(
 				region.backends.map(async (backend) => {
@@ -1066,8 +1081,7 @@ async function takeSnapshot(
 			return [region.id, Object.fromEntries(probes)] as const;
 		}),
 	);
-	const backends = Object.fromEntries(backendEntries);
-	const logicalEntries = await Promise.all(
+	const logicalEntriesPromise = Promise.all(
 		registry.map(async (region) => {
 			const credential = secrets.logical[region.id];
 			const servingRegion = state.regions[region.id].activeDataplane;
@@ -1080,7 +1094,7 @@ async function takeSnapshot(
 			return [region.id, checks] as const;
 		}),
 	);
-	const readEntries = await Promise.all(
+	const readEntriesPromise = Promise.all(
 		registry.map(async (region) => {
 			const credential = secrets.logical[region.id];
 			return [
@@ -1089,12 +1103,29 @@ async function takeSnapshot(
 			] as const;
 		}),
 	);
-	return {
-		dashboard: await ok(env.DASHBOARD_HEALTH_URL),
+	const [
+		dashboard,
 		database,
 		clickhouse,
-		dataplanes,
-		backends,
+		dataplaneEntries,
+		backendEntries,
+		logicalEntries,
+		readEntries,
+	] = await Promise.all([
+		ok(env.DASHBOARD_HEALTH_URL),
+		databasePromise,
+		clickhousePromise,
+		dataplaneEntriesPromise,
+		backendEntriesPromise,
+		logicalEntriesPromise,
+		readEntriesPromise,
+	]);
+	return {
+		dashboard,
+		database,
+		clickhouse,
+		dataplanes: Object.fromEntries(dataplaneEntries),
+		backends: Object.fromEntries(backendEntries),
 		logical: Object.fromEntries(logicalEntries),
 		homeReadOnly: Object.fromEntries(readEntries),
 	};
@@ -1174,7 +1205,7 @@ function deriveComponents(
 		const runtime = state.regions[region.id];
 		const homeProbe = snapshot.dataplanes[region.id];
 		const servingProbe = snapshot.dataplanes[runtime.activeDataplane];
-		const pgDogReachable = homeProbe?.readiness.postgres;
+		const pgdogReachable = homeProbe?.readiness.postgres;
 		const diskCache = homeProbe?.readiness.diskCache;
 		const postgresProbe = snapshot.database?.[region.id];
 		const clickHouseProbe = snapshot.clickhouse?.[region.id];
@@ -1182,9 +1213,9 @@ function deriveComponents(
 			? "operational"
 			: "outage";
 		components[`pgdog:${region.id}`] =
-			pgDogReachable === undefined
+			pgdogReachable === undefined
 				? "unknown"
-				: pgDogReachable
+				: pgdogReachable
 					? "operational"
 					: "outage";
 		components[`postgresql:${region.id}`] = !postgresProbe
@@ -3240,6 +3271,14 @@ async function ensureIncident(
 		await addUpdate(env, state, "investigating", message);
 		return;
 	}
+	const existing = await env.DB.prepare(
+		"SELECT id FROM incidents WHERE status = 'open' ORDER BY datetime(started_at) DESC LIMIT 1",
+	).first<{ id: string }>();
+	if (existing?.id) {
+		state.activeIncidentId = existing.id;
+		await addUpdate(env, state, "investigating", message);
+		return;
+	}
 	const id = crypto.randomUUID();
 	state.activeIncidentId = id;
 	await env.DB.prepare(
@@ -3267,14 +3306,22 @@ async function resolveIncident(
 	state: StatusState,
 	message: string,
 ): Promise<void> {
-	await addUpdate(env, state, "resolved", message);
-	if (state.activeIncidentId)
-		await env.DB.prepare(
-			"UPDATE incidents SET status = 'resolved', resolved_at = ? WHERE id = ?",
-		)
-			.bind(new Date().toISOString(), state.activeIncidentId)
-			.run();
+	const now = new Date().toISOString();
+	await env.DB.batch([
+		env.DB.prepare(
+			"INSERT INTO incident_updates (incident_id, status, message, created_at) SELECT id, 'resolved', ?, ? FROM incidents WHERE status = 'open'",
+		).bind(message, now),
+		env.DB.prepare(
+			"UPDATE incidents SET status = 'resolved', resolved_at = ? WHERE status = 'open'",
+		).bind(now),
+	]);
 	state.activeIncidentId = undefined;
+}
+async function hasOpenIncident(env: Env): Promise<boolean> {
+	const row = await env.DB.prepare(
+		"SELECT 1 AS present FROM incidents WHERE status = 'open' LIMIT 1",
+	).first<{ present: number }>();
+	return row?.present === 1;
 }
 async function notifyMaintainers(
 	env: Env,
@@ -3366,6 +3413,23 @@ async function fetchWithDeadline(
 		return await fetch(input, { ...init, signal: controller.signal });
 	} finally {
 		clearTimeout(timer);
+	}
+}
+async function withDeadline<T>(
+	promise: Promise<T>,
+	timeoutMs: number,
+	message: string,
+): Promise<T> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			promise,
+			new Promise<never>((_, reject) => {
+				timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+			}),
+		]);
+	} finally {
+		if (timer) clearTimeout(timer);
 	}
 }
 async function sleep(milliseconds: number): Promise<void> {
@@ -3658,4 +3722,5 @@ export const __test = {
 	chooseBackendCandidate,
 	deriveComponents,
 	deriveOverall,
+	incidentConfirmed: (failures: number) => failures >= INCIDENT_THRESHOLD,
 };
